@@ -1,0 +1,9 @@
+*.pyc
+__pycache__/
+*.xlsx
+*.csv
+!data/车企天线数据需求.csv
+!data/template_5G1.xlsx
+.env
+.venv/
+venv/
