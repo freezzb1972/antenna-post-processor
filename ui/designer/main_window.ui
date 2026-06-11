@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1050</width><height>700</height></rect>
+  </property>
+  <property name="minimumSize">
+   <size><width>850</width><height>600</height></size>
+  </property>
+  <property name="windowTitle">
+   <string>天线参数后处理工具 — Antenna Post-Processor</string>
+  </property>
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QVBoxLayout" name="rootVBox">
+    <property name="spacing"><number>6</number></property>
+    <property name="leftMargin"><number>12</number></property>
+    <property name="topMargin"><number>8</number></property>
+    <property name="rightMargin"><number>12</number></property>
+    <property name="bottomMargin"><number>8</number></property>
+
+    <item>
+     <!-- ====== 顶部工具栏 ====== -->
+     <layout class="QHBoxLayout" name="toolbarLayout">
+      <item><widget class="QLabel" name="lblAppTitle"><property name="text"><string>📡 天线参数后处理工具</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+      <item><spacer name="toolbarSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+      <item><widget class="QPushButton" name="btnLangToggle"><property name="text"><string>EN</string></property><property name="toolTip"><string>Switch Language / 切换语言</string></property><property name="minimumSize"><size><width>48</width><height>30</height></size></property></widget></item>
+     </layout>
+    </item>
+
+    <item>
+     <!-- ====== 配置 TabWidget ====== -->
+     <widget class="QTabWidget" name="tabConfig">
+      <property name="currentIndex"><number>0</number></property>
+
+      <!-- Tab 0: 文件设置 -->
+      <widget class="QWidget" name="tabFile">
+       <attribute name="title"><string>📂 文件设置</string></attribute>
+       <layout class="QVBoxLayout" name="vTabFile"><property name="spacing"><number>10</number></property>
+        <item>
+         <widget class="QGroupBox" name="groupInput">
+          <property name="title"><string>输入</string></property>
+          <layout class="QFormLayout" name="formInput"><property name="spacing"><number>8</number></property>
+           <item row="0"><widget class="QLabel" name="lblCsv"><property name="text"><string>EMQuest CSV：</string></property></widget></item>
+           <item row="0"><layout class="QHBoxLayout"><item><widget class="QLineEdit" name="editCsvPath"><property name="placeholderText"><string>选择 *_merged.csv ...</string></property></widget></item><item><widget class="QPushButton" name="btnBrowseCsv"><property name="text"><string>浏览...</string></property></widget></item></layout></item>
+           <item row="1"><widget class="QLabel" name="lblTemplate"><property name="text"><string>模板 Excel：</string></property></widget></item>
+           <item row="1"><layout class="QHBoxLayout"><item><widget class="QLineEdit" name="editTemplatePath"><property name="placeholderText"><string>选择模板 .xlsx ...</string></property></widget></item><item><widget class="QPushButton" name="btnBrowseTemplate"><property name="text"><string>浏览...</string></property></widget></item></layout></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="groupOutput">
+          <property name="title"><string>输出</string></property>
+          <layout class="QFormLayout" name="formOutput"><property name="spacing"><number>8</number></property>
+           <item row="0"><widget class="QLabel" name="lblOutputDir"><property name="text"><string>输出目录：</string></property></widget></item>
+           <item row="0"><layout class="QHBoxLayout"><item><widget class="QLineEdit" name="editOutputDir"><property name="placeholderText"><string>默认: ./output</string></property></widget></item><item><widget class="QPushButton" name="btnBrowseOutput"><property name="text"><string>浏览...</string></property></widget></item></layout></item>
+           <item row="1"><widget class="QLabel" name="lblOutputName"><property name="text"><string>文件名：</string></property></widget></item>
+           <item row="1"><widget class="QLineEdit" name="editOutputName"><property name="text"><string>antenna_report.xlsx</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item><spacer name="spFile"><property name="orientation"><enum>Qt::Vertical</enum></property></spacer></item>
+       </layout>
+      </widget>
+
+      <!-- Tab 1: LAG 配置 -->
+      <widget class="QWidget" name="tabLag">
+       <attribute name="title"><string>📐 LAG 配置</string></attribute>
+       <layout class="QVBoxLayout" name="vTabLag"><property name="spacing"><number>10</number></property>
+        <item>
+         <widget class="QGroupBox" name="groupQuickSingle">
+          <property name="title"><string>快捷单角度（点击切换）</string></property>
+          <layout class="QHBoxLayout" name="hQuickSingle">
+           <item><widget class="QPushButton" name="btnQuick0"><property name="text"><string>0°</string></property><property name="checkable"><bool>true</bool></property></widget></item>
+           <item><widget class="QPushButton" name="btnQuick30"><property name="text"><string>30°</string></property><property name="checkable"><bool>true</bool></property></widget></item>
+           <item><widget class="QPushButton" name="btnQuick60"><property name="text"><string>60°</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item>
+           <item><widget class="QPushButton" name="btnQuick70"><property name="text"><string>70°</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item>
+           <item><widget class="QPushButton" name="btnQuick80"><property name="text"><string>80°</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item>
+           <item><widget class="QPushButton" name="btnQuick90"><property name="text"><string>90°</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item>
+           <item><spacer name="spQuick"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+           <item><widget class="QLabel" name="lblCustomAngle"><property name="text"><string>自定义：</string></property></widget></item>
+           <item><widget class="QDoubleSpinBox" name="spinCustomAngle"><property name="value"><double>0.00</double></property><property name="maximum"><double>180.00</double></property><property name="suffix"><string>°</string></property></widget></item>
+           <item><widget class="QPushButton" name="btnAddCustomAngle"><property name="text"><string>+</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="groupStepGen">
+          <property name="title"><string>步进批量生成</string></property>
+          <layout class="QHBoxLayout" name="hStepGen">
+           <item><widget class="QLabel" name="lblStepStart"><property name="text"><string>起始：</string></property></widget></item>
+           <item><widget class="QDoubleSpinBox" name="spinStepStart"><property name="value"><double>0.00</double></property><property name="maximum"><double>180.00</double></property><property name="suffix"><string>°</string></property></widget></item>
+           <item><widget class="QLabel" name="lblStepEnd"><property name="text"><string>结束：</string></property></widget></item>
+           <item><widget class="QDoubleSpinBox" name="spinStepEnd"><property name="value"><double>90.00</double></property><property name="maximum"><double>180.00</double></property><property name="suffix"><string>°</string></property></widget></item>
+           <item><widget class="QLabel" name="lblStepBy"><property name="text"><string>步进：</string></property></widget></item>
+           <item><widget class="QDoubleSpinBox" name="spinStepBy"><property name="value"><double>10.00</double></property><property name="minimum"><double>0.50</double></property><property name="maximum"><double>90.00</double></property><property name="suffix"><string>°</string></property></widget></item>
+           <item><widget class="QPushButton" name="btnStepGenerate"><property name="text"><string>生成 &gt;&gt;</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="groupRange">
+          <property name="title"><string>添加角度范围 LAG（取范围内所有 θ 的 LAG 均值）</string></property>
+          <layout class="QHBoxLayout" name="hRange">
+           <item><widget class="QLabel" name="lblRStart"><property name="text"><string>起始：</string></property></widget></item>
+           <item><widget class="QDoubleSpinBox" name="spinRStart"><property name="value"><double>0.00</double></property><property name="maximum"><double>180.00</double></property><property name="suffix"><string>°</string></property></widget></item>
+           <item><widget class="QLabel" name="lblREnd"><property name="text"><string>结束：</string></property></widget></item>
+           <item><widget class="QDoubleSpinBox" name="spinREnd"><property name="value"><double>90.00</double></property><property name="maximum"><double>180.00</double></property><property name="suffix"><string>°</string></property></widget></item>
+           <item><widget class="QPushButton" name="btnAddRange"><property name="text"><string>添加范围</string></property></widget></item>
+           <item><spacer name="spRange"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="groupConfigured">
+          <property name="title"><string>已配置项</string></property>
+          <layout class="QVBoxLayout" name="vConfigured"><property name="spacing"><number>6</number></property>
+           <item><widget class="QLabel" name="lblConfigSingles"><property name="text"><string>单角度：60°, 70°, 80°, 90°</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+           <item><widget class="QLabel" name="lblConfigRanges"><property name="text"><string>角度范围：(0-90°), (60-90°)</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+           <item><layout class="QHBoxLayout" name="hConfigButtons">
+            <item><widget class="QPushButton" name="btnLoadFromTemplate"><property name="text"><string>📥 从模板加载</string></property></widget></item>
+            <item><widget class="QPushButton" name="btnClearConfig"><property name="text"><string>🗑 清空</string></property></widget></item>
+            <item><widget class="QPushButton" name="btnSavePreset"><property name="text"><string>💾 保存预设</string></property></widget></item>
+            <item><widget class="QPushButton" name="btnLoadPreset"><property name="text"><string>📂 加载预设</string></property></widget></item>
+            <item><spacer name="spConfig"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+           </layout></item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+
+      <!-- Tab 2: 图形设置 -->
+      <widget class="QWidget" name="tabPlot">
+       <attribute name="title"><string>📊 3D 图形</string></attribute>
+       <layout class="QVBoxLayout" name="vTabPlot"><property name="spacing"><number>10</number></property>
+        <item>
+         <widget class="QGroupBox" name="groupGenImg">
+          <property name="title"><string>生成选项</string></property>
+          <layout class="QVBoxLayout"><property name="spacing"><number>4</number></property>
+           <item><widget class="QCheckBox" name="checkEmbedExcel"><property name="text"><string>嵌入 Excel 工作表</string></property><property name="checked"><bool>true</bool></property></widget></item>
+           <item><widget class="QCheckBox" name="checkSavePng"><property name="text"><string>单独保存 PNG 文件（到输出目录下的 png/ 文件夹）</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="groupView">
+          <property name="title"><string>3D 视角设置</string></property>
+          <layout class="QFormLayout" name="formView"><property name="spacing"><number>8</number></property>
+           <item row="0"><widget class="QLabel" name="lblElev"><property name="text"><string>仰角 Elevation：</string></property></widget></item>
+           <item row="0"><widget class="QDoubleSpinBox" name="spinElev"><property name="value"><double>30.00</double></property><property name="minimum"><double>-90.00</double></property><property name="maximum"><double>90.00</double></property><property name="suffix"><string>°</string></property></widget></item>
+           <item row="1"><widget class="QLabel" name="lblAzim"><property name="text"><string>方位角 Azimuth：</string></property></widget></item>
+           <item row="1"><widget class="QDoubleSpinBox" name="spinAzim"><property name="value"><double>-60.00</double></property><property name="minimum"><double>-180.00</double></property><property name="maximum"><double>180.00</double></property><property name="suffix"><string>°</string></property></widget></item>
+           <item row="2"><widget class="QLabel" name="lblDpi"><property name="text"><string>分辨率 DPI：</string></property></widget></item>
+           <item row="2"><widget class="QSpinBox" name="spinDpi"><property name="value"><number>150</number></property><property name="minimum"><number>72</number></property><property name="maximum"><number>300</number></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item><spacer name="spPlot"><property name="orientation"><enum>Qt::Vertical</enum></property></spacer></item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+
+    <!-- ====== 进度区 ====== -->
+    <item>
+     <layout class="QHBoxLayout" name="hProgress">
+      <item><widget class="QProgressBar" name="progressBar"><property name="value"><number>0</number></property><property name="maximum"><number>100</number></property><property name="format"><string>%p%</string></property></widget></item>
+      <item><widget class="QLabel" name="lblProgressMsg"><property name="text"><string>就绪</string></property><property name="minimumSize"><size><width>320</width><height>0</height></size></property></widget></item>
+     </layout>
+    </item>
+
+    <!-- ====== 日志输出 ====== -->
+    <item>
+     <widget class="QTextEdit" name="logOutput">
+      <property name="readOnly"><bool>true</bool></property>
+      <property name="maximumBlockCount"><number>5000</number></property>
+      <property name="placeholderText"><string>处理日志将在此显示...</string></property>
+     </widget>
+    </item>
+
+    <!-- ====== 操作按钮 ====== -->
+    <item>
+     <layout class="QHBoxLayout" name="hButtons">
+      <item><spacer name="spBtnLeft"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+      <item><widget class="QPushButton" name="btnStart"><property name="text"><string>▶ 开始处理</string></property><property name="minimumSize"><size><width>140</width><height>36</height></size></property><property name="styleSheet"><string>font-weight: bold; font-size: 14px;</string></property></widget></item>
+      <item><widget class="QPushButton" name="btnStop"><property name="text"><string>⏹ 停止</string></property><property name="minimumSize"><size><width>100</width><height>36</height></size></property><property name="enabled"><bool>false</bool></property></widget></item>
+     </layout>
+    </item>
+
+    <!-- ====== 状态栏 ====== -->
+    <item>
+     <widget class="QStatusBar" name="statusBar">
+      <property name="sizeGripEnabled"><bool>false</bool></property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+</ui>

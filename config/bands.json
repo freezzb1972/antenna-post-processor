@@ -1,0 +1,34 @@
+{
+  "description": "天线频段分配配置 — 定义每个 Sheet 包含的频点范围",
+  "sheets": {
+    "5G1": {
+      "description": "5G1 天线",
+      "freq_min_mhz": 690,
+      "freq_max_mhz": 5000,
+      "notes": "全频段 690-5000 MHz，约 105 频点"
+    },
+    "5G2": {
+      "description": "5G2 天线",
+      "freq_min_mhz": 690,
+      "freq_max_mhz": 5000,
+      "notes": "全频段 690-5000 MHz，约 105 频点"
+    },
+    "5G3": {
+      "description": "5G3 天线",
+      "freq_min_mhz": 1710,
+      "freq_max_mhz": 5000,
+      "notes": "中高频段 1710-5000 MHz，约 75 频点"
+    },
+    "5G4": {
+      "description": "5G4 天线",
+      "freq_min_mhz": 1710,
+      "freq_max_mhz": 5000,
+      "notes": "中高频段 1710-5000 MHz，约 75 频点"
+    }
+  },
+  "frequency_bands": {
+    "low": { "min_mhz": 690, "max_mhz": 960, "count": 30 },
+    "mid": { "min_mhz": 1710, "max_mhz": 2690, "count": 43 },
+    "high": { "min_mhz": 3300, "max_mhz": 5000, "count": 32 }
+  }
+}
