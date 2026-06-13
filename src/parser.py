@@ -17,7 +17,6 @@ Memory strategy: Build a byte-offset index on first pass, then seek+read
 individual frequency blocks on demand. Peak memory ~1.3 MB per frequency.
 """
 
-import csv
 import os
 from typing import List, Tuple, Optional, Dict
 
@@ -147,7 +146,7 @@ class MergedCSVParser:
     def _build_index(self):
         """Single-pass scan to find section boundaries and frequency blocks."""
         # Detect encoding (UTF-8 with or without BOM)
-        encoding = self._detect_encoding()
+        encoding = self._ENCODING
 
         with open(self.path, "r", encoding=encoding, newline="") as f:
             # We use tell() after each readline to record byte offsets.
@@ -208,7 +207,7 @@ class MergedCSVParser:
         self, offset: int, n_phi: int, n_theta: int
     ) -> List[List[float]]:
         """Read a single frequency block from a given byte offset."""
-        encoding = self._detect_encoding()
+        encoding = self._ENCODING
         with open(self.path, "r", encoding=encoding, newline="") as f:
             f.seek(offset)
 
@@ -242,21 +241,7 @@ class MergedCSVParser:
 
     @staticmethod
     def _is_freq_block_start(line: str) -> bool:
-        """Check if a line starts a frequency block: starts with ',<number>,'."""
-        if not line.startswith(","):
-            return False
-        parts = line.split(",")
-        if len(parts) < 3:
-            return False
-        try:
-            float(parts[1])
-            return "Theta Angle" in line or "Frequency" in parts[1]
-        except (ValueError, IndexError):
-            return False
-
-    @staticmethod
-    def _is_freq_block_start_v2(line: str) -> bool:
-        """More robust check: line starts with ',<digits>,' followed by Theta Angle."""
+        """Check if a line starts a frequency block: starts with ',<digits>,' followed by Theta Angle."""
         if not line.startswith(","):
             return False
         parts = line.split(",")
@@ -268,9 +253,6 @@ class MergedCSVParser:
             return "Theta Angle" in line
         except (ValueError, IndexError):
             return False
-
-    # Override with the more robust version
-    _is_freq_block_start = _is_freq_block_start_v2
 
     @staticmethod
     def _parse_freq_from_line(line: str) -> Optional[float]:
@@ -328,8 +310,4 @@ class MergedCSVParser:
             values.append(0.0)
         return values
 
-    @staticmethod
-    def _detect_encoding(path: str = None) -> str:
-        """Detect file encoding. EMQuest files typically use UTF-8-BOM."""
-        # For our known input, always use utf-8-sig
-        return "utf-8-sig"
+    _ENCODING = "utf-8-sig"  # EMQuest files are UTF-8-BOM

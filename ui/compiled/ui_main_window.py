@@ -15,11 +15,11 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QCheckBox, QDoubleSpinBox, QFormLayout,
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout,
     QGroupBox, QHBoxLayout, QLabel, QLineEdit,
     QMainWindow, QProgressBar, QPushButton, QSizePolicy,
     QSpacerItem, QSpinBox, QStatusBar, QTabWidget,
-    QTextEdit, QVBoxLayout, QWidget)
+    QPlainTextEdit, QVBoxLayout, QWidget)
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -43,6 +43,18 @@ class Ui_MainWindow(object):
         self.toolbarSpacer = QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.toolbarLayout.addItem(self.toolbarSpacer)
+
+        self.lblTheme = QLabel(self.centralWidget)
+        self.lblTheme.setObjectName(u"lblTheme")
+
+        self.toolbarLayout.addWidget(self.lblTheme)
+
+        self.cmbThemeSelector = QComboBox(self.centralWidget)
+        self.cmbThemeSelector.setObjectName(u"cmbThemeSelector")
+        self.cmbThemeSelector.setMinimumSize(QSize(150, 28))
+        self.cmbThemeSelector.setToolTip("")
+
+        self.toolbarLayout.addWidget(self.cmbThemeSelector)
 
         self.btnLangToggle = QPushButton(self.centralWidget)
         self.btnLangToggle.setObjectName(u"btnLangToggle")
@@ -74,8 +86,9 @@ class Ui_MainWindow(object):
         self.hboxLayout.setObjectName(u"hboxLayout")
         self.editCsvPath = QLineEdit(self.groupInput)
         self.editCsvPath.setObjectName(u"editCsvPath")
+        self.editCsvPath.setMinimumWidth(320)
 
-        self.hboxLayout.addWidget(self.editCsvPath)
+        self.hboxLayout.addWidget(self.editCsvPath, 1)
 
         self.btnBrowseCsv = QPushButton(self.groupInput)
         self.btnBrowseCsv.setObjectName(u"btnBrowseCsv")
@@ -94,8 +107,9 @@ class Ui_MainWindow(object):
         self.hboxLayout1.setObjectName(u"hboxLayout1")
         self.editTemplatePath = QLineEdit(self.groupInput)
         self.editTemplatePath.setObjectName(u"editTemplatePath")
+        self.editTemplatePath.setMinimumWidth(320)
 
-        self.hboxLayout1.addWidget(self.editTemplatePath)
+        self.hboxLayout1.addWidget(self.editTemplatePath, 1)
 
         self.btnBrowseTemplate = QPushButton(self.groupInput)
         self.btnBrowseTemplate.setObjectName(u"btnBrowseTemplate")
@@ -122,8 +136,9 @@ class Ui_MainWindow(object):
         self.hboxLayout2.setObjectName(u"hboxLayout2")
         self.editOutputDir = QLineEdit(self.groupOutput)
         self.editOutputDir.setObjectName(u"editOutputDir")
+        self.editOutputDir.setMinimumWidth(320)
 
-        self.hboxLayout2.addWidget(self.editOutputDir)
+        self.hboxLayout2.addWidget(self.editOutputDir, 1)
 
         self.btnBrowseOutput = QPushButton(self.groupOutput)
         self.btnBrowseOutput.setObjectName(u"btnBrowseOutput")
@@ -142,6 +157,32 @@ class Ui_MainWindow(object):
         self.editOutputName.setObjectName(u"editOutputName")
 
         self.formOutput.setWidget(1, QFormLayout.ItemRole.LabelRole, self.editOutputName)
+
+        self.checkFullReport = QCheckBox(self.groupOutput)
+        self.checkFullReport.setObjectName(u"checkFullReport")
+
+        self.formOutput.setWidget(2, QFormLayout.ItemRole.SpanningRole, self.checkFullReport)
+
+        self.lblFullReportPath = QLabel(self.groupOutput)
+        self.lblFullReportPath.setObjectName(u"lblFullReportPath")
+
+        self.formOutput.setWidget(3, QFormLayout.ItemRole.LabelRole, self.lblFullReportPath)
+
+        self.hboxLayout3 = QHBoxLayout()
+        self.hboxLayout3.setObjectName(u"hboxLayout3")
+        self.editFullReportPath = QLineEdit(self.groupOutput)
+        self.editFullReportPath.setObjectName(u"editFullReportPath")
+        self.editFullReportPath.setMinimumWidth(320)
+        self.editFullReportPath.setPlaceholderText(QCoreApplication.translate("MainWindow", u"默认: ./output/full_report.xlsx", None))
+
+        self.hboxLayout3.addWidget(self.editFullReportPath, 1)
+
+        self.btnBrowseFullReport = QPushButton(self.groupOutput)
+        self.btnBrowseFullReport.setObjectName(u"btnBrowseFullReport")
+
+        self.hboxLayout3.addWidget(self.btnBrowseFullReport)
+
+        self.formOutput.setLayout(3, QFormLayout.ItemRole.FieldRole, self.hboxLayout3)
 
 
         self.vTabFile.addWidget(self.groupOutput)
@@ -318,37 +359,42 @@ class Ui_MainWindow(object):
         self.vConfigured = QVBoxLayout(self.groupConfigured)
         self.vConfigured.setSpacing(6)
         self.vConfigured.setObjectName(u"vConfigured")
-        self.lblConfigSingles = QLabel(self.groupConfigured)
-        self.lblConfigSingles.setObjectName(u"lblConfigSingles")
-        self.lblConfigSingles.setWordWrap(True)
+        self.configItemsWidget = QWidget(self.groupConfigured)
+        self.configItemsWidget.setObjectName(u"configItemsWidget")
+        sizePolicy3 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.MinimumExpanding)
+        sizePolicy3.setHorizontalStretch(0)
+        sizePolicy3.setVerticalStretch(0)
+        self.configItemsWidget.setSizePolicy(sizePolicy3)
+        self.configItemsLayout = QVBoxLayout(self.configItemsWidget)
+        self.configItemsLayout.setContentsMargins(0, 0, 0, 0)
+        self.configItemsLayout.setSpacing(3)
+        self.configItemsLayout.setObjectName(u"configItemsLayout")
 
-        self.vConfigured.addWidget(self.lblConfigSingles)
-
-        self.lblConfigRanges = QLabel(self.groupConfigured)
-        self.lblConfigRanges.setObjectName(u"lblConfigRanges")
-        self.lblConfigRanges.setWordWrap(True)
-
-        self.vConfigured.addWidget(self.lblConfigRanges)
+        self.vConfigured.addWidget(self.configItemsWidget)
 
         self.hConfigButtons = QHBoxLayout()
         self.hConfigButtons.setObjectName(u"hConfigButtons")
         self.btnLoadFromTemplate = QPushButton(self.groupConfigured)
         self.btnLoadFromTemplate.setObjectName(u"btnLoadFromTemplate")
+        self.btnLoadFromTemplate.setMinimumHeight(32)
 
         self.hConfigButtons.addWidget(self.btnLoadFromTemplate)
 
         self.btnClearConfig = QPushButton(self.groupConfigured)
         self.btnClearConfig.setObjectName(u"btnClearConfig")
+        self.btnClearConfig.setMinimumHeight(32)
 
         self.hConfigButtons.addWidget(self.btnClearConfig)
 
         self.btnSavePreset = QPushButton(self.groupConfigured)
         self.btnSavePreset.setObjectName(u"btnSavePreset")
+        self.btnSavePreset.setMinimumHeight(32)
 
         self.hConfigButtons.addWidget(self.btnSavePreset)
 
         self.btnLoadPreset = QPushButton(self.groupConfigured)
         self.btnLoadPreset.setObjectName(u"btnLoadPreset")
+        self.btnLoadPreset.setMinimumHeight(32)
 
         self.hConfigButtons.addWidget(self.btnLoadPreset)
 
@@ -460,7 +506,7 @@ class Ui_MainWindow(object):
 
         self.rootVBox.addLayout(self.hProgress)
 
-        self.logOutput = QTextEdit(self.centralWidget)
+        self.logOutput = QPlainTextEdit(self.centralWidget)
         self.logOutput.setObjectName(u"logOutput")
         self.logOutput.setReadOnly(True)
         self.logOutput.setMaximumBlockCount(5000)
@@ -513,6 +559,8 @@ class Ui_MainWindow(object):
 #if QT_CONFIG(tooltip)
         self.btnLangToggle.setToolTip(QCoreApplication.translate("MainWindow", u"Switch Language / \u5207\u6362\u8bed\u8a00", None))
 #endif // QT_CONFIG(tooltip)
+        self.lblTheme.setText(QCoreApplication.translate("MainWindow", u"\U0001f3a8 \U00004e3b\U00009898\U0000ff1a", None))
+        self.cmbThemeSelector.setToolTip(QCoreApplication.translate("MainWindow", u"\U00005207\U00006362 Material Design \U00004e3b\U00009898", None))
         self.groupInput.setTitle(QCoreApplication.translate("MainWindow", u"\u8f93\u5165", None))
         self.lblCsv.setText(QCoreApplication.translate("MainWindow", u"EMQuest CSV\uff1a", None))
         self.editCsvPath.setPlaceholderText(QCoreApplication.translate("MainWindow", u"\u9009\u62e9 *_merged.csv ...", None))
@@ -526,6 +574,9 @@ class Ui_MainWindow(object):
         self.btnBrowseOutput.setText(QCoreApplication.translate("MainWindow", u"\u6d4f\u89c8...", None))
         self.lblOutputName.setText(QCoreApplication.translate("MainWindow", u"\u6587\u4ef6\u540d\uff1a", None))
         self.editOutputName.setText(QCoreApplication.translate("MainWindow", u"antenna_report.xlsx", None))
+        self.checkFullReport.setText(QCoreApplication.translate("MainWindow", u"生成完整报告（独立文件，含全部指标 + 2D/3D 图）", None))
+        self.lblFullReportPath.setText(QCoreApplication.translate("MainWindow", u"报告路径：", None))
+        self.btnBrowseFullReport.setText(QCoreApplication.translate("MainWindow", u"浏览...", None))
         self.tabConfig.setTabText(self.tabConfig.indexOf(self.tabFile), QCoreApplication.translate("MainWindow", u"\U0001f4c2 \U00006587\U00004ef6\U00008bbe\U00007f6e", None))
         self.groupQuickSingle.setTitle(QCoreApplication.translate("MainWindow", u"\u5feb\u6377\u5355\u89d2\u5ea6\uff08\u70b9\u51fb\u5207\u6362\uff09", None))
         self.btnQuick0.setText(QCoreApplication.translate("MainWindow", u"0\u00b0", None))
@@ -552,8 +603,6 @@ class Ui_MainWindow(object):
         self.spinREnd.setSuffix(QCoreApplication.translate("MainWindow", u"\u00b0", None))
         self.btnAddRange.setText(QCoreApplication.translate("MainWindow", u"\u6dfb\u52a0\u8303\u56f4", None))
         self.groupConfigured.setTitle(QCoreApplication.translate("MainWindow", u"\u5df2\u914d\u7f6e\u9879", None))
-        self.lblConfigSingles.setText(QCoreApplication.translate("MainWindow", u"\u5355\u89d2\u5ea6\uff1a60\u00b0, 70\u00b0, 80\u00b0, 90\u00b0", None))
-        self.lblConfigRanges.setText(QCoreApplication.translate("MainWindow", u"\u89d2\u5ea6\u8303\u56f4\uff1a(0-90\u00b0), (60-90\u00b0)", None))
         self.btnLoadFromTemplate.setText(QCoreApplication.translate("MainWindow", u"\U0001f4e5 \U00004ece\U00006a21\U0000677f\U000052a0\U00008f7d", None))
         self.btnClearConfig.setText(QCoreApplication.translate("MainWindow", u"\U0001f5d1 \U00006e05\U00007a7a", None))
         self.btnSavePreset.setText(QCoreApplication.translate("MainWindow", u"\U0001f4be \U00004fdd\U00005b58\U00009884\U00008bbe", None))

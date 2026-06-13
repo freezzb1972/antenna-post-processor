@@ -47,3 +47,7 @@
 3. 151MB CSV 加载需要内存优化（考虑分 section 流式读取）
 4. 一个输入 CSV 对应多个天线 Sheet（5G1~5G4），频段分配不同
 5. 实际会有多组天线测试数据，每组产生一个输出 Excel
+6. GUI: PySide6 + Qt Designer + qt-material (dark_teal)，pyside6-uic 编译 .ui → .py，**禁止手动编辑编译产物**
+7. i18n: Qt Linguist .ts → .qm，运行时 QEvent.LanguageChange → retranslateUi
+8. 模板列头识别用**正则**不用 LLM（列头高度结构化，正则足够）
+9. 5G4 Sheet 有两个 "Gain" 列 — columns 用 List 存储而非 Dict

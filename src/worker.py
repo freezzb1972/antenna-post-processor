@@ -39,6 +39,7 @@ class ProcessingWorker(QObject):
         *,
         lag_config: Optional[LagConfig] = None,
         plot_config: Optional[PlotConfig] = None,
+        full_report_path: Optional[str] = None,
     ):
         super().__init__()
         self.csv_path = csv_path
@@ -46,11 +47,16 @@ class ProcessingWorker(QObject):
         self.output_path = output_path
         self.lag_config = lag_config
         self.plot_config = plot_config or PlotConfig()
+        self.full_report_path = full_report_path
         self._cancelled = False
 
     def cancel(self):
-        """请求取消处理。"""
+        """请求取消处理。每个频点处理前检查，1 秒内停止。"""
         self._cancelled = True
+
+    def _is_cancelled(self) -> bool:
+        """供 pipeline 内层循环调用的取消检查。"""
+        return self._cancelled
 
     def run(self):
         """在 QThread 中执行。"""
@@ -65,6 +71,8 @@ class ProcessingWorker(QObject):
                 output_path=self.output_path,
                 lag_config_override=self.lag_config,
                 plot_config=self.plot_config,
+                full_report_path=self.full_report_path,
+                cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
                 log_callback=self._on_log,
             )

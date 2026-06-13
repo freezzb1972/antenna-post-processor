@@ -9,6 +9,7 @@ Excel 输出模块
 from __future__ import annotations
 
 import io
+import os
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -29,7 +30,9 @@ def export_results(
     sheet_results: Dict[str, List[Dict[str, Any]]],
     *,
     pattern_images: Optional[Dict[str, Dict[float, io.BytesIO]]] = None,
+    sheets_info: Optional[List[SheetInfo]] = None,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    log_callback: Optional[Callable[[str], None]] = None,
 ) -> str:
     """基于模板填充数据 + 嵌入图片。
 
@@ -39,13 +42,16 @@ def export_results(
         sheet_results:  {sheet_name: [row_dict, ...]}，
                         row_dict key = column type ("directivity", "lag_single_60.0", ...)。
         pattern_images: {sheet_name: {freq_mhz: PNG_buffer}}（可选）。
+        sheets_info:    预解析的 Sheet 信息（可选，避免重复读模板）。
         progress_callback: (current, total, message)。
+        log_callback:   (message)。
 
     Returns:
         输出文件路径。
     """
-    # 读取模板
-    sheets_info = read_template(template_path)
+    # 读取模板（仅当调用方未提供 sheets_info 时）
+    if sheets_info is None:
+        sheets_info = read_template(template_path)
     info_map = {s.name: s for s in sheets_info}
 
     # 复制模板
@@ -104,13 +110,14 @@ def export_results(
 
         # ---- 嵌入 3D 方向图 ----
         if pattern_images and sheet_name in pattern_images:
-            _embed_images(ws, info, pattern_images[sheet_name])
+            _embed_images(ws, info, pattern_images[sheet_name], log_callback)
 
         current += 1
         if progress_callback:
             progress_callback(current, total_ops, f"完成 {sheet_name}")
 
     # 保存
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     wb.save(output_path)
     wb.close()
     return output_path
@@ -200,29 +207,44 @@ def _embed_images(
     ws,
     info: SheetInfo,
     images: Dict[float, io.BytesIO],
+    log_callback=None,
+    *,
+    col_offset: int = 3,
+    row_step: int = 22,
+    img_width: int = 280,
+    img_height: int = 210,
 ):
     """在数据区域右侧嵌入 3D 方向图。
 
-    图片布局：从数据区域右侧 2 列开始，每 20 行放一张图。
+    图片布局：从数据区域右侧 col_offset 列开始，每 row_step 行放一张图。
+
+    Args:
+        ws:         工作表对象。
+        info:       工作表结构信息。
+        images:     {freq_mhz: PNG_buffer}。
+        log_callback: 日志回调。
+        col_offset: 图片列相对数据区域右侧的偏移（列数）。
+        row_step:   每张图占用的行高。
+        img_width:  图片宽度 (px)。
+        img_height: 图片高度 (px)。
     """
     if not images:
         return
 
     max_col = max((c.col_index for c in info.columns), default=10)
-    image_col = max_col + 3  # 数据右侧 3 列
+    image_col = max_col + col_offset
     image_row = info.data_start_row
-    row_step = 22  # 每张图约占 22 行
 
     for idx, (freq, buf) in enumerate(sorted(images.items())):
         try:
             buf.seek(0)
             img = XLImage(buf)
-            # 缩放（保持比例）
-            img.width = 280
-            img.height = 210
+            img.width = img_width
+            img.height = img_height
             cell = f"{get_column_letter(image_col)}{image_row}"
             ws.add_image(img, cell)
             image_row += row_step
-        except Exception:
-            # 图片嵌入失败不阻塞数据输出
-            pass
+        except Exception as e:
+            # 图片嵌入失败不阻塞数据输出，但记录日志
+            if log_callback:
+                log_callback(f"  ⚠ {freq} MHz: 图片嵌入失败 — {e}")

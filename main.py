@@ -24,8 +24,8 @@ def main():
     app.setApplicationName("AntennaPostProcessor")
     app.setOrganizationName("AntennaPP")
 
-    # 主题
-    ThemeManager.apply("dark_teal")
+    # 主题（从上次保存恢复，首次使用默认 dark_teal）
+    ThemeManager.load_and_apply()
 
     # 国际化
     I18nManager.init(app)

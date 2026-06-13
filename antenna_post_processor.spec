@@ -7,19 +7,20 @@ PyInstaller 打包配置
 
 构建单目录调试版:
     pyinstaller --onedir antenna_post_processor.spec
+
+体积优化:
+  仅打包实际使用的 PySide6.QtCore/Gui/Widgets（~20MB DLL），
+  排除 WebEngine(195MB)、QML、Multimedia 等未使用模块。
 """
 
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import (
-    collect_data_files,
-    collect_submodules,
-)
+from PyInstaller.utils.hooks import collect_data_files
 
 block_cipher = None
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(SPECPATH).resolve()
 
 a = Analysis(
     ['main.py'],
@@ -32,27 +33,26 @@ a = Analysis(
         # 配置文件
         (str(PROJECT_ROOT / 'config' / 'bands.json'), 'config'),
         # 模板文件（可选，打包后也可以在运行时选择外部模板）
-        (str(PROJECT_ROOT / 'data' / '20260601乐来_SVW 5G1.xlsx'), 'templates'),
+        (str(PROJECT_ROOT / 'data' / 'template_5G1.xlsx'), 'templates'),
     ],
     hiddenimports=[
-        # PySide6
+        # PySide6 — 仅引用实际使用的模块，避免 collect_submodules 拉入全部 426MB
         'PySide6.QtCore',
         'PySide6.QtGui',
         'PySide6.QtWidgets',
-        # matplotlib backends
+        # matplotlib backends（Agg 必需，SVG 可选但小）
         'matplotlib.backends.backend_agg',
         'matplotlib.backends.backend_svg',
         # numpy
-        'numpy.core._methods',
         'numpy.lib.format',
         # openpyxl
         'openpyxl.cell._writer',
-    ] + collect_submodules('PySide6'),
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # 排除不使用的 PySide6 模块以减小体积
+        # 排除 PySide6 其他子模块（防止被间接引入）
         'PySide6.QtWebEngine',
         'PySide6.QtWebEngineCore',
         'PySide6.QtWebEngineWidgets',
@@ -70,6 +70,32 @@ a = Analysis(
         'PySide6.QtTest',
         'PySide6.QtXml',
         'PySide6.QtHelp',
+        'PySide6.QtQml',
+        'PySide6.QtQuick',
+        'PySide6.QtQuickWidgets',
+        'PySide6.QtQuick3D',
+        'PySide6.QtQuickControls2',
+        'PySide6.QtOpenGL',
+        'PySide6.QtOpenGLWidgets',
+        'PySide6.QtPrintSupport',
+        'PySide6.QtSvg',
+        'PySide6.QtSvgWidgets',
+        'PySide6.QtDesigner',
+        'PySide6.QtCharts',
+        'PySide6.QtDataVisualization',
+        'PySide6.QtGraphs',
+        'PySide6.QtGraphsWidgets',
+        'PySide6.QtHttpServer',
+        'PySide6.QtNetworkAuth',
+        'PySide6.QtPdf',
+        'PySide6.QtPdfWidgets',
+        'PySide6.QtScxml',
+        'PySide6.QtSerialBus',
+        'PySide6.QtSpatialAudio',
+        'PySide6.QtStateMachine',
+        'PySide6.QtTextToSpeech',
+        'PySide6.QtWebSockets',
+        'PySide6.QtWebView',
         # 排除不需要的 matplotlib backends
         'matplotlib.backends.backend_qt',
         'matplotlib.backends.backend_tkagg',

@@ -11,7 +11,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.excel_reader import read_template
 
 
-TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "data" / "20260601乐来_SVW 5G1.xlsx"
+TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "data" / "template_5G1.xlsx"
+if not TEMPLATE_PATH.exists():
+    TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "data" / "20260601乐来_SVW 5G1.xlsx"
 
 
 class TestReadTemplate:

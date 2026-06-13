@@ -1,10 +1,6 @@
 ---
 name: emquest-data-format
 description: EMQuest CSV 数据格式参考 — 结构、维度、频段、解析方式
-metadata: 
-  node_type: memory
-  type: reference
-  originSessionId: 0d038809-420b-4a1e-8631-c2bbd6c73f07
 ---
 
 # EMQuest Merged CSV 数据格式
@@ -39,7 +35,3 @@ Theta=0-90 LAG | Theta=60-90 LAG | Theta=60 | Theta=70 | Theta=80 | Theta=90
 - 13 列（多一个 Gain 重复列）
 - 列头: `Efficiency`（无%号）, `Gain`, `Gain`（重复）
 - columns 存储为 List 而非 Dict（处理重复列头）
-
-**Why:** 核心数据格式文档，解析器和计算引擎都基于此。
-
-**How to apply:** 修改 parser 或 calculator 时参考此格式约束。

@@ -24,6 +24,8 @@
      <layout class="QHBoxLayout" name="toolbarLayout">
       <item><widget class="QLabel" name="lblAppTitle"><property name="text"><string>📡 天线参数后处理工具</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
       <item><spacer name="toolbarSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+      <item><widget class="QLabel" name="lblTheme"><property name="text"><string>🎨 主题：</string></property></widget></item>
+      <item><widget class="QComboBox" name="cmbThemeSelector"><property name="toolTip"><string>切换 Material Design 主题</string></property><property name="minimumSize"><size><width>150</width><height>28</height></size></property></widget></item>
       <item><widget class="QPushButton" name="btnLangToggle"><property name="text"><string>EN</string></property><property name="toolTip"><string>Switch Language / 切换语言</string></property><property name="minimumSize"><size><width>48</width><height>30</height></size></property></widget></item>
      </layout>
     </item>
@@ -56,6 +58,9 @@
            <item row="0"><layout class="QHBoxLayout"><item><widget class="QLineEdit" name="editOutputDir"><property name="placeholderText"><string>默认: ./output</string></property></widget></item><item><widget class="QPushButton" name="btnBrowseOutput"><property name="text"><string>浏览...</string></property></widget></item></layout></item>
            <item row="1"><widget class="QLabel" name="lblOutputName"><property name="text"><string>文件名：</string></property></widget></item>
            <item row="1"><widget class="QLineEdit" name="editOutputName"><property name="text"><string>antenna_report.xlsx</string></property></widget></item>
+         <item row="2"><widget class="QCheckBox" name="checkFullReport"><property name="text"><string>生成完整报告（独立文件，含全部指标 + 2D/3D 图）</string></property></widget></item>
+           <item row="3"><widget class="QLabel" name="lblFullReportPath"><property name="text"><string>报告路径：</string></property></widget></item>
+           <item row="3"><layout class="QHBoxLayout"><item><widget class="QLineEdit" name="editFullReportPath"><property name="placeholderText"><string>默认: ./output/full_report.xlsx</string></property></widget></item><item><widget class="QPushButton" name="btnBrowseFullReport"><property name="text"><string>浏览...</string></property></widget></item></layout></item>
           </layout>
          </widget>
         </item>
@@ -115,8 +120,7 @@
          <widget class="QGroupBox" name="groupConfigured">
           <property name="title"><string>已配置项</string></property>
           <layout class="QVBoxLayout" name="vConfigured"><property name="spacing"><number>6</number></property>
-           <item><widget class="QLabel" name="lblConfigSingles"><property name="text"><string>单角度：60°, 70°, 80°, 90°</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-           <item><widget class="QLabel" name="lblConfigRanges"><property name="text"><string>角度范围：(0-90°), (60-90°)</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+           <item><widget class="QWidget" name="configItemsWidget" native="true"><property name="sizePolicy"><sizepolicy hsizetype="Preferred" vsizetype="MinimumExpanding"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property></widget></item>
            <item><layout class="QHBoxLayout" name="hConfigButtons">
             <item><widget class="QPushButton" name="btnLoadFromTemplate"><property name="text"><string>📥 从模板加载</string></property></widget></item>
             <item><widget class="QPushButton" name="btnClearConfig"><property name="text"><string>🗑 清空</string></property></widget></item>
@@ -172,7 +176,7 @@
 
     <!-- ====== 日志输出 ====== -->
     <item>
-     <widget class="QTextEdit" name="logOutput">
+     <widget class="QPlainTextEdit" name="logOutput">
       <property name="readOnly"><bool>true</bool></property>
       <property name="maximumBlockCount"><number>5000</number></property>
       <property name="placeholderText"><string>处理日志将在此显示...</string></property>

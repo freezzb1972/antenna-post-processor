@@ -26,6 +26,20 @@ from matplotlib.ticker import LinearLocator
 
 
 # ---------------------------------------------------------------------------
+# 内部辅助
+# ---------------------------------------------------------------------------
+
+def _fig_to_png_buffer(fig, dpi: int) -> io.BytesIO:
+    """将 matplotlib figure 渲染为 PNG buffer，关闭 figure 释放内存。"""
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight",
+                facecolor="white", edgecolor="none")
+    buf.seek(0)
+    plt.close(fig)
+    return buf
+
+
+# ---------------------------------------------------------------------------
 # 主绘图函数
 # ---------------------------------------------------------------------------
 
@@ -92,7 +106,7 @@ def generate_3d_pattern(
     norm = matplotlib.colors.Normalize(vmin=np.nanmin(g), vmax=np.nanmax(g))
     surf = ax.plot_surface(
         X, Y, Z,
-        facecolors=cm.get_cmap(cmap)(norm(g)),
+        facecolors=plt.get_cmap(cmap)(norm(g)),
         rstride=2, cstride=2,
         alpha=alpha,
         linewidth=0,
@@ -154,12 +168,7 @@ def generate_3d_pattern(
     fig.tight_layout(pad=0.5)
 
     # ---- 输出到 buffer ----
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight",
-                facecolor="white", edgecolor="none")
-    buf.seek(0)
-    plt.close(fig)
-    return buf
+    return _fig_to_png_buffer(fig, dpi)
 
 
 def generate_2d_polar_cut(
@@ -205,12 +214,7 @@ def generate_2d_polar_cut(
     ax.grid(True, alpha=0.4)
 
     fig.tight_layout()
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight",
-                facecolor="white", edgecolor="none")
-    buf.seek(0)
-    plt.close(fig)
-    return buf
+    return _fig_to_png_buffer(fig, dpi)
 
 
 def generate_2d_rectangular_cut(
@@ -255,9 +259,4 @@ def generate_2d_rectangular_cut(
     ax.set_title(title, fontsize=11, fontweight="bold", pad=10)
 
     fig.tight_layout()
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight",
-                facecolor="white", edgecolor="none")
-    buf.seek(0)
-    plt.close(fig)
-    return buf
+    return _fig_to_png_buffer(fig, dpi)

@@ -10,11 +10,11 @@ Qt Designer 编译 UI + 信号/槽逻辑。
   - 后台 Worker 启动/停止
   - 进度条 + 日志 + 状态栏
   - 中英文切换
+  - Material Design 主题切换
 """
 
 from __future__ import annotations
 
-import json
 import os
 from datetime import datetime
 from pathlib import Path
@@ -24,9 +24,16 @@ from PySide6.QtCore import QEvent, QSettings, Qt, QThread
 from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
     QFileDialog,
+    QHBoxLayout,
+    QLabel,
     QMainWindow,
     QMessageBox,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
 )
 
 from i18n.i18n_manager import I18nManager
@@ -34,6 +41,7 @@ from src.lag_config import LagConfig
 from src.pipeline import PlotConfig
 from src.worker import ProcessingWorker
 from ui.compiled.ui_main_window import Ui_MainWindow
+from ui.theme_manager import ThemeManager
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +50,16 @@ from ui.compiled.ui_main_window import Ui_MainWindow
 
 class MainWindow(QMainWindow):
     """天线参数后处理工具主窗口。"""
+
+    # 快捷按钮角度映射（单一定义，_connect_signals 和 _sync_quick_buttons 共享）
+    _QUICK_ANGLES: dict = {
+        0.0: "btnQuick0",
+        30.0: "btnQuick30",
+        60.0: "btnQuick60",
+        70.0: "btnQuick70",
+        80.0: "btnQuick80",
+        90.0: "btnQuick90",
+    }
 
     def __init__(self, app: QApplication):
         super().__init__()
@@ -60,6 +78,8 @@ class MainWindow(QMainWindow):
         self._settings = QSettings("AntennaPP", "AntennaPostProcessor")
 
         # ---- 初始化 ----
+        self._init_theme_selector()
+        self._apply_custom_qss()
         self._init_file_paths()
         self._connect_signals()
         self._update_lag_display()
@@ -85,23 +105,113 @@ class MainWindow(QMainWindow):
 
         self.ui.editOutputName.setText("antenna_report.xlsx")
 
+    def _init_theme_selector(self):
+        """填充主题下拉框并选中当前主题。"""
+        cmb = self.ui.cmbThemeSelector
+        for theme_id, display_name in ThemeManager.ALL_THEMES:
+            cmb.addItem(display_name, theme_id)
+        current = ThemeManager.current_theme()
+        for i in range(cmb.count()):
+            if cmb.itemData(i) == current:
+                cmb.setCurrentIndex(i)
+                break
+
+    def _apply_custom_qss(self):
+        """加载自定义 QSS 微调样式（不破坏 qt-material 主题）。"""
+        qss = """
+        /* 圆角卡片风格 — GroupBox 标题增强 */
+        QGroupBox {
+            border: 1px solid rgba(128, 128, 128, 60);
+            border-radius: 8px;
+            margin-top: 12px;
+            padding-top: 16px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 12px;
+            padding: 0 6px;
+        }
+        /* 按钮悬停过渡 */
+        QPushButton {
+            border-radius: 4px;
+            padding: 4px 12px;
+            transition: background-color 0.2s;
+        }
+        QPushButton:hover {
+            border: 1px solid rgba(128, 128, 128, 100);
+        }
+        /* 日志输出区 */
+        QPlainTextEdit {
+            border-radius: 6px;
+            border: 1px solid rgba(128, 128, 128, 50);
+            font-family: "Consolas", "Courier New", monospace;
+            font-size: 11px;
+        }
+        /* 进度条圆角 */
+        QProgressBar {
+            border-radius: 4px;
+            text-align: center;
+            height: 18px;
+        }
+        QProgressBar::chunk {
+            border-radius: 3px;
+        }
+        /* Tab 标签 */
+        QTabWidget::pane {
+            border-radius: 6px;
+        }
+        QTabBar::tab {
+            border-radius: 4px;
+            padding: 6px 16px;
+        }
+        /* 输入框 */
+        QLineEdit, QDoubleSpinBox, QSpinBox {
+            border-radius: 4px;
+            padding: 3px 6px;
+        }
+        /* 主题选择下拉框 */
+        QComboBox {
+            border-radius: 4px;
+            padding: 3px 8px;
+            min-width: 140px;
+        }
+        /* 开始按钮高亮 */
+        QPushButton#btnStart {
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        """
+        self.app.setStyleSheet(self.app.styleSheet() + qss)
+        csv_path = self._settings.value("csv_path", "")
+        template_path = self._settings.value("template_path", "")
+        output_dir = self._settings.value("output_dir", str(Path.cwd() / "output"))
+
+        if csv_path and Path(csv_path).exists():
+            self.ui.editCsvPath.setText(csv_path)
+        if template_path and Path(template_path).exists():
+            self.ui.editTemplatePath.setText(template_path)
+        if output_dir:
+            self.ui.editOutputDir.setText(output_dir)
+
+        self.ui.editOutputName.setText("antenna_report.xlsx")
+
     def _connect_signals(self):
         """连接所有信号/槽。"""
+        # 主题切换
+        self.ui.cmbThemeSelector.currentIndexChanged.connect(self._on_theme_changed)
+
         # 文件浏览
         self.ui.btnBrowseCsv.clicked.connect(self._on_browse_csv)
         self.ui.btnBrowseTemplate.clicked.connect(self._on_browse_template)
         self.ui.btnBrowseOutput.clicked.connect(self._on_browse_output)
+        self.ui.btnBrowseFullReport.clicked.connect(self._on_browse_full_report)
 
         # LAG 快捷按钮
-        quick_buttons = [
-            (self.ui.btnQuick0, 0.0),
-            (self.ui.btnQuick30, 30.0),
-            (self.ui.btnQuick60, 60.0),
-            (self.ui.btnQuick70, 70.0),
-            (self.ui.btnQuick80, 80.0),
-            (self.ui.btnQuick90, 90.0),
-        ]
-        for btn, angle in quick_buttons:
+        for angle, btn_attr in self._QUICK_ANGLES.items():
+            btn = getattr(self.ui, btn_attr)
             btn.clicked.connect(lambda checked, a=angle: self._toggle_quick_angle(a))
         self.ui.btnAddCustomAngle.clicked.connect(self._add_custom_angle)
 
@@ -129,8 +239,9 @@ class MainWindow(QMainWindow):
 
     def _on_browse_csv(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("选择 EMQuest CSV 文件"), "",
-            self.tr("CSV 文件 (*.csv);;所有文件 (*)")
+            self, self.tr("选择 EMQuest CSV 文件"),
+            self._settings.value("csv_path", ""),
+            self.tr("CSV 文件 (*.csv);;Excel 文件 (*.xlsx *.xls);;所有文件 (*)")
         )
         if path:
             self.ui.editCsvPath.setText(path)
@@ -138,20 +249,32 @@ class MainWindow(QMainWindow):
 
     def _on_browse_template(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("选择模板 Excel 文件"), "",
-            self.tr("Excel 文件 (*.xlsx);;所有文件 (*)")
+            self, self.tr("选择模板 Excel 文件"),
+            self._settings.value("template_path", ""),
+            self.tr("Excel 文件 (*.xlsx *.xls);;所有文件 (*)")
         )
         if path:
             self.ui.editTemplatePath.setText(path)
             self._settings.setValue("template_path", path)
 
     def _on_browse_output(self):
+        start_dir = self.ui.editOutputDir.text() or str(Path.cwd() / "output")
         path = QFileDialog.getExistingDirectory(
-            self, self.tr("选择输出目录"), ""
+            self, self.tr("选择输出目录"), start_dir
         )
         if path:
             self.ui.editOutputDir.setText(path)
             self._settings.setValue("output_dir", path)
+
+    def _on_browse_full_report(self):
+        start_dir = self.ui.editFullReportPath.text() or str(Path.cwd() / "output")
+        path, _ = QFileDialog.getSaveFileName(
+            self, self.tr("保存完整报告"),
+            str(Path(start_dir) / "full_report.xlsx"),
+            self.tr("Excel 文件 (*.xlsx)")
+        )
+        if path:
+            self.ui.editFullReportPath.setText(path)
 
     # ==================================================================
     # LAG 配置
@@ -168,9 +291,12 @@ class MainWindow(QMainWindow):
 
     def _add_custom_angle(self):
         angle = self.ui.spinCustomAngle.value()
+        if angle in self._lag_config.single_angles:
+            return  # 已存在，跳过
         self._lag_config.add_single(angle)
         self._sync_quick_buttons()
         self._update_lag_display()
+        self._log(self.tr(f"添加单角度: {angle}°"))
 
     def _on_step_generate(self):
         start = self.ui.spinStepStart.value()
@@ -186,6 +312,9 @@ class MainWindow(QMainWindow):
     def _on_add_range(self):
         lo = self.ui.spinRStart.value()
         hi = self.ui.spinREnd.value()
+        key = (min(lo, hi), max(lo, hi))
+        if key in self._lag_config.ranges:
+            return  # 已存在，跳过
         self._lag_config.add_range(lo, hi)
         self._update_lag_display()
         self._log(self.tr(f"添加 LAG 范围: ({lo}°-{hi}°)"))
@@ -250,35 +379,82 @@ class MainWindow(QMainWindow):
 
     def _sync_quick_buttons(self):
         """同步快捷按钮选中状态。"""
-        btn_map = {
-            0.0: self.ui.btnQuick0,
-            30.0: self.ui.btnQuick30,
-            60.0: self.ui.btnQuick60,
-            70.0: self.ui.btnQuick70,
-            80.0: self.ui.btnQuick80,
-            90.0: self.ui.btnQuick90,
-        }
-        for angle, btn in btn_map.items():
+        for angle, btn_attr in self._QUICK_ANGLES.items():
+            btn = getattr(self.ui, btn_attr)
             btn.setChecked(angle in self._lag_config.single_angles)
 
     def _update_lag_display(self):
-        """刷新已配置项文字。"""
+        """刷新已配置项 — 每项带删除按钮。"""
+        layout = self.ui.configItemsLayout
+        # 清除所有旧 widget
+        while layout.count():
+            child = layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
         singles = self._lag_config.singles_sorted
         ranges = self._lag_config.ranges_sorted
 
-        if singles:
-            self.ui.lblConfigSingles.setText(
-                self.tr("单角度：") + ", ".join(f"{a}°" for a in singles)
-            )
-        else:
-            self.ui.lblConfigSingles.setText(self.tr("单角度：—"))
+        if not singles and not ranges:
+            label = QLabel(self.tr("—"))
+            label.setStyleSheet("font-size: 13px; color: #888; padding: 8px;")
+            layout.addWidget(label)
+            return
 
+        # ---- 单角度 ----
+        if singles:
+            header = QLabel(self.tr("单角度："))
+            header.setStyleSheet("font-weight: bold; font-size: 13px; margin-top: 4px;")
+            layout.addWidget(header)
+            for a in singles:
+                row = QWidget()
+                h = QHBoxLayout(row)
+                h.setContentsMargins(8, 3, 0, 3)
+                h.setSpacing(8)
+                lbl = QLabel(f"  {a}°")
+                lbl.setStyleSheet("font-size: 13px;")
+                btn = QPushButton(" ✕ ")
+                btn.setFixedHeight(26)
+                btn.setToolTip(self.tr("移除此角度"))
+                btn.setStyleSheet("font-size: 11px; padding: 2px 6px;")
+                btn.clicked.connect(lambda checked, angle=a: self._remove_single(angle))
+                h.addWidget(lbl)
+                h.addWidget(btn)
+                h.addStretch()
+                layout.addWidget(row)
+
+        # ---- 角度范围 ----
         if ranges:
-            self.ui.lblConfigRanges.setText(
-                self.tr("角度范围：") + ", ".join(f"({lo}°-{hi}°)" for lo, hi in ranges)
-            )
-        else:
-            self.ui.lblConfigRanges.setText(self.tr("角度范围：—"))
+            header = QLabel(self.tr("角度范围："))
+            header.setStyleSheet("font-weight: bold; font-size: 13px; margin-top: 4px;")
+            layout.addWidget(header)
+            for lo, hi in ranges:
+                row = QWidget()
+                h = QHBoxLayout(row)
+                h.setContentsMargins(8, 3, 0, 3)
+                h.setSpacing(8)
+                lbl = QLabel(f"  ({lo}° - {hi}°)")
+                lbl.setStyleSheet("font-size: 13px;")
+                btn = QPushButton(" ✕ ")
+                btn.setFixedHeight(26)
+                btn.setToolTip(self.tr("移除此范围"))
+                btn.setStyleSheet("font-size: 11px; padding: 2px 6px;")
+                btn.clicked.connect(lambda checked, lo=lo, hi=hi: self._remove_range(lo, hi))
+                h.addWidget(lbl)
+                h.addWidget(btn)
+                h.addStretch()
+                layout.addWidget(row)
+
+        layout.addStretch()
+
+    def _remove_single(self, angle: float):
+        self._lag_config.remove_single(angle)
+        self._sync_quick_buttons()
+        self._update_lag_display()
+
+    def _remove_range(self, lo: float, hi: float):
+        self._lag_config.remove_range(lo, hi)
+        self._update_lag_display()
 
     # ==================================================================
     # 运行控制
@@ -286,21 +462,35 @@ class MainWindow(QMainWindow):
 
     def _on_start(self):
         """启动后台处理。"""
-        csv_path = self.ui.editCsvPath.text()
-        template_path = self.ui.editTemplatePath.text()
-        output_dir = self.ui.editOutputDir.text() or str(Path.cwd() / "output")
-        output_name = self.ui.editOutputName.text() or "antenna_report.xlsx"
+        csv_path = self.ui.editCsvPath.text().strip()
+        template_path = self.ui.editTemplatePath.text().strip()
+        output_dir = self.ui.editOutputDir.text().strip() or str(Path.cwd() / "output")
+        output_name = self.ui.editOutputName.text().strip() or "antenna_report.xlsx"
 
         # 验证
-        if not csv_path or not Path(csv_path).exists():
-            QMessageBox.warning(self, self.tr("警告"), self.tr("请选择有效的 CSV 输入文件。"))
+        if not csv_path:
+            QMessageBox.warning(self, self.tr("警告"), self.tr("请选择 CSV 输入文件。"))
             return
-        if not template_path or not Path(template_path).exists():
-            QMessageBox.warning(self, self.tr("警告"), self.tr("请选择有效的模板 Excel 文件。"))
+        if not Path(csv_path).exists():
+            QMessageBox.warning(self, self.tr("警告"),
+                self.tr(f"CSV 文件不存在:\n{csv_path}"))
+            return
+        if not template_path:
+            QMessageBox.warning(self, self.tr("警告"), self.tr("请选择模板 Excel 文件。"))
+            return
+        if not Path(template_path).exists():
+            QMessageBox.warning(self, self.tr("警告"),
+                self.tr(f"模板文件不存在:\n{template_path}"))
             return
 
         os.makedirs(output_dir, exist_ok=True)
         output_path = str(Path(output_dir) / output_name)
+
+        # 完整报告路径
+        full_report_path: Optional[str] = None
+        if self.ui.checkFullReport.isChecked():
+            path_text = self.ui.editFullReportPath.text().strip()
+            full_report_path = path_text if path_text else str(Path(output_dir) / "full_report.xlsx")
 
         # 构建 PlotConfig
         plot_config = PlotConfig(
@@ -324,6 +514,7 @@ class MainWindow(QMainWindow):
             output_path=output_path,
             lag_config=self._lag_config,
             plot_config=plot_config,
+            full_report_path=full_report_path,
         )
         self._worker.moveToThread(self._thread)
 
@@ -344,6 +535,8 @@ class MainWindow(QMainWindow):
         self._log(self.tr(f"▶ 开始处理: {csv_path}"))
         self._log(self.tr(f"  模板: {template_path}"))
         self._log(self.tr(f"  输出: {output_path}"))
+        if full_report_path:
+            self._log(self.tr(f"  完整报告: {full_report_path}"))
 
     def _on_stop(self):
         """停止处理。"""
@@ -384,6 +577,19 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, self.tr("处理错误"), message)
 
     # ==================================================================
+    # 主题切换
+    # ==================================================================
+
+    def _on_theme_changed(self, index: int):
+        """切换 Material Design 主题。"""
+        if index < 0:
+            return
+        theme_id = self.ui.cmbThemeSelector.itemData(index)
+        if theme_id and theme_id != ThemeManager.current_theme():
+            ThemeManager.apply(theme_id)
+            ThemeManager.save_theme(theme_id)
+
+    # ==================================================================
     # 语言切换
     # ==================================================================
 
@@ -413,7 +619,7 @@ class MainWindow(QMainWindow):
     def _log(self, message: str):
         """追加日志行。"""
         ts = datetime.now().strftime("%H:%M:%S")
-        self.ui.logOutput.append(f"[{ts}] {message}")
+        self.ui.logOutput.appendPlainText(f"[{ts}] {message}")
         # 自动滚动到底部
         cursor = self.ui.logOutput.textCursor()
         cursor.movePosition(QTextCursor.End)
