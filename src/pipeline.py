@@ -125,75 +125,74 @@ def _process_one_frequency(
     *,
     do_extrapolate: bool = False,
     robust_peak: bool = False,
+    needed_params: set = None,
 ) -> Dict[str, Any]:
-    """处理单个频点: 外推 → 计算 → 返回结果行。"""
+    """处理单个频点。按模板列需求 (needed_params) 跳过不需要的参数。"""
     theta_lm = raw["theta_logmag"]
     phi_lm = raw["phi_logmag"]
+    need = needed_params or set()
 
-    # Theta 外推 (仅在用户启用且数据不足 175° 时)
     need_extrap = do_extrapolate and theta_deg[-1] < 175
     if need_extrap:
-        theta_orig = theta_deg.copy()  # 保存原始范围，仅用于 Phase 外推
+        theta_orig = theta_deg.copy()
         new_theta, theta_lm = extrapolate_theta(theta_deg, theta_lm, "linear")
         _, phi_lm = extrapolate_theta(theta_deg, phi_lm, "linear")
         theta_deg = new_theta
 
     theta_rad = np.deg2rad(theta_deg)
-
-    # Gain
     gain_linear, peak_dbi = compute_total_gain_linear(theta_lm, phi_lm, robust=robust_peak)
+    row: Dict[str, Any] = {"frequency": freq}
+
+    # Gain (always include if template has it)
+    if "gain" in need or "peak_eirp" in need or not need:
+        row["gain"] = round(peak_dbi, 6)
 
     # Directivity
-    directivity_dbi = compute_directivity(gain_linear, theta_rad)
+    directivity_dbi = None
+    if "directivity" in need or not need:
+        directivity_dbi = compute_directivity(gain_linear, theta_rad)
+        row["directivity"] = round(directivity_dbi, 6)
 
     # Efficiency
-    eff_pct, eff_db = compute_efficiency(peak_dbi, directivity_dbi)
+    if "efficiency_pct" in need or "efficiency_db" in need or not need:
+        if directivity_dbi is None:
+            directivity_dbi = compute_directivity(gain_linear, theta_rad)
+        eff_pct, eff_db = compute_efficiency(peak_dbi, directivity_dbi)
+        if "efficiency_pct" in need or not need:
+            row["efficiency_pct"] = round(eff_pct, 6)
+        if "efficiency_db" in need or not need:
+            row["efficiency_db"] = round(eff_db, 6)
 
-    # TRP / NHPRP / Peak EIRP（有源测试指标，CTIA 标准）
-    trp_dbm = compute_trp(gain_linear, theta_rad)
-    nhprp_45 = compute_nhprp(gain_linear, theta_rad, 45.0)
-    nhprp_30 = compute_nhprp(gain_linear, theta_rad, 30.0)
-    peak_eirp = compute_peak_eirp(gain_linear)
+    # TRP / NHPRP / Peak EIRP
+    for ct, fn in [("trp", lambda: compute_trp(gain_linear, theta_rad)),
+                   ("nhprp_45", lambda: compute_nhprp(gain_linear, theta_rad, 45.0)),
+                   ("nhprp_30", lambda: compute_nhprp(gain_linear, theta_rad, 30.0)),
+                   ("peak_eirp", lambda: compute_peak_eirp(gain_linear))]:
+        if ct in need or not need:
+            row[ct] = round(fn(), 2)
 
-    row: Dict[str, Any] = {
-        "frequency": freq,
-        "directivity": round(directivity_dbi, 6),
-        "efficiency_pct": round(eff_pct, 6),
-        "efficiency_db": round(eff_db, 6),
-        "gain": round(peak_dbi, 6),
-        "trp": round(trp_dbm, 2),
-        "nhprp_45": round(nhprp_45, 2),
-        "nhprp_30": round(nhprp_30, 2),
-        "peak_eirp": round(peak_eirp, 2),
-    }
+    # Axial Ratio
+    if "axial_ratio" in need or not need:
+        tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
+        if tp is not None and pp is not None:
+            try:
+                if need_extrap:
+                    _, tp = extrapolate_theta(theta_orig, tp, "constant")
+                    _, pp = extrapolate_theta(theta_orig, pp, "constant")
+                ar = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
+                if ar is not None and ar.size > 0:
+                    row["axial_ratio"] = round(float(np.mean(ar[0, :5])), 6)
+            except Exception as e:
+                row["axial_ratio_error"] = str(e)
 
-    # Axial Ratio (仅当有 Phase 数据时)
-    tp = raw.get("theta_phase")
-    pp = raw.get("phi_phase")
-    if tp is not None and pp is not None:
-        try:
-            if need_extrap:
-                _, tp = extrapolate_theta(theta_orig, tp, "constant")
-                _, pp = extrapolate_theta(theta_orig, pp, "constant")
-            ar = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
-            if ar is not None and ar.size > 0:
-                # AR 返回线性值 (EMQuest 格式)，取前5个 phi 均值
-                row["axial_ratio"] = round(float(np.mean(ar[0, :5])), 6)
-        except Exception as e:
-            row["axial_ratio_error"] = str(e)
-
-    # LAG 单角度
+    # LAG
     singles = lag_config.singles_sorted
     if singles:
-        lag_singles = compute_lag_at_angles(gain_linear, theta_deg, singles)
-        for angle, val in lag_singles.items():
+        for angle, val in compute_lag_at_angles(gain_linear, theta_deg, singles).items():
             row[f"lag_single_{angle}"] = round(val, 6)
-
-    # LAG 范围
     ranges = lag_config.ranges_sorted
     if ranges:
-        lag_ranges = compute_lag_ranges(gain_linear, theta_deg, ranges)
-        for (lo, hi), val in lag_ranges.items():
+        for (lo, hi), val in compute_lag_ranges(gain_linear, theta_deg, ranges).items():
             row[f"lag_range_{lo}_{hi}"] = round(val, 6)
 
     return row
@@ -327,19 +326,20 @@ def _collect_tasks(
                 _log(log_cb, f"  ⚠ {si.name}: 无匹配数据源 — 跳过")
             continue
 
+        # 提取模板需要的参数类型
+        needed_params = {c.col_type for c in si.columns}
+
         is_expanded = si.name in expanded_names if use_multi else False
         use_ds_freqs = (is_expanded and freq_source == "datasource")
 
         if not use_ds_freqs:
-            # 先尝试最近邻匹配（模板频点 → 数据源频点）
             dsfreqs = ds.frequencies
             match_count = 0
             for freq in si.frequencies:
                 idx = _find_closest_freq(dsfreqs, freq)
                 if idx is not None:
-                    tasks.append((si.name, freq, idx, si.lag_config, ds))
+                    tasks.append((si.name, freq, idx, si.lag_config, ds, needed_params))
                     match_count += 1
-            # 如果一个都没匹配上，回退到数据源频点
             if match_count == 0 and dsfreqs:
                 _log(log_cb, f"  ↻ {si.name}: 模板频点无匹配 → 使用数据源全部 {len(dsfreqs)} 个频点")
                 use_ds_freqs = True
@@ -347,7 +347,7 @@ def _collect_tasks(
         if use_ds_freqs:
             dsfreqs = ds.frequencies
             for idx, freq in enumerate(dsfreqs):
-                tasks.append((si.name, freq, idx, si.lag_config, ds))
+                tasks.append((si.name, freq, idx, si.lag_config, ds, needed_params))
 
     # ---- 频点裁剪 (trim_start/trim_end) ----
     if trim_start > 0 or trim_end > 0:
@@ -394,12 +394,12 @@ def _load_and_compute(
     _log(log_callback, f"读取 {total} 个频点数据...")
     _report(progress_callback, 0, progress_max, f"读取中 0/{total}")
     compute_tasks = []
-    for i, (sheet_name, freq, csv_idx, lag_cfg, task_ds) in enumerate(tasks):
+    for i, (sheet_name, freq, csv_idx, lag_cfg, task_ds, needed_params) in enumerate(tasks):
         if cancel_callback and cancel_callback():
             break
         raw = task_ds.read_sections(csv_idx)
         theta_list = list(task_ds.theta_angles)
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak))
+        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params))
         if (i + 1) % 20 == 0 or (i + 1) == total:
             _report(progress_callback, i + 1, progress_max, f"读取中 {i + 1}/{total}")
 
@@ -436,12 +436,12 @@ def _run_compute_serial(
     cancel_callback, progress_callback,
 ):
     """串行逐频点计算（单进程或 parallel=1）。"""
-    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk) in enumerate(compute_tasks):
+    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams) in enumerate(compute_tasks):
         if cancel_callback and cancel_callback():
             break
         try:
             theta_arr = np.array(theta_list)
-            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk)
+            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams)
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
@@ -639,11 +639,11 @@ def _compute_chunk(
     """
     import numpy as np
     results = []
-    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk in compute_tasks:
+    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams in compute_tasks:
         try:
             theta_raw = np.array(theta_list)
             row = _process_one_frequency(raw, freq, theta_raw, lag_cfg,
-                                         do_extrapolate=do_extrap, robust_peak=rpk)
+                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams)
             results.append((sheet_name, row))
         except Exception as e:
             results.append((sheet_name, {"frequency": freq, "_error": str(e)}))
