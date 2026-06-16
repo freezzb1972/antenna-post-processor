@@ -234,19 +234,63 @@ class CalcParamsDialog(QDialog):
         # Tab 1: 参数选择
         tab_params = QWidget(); tabs.addTab(tab_params, "参数选择")
         pl = QVBoxLayout(tab_params)
+        self._param_checkboxes = {}
         param_groups = [
-            ("无源参数", ["Gain (dBi)", "Directivity (dBi)", "Efficiency (%)", "Efficiency (dB)"]),
-            ("LAG 参数", ["单角度 LAG", "范围 LAG"]),
-            ("轴比参数 (AR)", ["单角度 AR", "范围 AR"]),
-            ("有源参数", ["TRP", "Peak EIRP", "NHPRP ±45°", "NHPRP ±30°", "NHPRP ±22.5°",
-                        "Upper/Lower Hem. PRP", "PRP 0-120°", "Ratios", "Min/Max Power", "Average Gain/Power"]),
+            ("基础参数", [
+                ("gain", "Gain / Peak EIRP"),
+                ("directivity", "Directivity"),
+                ("efficiency_pct", "Efficiency (%)"),
+                ("efficiency_db", "Efficiency (dB)"),
+                ("frequency", "Frequency"),
+            ]),
+            ("有源 TRP 参数", [
+                ("trp", "Tot. Rad. Pwr. (TRP)"),
+                ("peak_eirp", "Peak EIRP"),
+                ("nhprp_45", "NHPRP ±45° (Pi/4)"),
+                ("nhprp_30", "NHPRP ±30° (Pi/6)"),
+                ("nhprp_225", "NHPRP ±22.5° (Pi/8)"),
+                ("uh_prp", "Upper Hem. PRP"),
+                ("lh_prp", "Lower Hem. PRP"),
+                ("prp_120", "PRP (theta 0-120°)"),
+            ]),
+            ("比率参数", [
+                ("nhprp45_ratio", "NHPRP45 / TRP Ratio"),
+                ("nhprp30_ratio", "NHPRP30 / TRP Ratio"),
+                ("nhprp225_ratio", "NHPRP225 / TRP Ratio"),
+                ("uh_ratio", "UHPRP / TRP Ratio"),
+                ("lh_ratio", "LHPRP / TRP Ratio"),
+                ("max_min_ratio", "Max/Min Ratio"),
+                ("max_avg_ratio", "Max/Avg Ratio"),
+                ("min_avg_ratio", "Min/Avg Ratio"),
+            ]),
+            ("方向与波束", [
+                ("boresight_theta", "Boresight Theta"),
+                ("boresight_phi", "Boresight Phi"),
+                ("theta_bw", "Theta Beamwidth (3dB)"),
+                ("phi_bw", "Phi Beamwidth (3dB)"),
+                ("front_back_ratio", "Front/Back Ratio"),
+            ]),
+            ("功率统计", [
+                ("max_power", "Maximum Power"),
+                ("min_power", "Minimum Power"),
+                ("avg_gain", "Average Gain"),
+                ("avg_power", "Average Power"),
+            ]),
+            ("LAG 参数", [
+                ("lag_single", "LAG 单角度"),
+                ("lag_range", "LAG 范围"),
+            ]),
+            ("轴比参数 (AR)", [
+                ("ar_single", "AR 单角度"),
+                ("ar_range", "AR 范围"),
+            ]),
         ]
         for grp_name, items in param_groups:
             grp = QGroupBox(grp_name); gl = QVBoxLayout(grp)
-            for item in items:
-                cb = QCheckBox(item); cb.setChecked(True)
-                setattr(self, f"_check_{grp_name}_{item.replace(' ','_').replace('(','').replace(')','').replace('/','_').replace('%','pct')[:30]}", cb)
+            for key, label in items:
+                cb = QCheckBox(label); cb.setChecked(True)
                 gl.addWidget(cb)
+                self._param_checkboxes[key] = cb
             pl.addWidget(grp)
         pl.addStretch()
 
