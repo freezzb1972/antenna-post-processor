@@ -27,6 +27,8 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
+    QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -94,6 +96,7 @@ class MainWindow(QMainWindow):
         self._apply_custom_qss()
         self._init_file_paths()
         self._init_multi_file_ui()
+        self._init_params_tab()
         self._connect_signals()
         self._update_lag_display()
         self._log("天线参数后处理工具已启动")
@@ -182,60 +185,24 @@ class MainWindow(QMainWindow):
         match_row.addWidget(self._btn_auto_match)
         match_row.addWidget(self._lbl_match_status)
         match_row.addStretch()
-
-        # 频点来源选择（数据源频点点数 ≠ 模板频点点数时生效）
-        self._cmb_freq_source = QComboBox()
-        self._cmb_freq_source.addItem(self.tr("新 sheet 频点: 数据源"), "datasource")
-        self._cmb_freq_source.addItem(self.tr("新 sheet 频点: 模板"), "template")
-        self._cmb_freq_source.setToolTip(
-            self.tr("当模板工作表数少于数据源数时，自动扩增的工作表使用哪个频点列表。\n"
-                     "「数据源」= 使用该数据源文件中的全部频点\n"
-                     "「模板」= 使用模板中定义的频点列表（最近邻匹配）"))
-        match_row.addWidget(self._cmb_freq_source)
         layout.addLayout(match_row)
 
-        # 频点裁剪 + 图表选择行
-        trim_chart_row = QHBoxLayout()
-
-        trim_chart_row.addWidget(QLabel(self.tr("去除频点: 前")))
-        self._spin_trim_start = self._create_spinbox(0, 0, 50, self.tr("去除数据前 N 个频点"))
-        trim_chart_row.addWidget(self._spin_trim_start)
-
-        trim_chart_row.addWidget(QLabel(self.tr("后")))
-        self._spin_trim_end = self._create_spinbox(0, 0, 50, self.tr("去除数据后 N 个频点"))
-        trim_chart_row.addWidget(self._spin_trim_end)
-
-        trim_chart_row.addSpacing(12)
-
+        # 图表选择行
+        chart_row = QHBoxLayout()
         self._check_chart_eff = QCheckBox(self.tr("效率曲线"))
         self._check_chart_eff.setChecked(True)
-        self._check_chart_eff.setToolTip(self.tr("无源测试: Efficiency (%) vs Frequency 图表"))
-        trim_chart_row.addWidget(self._check_chart_eff)
-
+        chart_row.addWidget(self._check_chart_eff)
         self._check_chart_lag = QCheckBox(self.tr("增益曲线"))
         self._check_chart_lag.setChecked(True)
-        self._check_chart_lag.setToolTip(self.tr("有源测试: Gain at Theta range vs Frequency 图表 (Y轴步进=1)"))
-        trim_chart_row.addWidget(self._check_chart_lag)
-
-        trim_chart_row.addStretch()
-        layout.addLayout(trim_chart_row)
+        chart_row.addWidget(self._check_chart_lag)
+        chart_row.addStretch()
+        layout.addLayout(chart_row)
 
         # 插入到 groupInput 之后
         vtab = self.ui.vTabFile
         idx = vtab.indexOf(self.ui.groupInput)
         if idx >= 0:
             vtab.insertWidget(idx + 1, self._data_file_widget)
-
-        # Theta 外推复选框
-        self._check_extrapolate = QCheckBox(self.tr("Theta 外推到 180°（启用后 Directivity 约低 0.04 dB）"))
-        self._check_extrapolate.setChecked(False)
-        self._check_extrapolate.setToolTip(
-            self.tr("勾选后将 Theta 0-110° 外推到 0-180°（线性外推）。"
-                     "外推会使球面积分增加，Directivity 降低约 0.04 dB。"
-                     "默认关闭，与人工计算方式一致。"))
-        out_idx = vtab.indexOf(self.ui.groupOutput)
-        if out_idx >= 0:
-            vtab.insertWidget(out_idx + 1, self._check_extrapolate)
 
         # 完整报告路径显示/隐藏
         self.ui.checkFullReport.toggled.connect(self._on_full_report_toggled)
@@ -244,6 +211,52 @@ class MainWindow(QMainWindow):
         # ---- 将整个 Tab 的内容包裹在可滚动区域中，防止内容溢出被压缩 ----
         self._make_tab_scrollable(self.ui.tabFile)
         self._make_tab_scrollable(self.ui.tabLag)
+
+    def _init_params_tab(self):
+        """构建「参数设置」标签页（频点 + 算法选项）。"""
+        vtab = self.ui.vTabCalc
+
+        group_freq = QGroupBox(self.tr("频点设置"))
+        freq_form = QFormLayout(group_freq)
+        freq_form.setSpacing(8)
+
+        self._cmb_freq_source = QComboBox()
+        self._cmb_freq_source.addItem(self.tr("新 sheet 频点: 数据源"), "datasource")
+        self._cmb_freq_source.addItem(self.tr("新 sheet 频点: 模板"), "template")
+        freq_form.addRow(self.tr("频点来源:"), self._cmb_freq_source)
+
+        trim_row = QHBoxLayout()
+        trim_row.addWidget(QLabel(self.tr("前")))
+        self._spin_trim_start = self._create_spinbox(0, 0, 50, self.tr("去除数据前 N 个频点"))
+        trim_row.addWidget(self._spin_trim_start)
+        trim_row.addWidget(QLabel(self.tr("后")))
+        self._spin_trim_end = self._create_spinbox(0, 0, 50, self.tr("去除数据后 N 个频点"))
+        trim_row.addStretch()
+        freq_form.addRow(self.tr("去除频点:"), trim_row)
+
+        vtab.addWidget(group_freq)
+
+        group_algo = QGroupBox(self.tr("计算算法"))
+        algo_vbox = QVBoxLayout(group_algo)
+        algo_vbox.setSpacing(6)
+
+        self._check_extrapolate = QCheckBox(
+            self.tr("Theta 外推到 180°"))
+        self._check_extrapolate.setChecked(False)
+        algo_vbox.addWidget(self._check_extrapolate)
+
+        self._check_robust_peak = QCheckBox(
+            self.tr("Robust peak detection (替代 np.max)"))
+        self._check_robust_peak.setChecked(False)
+        self._check_robust_peak.setToolTip(self.tr(
+            "启用后使用鲁棒峰值检测。适用于存在异常值的数据。默认关闭（IEEE 149 np.max）。"))
+        algo_vbox.addWidget(self._check_robust_peak)
+
+        algo_vbox.addStretch()
+        vtab.addWidget(group_algo)
+        vtab.addStretch()
+
+        self._make_tab_scrollable(self.ui.tabCalc)
 
     def _make_tab_scrollable(self, tab: QWidget):
         """将指定 Tab 的内容包裹在 QScrollArea 中，防止内容溢出被压缩。"""
@@ -846,6 +859,7 @@ class MainWindow(QMainWindow):
             trim_end=self._spin_trim_end.value(),
             chart_eff=self._check_chart_eff.isChecked(),
             chart_lag=self._check_chart_lag.isChecked(),
+            robust_peak=self._check_robust_peak.isChecked(),
         )
         self._worker.moveToThread(self._thread)
 

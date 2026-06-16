@@ -124,6 +124,7 @@ def _process_one_frequency(
     lag_config: LagConfig,
     *,
     do_extrapolate: bool = False,
+    robust_peak: bool = False,
 ) -> Dict[str, Any]:
     """处理单个频点: 外推 → 计算 → 返回结果行。"""
     theta_lm = raw["theta_logmag"]
@@ -140,7 +141,7 @@ def _process_one_frequency(
     theta_rad = np.deg2rad(theta_deg)
 
     # Gain
-    gain_linear, peak_dbi = compute_total_gain_linear(theta_lm, phi_lm)
+    gain_linear, peak_dbi = compute_total_gain_linear(theta_lm, phi_lm, robust=robust_peak)
 
     # Directivity
     directivity_dbi = compute_directivity(gain_linear, theta_rad)
@@ -176,6 +177,7 @@ def _process_one_frequency(
                 _, pp = extrapolate_theta(theta_orig, pp, "constant")
             ar = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
             if ar is not None and ar.size > 0:
+                # AR 返回线性值 (EMQuest 格式)，取前5个 phi 均值
                 row["axial_ratio"] = round(float(np.mean(ar[0, :5])), 6)
         except Exception as e:
             row["axial_ratio_error"] = str(e)
@@ -374,6 +376,7 @@ def _load_and_compute(
     tasks: List[Tuple[str, float, int, Any, DataSource]],
     sheets_info: List[Any],
     extrapolate_theta: bool,
+    robust_peak: bool,
     parallel: int,
     cancel_callback=None,
     progress_callback=None,
@@ -396,7 +399,7 @@ def _load_and_compute(
             break
         raw = task_ds.read_sections(csv_idx)
         theta_list = list(task_ds.theta_angles)
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta))
+        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak))
         if (i + 1) % 20 == 0 or (i + 1) == total:
             _report(progress_callback, i + 1, progress_max, f"读取中 {i + 1}/{total}")
 
@@ -433,12 +436,12 @@ def _run_compute_serial(
     cancel_callback, progress_callback,
 ):
     """串行逐频点计算（单进程或 parallel=1）。"""
-    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap) in enumerate(compute_tasks):
+    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk) in enumerate(compute_tasks):
         if cancel_callback and cancel_callback():
             break
         try:
             theta_arr = np.array(theta_list)
-            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap)
+            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk)
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
@@ -481,6 +484,7 @@ def run_pipeline(
     trim_start: int = 0,
     trim_end: int = 0,
     chart_config: Optional[Dict[str, bool]] = None,
+    robust_peak: bool = False,
     parallel: int = 1,
     cancel_callback: Optional[Callable[[], bool]] = None,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
@@ -539,7 +543,7 @@ def run_pipeline(
     # ---- 2. 收集任务 + 加载数据 + 计算 ----
     tasks = _collect_tasks(sheets_info, datasource, datasource_map, freq_source, trim_start, trim_end, log_callback)
     sheet_results = _load_and_compute(
-        tasks, sheets_info, extrapolate_theta, parallel,
+        tasks, sheets_info, extrapolate_theta, robust_peak, parallel,
         cancel_callback, progress_callback, log_callback,
     )
     _close_datasources(use_multi_ds, datasource, datasource_map)
@@ -635,11 +639,11 @@ def _compute_chunk(
     """
     import numpy as np
     results = []
-    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap in compute_tasks:
+    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk in compute_tasks:
         try:
             theta_raw = np.array(theta_list)
             row = _process_one_frequency(raw, freq, theta_raw, lag_cfg,
-                                         do_extrapolate=do_extrap)
+                                         do_extrapolate=do_extrap, robust_peak=rpk)
             results.append((sheet_name, row))
         except Exception as e:
             results.append((sheet_name, {"frequency": freq, "_error": str(e)}))

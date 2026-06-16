@@ -163,6 +163,14 @@
         <item><spacer name="spPlot"><property name="orientation"><enum>Qt::Vertical</enum></property></spacer></item>
        </layout>
       </widget>
+      <widget class="QWidget" name="tabCalc">
+       <attribute name="title">
+        <string>🧮 参数设置</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="vTabCalc">
+        <property name="spacing"><number>10</number></property>
+       </layout>
+      </widget>
      </widget>
     </item>
 

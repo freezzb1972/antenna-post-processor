@@ -25,12 +25,16 @@ import numpy as np
 def compute_total_gain_linear(
     theta_logmag: np.ndarray,  # (n_phi, n_theta)  dB
     phi_logmag: np.ndarray,    # (n_phi, n_theta)  dB
+    *,
+    robust: bool = False,
 ) -> Tuple[np.ndarray, float]:
     """计算总增益（Theta + Phi 极化合成）。
 
     Args:
         theta_logmag: Theta 极化 LogMag，单位 dB，形状 (n_phi, n_theta)。
         phi_logmag:   Phi   极化 LogMag，单位 dB，形状 (n_phi, n_theta)。
+        robust:       True → 鲁棒峰值检测（排除 null 伪影）；
+                      False → IEEE 149 标准 np.max（默认）。
 
     Returns:
         (gain_linear, peak_gain_dbi)
@@ -41,16 +45,15 @@ def compute_total_gain_linear(
     g_phi = np.power(10.0, phi_logmag / 10.0)
     total = g_theta + g_phi
 
-    # 鲁棒峰值检测：主瓣区域 (theta<40°) 的 phi-cut 峰值中位数
-    # 排除 null 测量伪影，避免单一异常点主导结果
-    n_phi, n_theta = total.shape
-    main_lobe_cols = min(n_theta, max(1, int(n_theta * 0.4)))  # 前 40% theta
-    if main_lobe_cols > 0:
-        lobe = total[:, :main_lobe_cols]  # (n_phi, main_lobe_cols)
-        cut_peaks = np.max(lobe, axis=1)   # (n_phi,) each phi-cut peak
-        peak = float(np.median(cut_peaks)) * 1.05  # 中位数 × 1.05 近似真峰值
+    if robust:
+        n_phi, n_theta = total.shape
+        main_lobe_cols = min(n_theta, max(1, int(n_theta * 0.4)))
+        lobe = total[:, :main_lobe_cols]
+        cut_peaks = np.max(lobe, axis=1)
+        peak = float(np.median(cut_peaks)) * 1.05
     else:
         peak = float(np.max(total))
+
     peak_dbi = 10.0 * np.log10(peak) if peak > 0 else -999.0
     return total, peak_dbi
 
@@ -366,34 +369,23 @@ def compute_axial_ratio(
     # AR = |E_RHC + E_LHC| / |E_RHC - E_LHC| 的绝对值
     # 或通过 Stokes 参数计算
 
-    # 方法：通过复电场的实部/虚部构建极化椭圆
-    # E(t) = Re{ [E_θ, E_φ] · e^{jωt} }
-    # 椭圆半轴通过求解特征值得到
+    # 圆极化分量法（EMQuest 同款，数值稳定）
+    # E_RHCP = (E_θ - j·E_φ) / √2
+    # E_LHCP = (E_θ + j·E_φ) / √2
+    # AR = (|E_RHCP| + |E_LHCP|) / ||E_RHCP| - |E_LHCP||
+    e_rhcp = (e_theta - 1j * e_phi) / np.sqrt(2.0)
+    e_lhcp = (e_theta + 1j * e_phi) / np.sqrt(2.0)
 
-    # Stokes 参数法（最数值稳定）
-    e_theta_conj = np.conj(e_theta)
-    e_phi_conj = np.conj(e_phi)
+    abs_rhcp = np.abs(e_rhcp)
+    abs_lhcp = np.abs(e_lhcp)
 
-    s0 = np.abs(e_theta) ** 2 + np.abs(e_phi) ** 2
-    s1 = np.abs(e_theta) ** 2 - np.abs(e_phi) ** 2
-    s2 = 2.0 * np.real(e_theta * e_phi_conj)
-    s3 = 2.0 * np.imag(e_theta * e_phi_conj)
+    # 避免除零：|RHCP| ≈ |LHCP| 时 AR → ∞
+    denom = np.abs(abs_rhcp - abs_lhcp)
+    denom = np.maximum(denom, 1e-15)
 
-    # 极化椭圆主轴/短轴
-    # |E_major|² = (S₀ + √(S₁²+S₂²+S₃²)) / 2
-    # |E_minor|² = (S₀ - √(S₁²+S₂²+S₃²)) / 2
-    s_pol = np.sqrt(s1**2 + s2**2 + s3**2)
-
-    major_sq = (s0 + s_pol) / 2.0
-    minor_sq = (s0 - s_pol) / 2.0
-
-    # 避免除零
-    minor_sq = np.maximum(minor_sq, 1e-30)
-
-    ar_linear = np.sqrt(major_sq / minor_sq)
-    ar_db = 20.0 * np.log10(ar_linear)
-
-    return ar_db  # (n_phi, n_theta)
+    ar_linear = (abs_rhcp + abs_lhcp) / denom
+    # EMQuest AxR 输出线性值（不是 dB），保持线性；调用方可自行转换
+    return ar_linear  # (n_phi, n_theta) AR 线性值
 
 
 # ======================================================================

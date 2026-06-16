@@ -38,6 +38,7 @@ class ProcessingWorker(QObject):
         trim_end: int = 0,
         chart_eff: bool = True,
         chart_lag: bool = True,
+        robust_peak: bool = False,
     ):
         super().__init__()
         self.csv_path = csv_path
@@ -54,6 +55,7 @@ class ProcessingWorker(QObject):
         self.trim_end = trim_end
         self.chart_eff = chart_eff
         self.chart_lag = chart_lag
+        self.robust_peak = robust_peak
         self._cancelled = False
 
     def cancel(self):
@@ -79,6 +81,7 @@ class ProcessingWorker(QObject):
                 trim_start=self.trim_start,
                 trim_end=self.trim_end,
                 chart_config={"eff": self.chart_eff, "lag": self.chart_lag},
+                robust_peak=self.robust_peak,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
                 log_callback=self._on_log,

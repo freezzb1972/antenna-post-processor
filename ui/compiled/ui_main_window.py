@@ -473,6 +473,12 @@ class Ui_MainWindow(object):
         self.vTabPlot.addItem(self.spPlot)
 
         self.tabConfig.addTab(self.tabPlot, "")
+        self.tabCalc = QWidget()
+        self.tabCalc.setObjectName(u"tabCalc")
+        self.vTabCalc = QVBoxLayout(self.tabCalc)
+        self.vTabCalc.setSpacing(10)
+        self.vTabCalc.setObjectName(u"vTabCalc")
+        self.tabConfig.addTab(self.tabCalc, "")
 
         self.rootVBox.addWidget(self.tabConfig)
 
@@ -609,6 +615,7 @@ class Ui_MainWindow(object):
         self.spinAzim.setSuffix(QCoreApplication.translate("MainWindow", u"\u00b0", None))
         self.lblDpi.setText(QCoreApplication.translate("MainWindow", u"\u5206\u8fa8\u7387 DPI\uff1a", None))
         self.tabConfig.setTabText(self.tabConfig.indexOf(self.tabPlot), QCoreApplication.translate("MainWindow", u"\U0001f4ca 3D \U000056fe\U00005f62", None))
+        self.tabConfig.setTabText(self.tabConfig.indexOf(self.tabCalc), QCoreApplication.translate("MainWindow", u"\U0001f9ee \U000053c2\U00006570\U00008bbe\U00007f6e", None))
         self.progressBar.setFormat(QCoreApplication.translate("MainWindow", u"%p%", None))
         self.lblProgressMsg.setText(QCoreApplication.translate("MainWindow", u"\u5c31\u7eea", None))
         self.logOutput.setPlaceholderText(QCoreApplication.translate("MainWindow", u"\u5904\u7406\u65e5\u5fd7\u5c06\u5728\u6b64\u663e\u793a...", None))
