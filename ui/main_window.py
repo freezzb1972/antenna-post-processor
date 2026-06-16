@@ -325,6 +325,9 @@ class MainWindow(QMainWindow):
         pm = menubar.addMenu(self.tr("&处理"))
         pm.addAction(self.tr("▶ 开始处理"), self._on_start, QKeySequence("F5"))
         pm.addAction(self.tr("⏹ 停止"), self._on_stop, QKeySequence("Esc"))
+        tm = menubar.addMenu(self.tr("&工具"))
+        tm.addAction(self.tr("数据转换 (Raw→标准)..."), self._on_tool_convert)
+        tm.addAction(self.tr("数据合并 (多段拼接)..."), self._on_tool_merge)
         hm = menubar.addMenu(self.tr("&帮助"))
         hm.addAction(self.tr("使用说明"), self._on_help, QKeySequence("F1"))
         hm.addAction(self.tr("关于..."), self._on_about)
@@ -350,6 +353,44 @@ class MainWindow(QMainWindow):
         import webbrowser, os
         guide = os.path.join(os.path.dirname(__file__), "..", "USER_GUIDE.html")
         if os.path.exists(guide): webbrowser.open(f"file://{os.path.abspath(guide)}")
+
+    def _on_tool_convert(self):
+        path, _ = QFileDialog.getOpenFileName(self, self.tr("选择 Raw CSV 文件"), "",
+            self.tr("CSV 文件 (*.csv);;所有文件 (*)"))
+        if not path: return
+        out = str(Path(path).parent / f"{Path(path).stem}_converted.csv")
+        out_path, _ = QFileDialog.getSaveFileName(self, self.tr("保存转换结果"), out,
+            self.tr("CSV 文件 (*.csv)"))
+        if not out_path: return
+        try:
+            from src.raw_converter import convert_aborted_to_normal
+            self._log(f"🔄 数据转换: {Path(path).name}")
+            result = convert_aborted_to_normal(path, out_path,
+                progress_callback=lambda c, t, m: self._on_progress(c, t, m))
+            self._log(f"✓ 转换完成: {result}")
+            QMessageBox.information(self, self.tr("完成"), self.tr(f"转换完成:\n{result}"))
+        except Exception as e:
+            self._log(f"✗ 转换失败: {e}")
+            QMessageBox.critical(self, self.tr("错误"), str(e))
+
+    def _on_tool_merge(self):
+        paths, _ = QFileDialog.getOpenFileNames(self, self.tr("选择要合并的 CSV 文件 (可多选)"), "",
+            self.tr("CSV 文件 (*.csv);;所有文件 (*)"))
+        if len(paths) < 2: return
+        out = str(Path(paths[0]).parent / "merged.csv")
+        out_path, _ = QFileDialog.getSaveFileName(self, self.tr("保存合并结果"), out,
+            self.tr("CSV 文件 (*.csv)"))
+        if not out_path: return
+        try:
+            from src.raw_converter import merge_csv_files
+            self._log(f"🔗 数据合并: {len(paths)} 个文件")
+            result = merge_csv_files(paths, out_path,
+                progress_callback=lambda c, t, m: self._on_progress(c, t, m))
+            self._log(f"✓ 合并完成: {result}")
+            QMessageBox.information(self, self.tr("完成"), self.tr(f"合并完成:\n{result}"))
+        except Exception as e:
+            self._log(f"✗ 合并失败: {e}")
+            QMessageBox.critical(self, self.tr("错误"), str(e))
 
     def _on_about(self):
         QMessageBox.about(self, self.tr("关于"),
