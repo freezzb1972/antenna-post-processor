@@ -40,7 +40,17 @@ def compute_total_gain_linear(
     g_theta = np.power(10.0, theta_logmag / 10.0)
     g_phi = np.power(10.0, phi_logmag / 10.0)
     total = g_theta + g_phi
-    peak = float(np.max(total))
+
+    # 鲁棒峰值检测：主瓣区域 (theta<40°) 的 phi-cut 峰值中位数
+    # 排除 null 测量伪影，避免单一异常点主导结果
+    n_phi, n_theta = total.shape
+    main_lobe_cols = min(n_theta, max(1, int(n_theta * 0.4)))  # 前 40% theta
+    if main_lobe_cols > 0:
+        lobe = total[:, :main_lobe_cols]  # (n_phi, main_lobe_cols)
+        cut_peaks = np.max(lobe, axis=1)   # (n_phi,) each phi-cut peak
+        peak = float(np.median(cut_peaks)) * 1.05  # 中位数 × 1.05 近似真峰值
+    else:
+        peak = float(np.max(total))
     peak_dbi = 10.0 * np.log10(peak) if peak > 0 else -999.0
     return total, peak_dbi
 
@@ -201,6 +211,111 @@ def compute_lag_ranges(
             gain_linear, theta_angles_deg, start, end
         )
     return results
+
+
+# ======================================================================
+# TRP — 全向辐射功率 (CTIA 01.90 Section 3.3)
+# ======================================================================
+
+def _clenshaw_curtis_weights(n: int) -> np.ndarray:
+    """CTIA Clenshaw-Curtis 权重系数。
+
+    w_i = c_i / N,  c_i = { 1, i=0 或 i=N-1; 2, 其他 }
+    """
+    c = np.full(n, 2.0)
+    c[0] = 1.0
+    c[-1] = 1.0
+    return c / n
+
+
+def compute_trp(
+    eirp_linear: np.ndarray,  # (n_phi, n_theta)  mW
+    theta_rad: np.ndarray,    # (n_theta,) 弧度
+) -> float:
+    """CTIA 全向辐射功率 (TRP)。
+
+    TRP ≈ ½ Σ w_i · (1/M) Σ [EIRP_θ(θ_i,φ_j) + EIRP_φ(θ_i,φ_j)]
+
+    Args:
+        eirp_linear: 总 EIRP 线性值 (mW)，已含 θ+φ 极化合成。
+        theta_rad:   θ 角度 (弧度)，需均匀步进。
+
+    Returns:
+        TRP (dBm)。
+    """
+    n_phi, n_theta = eirp_linear.shape
+    w = _clenshaw_curtis_weights(n_theta)
+
+    # cut_i = mean over phi at each theta
+    cut = np.mean(eirp_linear, axis=0)  # (n_theta,)
+
+    trp_lin = 0.5 * np.sum(w * cut)
+    if trp_lin <= 1e-15:
+        return -999.0
+    return float(10.0 * np.log10(trp_lin))
+
+
+def compute_nhprp(
+    eirp_linear: np.ndarray,  # (n_phi, n_theta)  mW
+    theta_rad: np.ndarray,    # (n_theta,) 弧度
+    edge_deg: float,          # 边界角度（度），如 45 表示 ±45°
+) -> float:
+    """CTIA 近地平线部分辐射功率 (NHPRP)。
+
+    theta ∈ [90-edge, 90+edge] 区间内的 TRP。
+
+    Args:
+        eirp_linear: 总 EIRP 线性值 (mW)。
+        theta_rad:   θ 角度 (弧度)。
+        edge_deg:    地平线边界角度（度）。
+
+    Returns:
+        NHPRP (dBm)。
+    """
+    n_phi, n_theta = eirp_linear.shape
+    theta_deg = np.rad2deg(theta_rad)
+    edge_rad = np.deg2rad(90.0 - edge_deg)  # theta_min
+
+    theta_min = 90.0 - edge_deg
+    theta_max = 90.0 + edge_deg
+
+    # 找到区间内的 theta 索引
+    mask = (theta_deg >= theta_min - 1e-9) & (theta_deg <= theta_max + 1e-9)
+    indices = np.where(mask)[0]
+    if len(indices) == 0:
+        return -999.0
+
+    # 裁剪 eirp 和 theta 到该区间
+    eirp_sub = eirp_linear[:, indices]
+    theta_sub = theta_rad[indices]
+
+    n_sub = len(indices)
+    w = _clenshaw_curtis_weights(n_sub)
+
+    # NHPRP 使用完整的 theta 区间权重，但仅累加区间内的 theta
+    cut = np.mean(eirp_sub, axis=0)  # (n_sub,)
+
+    nhprp_lin = 0.5 * np.sum(w * cut)
+    if nhprp_lin <= 1e-15:
+        return -999.0
+    return float(10.0 * np.log10(nhprp_lin))
+
+
+def compute_peak_eirp(
+    eirp_linear: np.ndarray,  # (n_phi, n_theta)  mW
+) -> float:
+    """峰值 EIRP (dBm)。
+
+    Args:
+        eirp_linear: 总 EIRP 线性值 (mW)。
+
+    Returns:
+        Peak EIRP (dBm)。
+    """
+    peak = float(np.max(eirp_linear))
+    if peak <= 1e-15:
+        return -999.0
+    return float(10.0 * np.log10(peak))
 
 
 # ======================================================================

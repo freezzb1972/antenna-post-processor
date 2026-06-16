@@ -24,10 +24,16 @@ from .calculator import (
     compute_efficiency,
     compute_lag_at_angles,
     compute_lag_ranges,
+    compute_nhprp,
+    compute_peak_eirp,
     compute_total_gain_linear,
+    compute_trp,
 )
+import copy
+import re
+
 from .datasource import DataSource
-from .excel_reader import read_template
+from .excel_reader import ColumnInfo, SheetInfo, read_template
 from .exporter import export_results
 from .lag_config import LagConfig
 from .parser import MergedCSVParser
@@ -142,12 +148,22 @@ def _process_one_frequency(
     # Efficiency
     eff_pct, eff_db = compute_efficiency(peak_dbi, directivity_dbi)
 
+    # TRP / NHPRP / Peak EIRP（有源测试指标，CTIA 标准）
+    trp_dbm = compute_trp(gain_linear, theta_rad)
+    nhprp_45 = compute_nhprp(gain_linear, theta_rad, 45.0)
+    nhprp_30 = compute_nhprp(gain_linear, theta_rad, 30.0)
+    peak_eirp = compute_peak_eirp(gain_linear)
+
     row: Dict[str, Any] = {
         "frequency": freq,
         "directivity": round(directivity_dbi, 6),
         "efficiency_pct": round(eff_pct, 6),
         "efficiency_db": round(eff_db, 6),
         "gain": round(peak_dbi, 6),
+        "trp": round(trp_dbm, 2),
+        "nhprp_45": round(nhprp_45, 2),
+        "nhprp_30": round(nhprp_30, 2),
+        "peak_eirp": round(peak_eirp, 2),
     }
 
     # Axial Ratio (仅当有 Phase 数据时)
@@ -193,6 +209,92 @@ def _find_closest_freq(csv_freqs: List[float], target: float, tol=5.0) -> Option
 
 
 # ---------------------------------------------------------------------------
+# 模板工作表自动扩增
+# ---------------------------------------------------------------------------
+
+def _derive_sheet_name(reference_name: str, target_key: str) -> str:
+    """从参考工作表名推导新工作表名。
+
+    "5G1" + key="G2" → "5G2"
+    "Antenna_G1" + key="G3" → "Antenna_G3"
+    """
+    m = re.search(r'G\d+', reference_name, re.IGNORECASE)
+    tk = re.search(r'G\d+', target_key, re.IGNORECASE)
+    if m and tk:
+        return reference_name[:m.start()] + tk.group(0).upper() + reference_name[m.end():]
+    return target_key
+
+
+def _expand_template_sheets(
+    sheets_info: List[SheetInfo],
+    datasource_map: Dict[str, DataSource],
+    freq_source: str = "datasource",
+) -> List[SheetInfo]:
+    """当模板工作表数少于数据源数时，用第一个 sheet 为模板克隆其余 sheet。
+
+    Args:
+        sheets_info:    read_template() 返回的原始列表。
+        datasource_map: {sheet_name: DataSource}。
+        freq_source:    "datasource" → 新 sheet 用数据源频点；
+                        "template" → 新 sheet 用模板最近邻匹配。
+
+    Returns:
+        扩展后的 SheetInfo 列表。
+    """
+    if len(sheets_info) < 2:
+        return list(sheets_info)
+
+    ref = sheets_info[0]
+    matched_names = {si.name for si in sheets_info}
+    existing_ds_names = set(datasource_map.keys())
+
+    # 找出有 datasource 但没对应 sheet 的名称
+    unmatched = existing_ds_names - matched_names
+    if not unmatched:
+        return list(sheets_info)
+
+    expanded = list(sheets_info)
+
+    for ds_name in sorted(unmatched):
+        # 从 datasource 名称提取 key
+        from .sheet_file_matcher import extract_key
+        key = extract_key(ds_name).lstrip("0123456789")
+        new_name = _derive_sheet_name(ref.name, key)
+
+        # 深拷贝列头结构
+        new_columns = [
+            ColumnInfo(
+                col_letter=c.col_letter,
+                col_index=c.col_index,
+                raw_header=c.raw_header,
+                normalized_header=c.normalized_header,
+                col_type=c.col_type,
+            )
+            for c in ref.columns
+        ]
+
+        ds = datasource_map[ds_name]
+        if freq_source == "template":
+            frequencies = list(ref.frequencies)
+        else:
+            frequencies = list(ds.frequencies)
+
+        new_si = SheetInfo(
+            name=new_name,
+            header_row=ref.header_row,
+            data_start_row=ref.data_start_row,
+            data_end_row=ref.data_start_row + len(frequencies) - 1,
+            columns=new_columns,
+            frequencies=frequencies,
+            lag_config=copy.deepcopy(ref.lag_config),
+            theta_range=ref.theta_range,
+        )
+        expanded.append(new_si)
+
+    return expanded
+
+
+# ---------------------------------------------------------------------------
 # 管线助手 — 任务收集 / 数据加载+计算
 # ---------------------------------------------------------------------------
 
@@ -200,11 +302,19 @@ def _collect_tasks(
     sheets_info: List[Any],
     datasource: Optional[DataSource],
     datasource_map: Optional[Dict[str, DataSource]],
+    freq_source: str = "datasource",
     log_cb=None,
 ) -> List[Tuple[str, float, int, Any, DataSource]]:
     """收集所有 (sheet_name, freq, csv_idx, lag_cfg, ds) 任务。"""
     use_multi = datasource_map is not None
     tasks: List[Tuple[str, float, int, Any, DataSource]] = []
+
+    if use_multi:
+        original_sheets = {si.name for si in sheets_info}
+        all_ds_names = set(datasource_map.keys())
+        expanded_names = all_ds_names - original_sheets
+    else:
+        expanded_names = set()
 
     for si in sheets_info:
         ds: Optional[DataSource] = datasource_map.get(si.name) if use_multi else datasource
@@ -212,13 +322,28 @@ def _collect_tasks(
             if use_multi:
                 _log(log_cb, f"  ⚠ {si.name}: 无匹配数据源 — 跳过")
             continue
-        dsfreqs = ds.frequencies
-        for freq in si.frequencies:
-            idx = _find_closest_freq(dsfreqs, freq)
-            if idx is not None:
+
+        is_expanded = si.name in expanded_names if use_multi else False
+        use_ds_freqs = (is_expanded and freq_source == "datasource")
+
+        if not use_ds_freqs:
+            # 先尝试最近邻匹配（模板频点 → 数据源频点）
+            dsfreqs = ds.frequencies
+            match_count = 0
+            for freq in si.frequencies:
+                idx = _find_closest_freq(dsfreqs, freq)
+                if idx is not None:
+                    tasks.append((si.name, freq, idx, si.lag_config, ds))
+                    match_count += 1
+            # 如果一个都没匹配上，回退到数据源频点
+            if match_count == 0 and dsfreqs:
+                _log(log_cb, f"  ↻ {si.name}: 模板频点无匹配 → 使用数据源全部 {len(dsfreqs)} 个频点")
+                use_ds_freqs = True
+
+        if use_ds_freqs:
+            dsfreqs = ds.frequencies
+            for idx, freq in enumerate(dsfreqs):
                 tasks.append((si.name, freq, idx, si.lag_config, ds))
-            else:
-                _log(log_cb, f"  ⚠ {si.name} · {freq} MHz: 无匹配频点")
 
     _log(log_cb, f"共 {len(tasks)} 个待处理频点")
     return tasks
@@ -331,6 +456,7 @@ def run_pipeline(
     plot_config: Optional[PlotConfig] = None,
     full_report_path: Optional[str] = None,
     extrapolate_theta: bool = False,
+    freq_source: str = "datasource",
     parallel: int = 1,
     cancel_callback: Optional[Callable[[], bool]] = None,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
@@ -347,6 +473,9 @@ def run_pipeline(
         lag_config_override: LAG 配置覆盖。
         plot_config:         3D 图配置 (默认: 不生成图)。
         full_report_path:    完整报告路径。
+        extrapolate_theta:   Theta 外推开关。
+        freq_source:         "datasource" 或 "template"。
+                             当模板 sheet 数<数据源数时，新 sheet 的频点来源。
         parallel:            (保留参数，当前仅串行)。
         cancel_callback / progress_callback / log_callback: 同旧版。
 
@@ -371,13 +500,20 @@ def run_pipeline(
     for si in sheets_info:
         _log(log_callback, f"  {si.name}: {len(si.frequencies)} 频点")
 
+    # ---- 1.5: 自动扩增工作表 (模板 sheet 数 < 数据源数) ----
+    if use_multi_ds and len(sheets_info) < len(datasource_map):
+        _log(log_callback, f"模板 {len(sheets_info)} 个工作表 → {len(datasource_map)} 个数据源，自动扩增...")
+        sheets_info = _expand_template_sheets(sheets_info, datasource_map, freq_source)
+        for si in sheets_info:
+            _log(log_callback, f"  {si.name}: {len(si.frequencies)} 频点 (来源: {'数据源' if freq_source == 'datasource' else '模板'})")
+
     if lag_config_override is not None and not lag_config_override.is_empty():
         for si in sheets_info:
             si.lag_config = lag_config_override
         _log(log_callback, "使用用户指定的 LAG 配置")
 
     # ---- 2. 收集任务 + 加载数据 + 计算 ----
-    tasks = _collect_tasks(sheets_info, datasource, datasource_map, log_callback)
+    tasks = _collect_tasks(sheets_info, datasource, datasource_map, freq_source, log_callback)
     sheet_results = _load_and_compute(
         tasks, sheets_info, extrapolate_theta, parallel,
         cancel_callback, progress_callback, log_callback,

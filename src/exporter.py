@@ -21,6 +21,106 @@ from .lag_config import (_RE_LAG_RANGE, _RE_LAG_RANGE_NO_PREFIX,
                          _RE_LAG_SINGLE, _RE_LAG_SINGLE_NO_PREFIX, normalize_header)
 
 
+def _replace_cell_text(ws, old_sheet_name: str, new_sheet_name: str, max_scan_rows: int = 15):
+    """在工作表的前 N 行中查找并替换天线名称。
+
+    智能匹配策略（按优先级）：
+    1. 查找包含「旧全名」的单元格 → 替换为「新全名」
+    2. 查找包含「差异部分」（两名的变化字符段）的单元格 → 精准替换
+    3. 两策略都匹配多个单元格时，选「得分最高」的唯一匹配；否则跳过不替换
+    """
+    if old_sheet_name == new_sheet_name:
+        return
+
+    # 找出两个名字的差异段
+    old_delta, new_delta = _name_delta(old_sheet_name, new_sheet_name)
+
+    # 策略 1: 全名精确匹配（得分最高）
+    candidates_full = _find_matching_cells(ws, old_sheet_name, max_scan_rows)
+
+    # 策略 2: 差异段匹配（更灵活，如 "5G1"→"5G2" 中 "G1"→"G2"）
+    candidates_delta = []
+    if old_delta and len(old_delta) >= 2:  # 差异段至少 2 字符，避免 "1"→"2" 过度匹配
+        candidates_delta = _find_matching_cells(ws, old_delta, max_scan_rows)
+
+    # 选最佳匹配：优先全名唯一匹配 → 差异段唯一匹配 → 全名最高分 → 跳过
+    best = None
+    if len(candidates_full) == 1:
+        best = ("full", candidates_full[0])
+    elif len(candidates_delta) == 1:
+        best = ("delta", candidates_delta[0])
+    elif candidates_full:
+        best = ("full", candidates_full[0])  # 全名匹配多个时选最高分
+    elif candidates_delta:
+        best = ("delta", candidates_delta[0])  # 差异段匹配多个时选最高分
+
+    if best is None:
+        return  # 找不到可靠匹配，安全跳过
+
+    strategy, (row, col, _score) = best
+    cell = ws.cell(row, col)
+    old_text = str(cell.value) if cell.value else ""
+
+    if strategy == "full":
+        cell.value = old_text.replace(old_sheet_name, new_sheet_name)
+    else:
+        cell.value = old_text.replace(old_delta, new_delta)
+
+
+def _find_matching_cells(ws, search: str, max_rows: int):
+    """扫描前 N 行，返回匹配单元格列表 [(row, col, score), ...]。
+
+    分值规则:
+      - 单元格文本 == search        → 10 分（精确匹配）
+      - 单元格文本 以 search 开头    → 8 分
+      - 单元格文本 包含 search       → 5 分
+    """
+    matches = []
+    for row in range(1, max_rows + 1):
+        for col in range(1, ws.max_column + 1):
+            val = ws.cell(row, col).value
+            if not val or not isinstance(val, str):
+                continue
+            if search not in val:
+                continue
+            if val == search:
+                matches.append((row, col, 10))
+            elif val.startswith(search):
+                matches.append((row, col, 8))
+            else:
+                matches.append((row, col, 5))
+    matches.sort(key=lambda x: -x[2])  # 按分值降序
+    return matches
+
+
+def _name_delta(old: str, new: str):
+    """提取两个名字的「差异段」。
+
+    "5G1" vs "5G2" → ("5G1", "5G2") — 无共同字符，返回全名
+    "ANT001" vs "ANT002" → ("1", "2") — 共同前缀 ANT00，差异在末尾
+    "DUT-A" vs "DUT-B" → ("A", "B")
+    """
+    if old == new:
+        return "", ""
+
+    # 找共同前缀
+    i = 0
+    while i < min(len(old), len(new)) and old[i] == new[i]:
+        i += 1
+
+    # 找共同后缀（从差异点之后开始）
+    old_rest = old[i:]
+    new_rest = new[i:]
+    j = 0
+    while j < min(len(old_rest), len(new_rest)) and old_rest[-(j+1)] == new_rest[-(j+1)]:
+        j += 1
+
+    old_delta = old_rest[:len(old_rest)-j] if j > 0 else old_rest
+    new_delta = new_rest[:len(new_rest)-j] if j > 0 else new_rest
+
+    return old_delta, new_delta
+
+
 # ---------------------------------------------------------------------------
 # 公开 API
 # ---------------------------------------------------------------------------
@@ -61,13 +161,34 @@ def export_results(
     total_ops = sum(len(rows) for rows in sheet_results.values()) + len(sheets_info)
     current = 0
 
+    # 找到参考 worksheet（用于克隆）
+    ref_ws = wb.worksheets[0] if wb.worksheets else None
+
     for sheet_name, rows in sheet_results.items():
         if sheet_name not in wb.sheetnames:
-            continue
-        if sheet_name not in info_map:
-            continue
+            # 自动克隆：用第一个 worksheet 为模板创建新 sheet
+            if ref_ws is not None:
+                if log_callback:
+                    log_callback(f"  ↗ 自动创建工作表: {sheet_name}")
+                ws = wb.copy_worksheet(ref_ws)
+                ws.title = sheet_name
+                # 替换单元格中旧的 sheet 名 → 新的 sheet 名（如 "5G1"→"5G2"）
+                _replace_cell_text(ws, ref_ws.title, sheet_name)
+            else:
+                continue
+        else:
+            ws = wb[sheet_name]
 
-        ws = wb[sheet_name]
+        if sheet_name not in info_map:
+            # 自动扩增的 sheet 不在原始 info_map 中 — 从 sheets_info 查找
+            if sheets_info:
+                for si in sheets_info:
+                    if si.name == sheet_name:
+                        info_map[sheet_name] = si
+                        break
+            if sheet_name not in info_map:
+                continue
+
         info = info_map[sheet_name]
 
         # 构建列映射: col_type → ColumnInfo
@@ -94,6 +215,14 @@ def export_results(
                 elif key == "gain":
                     # 可能有多个 Gain 列 (5G4)
                     _write_cell(ws, excel_row, col_map, "gain", value)
+                elif key == "trp":
+                    _write_cell(ws, excel_row, col_map, "trp", value)
+                elif key == "nhprp_45":
+                    _write_cell(ws, excel_row, col_map, "nhprp_45", value)
+                elif key == "nhprp_30":
+                    _write_cell(ws, excel_row, col_map, "nhprp_30", value)
+                elif key == "peak_eirp":
+                    _write_cell(ws, excel_row, col_map, "peak_eirp", value)
                 elif key.startswith("lag_single_"):
                     # key: "lag_single_60.0" → 匹配 theta=60 的 LAG 列
                     angle_str = key[len("lag_single_"):]
@@ -117,11 +246,115 @@ def export_results(
         if progress_callback:
             progress_callback(current, total_ops, f"完成 {sheet_name}")
 
+    # ---- 嵌入图表 ----
+    _add_charts(wb, sheet_results, info_map, log_callback)
+
     # 保存
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     wb.save(output_path)
     wb.close()
     return output_path
+
+
+def _add_charts(wb, sheet_results, info_map, log_callback=None):
+    """在对应的 sheet 中嵌入图表。"""
+    from openpyxl.chart import ScatterChart, Reference, Series
+    from openpyxl.chart.axis import NumericAxis
+
+    for sheet_name, rows in sheet_results.items():
+        if not rows or sheet_name not in wb.sheetnames:
+            continue
+        ws = wb[sheet_name]
+        info = info_map.get(sheet_name)
+        if info is None:
+            continue
+
+        data_start = info.data_start_row
+        n_rows = len(rows)
+        if n_rows < 2:
+            continue
+        data_end = data_start + n_rows - 1
+
+        # 确定 X 列 (Frequency)
+        freq_col = None
+        for cinfo in info.columns:
+            if cinfo.col_type == "frequency":
+                freq_col = cinfo.col_index
+                break
+        if freq_col is None:
+            continue
+
+        # 图表 1: 无源测试 → Efficiency vs Frequency
+        eff_col = None
+        for cinfo in info.columns:
+            if cinfo.col_type == "efficiency_pct":
+                eff_col = cinfo.col_index
+                break
+        if eff_col is not None:
+            _add_scatter_chart(ws, "Efficiency vs Frequency", freq_col, eff_col,
+                              data_start, data_end, n_rows + 5, freq_col + 2)
+
+        # 图表 2: 有源测试 → Gain at Theta=0~70 vs Frequency (Y轴步进=1)
+        lag_col = None
+        for cinfo in info.columns:
+            if cinfo.col_type == "lag_range":
+                lag_col = cinfo.col_index
+                break
+        if lag_col is not None:
+            chart = _add_scatter_chart(ws, "Gain at Theta=0~70 vs Frequency",
+                                       freq_col, lag_col, data_start, data_end,
+                                       n_rows + 5, lag_col + 2,
+                                       y_step=1.0, y_min=None)
+
+
+def _add_scatter_chart(ws, title, x_col, y_col, data_start, data_end,
+                       anchor_row, anchor_col, y_step=None, y_min=None):
+    """添加散点折线图到工作表。返回 chart 对象。"""
+    from openpyxl.chart import ScatterChart, Reference, Series
+    from openpyxl.chart.axis import NumericAxis
+    from openpyxl.utils import get_column_letter
+
+    chart = ScatterChart()
+    chart.title = title
+    chart.style = 2
+    chart.width = 18  # cm
+    chart.height = 10
+
+    # X 轴
+    x_letter = get_column_letter(x_col)
+    x_values = Reference(ws, min_col=x_col, min_row=data_start,
+                         max_row=data_end, max_col=x_col)
+
+    # Y 轴
+    y_letter = get_column_letter(y_col)
+    y_values = Reference(ws, min_col=y_col, min_row=data_start,
+                         max_row=data_end, max_col=y_col)
+
+    series = Series(y_values, x_values, title_from_data=False)
+    series.marker.symbol = 'circle'
+    series.marker.size = 4
+    series.graphicalProperties.line.width = 20000  # EMU
+
+    chart.series.append(series)
+
+    # Y 轴配置
+    if y_step is not None:
+        chart.y_axis.numFmt = '0'
+        chart.y_axis.tickLblSkip = 1
+        chart.y_axis.tickMarkSkip = 1
+        # 设置主刻度单位为 1
+        chart.y_axis.majorUnit = y_step
+        chart.y_axis.scaling.min = y_min
+
+    # X 轴
+    chart.x_axis.title = 'Frequency (MHz)'
+    chart.x_axis.numFmt = '0'
+
+    # 放置图表
+    anchor_cell = f"{get_column_letter(anchor_col)}{anchor_row}"
+    ws.add_chart(chart, anchor_cell)
+
+    return chart
 
 
 # ---------------------------------------------------------------------------

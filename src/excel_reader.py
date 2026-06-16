@@ -50,7 +50,31 @@ def is_gain_column(header: str) -> bool:
     # 排除 "average gain" — 那是 LAG，不是峰值增益
     if "average" in h:
         return False
-    return h.startswith("gain") or h in ("g(dbi)", "peakgain")
+    return h.startswith("gain") or h in ("g(dbi)", "peakgain", "peakeirp")
+
+
+def is_trp_column(header: str) -> bool:
+    """TRP 列。"""
+    h = header.lower()
+    return "trp" in h and "nhprp" not in h
+
+
+def is_nhprp_45_column(header: str) -> bool:
+    """NHPRP +/-45 列。"""
+    h = header.lower()
+    return ("nhprp" in h or "nhprp" in h) and "45" in h
+
+
+def is_nhprp_30_column(header: str) -> bool:
+    """NHPRP +/-30 列。"""
+    h = header.lower()
+    return ("nhprp" in h or "nhprp" in h) and "30" in h
+
+
+def is_peak_eirp_column(header: str) -> bool:
+    """Peak EIRP 列。"""
+    h = _normalize_key(header)
+    return "peakeirp" in h or "eirppeak" in h
 
 
 @dataclass
@@ -148,6 +172,14 @@ def _parse_sheet(ws) -> Optional[SheetInfo]:
                 ctype = "efficiency_pct"  # 默认当作 %
         elif is_gain_column(raw):
             ctype = "gain"
+        elif is_trp_column(raw):
+            ctype = "trp"
+        elif is_nhprp_45_column(raw):
+            ctype = "nhprp_45"
+        elif is_nhprp_30_column(raw):
+            ctype = "nhprp_30"
+        elif is_peak_eirp_column(raw):
+            ctype = "peak_eirp"
         else:
             # 可能是 LAG 列
             if _RE_LAG_RANGE.search(norm) or _RE_LAG_RANGE_NO_PREFIX.search(norm):

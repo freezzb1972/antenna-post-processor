@@ -33,6 +33,7 @@ class ProcessingWorker(QObject):
         plot_config: Optional[PlotConfig] = None,
         full_report_path: Optional[str] = None,
         extrapolate_theta: bool = False,
+        freq_source: str = "datasource",
     ):
         super().__init__()
         self.csv_path = csv_path
@@ -44,6 +45,7 @@ class ProcessingWorker(QObject):
         self.plot_config = plot_config or PlotConfig()
         self.full_report_path = full_report_path
         self.extrapolate_theta = extrapolate_theta
+        self.freq_source = freq_source
         self._cancelled = False
 
     def cancel(self):
@@ -65,6 +67,7 @@ class ProcessingWorker(QObject):
                 plot_config=self.plot_config,
                 full_report_path=self.full_report_path,
                 extrapolate_theta=self.extrapolate_theta,
+                freq_source=self.freq_source,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
                 log_callback=self._on_log,

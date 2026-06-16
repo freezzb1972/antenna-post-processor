@@ -181,6 +181,16 @@ class MainWindow(QMainWindow):
         match_row.addWidget(self._btn_auto_match)
         match_row.addWidget(self._lbl_match_status)
         match_row.addStretch()
+
+        # 频点来源选择（数据源频点点数 ≠ 模板频点点数时生效）
+        self._cmb_freq_source = QComboBox()
+        self._cmb_freq_source.addItem(self.tr("新 sheet 频点: 数据源"), "datasource")
+        self._cmb_freq_source.addItem(self.tr("新 sheet 频点: 模板"), "template")
+        self._cmb_freq_source.setToolTip(
+            self.tr("当模板工作表数少于数据源数时，自动扩增的工作表使用哪个频点列表。\n"
+                     "「数据源」= 使用该数据源文件中的全部频点\n"
+                     "「模板」= 使用模板中定义的频点列表（最近邻匹配）"))
+        match_row.addWidget(self._cmb_freq_source)
         layout.addLayout(match_row)
 
         # 插入到 groupInput 之后
@@ -340,7 +350,11 @@ class MainWindow(QMainWindow):
 
     def _build_datasource_map(self):
         from src.datasource import DataSource
+        from src.sheet_file_matcher import extract_key
         result = {}
+
+        # 已匹配的行
+        matched_files = set()
         for row in range(self._match_table.rowCount()):
             sheet_name = self._match_table.item(row, 0).text()
             combo = self._match_table.cellWidget(row, 1)
@@ -348,9 +362,33 @@ class MainWindow(QMainWindow):
             if fp and fp != "—" and Path(fp).exists():
                 try:
                     result[sheet_name] = DataSource.from_path(fp)
+                    matched_files.add(fp)
                 except Exception as e:
                     self._log(f"⚠ {sheet_name} 数据源加载失败: {e}")
+
+        # 未匹配的剩余数据文件：自动按命名推导工作表名
+        unmatched = [f for f in self._data_file_paths if f not in matched_files]
+        if unmatched and self._match_table.rowCount() > 0:
+            ref_name = self._match_table.item(0, 0).text() if self._match_table.item(0, 0) else ""
+            for fp in unmatched:
+                key = extract_key(fp).lstrip("0123456789")
+                sheet_name = self._derive_new_sheet_name(ref_name, key)
+                try:
+                    result[sheet_name] = DataSource.from_path(fp)
+                    self._log(f"  ↗ 自动添加: {sheet_name} ← {Path(fp).name}")
+                except Exception as e:
+                    self._log(f"⚠ {Path(fp).name} 加载失败: {e}")
+
         return result
+
+    def _derive_new_sheet_name(self, reference_name: str, target_key: str) -> str:
+        """从参考工作表名推导新工作表名: "5G1"+"G2" → "5G2" """
+        import re
+        m = re.search(r'G\d+', reference_name, re.IGNORECASE)
+        tk = re.search(r'G\d+', target_key, re.IGNORECASE)
+        if m and tk:
+            return reference_name[:m.start()] + tk.group(0).upper() + reference_name[m.end():]
+        return target_key
 
     def _init_theme_selector(self):
         """填充主题下拉框并选中当前主题。"""
@@ -767,6 +805,7 @@ class MainWindow(QMainWindow):
             plot_config=plot_config,
             full_report_path=full_report_path,
             extrapolate_theta=self._check_extrapolate.isChecked(),
+            freq_source=self._cmb_freq_source.currentData() or "datasource",
         )
         self._worker.moveToThread(self._thread)
 
