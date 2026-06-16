@@ -243,20 +243,32 @@ class CalcParamsDialog(QDialog):
                 ("efficiency_db", "Efficiency (dB)"),
                 ("frequency", "Frequency"),
             ]),
-            ("有源 TRP 参数", [
+            ("有源 TRP/TIS 参数", [
                 ("trp", "Tot. Rad. Pwr. (TRP)"),
+                ("tis", "Tot. Isot. Sens. (TIS)"),
                 ("peak_eirp", "Peak EIRP"),
                 ("nhprp_45", "NHPRP ±45° (Pi/4)"),
                 ("nhprp_30", "NHPRP ±30° (Pi/6)"),
                 ("nhprp_225", "NHPRP ±22.5° (Pi/8)"),
+                ("nhprp_custom", "NHPRP 自定义角度"),
+                ("nhpis_45", "NHPIS ±45° (Pi/4)"),
+                ("nhpis_30", "NHPIS ±30° (Pi/6)"),
+                ("nhpis_225", "NHPIS ±22.5° (Pi/8)"),
+                ("nhpis_custom", "NHPIS 自定义角度"),
                 ("uh_prp", "Upper Hem. PRP"),
                 ("lh_prp", "Lower Hem. PRP"),
+                ("uh_pis", "Upper Hem. PIS"),
+                ("lh_pis", "Lower Hem. PIS"),
                 ("prp_120", "PRP (theta 0-120°)"),
+                ("pis_120", "PIS (theta 0-120°)"),
             ]),
             ("比率参数", [
                 ("nhprp45_ratio", "NHPRP45 / TRP Ratio"),
                 ("nhprp30_ratio", "NHPRP30 / TRP Ratio"),
                 ("nhprp225_ratio", "NHPRP225 / TRP Ratio"),
+                ("nhpis45_ratio", "NHPIS45 / TIS Ratio"),
+                ("nhpis30_ratio", "NHPIS30 / TIS Ratio"),
+                ("nhpis225_ratio", "NHPIS225 / TIS Ratio"),
                 ("uh_ratio", "UHPRP / TRP Ratio"),
                 ("lh_ratio", "LHPRP / TRP Ratio"),
                 ("max_min_ratio", "Max/Min Ratio"),
@@ -325,6 +337,17 @@ class CalcParamsDialog(QDialog):
         if self._spin_end: rl.addWidget(self._spin_end)
         btn_range = QPushButton("添加范围"); rl.addWidget(btn_range); rl.addStretch()
         al.addWidget(grp_range)
+
+        # NHPRP/NHPIS 自定义地平线角度
+        grp_nh = QGroupBox("NHPRP/NHPIS 地平线边界角度")
+        nhl = QHBoxLayout(grp_nh)
+        nhl.addWidget(QLabel("±"))
+        self._spin_nhprp_angle = QDoubleSpinBox(); self._spin_nhprp_angle.setRange(0, 90)
+        self._spin_nhprp_angle.setValue(45.0); self._spin_nhprp_angle.setSuffix("°")
+        nhl.addWidget(self._spin_nhprp_angle)
+        nhl.addWidget(QLabel("(地平线±角度)"))
+        nhl.addStretch()
+        al.addWidget(grp_nh)
         al.addStretch()
 
         # Tab 3: 算法选项

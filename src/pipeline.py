@@ -177,23 +177,39 @@ def _process_one_frequency(
     nhprp_225 = compute_nhprp_flex(gain_linear, theta_rad, 22.5)
     nhprp_45_flex = compute_nhprp_flex(gain_linear, theta_rad, 45.0)
     nhprp_30_flex = compute_nhprp_flex(gain_linear, theta_rad, 30.0)
-    if "nhprp_225" in need or not need:
-        row["nhprp_225"] = round(nhprp_225, 2)
+    if "nhprp_225" in need or not need: row["nhprp_225"] = round(nhprp_225, 2)
+
+    # TIS = TRP (同公式, 不同测量模式)
+    if "tis" in need or not need: row["tis"] = round(compute_trp(gain_linear, theta_rad), 2)
+    # NHPIS = NHPRP (同公式, 不同测量模式)
+    for label, edge in [("nhpis_45", 45.0), ("nhpis_30", 30.0), ("nhpis_225", 22.5)]:
+        if label in need or not need: row[label] = round(compute_nhprp_flex(gain_linear, theta_rad, edge), 2)
+    # Custom NHPRP/NHPIS angle
+    if "nhprp_custom" in need or not need: row["nhprp_custom"] = round(compute_nhprp_flex(gain_linear, theta_rad, 45.0), 2)
+    if "nhpis_custom" in need or not need: row["nhpis_custom"] = round(compute_nhprp_flex(gain_linear, theta_rad, 45.0), 2)
 
     uh_prp = compute_upper_hemisphere_prp(gain_linear, theta_rad)
     lh_prp = compute_lower_hemisphere_prp(gain_linear, theta_rad)
     if "uh_prp" in need or not need: row["uh_prp"] = round(uh_prp, 2)
     if "lh_prp" in need or not need: row["lh_prp"] = round(lh_prp, 2)
+    if "uh_pis" in need or not need: row["uh_pis"] = round(uh_prp, 2)
+    if "lh_pis" in need or not need: row["lh_pis"] = round(lh_prp, 2)
 
     prp_120 = compute_partial_prp(gain_linear, theta_rad, 0, 120)
     if "prp_120" in need or not need: row["prp_120"] = round(prp_120, 2)
+    if "pis_120" in need or not need: row["pis_120"] = round(prp_120, 2)
 
-    ratio_need = need & {"nhprp45_ratio", "nhprp30_ratio", "nhprp225_ratio", "uh_ratio", "lh_ratio"}
+    ratio_need = need & {"nhprp45_ratio", "nhprp30_ratio", "nhprp225_ratio", "nhpis45_ratio",
+                          "nhpis30_ratio", "nhpis225_ratio", "uh_ratio", "lh_ratio"}
     if ratio_need or not need:
         trp_val = compute_trp(gain_linear, theta_rad)
-        for ratio_key, prp_val in [("nhprp45", nhprp_45_flex), ("nhprp30", nhprp_30_flex),
-                                    ("nhprp225", nhprp_225), ("uh", uh_prp), ("lh", lh_prp)]:
-            rdb, rpct = compute_prp_trp_ratio(prp_val, trp_val)
+        tis_val = trp_val  # same formula
+        for ratio_key, prp_val, ref_val in [
+            ("nhprp45", nhprp_45_flex, trp_val), ("nhprp30", nhprp_30_flex, trp_val),
+            ("nhprp225", nhprp_225, trp_val), ("nhpis45", nhprp_45_flex, tis_val),
+            ("nhpis30", nhprp_30_flex, tis_val), ("nhpis225", nhprp_225, tis_val),
+            ("uh", uh_prp, trp_val), ("lh", lh_prp, trp_val)]:
+            rdb, rpct = compute_prp_trp_ratio(prp_val, ref_val)
             if f"{ratio_key}_ratio_db" in need or not need: row[f"{ratio_key}_ratio_db"] = round(rdb, 2)
             if f"{ratio_key}_ratio_pct" in need or not need: row[f"{ratio_key}_ratio_pct"] = round(rpct, 2)
 
