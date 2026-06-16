@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -192,6 +193,32 @@ class MainWindow(QMainWindow):
                      "「模板」= 使用模板中定义的频点列表（最近邻匹配）"))
         match_row.addWidget(self._cmb_freq_source)
         layout.addLayout(match_row)
+
+        # 频点裁剪 + 图表选择行
+        trim_chart_row = QHBoxLayout()
+
+        trim_chart_row.addWidget(QLabel(self.tr("去除频点: 前")))
+        self._spin_trim_start = self._create_spinbox(0, 0, 50, self.tr("去除数据前 N 个频点"))
+        trim_chart_row.addWidget(self._spin_trim_start)
+
+        trim_chart_row.addWidget(QLabel(self.tr("后")))
+        self._spin_trim_end = self._create_spinbox(0, 0, 50, self.tr("去除数据后 N 个频点"))
+        trim_chart_row.addWidget(self._spin_trim_end)
+
+        trim_chart_row.addSpacing(12)
+
+        self._check_chart_eff = QCheckBox(self.tr("效率曲线"))
+        self._check_chart_eff.setChecked(True)
+        self._check_chart_eff.setToolTip(self.tr("无源测试: Efficiency (%) vs Frequency 图表"))
+        trim_chart_row.addWidget(self._check_chart_eff)
+
+        self._check_chart_lag = QCheckBox(self.tr("增益曲线"))
+        self._check_chart_lag.setChecked(True)
+        self._check_chart_lag.setToolTip(self.tr("有源测试: Gain at Theta range vs Frequency 图表 (Y轴步进=1)"))
+        trim_chart_row.addWidget(self._check_chart_lag)
+
+        trim_chart_row.addStretch()
+        layout.addLayout(trim_chart_row)
 
         # 插入到 groupInput 之后
         vtab = self.ui.vTabFile
@@ -509,6 +536,15 @@ class MainWindow(QMainWindow):
     # 文件浏览
     # ==================================================================
 
+    @staticmethod
+    def _create_spinbox(value, min_v, max_v, tooltip=""):
+        sb = QSpinBox()
+        sb.setRange(min_v, max_v)
+        sb.setValue(value)
+        sb.setToolTip(tooltip)
+        sb.setFixedWidth(50)
+        return sb
+
     def _on_full_report_toggled(self, checked: bool):
         """完整报告复选框切换 → 显示/隐藏路径输入框。"""
         self.ui.lblFullReportPath.setVisible(checked)
@@ -806,6 +842,10 @@ class MainWindow(QMainWindow):
             full_report_path=full_report_path,
             extrapolate_theta=self._check_extrapolate.isChecked(),
             freq_source=self._cmb_freq_source.currentData() or "datasource",
+            trim_start=self._spin_trim_start.value(),
+            trim_end=self._spin_trim_end.value(),
+            chart_eff=self._check_chart_eff.isChecked(),
+            chart_lag=self._check_chart_lag.isChecked(),
         )
         self._worker.moveToThread(self._thread)
 

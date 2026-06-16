@@ -34,6 +34,10 @@ class ProcessingWorker(QObject):
         full_report_path: Optional[str] = None,
         extrapolate_theta: bool = False,
         freq_source: str = "datasource",
+        trim_start: int = 0,
+        trim_end: int = 0,
+        chart_eff: bool = True,
+        chart_lag: bool = True,
     ):
         super().__init__()
         self.csv_path = csv_path
@@ -46,6 +50,10 @@ class ProcessingWorker(QObject):
         self.full_report_path = full_report_path
         self.extrapolate_theta = extrapolate_theta
         self.freq_source = freq_source
+        self.trim_start = trim_start
+        self.trim_end = trim_end
+        self.chart_eff = chart_eff
+        self.chart_lag = chart_lag
         self._cancelled = False
 
     def cancel(self):
@@ -68,6 +76,9 @@ class ProcessingWorker(QObject):
                 full_report_path=self.full_report_path,
                 extrapolate_theta=self.extrapolate_theta,
                 freq_source=self.freq_source,
+                trim_start=self.trim_start,
+                trim_end=self.trim_end,
+                chart_config={"eff": self.chart_eff, "lag": self.chart_lag},
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
                 log_callback=self._on_log,

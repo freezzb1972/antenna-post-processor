@@ -303,6 +303,8 @@ def _collect_tasks(
     datasource: Optional[DataSource],
     datasource_map: Optional[Dict[str, DataSource]],
     freq_source: str = "datasource",
+    trim_start: int = 0,
+    trim_end: int = 0,
     log_cb=None,
 ) -> List[Tuple[str, float, int, Any, DataSource]]:
     """收集所有 (sheet_name, freq, csv_idx, lag_cfg, ds) 任务。"""
@@ -344,6 +346,25 @@ def _collect_tasks(
             dsfreqs = ds.frequencies
             for idx, freq in enumerate(dsfreqs):
                 tasks.append((si.name, freq, idx, si.lag_config, ds))
+
+    # ---- 频点裁剪 (trim_start/trim_end) ----
+    if trim_start > 0 or trim_end > 0:
+        # 按 sheet 分组、按 freq 排序后裁剪首尾
+        from collections import OrderedDict
+        grouped: Dict[str, list] = OrderedDict()
+        for t in tasks:
+            grouped.setdefault(t[0], []).append(t)
+        tasks = []
+        for sn, group in grouped.items():
+            group.sort(key=lambda x: x[1])  # 按 freq 排序
+            end = len(group) - trim_end if trim_end > 0 else len(group)
+            trimmed = group[trim_start:end]
+            if trimmed:
+                tasks.extend(trimmed)
+            if trim_start > 0 or trim_end > 0:
+                removed = len(group) - len(trimmed)
+                if removed > 0:
+                    _log(log_cb, f"  ✂ {sn}: 去除 {removed} 个频点 (前{trim_start}后{trim_end})")
 
     _log(log_cb, f"共 {len(tasks)} 个待处理频点")
     return tasks
@@ -457,6 +478,9 @@ def run_pipeline(
     full_report_path: Optional[str] = None,
     extrapolate_theta: bool = False,
     freq_source: str = "datasource",
+    trim_start: int = 0,
+    trim_end: int = 0,
+    chart_config: Optional[Dict[str, bool]] = None,
     parallel: int = 1,
     cancel_callback: Optional[Callable[[], bool]] = None,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
@@ -513,7 +537,7 @@ def run_pipeline(
         _log(log_callback, "使用用户指定的 LAG 配置")
 
     # ---- 2. 收集任务 + 加载数据 + 计算 ----
-    tasks = _collect_tasks(sheets_info, datasource, datasource_map, freq_source, log_callback)
+    tasks = _collect_tasks(sheets_info, datasource, datasource_map, freq_source, trim_start, trim_end, log_callback)
     sheet_results = _load_and_compute(
         tasks, sheets_info, extrapolate_theta, parallel,
         cancel_callback, progress_callback, log_callback,
@@ -532,6 +556,7 @@ def run_pipeline(
         sheet_results=sheet_results,
         pattern_images=None,
         sheets_info=sheets_info,
+        chart_config=chart_config or {},
         log_callback=log_callback,
     )
     _report(progress_callback, progress_max - 1, progress_max, "Excel 写入完成")

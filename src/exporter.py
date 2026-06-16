@@ -132,6 +132,7 @@ def export_results(
     *,
     pattern_images: Optional[Dict[str, Dict[float, io.BytesIO]]] = None,
     sheets_info: Optional[List[SheetInfo]] = None,
+    chart_config: Optional[Dict[str, bool]] = None,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
     log_callback: Optional[Callable[[str], None]] = None,
 ) -> str:
@@ -247,7 +248,9 @@ def export_results(
             progress_callback(current, total_ops, f"完成 {sheet_name}")
 
     # ---- 嵌入图表 ----
-    _add_charts(wb, sheet_results, info_map, log_callback)
+    if chart_config is None:
+        chart_config = {}
+    _add_charts(wb, sheet_results, info_map, chart_config, log_callback)
 
     # 保存
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
@@ -256,8 +259,8 @@ def export_results(
     return output_path
 
 
-def _add_charts(wb, sheet_results, info_map, log_callback=None):
-    """在对应的 sheet 中嵌入图表。自动检测列类型匹配图表。"""
+def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
+    """在对应的 sheet 中嵌入图表。根据 chart_config 控制生成哪些图。"""
     for sheet_name, rows in sheet_results.items():
         if not rows or sheet_name not in wb.sheetnames:
             continue
@@ -278,20 +281,22 @@ def _add_charts(wb, sheet_results, info_map, log_callback=None):
 
         chart_offset = 0
 
-        # Efficiency vs Frequency (无源测试)
-        eff_col = next((c.col_index for c in info.columns if c.col_type == "efficiency_pct"), None)
-        if eff_col is not None:
-            _add_scatter_chart(ws, "Efficiency vs Frequency", freq_col, eff_col,
-                              data_start, data_end, n_rows + 5 + chart_offset, freq_col + 2)
-            chart_offset += 18
+        # Efficiency vs Frequency — 受 chart_config["eff"] 控制
+        if chart_config.get("eff", True):
+            eff_col = next((c.col_index for c in info.columns if c.col_type == "efficiency_pct"), None)
+            if eff_col is not None:
+                _add_scatter_chart(ws, "Efficiency vs Frequency", freq_col, eff_col,
+                                  data_start, data_end, n_rows + 5 + chart_offset, freq_col + 2)
+                chart_offset += 18
 
-        # Gain at Theta range vs Frequency (有源测试), Y轴步进=1
-        lag_col = next((c.col_index for c in info.columns if c.col_type == "lag_range"), None)
-        if lag_col is not None:
-            _add_scatter_chart(ws, "Gain at Theta=0~70 vs Frequency", freq_col, lag_col,
-                              data_start, data_end, n_rows + 5 + chart_offset, lag_col + 2,
-                              y_step=1.0)
-            chart_offset += 18
+        # Gain at Theta range vs Frequency — 受 chart_config["lag"] 控制
+        if chart_config.get("lag", True):
+            lag_col = next((c.col_index for c in info.columns if c.col_type == "lag_range"), None)
+            if lag_col is not None:
+                _add_scatter_chart(ws, "Gain at Theta=0~70 vs Frequency", freq_col, lag_col,
+                                  data_start, data_end, n_rows + 5 + chart_offset, lag_col + 2,
+                                  y_step=1.0)
+                chart_offset += 18
 
 
 def _add_scatter_chart(ws, title, x_col, y_col, data_start, data_end,
