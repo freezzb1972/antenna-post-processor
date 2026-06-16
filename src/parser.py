@@ -20,8 +20,12 @@ individual frequency blocks on demand. Peak memory ~1.3 MB per frequency.
 import os
 from typing import List, Tuple, Optional, Dict
 
+import numpy as np
 
-class MergedCSVParser:
+from .datasource import DataSource
+
+
+class MergedCSVParser(DataSource):
     """Parser for EMQuest merged CSV with byte-offset indexing."""
 
     SECTION_NAMES = [
@@ -32,11 +36,14 @@ class MergedCSVParser:
     ]
 
     def __init__(self, path: str):
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"CSV 文件不存在: {path}")
         self.path = path
         self._file_size = os.path.getsize(path)
         # Byte offsets: section_name -> list of file positions for each freq block
         self._section_offsets: Dict[str, List[int]] = {}
         self._frequencies: List[float] = []
+        self._fh = None  # 缓存文件句柄，避免重复 open
         self._theta_angles: List[float] = []
         self._phi_angles: List[float] = []
         self._indexed = False
@@ -139,6 +146,16 @@ class MergedCSVParser:
             result[key] = self.read_section_block(section_name, freq_index)
         return result
 
+    def read_sections(self, freq_index: int) -> Dict[str, Optional[np.ndarray]]:
+        """DataSource 接口: 返回 ndarray 格式的数据。"""
+        raw = self.read_all_sections_for_freq(freq_index)
+        return {
+            "theta_logmag": np.array(raw["theta_logmag"], dtype=np.float64),
+            "theta_phase": np.array(raw["theta_phase"], dtype=np.float64),
+            "phi_logmag": np.array(raw["phi_logmag"], dtype=np.float64),
+            "phi_phase": np.array(raw["phi_phase"], dtype=np.float64),
+        }
+
     # ------------------------------------------------------------------
     # Index building
     # ------------------------------------------------------------------
@@ -188,11 +205,17 @@ class MergedCSVParser:
                             # Read the next line (phi header) and data lines
                             f.readline()  # skip phi/response header
                             phi_vals = []
-                            for _ in range(360):
+                            while True:
+                                save_pos = f.tell()
                                 data_line = f.readline()
                                 if not data_line:
                                     break
-                                phi = self._parse_phi_from_line(data_line.strip())
+                                stripped = data_line.strip()
+                                # Stop if we hit next section or freq block
+                                if self._detect_section_or_freq(stripped):
+                                    f.seek(save_pos)  # don't consume boundary line
+                                    break
+                                phi = self._parse_phi_from_line(stripped)
                                 if phi is not None:
                                     phi_vals.append(phi)
                             self._phi_angles = phi_vals
@@ -207,25 +230,31 @@ class MergedCSVParser:
         self, offset: int, n_phi: int, n_theta: int
     ) -> List[List[float]]:
         """Read a single frequency block from a given byte offset."""
-        encoding = self._ENCODING
-        with open(self.path, "r", encoding=encoding, newline="") as f:
-            f.seek(offset)
+        if self._fh is None:
+            self._fh = open(self.path, "r", encoding=self._ENCODING, newline="")
+        self._fh.seek(offset)
 
-            # Skip the frequency+theta header line
-            f.readline()
-            # Skip the phi+response header line
-            f.readline()
+        # Skip the frequency+theta header line
+        self._fh.readline()
+        # Skip the phi+response header line
+        self._fh.readline()
 
-            # Read phi data lines
-            data = []
-            for _ in range(n_phi):
-                line = f.readline()
-                if not line:
-                    break
-                values = self._parse_phi_data_line(line.strip(), n_theta)
-                data.append(values)
+        # Read phi data lines
+        data = []
+        for _ in range(n_phi):
+            line = self._fh.readline()
+            if not line:
+                break
+            values = self._parse_phi_data_line(line.strip(), n_theta)
+            data.append(values)
 
         return data
+
+    def close(self):
+        """释放缓存文件句柄。"""
+        if self._fh:
+            self._fh.close()
+            self._fh = None
 
     # ------------------------------------------------------------------
     # Line-level parsing helpers
@@ -238,6 +267,22 @@ class MergedCSVParser:
             if line.startswith(name + ","):
                 return name
         return None
+
+    @staticmethod
+    def _detect_section_or_freq(line: str) -> bool:
+        """Check if this line starts a new section or frequency block."""
+        if MergedCSVParser._detect_section_header(line):
+            return True
+        if line.startswith(","):
+            parts = line.split(",")
+            if len(parts) >= 3:
+                try:
+                    float(parts[1].strip())
+                    if "Theta Angle" in line:
+                        return True
+                except (ValueError, IndexError):
+                    pass
+        return False
 
     @staticmethod
     def _is_freq_block_start(line: str) -> bool:

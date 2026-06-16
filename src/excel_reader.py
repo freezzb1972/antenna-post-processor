@@ -9,19 +9,48 @@ Excel 模板读取器
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 import openpyxl
 
-from .lag_config import (
-    LagConfig,
-    is_directivity_column,
-    is_efficiency_column,
-    is_frequency_column,
-    is_gain_column,
-    normalize_header,
-)
+from .lag_config import (LagConfig, normalize_header,
+                         _RE_LAG_RANGE, _RE_LAG_RANGE_NO_PREFIX,
+                         _RE_LAG_SINGLE, _RE_LAG_SINGLE_NO_PREFIX)
+
+
+# ---------------------------------------------------------------------------
+# 列头规范化 & 分类 (从 lag_config.py 移入 — 它们只被模板解析使用)
+# ---------------------------------------------------------------------------
+
+def _normalize_key(name: str) -> str:
+    """将列头转成小写无空格键，用于固定列匹配。"""
+    return re.sub(r"[^a-z%％()db]+", "", name.lower())
+
+
+def is_frequency_column(header: str) -> bool:
+    h = _normalize_key(header)
+    return "frequency" in h or h in ("freq", "f", "f(mhz)", "freq(mhz)")
+
+
+def is_directivity_column(header: str) -> bool:
+    h = _normalize_key(header)
+    return "directivity" in h or h in ("dir", "d(dbi)")
+
+
+def is_efficiency_column(header: str) -> bool:
+    h = _normalize_key(header)
+    return "efficiency" in h
+
+
+def is_gain_column(header: str) -> bool:
+    """峰值增益列（不是 LAG / Average Gain）。"""
+    h = _normalize_key(header)
+    # 排除 "average gain" — 那是 LAG，不是峰值增益
+    if "average" in h:
+        return False
+    return h.startswith("gain") or h in ("g(dbi)", "peakgain")
 
 
 @dataclass
@@ -121,12 +150,17 @@ def _parse_sheet(ws) -> Optional[SheetInfo]:
             ctype = "gain"
         else:
             # 可能是 LAG 列
-            from .lag_config import _RE_LAG_RANGE, _RE_LAG_SINGLE
-
-            if _RE_LAG_RANGE.search(norm):
+            if _RE_LAG_RANGE.search(norm) or _RE_LAG_RANGE_NO_PREFIX.search(norm):
                 ctype = "lag_range"
-            elif _RE_LAG_SINGLE.search(norm):
+            elif _RE_LAG_SINGLE.search(norm) or _RE_LAG_SINGLE_NO_PREFIX.search(norm):
                 ctype = "lag_single"
+            elif "average" in norm.lower() and "gain" in norm.lower():
+                # "Average Gain (dB)" ≈ LAG — 从列头尝试提取角度范围
+                _avg_range = re.search(r"(\d+)\s*[-–—]\s*(\d+)\s*deg", norm)
+                if _avg_range:
+                    ctype = "lag_range"
+                else:
+                    ctype = "gain_avg"
             else:
                 ctype = "unknown"
 

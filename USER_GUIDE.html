@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Antenna Post-Processor — 使用说明 & 公式参考</title>
+<style>
+  :root { --bg:#f8f9fa; --card:#fff; --text:#212529; --muted:#6c757d;
+          --accent:#0d6efd; --border:#dee2e6; --code-bg:#f1f3f5; --highlight:#e9ecef; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,'Segoe UI','Noto Sans SC',Roboto,sans-serif;
+         background:var(--bg); color:var(--text); line-height:1.7;
+         max-width:960px; margin:0 auto; padding:24px 20px; }
+  h1 { font-size:1.8em; margin:32px 0 16px; color:#0a58ca; border-bottom:2px solid var(--accent); padding-bottom:8px; }
+  h2 { font-size:1.35em; margin:28px 0 12px; color:#084298; }
+  h3 { font-size:1.1em; margin:20px 0 8px; color:#333; }
+  h4 { font-size:1em; margin:16px 0 6px; color:#495057; }
+  p, li { margin-bottom:6px; }
+  ul, ol { padding-left:24px; margin-bottom:12px; }
+  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:0.93em; }
+  th, td { padding:8px 12px; border:1px solid var(--border); text-align:left; vertical-align:top; }
+  th { background:var(--highlight); font-weight:600; }
+  tr:hover td { background:#f8f9fa; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:20px; margin:16px 0; }
+  .formula { background:var(--code-bg); border-left:3px solid var(--accent);
+    padding:14px 18px; margin:12px 0; border-radius:0 6px 6px 0;
+    font-family:'Courier New',Consolas,monospace; font-size:0.93em;
+    overflow-x:auto; white-space:pre-wrap; line-height:1.9; }
+  .note { background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:10px 14px; margin:10px 0; font-size:0.92em; }
+  code { background:var(--code-bg); padding:2px 6px; border-radius:4px; font-size:0.92em; }
+  .toc { line-height:2.1; }
+  .toc a { color:var(--accent); text-decoration:none; }
+  .toc a:hover { text-decoration:underline; }
+  .step { display:inline-block; background:var(--accent); color:#fff; border-radius:50%;
+          width:26px; height:26px; text-align:center; line-height:26px;
+          font-weight:700; margin-right:8px; font-size:0.85em; }
+  .ref { color:var(--muted); font-size:0.85em; }
+</style>
+</head>
+<body>
+
+<h1>📡 Antenna Post-Processor — 使用说明 & 公式参考</h1>
+
+<div class="card">
+  <h3>目录</h3>
+  <ol class="toc">
+    <li><a href="#quickstart">快速上手（操作指南）</a></li>
+    <li><a href="#overview">项目概述</a></li>
+    <li><a href="#io">输入输出格式</a></li>
+    <li><a href="#multi-file">多文件批量处理</a></li>
+    <li><a href="#flow">处理流程</a></li>
+    <li><a href="#f1">公式 1 — 总增益 Gain (dBi)</a></li>
+    <li><a href="#f2">公式 2 — 方向性 Directivity (dBi)</a></li>
+    <li><a href="#f3">公式 3 — 效率 Efficiency</a></li>
+    <li><a href="#f4">公式 4 — LAG 局部方位面增益</a></li>
+    <li><a href="#f5">公式 5 — 轴比 Axial Ratio (Stokes 参数法)</a></li>
+    <li><a href="#output-detail">输出模板 & 列头命名准则</a></li>
+    <li><a href="#extrapolation">Theta 外推选项</a></li>
+    <li><a href="#config">配置 & 频段</a></li>
+    <li><a href="#terminology">术语对照表</a></li>
+  </ol>
+</div>
+
+<!-- ================================================================== -->
+<h2 id="overview">2. 项目概述</h2>
+
+<p>Antenna Post-Processor 从 EMQuest 测试系统导出的 <code>*_merged.csv</code> 计算车企要求的各项天线指标，填入 Excel 模板并自动生成 3D 辐射方向图。</p>
+
+<div class="card">
+  <h4>运行方式</h4>
+  <div class="formula">
+# 图形界面 (PySide6, 主题 dark_teal)
+python main.py
+
+# 命令行批处理
+python -c "
+from src.pipeline import run_batch_pipeline
+run_batch_pipeline('data/5G1_merged.csv', 'data/template_5G1.xlsx', 'output/result.xlsx')
+"
+
+# 打包为 .exe
+pyinstaller antenna_post_processor.spec
+  </div>
+</div>
+
+<p><strong>技术栈:</strong> Python 3.8+ · NumPy · PySide6 (GUI) · openpyxl · Matplotlib · Qt Designer · i18n (中/英)</p>
+
+<!-- ================================================================== -->
+<!-- ================================================================== -->
+<h2 id="quickstart">1. 快速上手（操作指南）</h2>
+
+<h3>1.1 单文件模式</h3>
+
+<div class="card">
+  <p><span class="step">1</span> <strong>选择输入文件</strong> — 点击 <code>浏览...</code> 按钮（📂 文件设置 Tab → 输入文件），选择 <code>.csv</code> 或 <code>.xlsx</code> 数据文件。</p>
+  <p><span class="step">2</span> <strong>选择模板</strong> — 点击第二个 <code>浏览...</code>，选择模板 Excel（<code>.xlsx</code>）。选择后自动识别 LAG 列配置。</p>
+  <p><span class="step">3</span> <strong>确认 LAG 设置</strong> — 切换到 📐 <strong>LAG 配置</strong> Tab，确认快捷角度按钮和已配置项。可按需添加自定义角度或范围。</p>
+  <p><span class="step">4</span> <strong>选择外推</strong> — 勾选 <code>Theta 外推到 180°</code> 复选框（默认关闭）。外推会使 Directivity 降低约 0.04 dB，更接近 IEEE 标准全空间积分。</p>
+  <p><span class="step">5</span> <strong>开始处理</strong> — 点击 <code>▶ 开始处理</code> 按钮。进度条显示读取/计算/写入三阶段进度。完成后结果 CSV 自动导出到 <code>~/Downloads/</code>。</p>
+  <p><span class="step">6</span> <strong>查看结果</strong> — 输出 Excel 在输出目录中生成，每个 Sheet 填入对应频点的计算值。</p>
+</div>
+
+<h3>1.2 多文件批量模式</h3>
+
+<div class="card">
+  <p><span class="step">1</span> <strong>添加数据文件</strong> — 点击 <code>📂 添加数据文件...</code>（可在文件对话框中 Ctrl+点击多选），支持 <code>.csv</code> 和 <code>.xlsx</code> 混合选择。</p>
+  <p><span class="step">2</span> <strong>选择模板</strong> — 选择包含多个工作表（如 5G1~5G4）的模板 Excel。</p>
+  <p><span class="step">3</span> <strong>自动匹配</strong> — 点击 <code>🔗 自动匹配</code> 按钮，软件自动将工作表名与数据文件名按命名键匹配（如 "5G1" ↔ "G1FinalSummary.xlsx"）。</p>
+  <p><span class="step">4</span> <strong>检查匹配</strong> — 匹配表中每行显示 [工作表 | 数据文件（下拉可选） | 状态]。绿色 ✓ 表示已匹配，可手动调整下拉框覆盖自动匹配。</p>
+  <p><span class="step">5</span> <strong>开始处理</strong> — 点击 <code>▶ 开始处理</code>，每个工作表使用自己的数据源独立计算，结果写入同一个输出 Excel。</p>
+</div>
+
+<h3>1.3 功能速查</h3>
+
+<table>
+  <tr><th>功能</th><th>位置</th><th>说明</th></tr>
+  <tr><td>📂 文件设置</td><td>Tab 0</td><td>选择数据文件、模板、输出目录</td></tr>
+  <tr><td>📐 LAG 配置</td><td>Tab 1</td><td>快捷角度按钮（点击切换）、步进批量生成、角度范围、保存/加载预设</td></tr>
+  <tr><td>📊 3D 图形设置</td><td>Tab 2</td><td>视角（仰角/方位角）、分辨率 (DPI)、嵌入 Excel / 独立 PNG</td></tr>
+  <tr><td>🔗 自动匹配</td><td>文件 Tab（多文件区）</td><td>工作表↔数据文件自动匹配，支持手动覆盖</td></tr>
+  <tr><td>📏 外推开关</td><td>文件 Tab（底部）</td><td>Theta 0-110° → 0-180° 线性外推，默认关闭</td></tr>
+  <tr><td>🌐 语言切换</td><td>顶部工具栏</td><td>EN → 中 / 中 → EN</td></tr>
+  <tr><td>🎨 主题切换</td><td>顶部工具栏</td><td>下拉选择 Material Design 主题</td></tr>
+  <tr><td>📄 完整报告</td><td>输出区域复选框</td><td>生成独立 Excel 含全部指标 + 图表</td></tr>
+</table>
+
+
+<h2 id="io">3. 输入输出格式</h2>
+
+<h3>2.1 输入: EMQuest 合并 CSV</h3>
+
+<table>
+  <tr><th>Section</th><th>数据维度</th><th>说明</th></tr>
+  <tr><td>Theta Log Magnitude</td><td>105 频点 × 360 Phi × 111 Theta</td><td>θ 极化对数幅度 (dB)</td></tr>
+  <tr><td>Theta Phase</td><td>105 频点 × 360 Phi × 111 Theta</td><td>θ 极化相位 (°)</td></tr>
+  <tr><td>Phi Log Magnitude</td><td>105 频点 × 360 Phi × 111 Theta</td><td>φ 极化对数幅度 (dB)</td></tr>
+  <tr><td>Phi Phase</td><td>105 频点 × 360 Phi × 111 Theta</td><td>φ 极化相位 (°)</td></tr>
+</table>
+
+<ul>
+  <li><strong>Theta</strong> (俯仰角): 0–110°, step 1° (111 点)</li>
+  <li><strong>Phi</strong> (方位角): 0–359°, step 1° (360 点)</li>
+  <li><strong>频段:</strong> Low 690–960 MHz (30点) · Mid 1710–2690 MHz (43点) · High 3300–5000 MHz (32点)</li>
+</ul>
+
+<p class="ref">内存策略: 首遍扫描建立字节偏移索引，按需 seek+read 单个频点块，峰值内存 ~1.3 MB/频点。150 MB 文件加载时间 ~2 秒。</p>
+
+<h3>2.2 输出: 车企报告 Excel</h3>
+
+<p>从模板复制格式，逐频点填入计算值 + 嵌入 3D 球面辐射方向图 PNG。支持 4 个天线 Sheet (5G1~5G4)，每 Sheet 的列由模板自动检测。</p>
+
+<!-- ================================================================== -->
+
+<!-- ================================================================== -->
+<h2 id="multi-file">4. 多文件批量处理</h2>
+
+<h3>4.1 适用场景</h3>
+
+<p>当模板包含多个工作表（如 5G1、5G2、5G3、5G4），每个工作表对应<strong>不同天线</strong>的测试数据时使用。例如：</p>
+
+<table>
+  <tr><th>模板工作表</th><th>数据文件</th><th>匹配键</th></tr>
+  <tr><td>5G1</td><td>G1FinalSummary.xlsx</td><td>G1 ↔ G1</td></tr>
+  <tr><td>5G2</td><td>G2FinalSummary.xlsx</td><td>G2 ↔ G2</td></tr>
+  <tr><td>5G3</td><td>G3FinalSummary.xlsx</td><td>G3 ↔ G3</td></tr>
+  <tr><td>5G4</td><td>G4FinalSummary.xlsx</td><td>G4 ↔ G4</td></tr>
+</table>
+
+<h3>4.2 匹配算法</h3>
+
+<p>三步匹配策略，可手动覆盖：</p>
+
+<div class="formula">
+# 步骤 1：提取键
+"5G1"               → extract_key() → "G1"
+"G1FinalSummary.xlsx" → extract_key() → "G1"
+
+# 步骤 2：精确匹配（键相等 → 置信度 1.0）
+"G1" == "G1"  →  匹配 ✓
+
+# 步骤 3：回退匹配（第一个未匹配工作表 ← 第一个未使用文件 → 置信度 0.5）
+</div>
+
+<div class="note"><strong>提示：</strong>如果自动匹配不正确，可以在匹配表每行的下拉框中手动选择正确的数据文件。</div>
+
+<h3>4.3 多源处理逻辑</h3>
+
+<p>每个工作表使用<strong>独立的数据源</strong>和<strong>独立的 LAG 配置</strong>：</p>
+<ul>
+  <li>工作表 5G1 读取 G1FinalSummary.xlsx → 自己的频率列表 → 自己的列结构</li>
+  <li>工作表 5G2 读取 G2FinalSummary.xlsx → 自己的频率列表 → 自己的列结构</li>
+  <li>如果一个工作表没有匹配到数据源，会被跳过（日志中显示警告）</li>
+</ul>
+
+
+<h2 id="flow">5. 处理流程</h2>
+
+<div class="card">
+  <p><span class="step">1</span> <strong>CSV 流式索引</strong> — 扫描 section header 和频点位置，构建字节偏移表 (<code>src/parser.py</code>)</p>
+  <p><span class="step">2</span> <strong>模板列头解析</strong> — 正则识别 Frequency / Directivity / Gain / LAG 列，自动生成 LAG 配置 (<code>src/lag_config.py</code>)</p>
+  <p><span class="step">3</span> <strong>逐频点计算</strong> — 按 Sheet 频点列表，取 CSV 最近邻频点，计算全部指标 (<code>src/calculator.py</code>)</p>
+  <p><span class="step">4</span> <strong>图表生成</strong> — 3D 球面方向图 + 2D 极坐标 / 直角坐标切面 (<code>src/plotter.py</code>)</p>
+  <p><span class="step">5</span> <strong>Excel 填充</strong> — 保留模板格式，写入数值 + 嵌入 PNG (<code>src/exporter.py</code>)</p>
+</div>
+
+<!-- ================================================================== -->
+<h2 id="f1">公式 1 — 总增益 Gain (dBi)</h2>
+
+<h3>1.1 双极化合成 Total Power</h3>
+
+<p>Theta 极化 <code>G<sub>θ</sub></code> 和 Phi 极化 <code>G<sub>φ</sub></code> (均为 dB) 在线性域合成总功率：</p>
+
+<div class="formula">
+G<sub>θ,lin</sub>(φ,θ) = 10<sup> G<sub>θ</sub>(φ,θ) / 10 </sup>
+G<sub>φ,lin</sub>(φ,θ) = 10<sup> G<sub>φ</sub>(φ,θ) / 10 </sup>
+
+G<sub>total,lin</sub>(φ,θ) = G<sub>θ,lin</sub>(φ,θ) + G<sub>φ,lin</sub>(φ,θ)     <span class="ref">[线性标度]</span>
+
+G<sub>total</sub>(φ,θ) = 10 · log<sub>10</sub>( G<sub>total,lin</sub>(φ,θ) )        <span class="ref">[dBi]</span>
+</div>
+
+<h3>1.2 峰值增益</h3>
+
+<div class="formula">
+G<sub>peak</sub> = max { G<sub>total</sub>(φ,θ) }     for all φ ∈ [0, 359°], θ ∈ [0, 110°]
+</div>
+
+<p class="ref">实现: <code>src/calculator.py:compute_total_gain_linear()</code> — NumPy 向量化，单频点计算 &lt;1 ms。</p>
+
+<!-- ================================================================== -->
+<h2 id="f2">公式 2 — 方向性 Directivity (dBi)</h2>
+
+<h3>2.1 球面积分</h3>
+
+<div class="formula">
+U(φ,θ) = G<sub>total,lin</sub>(φ,θ)          <span class="ref">[辐射强度, 线性]</span>
+
+P<sub>rad</sub> = ∫<sub>0</sub><sup>2π</sup> ∫<sub>0</sub><sup>π</sup> U(φ,θ) · sin(θ)  dθ  dφ
+</div>
+
+<h3>2.2 数值积分（均匀网格）</h3>
+
+<div class="formula">
+Δθ = π / (N<sub>θ</sub> − 1)              <span class="ref">[弧度]</span>
+Δφ = 2π / N<sub>φ</sub>                   <span class="ref">[弧度]</span>
+
+P<sub>rad</sub> ≈ Σ<sub>i=0</sub><sup>Nφ−1</sup> Σ<sub>j=0</sub><sup>Nθ−1</sup> U(φ<sub>i</sub>,θ<sub>j</sub>) · sin(θ<sub>j</sub>) · Δθ · Δφ
+</div>
+
+<h3>2.3 方向性</h3>
+
+<div class="formula">
+D<sub>max</sub> = 10 · log<sub>10</sub> ( 4π · U<sub>max</sub> / P<sub>rad</sub> )    <span class="ref">[dBi]</span>
+</div>
+
+<p>其中 <code>U<sub>max</sub> = max{U(φ,θ)}</code>。</p>
+
+<div class="note"><strong>注意:</strong> 当前数据仅覆盖 Theta 0–110°，未做外推。对背部 (110–180°) 的忽略会导致 Directivity 略微高估。如需精确值，可在 pipeline 中启用外推。</div>
+
+<p class="ref">实现: <code>src/calculator.py:compute_directivity()</code> — NumPy broadcast，Δθ = π/(111−1)，Δφ = 2π/360。</p>
+
+<!-- ================================================================== -->
+<h2 id="f3">公式 3 — 效率 Efficiency</h2>
+
+<h3>3.1 辐射效率</h3>
+
+<div class="formula">
+η<sub>dB</sub> = G<sub>peak</sub> − D<sub>max</sub>             <span class="ref">[dB]</span>
+
+η<sub>%</sub> = 10<sup> η<sub>dB</sub> / 10 </sup> × 100      <span class="ref">[%]</span>
+</div>
+
+<p><strong>物理含义:</strong> η &lt; 100% (即 η<sub>dB</sub> &lt; 0) 表示存在导体损耗、介质损耗或阻抗失配。理想无损天线 G<sub>peak</sub> = D<sub>max</sub>，η = 100%。</p>
+
+<p class="ref">实现: <code>src/calculator.py:compute_efficiency()</code></p>
+
+<!-- ================================================================== -->
+<h2 id="f4">公式 4 — LAG 局部方位面增益</h2>
+
+<h3>4.1 定义</h3>
+
+<p>LAG (Local Azimuth Gain) = 固定俯仰角 θ 上，方位面 0–360° 扫描的<strong>线性域平均增益</strong>。用于评估天线在"某个仰角圈"上的覆盖能力。</p>
+
+<h3>4.2 单俯仰角 LAG</h3>
+
+<div class="formula">
+LAG(θ) = 10 · log<sub>10</sub>( (1 / N<sub>φ</sub>) · Σ<sub>i=0</sub><sup>Nφ−1</sup> G<sub>total,lin</sub>(φ<sub>i</sub>, θ) )     <span class="ref">[dB]</span>
+</div>
+
+<p>关键: <strong>在线性域做平均</strong>（先 10^(dB/10) 转线性，求和取均值，再转回 dB），而非直接在 dB 域求算术平均。</p>
+
+<h3>4.3 俯仰角范围 LAG</h3>
+
+<div class="formula">
+LAG(θ<sub>1</sub>→θ<sub>2</sub>) = (1 / N<sub>θ</sub>) · Σ<sub>θ∈[θ₁,θ₂]</sub> LAG(θ)       <span class="ref">[dB]</span>
+</div>
+
+<p>范围 LAG 在 <strong>dB 域</strong> 对各切片取均值。典型输出:</p>
+<ul>
+  <li><code>LAG(0→90°)</code> — 上半球面覆盖能力</li>
+  <li><code>LAG(60→90°)</code> — 低仰角覆盖能力（车载天线关键指标）</li>
+  <li><code>Theta=60/70/80/90</code> — 指定俯仰角切片的 LAG 值</li>
+</ul>
+
+<h3>4.4 LAG 配置自动检测</h3>
+
+  <p>模板 Excel 列头中正则匹配以下格式的列，自动提取单角度和范围配置：</p>
+
+  <h4>支持的单角度 LAG 列头格式</h4>
+  <div class="formula">
+  Theta=60           θ=70           Theta = 80      <span class="ref">← Theta=/θ= 前缀（推荐）</span>
+  60度LAG            70度 LAG        80度LAG          <span class="ref">← X度LAG 格式</span>
+  </div>
+
+  <h4>支持的范围 LAG 列头格式</h4>
+  <div class="formula">
+  Theta=0-90 LAG     θ=60-90         Theta=60-90 LAG  <span class="ref">← Theta=/θ= 前缀（推荐）</span>
+  0-90LAG            60-90LAG        0-90 LAG          <span class="ref">← X-YLAG 格式</span>
+  Average Gain (dB)                                  <span class="ref">← Average Gain 也识别为 LAG</span>
+  </div>
+
+  <p>也支持用户通过 GUI 手动配置任意角度组合。</p>
+
+<p class="ref">实现: <code>src/calculator.py:compute_lag_single() / compute_lag_at_angles() / compute_lag_range() / compute_lag_ranges()</code></p>
+
+<!-- ================================================================== -->
+<h2 id="f5">公式 5 — 轴比 Axial Ratio (Stokes 参数法, IEEE 149)</h2>
+
+<h3>5.1 复电场分量</h3>
+
+<div class="formula">
+|E<sub>θ</sub>| = 10<sup> G<sub>θ</sub> / 20 </sup>          <span class="ref">[场强幅值, 线性]</span>
+|E<sub>φ</sub>| = 10<sup> G<sub>φ</sub> / 20 </sup>          <span class="ref">[场强幅值, 线性]</span>
+
+E<sub>θ</sub> = |E<sub>θ</sub>| · e<sup> j · φ<sub>θ</sub> </sup>          <span class="ref">[复电场, θ 分量]</span>
+E<sub>φ</sub> = |E<sub>φ</sub>| · e<sup> j · φ<sub>φ</sub> </sup>          <span class="ref">[复电场, φ 分量]</span>
+</div>
+
+<p>其中 φ<sub>θ</sub>、φ<sub>φ</sub> 分别为 Theta Phase 和 Phi Phase 的弧度值。</p>
+
+<h3>5.2 Stokes 参数</h3>
+
+<div class="formula">
+S<sub>0</sub> = |E<sub>θ</sub>|² + |E<sub>φ</sub>|²                                    <span class="ref">[总功率]</span>
+S<sub>1</sub> = |E<sub>θ</sub>|² − |E<sub>φ</sub>|²                                    <span class="ref">[θ vs φ 功率差]</span>
+S<sub>2</sub> = 2 · Re( E<sub>θ</sub> · E<sub>φ</sub>* )                                <span class="ref">[±45° 线极化分量]</span>
+S<sub>3</sub> = 2 · Im( E<sub>θ</sub> · E<sub>φ</sub>* )                                <span class="ref">[圆极化分量]</span>
+</div>
+
+<p>其中 <code>E<sub>φ</sub>*</code> 为复共轭。S<sub>3</sub> > 0 表示右旋圆极化 (RHCP)，S<sub>3</sub> &lt; 0 表示左旋圆极化 (LHCP)。</p>
+
+<h3>5.3 极化椭圆半轴</h3>
+
+<div class="formula">
+S<sub>pol</sub> = √( S<sub>1</sub>² + S<sub>2</sub>² + S<sub>3</sub>² )                       <span class="ref">[极化功率]</span>
+
+|E<sub>major</sub>|² = ( S<sub>0</sub> + S<sub>pol</sub> ) / 2
+|E<sub>minor</sub>|² = ( S<sub>0</sub> − S<sub>pol</sub> ) / 2
+</div>
+
+<h3>5.4 轴比</h3>
+
+<div class="formula">
+AR<sub>linear</sub> = |E<sub>major</sub>| / |E<sub>minor</sub>|
+
+AR<sub>dB</sub> = 20 · log<sub>10</sub>( AR<sub>linear</sub> )                     <span class="ref">[dB]</span>
+</div>
+
+<p><strong>物理含义:</strong> AR = 0 dB → 理想圆极化；AR → ∞ (大值) → 纯线极化。|S<sub>3</sub>|/S<sub>0</sub> 越接近 1 极化越"圆"。</p>
+
+<div class="note"><strong>Stokes 法优势:</strong> 相比直接求解椭圆方程（易出现 C²≈0 的数值不稳定），Stokes 参数法通过 S<sub>1</sub>²+S<sub>2</sub>²+S<sub>3</sub>² 恒正保证了数值稳定性。参考 IEEE Std 149-2021 §C.2。</div>
+
+<p class="ref">实现: <code>src/calculator.py:compute_axial_ratio()</code> — NumPy 向量化，输出 (360, 111) AR 矩阵。</p>
+
+<!-- ================================================================== -->
+<h2 id="output-detail">6. 输出模板 & LAG 自动检测</h2>
+
+<h3>6.1 模板列头命名准则（正则识别）</h3>
+
+  <p>程序通过<strong>正则表达式</strong>（非 LLM）自动解析模板列头。<strong>模板制作时必须遵循以下命名准则</strong>，否则列头无法识别，数据不会填入对应列。</p>
+
+  <div class="note"><strong>重要：</strong>列头不区分大小写、忽略多余空格、支持全角/半角括号混用。但<strong>关键词拼写必须正确</strong>。</div>
+
+  <table>
+    <tr><th>列类型</th><th>✅ 正确写法（推荐）</th><th>✅ 也支持</th><th>❌ 无法识别</th></tr>
+    <tr>
+      <td><strong>Frequency</strong></td>
+      <td><code>Frequency</code><br><code>Frequency (MHz)</code></td>
+      <td><code>Freq</code><br><code>f(MHz)</code></td>
+      <td><code>F</code>（太短）<br><code>频点</code>（纯中文）</td>
+    </tr>
+    <tr>
+      <td><strong>Directivity</strong></td>
+      <td><code>Directivity</code></td>
+      <td><code>Dir</code><br><code>D(dBi)</code></td>
+      <td><code>方向性</code><br><code>DIRECT</code></td>
+    </tr>
+    <tr>
+      <td><strong>Efficiency (dB)</strong></td>
+      <td><code>Efficiency (dB)</code></td>
+      <td><code>Efficiency  (dB)</code><br><code>EFF (dB)</code></td>
+      <td><code>Eff_dB</code><br><code>效率(dB)</code></td>
+    </tr>
+    <tr>
+      <td><strong>Efficiency (%)</strong></td>
+      <td><code>Efficiency (%)</code></td>
+      <td><code>Efficiency（％）</code><br><code>EFF (%)</code></td>
+      <td><code>Eff%</code><br><code>效率(%)</code></td>
+    </tr>
+    <tr>
+      <td><strong>Gain（峰值增益）</strong></td>
+      <td><code>Gain (dBi)</code></td>
+      <td><code>Gain</code><br><code>PeakGain</code></td>
+      <td><code>Average Gain</code>（会被识别为 LAG）<br><code>增益</code></td>
+    </tr>
+    <tr>
+      <td><strong>LAG 单角度</strong></td>
+      <td><code>Theta=60</code><br><code>θ=70</code></td>
+      <td><code>60度LAG</code><br><code>70度 LAG</code></td>
+      <td><code>LAG@60</code><br><code>θ60</code>（缺等号）</td>
+    </tr>
+    <tr>
+      <td><strong>LAG 范围</strong></td>
+      <td><code>Theta=0-90 LAG</code><br><code>θ=60-90</code></td>
+      <td><code>60-90LAG</code><br><code>0-90 LAG</code></td>
+      <td><code>LAG_0_90</code><br><code>θ(0-90)</code></td>
+    </tr>
+    <tr>
+      <td><strong>Average Gain</strong><br>（等同于 LAG 范围）</td>
+      <td><code>Average Gain (dB)</code></td>
+      <td><code>Average Gain (dB)(60-90deg)</code></td>
+      <td><code>AvgGain</code><br><code>Mean Gain</code></td>
+    </tr>
+  </table>
+
+  <h4>LAG 单角度命名详解</h4>
+  <div class="formula">
+  # 方式 1 — 推荐（最明确）
+  Theta=60     Theta=70     Theta=80     Theta=90
+  θ=60         θ=70
+
+  # 方式 2 — 中文习惯
+  60度LAG      70度LAG      80度LAG      90度LAG
+  60度 LAG     90度 LAG     （空格可选）
+  </div>
+
+  <h4>LAG 范围命名详解</h4>
+  <div class="formula">
+  # 方式 1 — 推荐（最明确）
+  Theta=0-90 LAG    Theta=60-90 LAG
+  θ=0-90            θ=60-90
+
+  # 方式 2 — 简写
+  0-90LAG           60-90LAG
+  0-90 LAG          （空格可选）
+  </div>
+
+  <h4>角度范围自动提取</h4>
+  <p><code>Average Gain (dB)（60-90deg，step 1°）</code> 这种列头会从括号内提取 "60-90deg" 并自动识别为 LAG 范围。</p>
+
+  <h3>6.2 5G4 多 Gain 列处理</h3>
+
+  <p>5G4 Sheet 有两个 "Gain" 列头。程序用 List 存储所有匹配列（而非 Dict），保证不丢失重复列头数据。</p>
+
+  <h3>6.3 频点匹配</h3>
+
+  <p>模板中的频点不一定在 CSV 中精确存在，程序取<strong>最近邻匹配</strong>（容差 ±5 MHz）。</p>
+
+<!-- ================================================================== -->
+
+<!-- ================================================================== -->
+<h2 id="extrapolation">12. Theta 外推选项</h2>
+
+<h3>12.1 背景</h3>
+
+<p>EMQuest 测量数据通常只覆盖 Theta 0–110°（部分球面）。标准天线计算公式（如 Directivity 球面积分）需要全空间 0–180° 数据。</p>
+
+<h3>12.2 不外推 vs 外推</h3>
+
+<table>
+  <tr><th></th><th>不外推（默认）</th><th>外推（勾选开关）</th></tr>
+  <tr><td>积分范围</td><td>0–110°</td><td>0–180°</td></tr>
+  <tr><td>Directivity 偏差</td><td>~0.0007 dB（与人工计算对比）</td><td>~0.04 dB 差异（补入了背部能量估计）</td></tr>
+  <tr><td>物理合理性</td><td>假设背部辐射为零（高估 D）</td><td>尾部 10 点线性回归外推（IEEE 推荐）</td></tr>
+  <tr><td>适用场景</td><td>方向性天线（前后比 &gt; 20 dB）</td><td>低方向性天线、需对标准全空间积分</td></tr>
+</table>
+
+<h3>12.3 外推算法</h3>
+
+<div class="formula">
+# LogMag 数据：逐 φ 独立线性回归（尾部 10 点）
+slope = (n·Σxy - Σx·Σy) / (n·Σx² - Σx²)    ← 最小二乘斜率
+约束：slope > 0 时归零（增益不上升）
+      外推值 ≤ 最后一点（不超出末端的实测值）
+      外推值 ≥ 峰值 - 40 dB（不超过 40 dB 动态范围）
+
+# Phase 数据：尾部 10 点平均值填充（常数法）
+phase_extrap = mean(phase[-10:])              ← 相位无趋势，填均值最安全
+</div>
+
+<h3>12.4 使用建议</h3>
+
+<ul>
+  <li><strong>车载鲨鱼鳍天线</strong>（前后比 > 20 dB）：不勾选外推，差异可忽略</li>
+  <li><strong>基站天线</strong>（较低方向性）：建议勾选，使 Directivity 更接近真实值</li>
+  <li><strong>不确定时：</strong>用两个选项各跑一次，比较结果。如果 Directivity 差异 < 0.05 dB，外推影响可忽略</li>
+</ul>
+
+
+<h2 id="config">7. 配置 & 频段</h2>
+
+<table>
+  <tr><th>Sheet</th><th>频段</th><th>频点数</th></tr>
+  <tr><td>5G1</td><td>690–5000 MHz (全频段)</td><td>~105</td></tr>
+  <tr><td>5G2</td><td>690–5000 MHz (全频段)</td><td>~105</td></tr>
+  <tr><td>5G3</td><td>1710–5000 MHz (中高频)</td><td>~75</td></tr>
+  <tr><td>5G4</td><td>1710–5000 MHz (中高频)</td><td>~75</td></tr>
+</table>
+
+<p>配置文件: <code>config/bands.json</code></p>
+
+<h3>内置功能</h3>
+<ul>
+  <li><strong>3D 球面辐射方向图</strong> — 可调仰角/方位角视角，嵌入 Excel 或存 PNG</li>
+  <li><strong>2D 极坐标切面图</strong> — φ=0° 切面</li>
+  <li><strong>2D 直角坐标切面图</strong> — Theta vs Gain 曲线</li>
+  <li><strong>完整报告导出</strong> — 独立 Excel 含所有图表 (<code>src/report_exporter.py</code>)</li>
+  <li><strong>i18n 国际化</strong> — 中/英界面切换，Qt Linguist .ts/.qm</li>
+  <li><strong>主题</strong> — qt-material dark_teal，GUI 可切换</li>
+</ul>
+
+<!-- ================================================================== -->
+<h2 id="terminology">8. 术语对照表</h2>
+
+<table>
+  <tr><th>缩写</th><th>英文全称</th><th>中文</th><th>单位</th><th>实现</th></tr>
+  <tr><td>G</td><td>Gain</td><td>增益</td><td>dBi</td><td><code>compute_total_gain_linear()</code></td></tr>
+  <tr><td>D</td><td>Directivity</td><td>方向性系数</td><td>dBi</td><td><code>compute_directivity()</code></td></tr>
+  <tr><td>η</td><td>Efficiency</td><td>天线效率</td><td>% / dB</td><td><code>compute_efficiency()</code></td></tr>
+  <tr><td>AR</td><td>Axial Ratio</td><td>轴比</td><td>dB</td><td><code>compute_axial_ratio()</code> (Stokes)</td></tr>
+  <tr><td>LAG</td><td>Local Azimuth Gain</td><td>局部方位面增益</td><td>dB</td><td><code>compute_lag_*()</code></td></tr>
+  <tr><td>θ</td><td>Theta / Elevation</td><td>俯仰角</td><td>°</td><td>0–110° step 1°</td></tr>
+  <tr><td>φ</td><td>Phi / Azimuth</td><td>方位角</td><td>°</td><td>0–359° step 1°</td></tr>
+  <tr><td>S₀–S₃</td><td>Stokes Parameters</td><td>斯托克斯参数</td><td>线性</td><td>IEEE 149-2021</td></tr>
+  <tr><td>P<sub>rad</sub></td><td>Radiated Power</td><td>总辐射功率</td><td>W (线性)</td><td>球面积分</td></tr>
+  <tr><td>U</td><td>Radiation Intensity</td><td>辐射强度</td><td>W/sr (线性)</td><td>U = G<sub>total,lin</sub></td></tr>
+</table>
+
+<h3>项目结构</h3>
+<div class="formula">
+antenna-post-processor/
+├── main.py              # 入口 (GUI)
+├── src/
+│   ├── calculator.py    # 计算引擎 (NumPy)
+│   ├── parser.py        # CSV 流式解析 (字节偏移索引)
+│   ├── pipeline.py      # 批处理管线
+│   ├── exporter.py      # Excel 模板填充
+│   ├── report_exporter.py  # 完整报告导出
+│   ├── plotter.py       # 3D/2D 图表 (Matplotlib)
+│   ├── lag_config.py    # LAG 配置 & 模板列头解析
+│   └── excel_reader.py  # 模板读取
+├── ui/                  # PySide6 GUI
+├── i18n/                # 国际化 (zh_CN / en_US)
+├── config/bands.json    # 频段配置
+├── data/                # 测试数据
+└── tests/               # 单元测试
+</div>
+
+<hr style="margin:36px 0 16px; border:none; border-top:1px solid var(--border);">
+<p style="color:var(--muted); font-size:0.85em;">
+  Antenna Post-Processor · 天线参数后处理程序<br>
+  2026-06 · 最后更新: 2026-06-16 · <a href="https://github.com/freezzb1972/antenna-post-processor">GitHub</a>
+</p>
+
+</body>
+</html>

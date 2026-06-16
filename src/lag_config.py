@@ -12,7 +12,6 @@ LAG (Linear Average Gain) 配置模型与模板列头解析
 
 from __future__ import annotations
 
-import copy
 import json
 import re
 from dataclasses import dataclass, field
@@ -44,47 +43,25 @@ _RE_LAG_RANGE = re.compile(
     re.IGNORECASE,
 )
 
+# 匹配 "60-90LAG" / "0-90 LAG"（无 Theta= 前缀的 LAG 范围）
+_RE_LAG_RANGE_NO_PREFIX = re.compile(
+    r"(\d+\.?\d*)\s*[-–—]\s*(\d+\.?\d*)\s*LAG",
+    re.IGNORECASE,
+)
+
 # 匹配 "Theta=60" / "θ=70" / "Theta = 80"（但不能是范围）
 _RE_LAG_SINGLE = re.compile(
     r"(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)\s*$",
     re.IGNORECASE,
 )
 
-# 固定列名识别
-_FIXED_COLUMNS = {
-    "frequency": "frequency",
-    "directivity": "directivity",
-    "efficiency": "efficiency",
-    "gain": "gain",
-}
+# 匹配 "60度LAG" / "90度 LAG"（无 Theta= 前缀的单角度 LAG）
+_RE_LAG_SINGLE_NO_PREFIX = re.compile(
+    r"(\d+\.?\d*)\s*度\s*LAG",
+    re.IGNORECASE,
+)
 
-
-def _normalize_key(name: str) -> str:
-    """将列头转成小写无空格键，用于固定列匹配。"""
-    return re.sub(r"[^a-z%％()db]+", "", name.lower())
-
-
-def is_frequency_column(header: str) -> bool:
-    h = _normalize_key(header)
-    return "frequency" in h or h in ("freq", "f", "f(mhz)", "freq(mhz)")
-
-
-def is_directivity_column(header: str) -> bool:
-    h = _normalize_key(header)
-    return "directivity" in h or h in ("dir", "d(dbi)")
-
-
-def is_efficiency_column(header: str) -> bool:
-    """Efficiency(%) 或 Efficiency(dB)"""
-    h = _normalize_key(header)
-    return "efficiency" in h
-
-
-def is_gain_column(header: str) -> bool:
-    h = _normalize_key(header)
-    return h.startswith("gain") or h in ("g(dbi)", "peakgain")
-
-
+# is_*_column / _normalize_key 已移至 excel_reader.py（它们只被模板解析使用）
 # ---------------------------------------------------------------------------
 # LAG 配置数据类
 # ---------------------------------------------------------------------------
@@ -126,8 +103,9 @@ class LagConfig:
 
         识别模式：
           - ``Theta=60`` / ``θ=60``  → 单角度 60°
+          - ``60度LAG`` / ``90度 LAG`` → 单角度 60°, 90°
           - ``Theta=0-90 LAG``       → 范围 (0, 90)
-          - ``Theta=60-90 LAG``      → 范围 (60, 90)
+          - ``60-90LAG`` / ``0-90 LAG`` → 范围 (60, 90)
 
         注意：列头可能含换行符 ``\\n``、全角括号等，先做规范化。
         """
@@ -141,6 +119,8 @@ class LagConfig:
 
             # 先检测范围（避免 "0-90" 中的 0 被单角度误匹配）
             rm = _RE_LAG_RANGE.search(h)
+            if not rm:
+                rm = _RE_LAG_RANGE_NO_PREFIX.search(h)
             if rm:
                 lo, hi = float(rm.group(1)), float(rm.group(2))
                 # 去重
@@ -151,6 +131,8 @@ class LagConfig:
 
             # 再检测单角度
             sm = _RE_LAG_SINGLE.search(h)
+            if not sm:
+                sm = _RE_LAG_SINGLE_NO_PREFIX.search(h)
             if sm:
                 val = float(sm.group(1))
                 if val not in singles:

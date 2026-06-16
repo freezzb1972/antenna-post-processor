@@ -52,10 +52,6 @@ IMG_2D_SIZE = (280, 210)    # 2D 切面图
 # 工具
 # ---------------------------------------------------------------------------
 
-def _pixels_to_emus(px: int) -> int:
-    """像素 → EMU（Excel 图像单位）。"""
-    return int(px * 9525)
-
 
 def _auto_width(ws, min_width: int = 10, max_width: int = 30):
     """自动调整列宽（基于内容）。"""
@@ -154,10 +150,12 @@ def _write_data_table(ws, rows: List[Dict[str, Any]], start_row: int):
         return
 
     # 收集所有列名
+    seen = set()
     all_keys = []
     for row in rows:
         for k in row:
-            if k not in all_keys:
+            if k not in seen:
+                seen.add(k)
                 all_keys.append(k)
 
     # 排序：固定列在前，LAG 列在后

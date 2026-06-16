@@ -34,19 +34,52 @@ a = Analysis(
         (str(PROJECT_ROOT / 'config' / 'bands.json'), 'config'),
         # 模板文件（可选，打包后也可以在运行时选择外部模板）
         (str(PROJECT_ROOT / 'data' / 'template_5G1.xlsx'), 'templates'),
+        # qt-material 主题文件
+        *collect_data_files('qt_material'),
     ],
     hiddenimports=[
-        # PySide6 — 仅引用实际使用的模块，避免 collect_submodules 拉入全部 426MB
+        # ---- 项目内部模块 ----
+        # PyInstaller 静态分析会追踪大多数导入，但以下模块使用
+        # 懒加载 / from_path 工厂 / 动态 import，需显式声明。
+        'src.calculator',
+        'src.datasource',
+        'src.excel_reader',
+        'src.exporter',
+        'src.finalsummary_reader',
+        'src.lag_config',
+        'src.parser',
+        'src.pipeline',
+        'src.plot_config',
+        'src.plotter',
+        'src.report_exporter',
+        'src.worker',
+        'ui.main_window',
+        'ui.theme_manager',
+        'ui.compiled',
+        'ui.compiled.ui_main_window',
+        'i18n.i18n_manager',
+
+        # ---- PySide6 — 仅引用实际使用的模块，避免 collect_submodules 拉入全部 426MB ----
         'PySide6.QtCore',
         'PySide6.QtGui',
         'PySide6.QtWidgets',
-        # matplotlib backends（Agg 必需，SVG 可选但小）
+
+        # ---- matplotlib backends（Agg 必需，SVG 可选但小） ----
         'matplotlib.backends.backend_agg',
         'matplotlib.backends.backend_svg',
-        # numpy
+        'matplotlib.cm',
+
+        # ---- numpy ----
         'numpy.lib.format',
-        # openpyxl
+
+        # ---- openpyxl ----
         'openpyxl.cell._writer',
+        'openpyxl.styles',
+        'openpyxl.utils',
+        'openpyxl.drawing.image',
+
+        # ---- qt-material（主题引擎） ----
+        'qt_material',
     ],
     hookspath=[],
     hooksconfig={},

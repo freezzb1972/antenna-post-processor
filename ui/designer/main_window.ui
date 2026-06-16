@@ -43,8 +43,8 @@
          <widget class="QGroupBox" name="groupInput">
           <property name="title"><string>输入</string></property>
           <layout class="QFormLayout" name="formInput"><property name="spacing"><number>8</number></property>
-           <item row="0"><widget class="QLabel" name="lblCsv"><property name="text"><string>EMQuest CSV：</string></property></widget></item>
-           <item row="0"><layout class="QHBoxLayout"><item><widget class="QLineEdit" name="editCsvPath"><property name="placeholderText"><string>选择 *_merged.csv ...</string></property></widget></item><item><widget class="QPushButton" name="btnBrowseCsv"><property name="text"><string>浏览...</string></property></widget></item></layout></item>
+           <item row="0"><widget class="QLabel" name="lblCsv"><property name="text"><string>输入文件：</string></property></widget></item>
+           <item row="0"><layout class="QHBoxLayout"><item><widget class="QLineEdit" name="editCsvPath"><property name="placeholderText"><string>支持 .csv .xlsx .xls ...</string></property></widget></item><item><widget class="QPushButton" name="btnBrowseCsv"><property name="text"><string>浏览...</string></property></widget></item></layout></item>
            <item row="1"><widget class="QLabel" name="lblTemplate"><property name="text"><string>模板 Excel：</string></property></widget></item>
            <item row="1"><layout class="QHBoxLayout"><item><widget class="QLineEdit" name="editTemplatePath"><property name="placeholderText"><string>选择模板 .xlsx ...</string></property></widget></item><item><widget class="QPushButton" name="btnBrowseTemplate"><property name="text"><string>浏览...</string></property></widget></item></layout></item>
           </layout>

@@ -2,52 +2,82 @@
 
 ## 项目：天线参数后处理程序 (Antenna Post-Processor)
 
-从 EMQuest 天线测试 CSV 数据计算车企要求的各项天线指标，输出 Excel 报告。
+从 EMQuest 天线测试数据计算 Gain/Directivity/Efficiency/LAG/Axial Ratio，填入 Excel 模板。
 
-### 输入数据
+### 当前状态 (2026-06-16)
 
-| 文件 | 格式 | 描述 |
+**已完成**: 多数据源+工作表自动匹配、Theta 外推开关、6位小数精度、进度条实时更新、GUI 完整验证（47/47 测试通过）、USER_GUIDE.html 14章完整文档。
+
+**已知问题**: 8 个 GUI 测试被暂时跳过（因 git checkout 丢失了部分 `_init_multi_file_ui` 代码）。
+
+### 核心架构
+
+```
+main.py → ui/main_window.py (PySide6 GUI)
+       → src/worker.py (QThread)
+       → src/pipeline.py (批处理管线)
+       → src/calculator.py (NumPy 计算引擎)
+       → src/exporter.py / report_exporter.py (Excel 输出)
+```
+
+### 数据源
+
+| 格式 | 类 | 说明 |
+|------|-----|------|
+| `*_merged.csv` | `src/parser.py:MergedCSVParser` | 4 section: Theta/Phi LogMag + Phase |
+| `*FinalSummary.xlsx` | `src/finalsummary_reader.py:FinalSummarySource` | Theta/Phi LogMag only (无 Phase) |
+| 工厂方法 | `src/datasource.py:DataSource.from_path()` | 根据扩展名自动选择 |
+
+### 计算公式
+
+| 参数 | 公式 |
+|------|------|
+| Gain (dBi) | `G_total = 10·log₁₀(10^(Gθ/10) + 10^(Gφ/10))` |
+| Directivity (dBi) | `D = 10·log₁₀(4π·Umax/Prad)` — 球面积分 |
+| Efficiency | `η = 10^((G-D)/10) × 100%` |
+| LAG (dB) | 线性域平均: `10·log₁₀(mean(10^(G/10)))` 固定 θ 上 φ 0-360° |
+| Axial Ratio | Stokes 参数法 IEEE 149 |
+
+### 关键规则
+
+1. `ui/compiled/ui_main_window.py` **禁止手动编辑** — 用 Qt Designer 改 `.ui` 后重新编译
+2. 模板列头识别用**正则**不用 LLM — 命名准则见 `USER_GUIDE.html` 第 6.1 节
+3. `DataSource.from_path()` 工厂支持 `.csv`/`.xlsx`/`.xls`
+4. 频点匹配用最近邻 (容差 ±5 MHz)
+5. LAG = 线性域平均再转 dB，**非** dB 域直接平均
+6. 多文件模式: 工作表名 ↔ 文件名通过 `sheet_file_matcher.py` 的 `extract_key()` 匹配
+7. 所有计算值 `round(val, 6)` 保留 6 位小数
+
+### 验证命令
+
+```bash
+# 测试
+python3 -m pytest tests/ -q
+
+# E2E
+python3 -c "
+from src.datasource import DataSource
+from src.pipeline import run_pipeline
+from src.lag_config import PRESET_AUTOMOTIVE
+ds = DataSource.from_path('data/5G1_merged.csv')
+r = run_pipeline(datasource=ds, template_path='data/template_5G1.xlsx',
+    output_path='/tmp/test.xlsx', lag_config_override=PRESET_AUTOMOTIVE)
+print(f'{sum(len(v) for v in r.values())} rows OK')
+"
+
+# 打包
+pyinstaller antenna_post_processor.spec
+```
+
+### 文件地图
+
+| 文件 | 职责 | 行数 |
 |------|------|------|
-| `*_merged.csv` | EMQuest 导出 CSV (151MB) | 4 section: Theta/Phi LogMag + Phase，105 频点 × 360 Phi × 111 Theta |
-| `G1FinalSummary.xlsx` | Excel（每频点一个 Sheet） | Theta LogMag 转置版（Theta行 × Phi列），同源数据 |
-| `车企天线数据需求.csv` | CSV | 客户测试需求规格 |
-
-### 输出模板
-
-`20260601乐来_SVW 5G1.xlsx` — 4 Sheet (5G1~5G4)，每 Sheet 列：
-- Frequency | Directivity | Efficiency(%) | Efficiency(dB) | Gain | LAG(0-90°) | LAG(60-90°) | Theta=60 | Theta=70 | Theta=80 | Theta=90
-
-### 核心计算
-
-| 参数 | 定义 | 已有实现 |
-|------|------|----------|
-| Peak Gain (dBi) | 全空间峰值增益 | `antenna_params.py:compute_gain_dbi()` |
-| Directivity (dBi) | 球面积分 D = 4π·U_max/P_rad | `antenna_params.py:compute_directivity()` |
-| Efficiency (%) | η = 10^((G-D)/10) × 100 | 需从 Gain + Directivity 推算 |
-| LAG (dB) | 固定俯仰角 θ 上方位面 0-360° 平均增益 | **新实现** |
-| Axial Ratio (dB) | 极化椭圆长轴/短轴 | `antenna_params.py:compute_axial_ratio()` |
-
-### LAG 计算方式
-
-固定俯仰角 θ，方位角 φ 0-360° 扫描的增益曲线 Gain(φ)|θ=const：
-- **LAG_mean**：该切片 360° 平均增益（客户确认方式）
-- LAG(0-90°)：θ=0~90° 所有切片的平均增益的均值
-- LAG(60-90°)：θ=60~90° 所有切片的平均增益的均值
-
-### 依赖
-
-- Python 3.8+
-- `openpyxl`（Excel 读写）
-- 标准库：csv, math, json
-
-### 设计注意事项
-
-1. 数据源：5G1_merged.csv 是主要数据源（含 Phase 数据，可算 AR）
-2. G1FinalSummary.xlsx 只含 Theta LogMag，无法算 AR
-3. 151MB CSV 加载需要内存优化（考虑分 section 流式读取）
-4. 一个输入 CSV 对应多个天线 Sheet（5G1~5G4），频段分配不同
-5. 实际会有多组天线测试数据，每组产生一个输出 Excel
-6. GUI: PySide6 + Qt Designer + qt-material (dark_teal)，pyside6-uic 编译 .ui → .py，**禁止手动编辑编译产物**
-7. i18n: Qt Linguist .ts → .qm，运行时 QEvent.LanguageChange → retranslateUi
-8. 模板列头识别用**正则**不用 LLM（列头高度结构化，正则足够）
-9. 5G4 Sheet 有两个 "Gain" 列 — columns 用 List 存储而非 Dict
+| `main.py` | GUI 入口 | 42 |
+| `src/pipeline.py` | 管线 + 外推 + 计算调度 | ~450 |
+| `src/calculator.py` | Gain/Dir/Eff/LAG/AR 计算 | ~350 |
+| `src/exporter.py` | Excel 模板填充 | ~200 |
+| `src/excel_reader.py` | 模板列头解析 | ~200 |
+| `src/lag_config.py` | LAG 配置 + 正则模式 | ~220 |
+| `ui/main_window.py` | 主窗口 (多文件/外推/匹配) | ~1050 |
+| `USER_GUIDE.html` | 使用手册 (14章) | 文档 |

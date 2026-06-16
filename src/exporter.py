@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import io
 import os
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 import openpyxl
@@ -18,6 +17,8 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils import get_column_letter
 
 from .excel_reader import ColumnInfo, SheetInfo, read_template
+from .lag_config import (_RE_LAG_RANGE, _RE_LAG_RANGE_NO_PREFIX,
+                         _RE_LAG_SINGLE, _RE_LAG_SINGLE_NO_PREFIX, normalize_header)
 
 
 # ---------------------------------------------------------------------------
@@ -135,16 +136,6 @@ def _build_col_map(info: SheetInfo) -> Dict[str, List[ColumnInfo]]:
     return m
 
 
-def _find_col_by_type(
-    col_map: Dict[str, List[ColumnInfo]], ctype: str, index: int = 0
-) -> Optional[ColumnInfo]:
-    """查找第 index 个指定类型的列。"""
-    cols = col_map.get(ctype, [])
-    if index < len(cols):
-        return cols[index]
-    return None
-
-
 def _write_cell(
     ws,
     row: int,
@@ -161,7 +152,7 @@ def _write_cell(
         if value is not None:
             # 保留 2 位小数（科学计算常用）
             if isinstance(value, float):
-                cell.value = round(value, 2)
+                cell.value = round(value, 6)
             else:
                 cell.value = value
 
@@ -172,13 +163,14 @@ def _write_lag_single(
 ):
     """写入单角度 LAG 到匹配的列。"""
     for cinfo in col_map.get("lag_single", []):
-        # 从列头中提取角度
-        from .lag_config import _RE_LAG_SINGLE, normalize_header
-        m = _RE_LAG_SINGLE.search(normalize_header(cinfo.raw_header))
+        norm = normalize_header(cinfo.raw_header)
+        m = _RE_LAG_SINGLE.search(norm)
+        if not m:
+            m = _RE_LAG_SINGLE_NO_PREFIX.search(norm)
         if m and abs(float(m.group(1)) - angle) < 0.01:
             cell = ws.cell(row, cinfo.col_index)
             if isinstance(value, float):
-                cell.value = round(value, 2)
+                cell.value = round(value, 6)
             else:
                 cell.value = value
             return
@@ -190,14 +182,14 @@ def _write_lag_range(
 ):
     """写入范围 LAG 到匹配的列。"""
     for cinfo in col_map.get("lag_range", []):
-        from .lag_config import _RE_LAG_RANGE, normalize_header
-        m = _RE_LAG_RANGE.search(normalize_header(cinfo.raw_header))
+        norm = normalize_header(cinfo.raw_header)
+        m = _RE_LAG_RANGE.search(norm) or _RE_LAG_RANGE_NO_PREFIX.search(norm)
         if m:
             clo, chi = float(m.group(1)), float(m.group(2))
             if abs(clo - lo) < 0.01 and abs(chi - hi) < 0.01:
                 cell = ws.cell(row, cinfo.col_index)
                 if isinstance(value, float):
-                    cell.value = round(value, 2)
+                    cell.value = round(value, 6)
                 else:
                     cell.value = value
                 return

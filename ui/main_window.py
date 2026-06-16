@@ -21,24 +21,29 @@ from pathlib import Path
 from typing import List, Optional
 
 from PySide6.QtCore import QEvent, QSettings, Qt, QThread
-from PySide6.QtGui import QTextCursor
+from PySide6.QtGui import QColor, QDragEnterEvent, QDropEvent, QPalette, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
+    QListWidget,
     QMainWindow,
     QMessageBox,
     QPushButton,
     QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
 from i18n.i18n_manager import I18nManager
-from src.lag_config import LagConfig
-from src.pipeline import PlotConfig
+from src.lag_config import LagConfig, PRESET_AUTOMOTIVE
+from src.plot_config import PlotConfig
 from src.worker import ProcessingWorker
 from ui.compiled.ui_main_window import Ui_MainWindow
 from ui.theme_manager import ThemeManager
@@ -76,14 +81,20 @@ class MainWindow(QMainWindow):
         self._worker: Optional[ProcessingWorker] = None
         self._running = False
         self._settings = QSettings("AntennaPP", "AntennaPostProcessor")
+        self._data_file_paths: List[str] = []
+        self._data_file_widget: Optional[QWidget] = None
+        self._file_list_widget: Optional[QListWidget] = None
+        self._match_table: Optional[QTableWidget] = None
+        self._lbl_match_status: Optional[QLabel] = None
 
         # ---- 初始化 ----
         self._init_theme_selector()
         self._apply_custom_qss()
         self._init_file_paths()
+        self._init_multi_file_ui()
         self._connect_signals()
         self._update_lag_display()
-        self._log(self.tr("天线参数后处理工具已启动"))
+        self._log("天线参数后处理工具已启动")
         self._log(self.tr("默认 LAG 配置: 单角度 [60°, 70°, 80°, 90°], 范围 [(0-90°), (60-90°)]"))
 
     # ==================================================================
@@ -104,6 +115,187 @@ class MainWindow(QMainWindow):
             self.ui.editOutputDir.setText(output_dir)
 
         self.ui.editOutputName.setText("antenna_report.xlsx")
+
+
+    def _init_multi_file_ui(self):
+        """构建多文件选择 + 自动匹配 UI（动态插入到 vTabFile）。"""
+        self._data_file_widget = QWidget()
+        layout = QVBoxLayout(self._data_file_widget)
+        layout.setContentsMargins(0, 4, 0, 0)
+        layout.setSpacing(4)
+
+        btn_row = QHBoxLayout()
+        self._btn_add_files = QPushButton(self.tr("📂 添加数据文件..."))
+        self._btn_add_files.setToolTip(self.tr("选择多个数据文件 (Ctrl+点击多选)"))
+        self._btn_clear_files = QPushButton(self.tr("清除"))
+        self._btn_add_files.clicked.connect(self._on_add_data_files)
+        self._btn_clear_files.clicked.connect(self._on_clear_data_files)
+        btn_row.addWidget(self._btn_add_files)
+        btn_row.addWidget(self._btn_clear_files)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        self._file_list_widget = QListWidget()
+        self._file_list_widget.setMaximumHeight(65)
+        self._file_list_widget.setAlternatingRowColors(True)
+        layout.addWidget(self._file_list_widget)
+
+        self._match_table = QTableWidget()
+        self._match_table.setColumnCount(3)
+        self._match_table.setHorizontalHeaderLabels([
+            self.tr("工作表"), self.tr("数据文件"), self.tr("状态")
+        ])
+        self._match_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self._match_table.setMaximumHeight(140)
+        self._match_table.setAlternatingRowColors(True)
+        layout.addWidget(self._match_table)
+
+        match_row = QHBoxLayout()
+        self._btn_auto_match = QPushButton(self.tr("🔗 自动匹配"))
+        self._btn_auto_match.clicked.connect(self._on_auto_match)
+        self._btn_auto_match.setToolTip(self.tr("按文件命名自动匹配工作表"))
+        self._lbl_match_status = QLabel("")
+        self._lbl_match_status.setStyleSheet("font-size: 12px;")
+        match_row.addWidget(self._btn_auto_match)
+        match_row.addWidget(self._lbl_match_status)
+        match_row.addStretch()
+        layout.addLayout(match_row)
+
+        vtab = self.ui.vTabFile
+        idx = vtab.indexOf(self.ui.groupInput)
+        if idx >= 0:
+            vtab.insertWidget(idx + 1, self._data_file_widget)
+
+        self._check_extrapolate = QCheckBox(self.tr("Theta 外推到 180°（启用后 Directivity 约低 0.04 dB）"))
+        self._check_extrapolate.setChecked(False)
+        self._check_extrapolate.setToolTip(
+            self.tr("勾选后将 Theta 0-110° 外推到 0-180°（线性外推）。"
+                     "外推会使球面积分增加，Directivity 降低约 0.04 dB。"
+                     "默认关闭，与人工计算方式一致。"))
+        out_idx = vtab.indexOf(self.ui.groupOutput)
+        if out_idx >= 0:
+            vtab.insertWidget(out_idx + 1, self._check_extrapolate)
+
+    # ==================================================================
+    # 多文件操作
+    # ==================================================================
+
+    def _on_add_data_files(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, self.tr("选择数据文件 (可多选)"),
+            self._settings.value("csv_path", ""),
+            self.tr("CSV 文件 (*.csv);;Excel 文件 (*.xlsx *.xls);;所有文件 (*)")
+        )
+        if not paths:
+            return
+        existing = set(self._data_file_paths)
+        new_paths = [p for p in paths if p not in existing]
+        if not new_paths:
+            return
+        self._data_file_paths.extend(new_paths)
+        self._settings.setValue("csv_path", new_paths[0])
+        self._refresh_data_file_ui()
+        if self.ui.editTemplatePath.text().strip():
+            self._on_auto_match()
+
+    def _on_clear_data_files(self):
+        self._data_file_paths.clear()
+        self._file_list_widget.clear()
+        self._match_table.setRowCount(0)
+        self._lbl_match_status.setText("")
+
+    def _refresh_data_file_ui(self):
+        if self._file_list_widget is None:
+            return
+        self._file_list_widget.clear()
+        for p in self._data_file_paths:
+            try:
+                size_mb = Path(p).stat().st_size / (1024 * 1024)
+                self._file_list_widget.addItem(f"📄 {Path(p).name}  ({size_mb:.1f} MB)")
+            except OSError:
+                self._file_list_widget.addItem(f"📄 {Path(p).name}")
+
+    def _on_auto_match(self):
+        template_path = self.ui.editTemplatePath.text().strip()
+        if not template_path:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择模板文件。"))
+            return
+        if not self._data_file_paths:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请先添加数据文件。"))
+            return
+
+        from src.excel_reader import read_template
+        from src.sheet_file_matcher import auto_match
+
+        try:
+            sheets = read_template(template_path)
+        except Exception as e:
+            self._log(f"⚠ 读取模板失败: {e}")
+            return
+
+        sheet_names = [s.name for s in sheets]
+        if not sheet_names:
+            self._log(f"模板中未检测到数据工作表")
+            return
+
+        matches = auto_match(sheet_names, self._data_file_paths)
+        self._populate_match_table(matches)
+
+        matched = sum(1 for m in matches if m.file_path is not None)
+        self._lbl_match_status.setText(
+            f"✓ {matched}/{len(matches)} 个工作表已匹配"
+        )
+        self._log(f"自动匹配完成: {matched}/{len(matches)}")
+
+    def _populate_match_table(self, matches):
+        self._match_table.setRowCount(len(matches))
+        for i, m in enumerate(matches):
+            self._match_table.setItem(i, 0, QTableWidgetItem(m.sheet_name))
+            combo = QComboBox()
+            combo.addItem("—")
+            for fp in self._data_file_paths:
+                combo.addItem(fp)
+            if m.file_path:
+                idx = combo.findText(m.file_path)
+                if idx >= 0:
+                    combo.setCurrentIndex(idx)
+            combo.currentIndexChanged.connect(lambda idx, row=i: self._on_match_changed(row))
+            self._match_table.setCellWidget(i, 1, combo)
+
+            if m.file_path:
+                status = QTableWidgetItem(self.tr("✓ 已匹配"))
+                status.setForeground(QColor("green"))
+            else:
+                status = QTableWidgetItem(self.tr("未匹配"))
+                status.setForeground(QColor("orange"))
+            self._match_table.setItem(i, 2, status)
+
+    def _on_match_changed(self, row: int):
+        combo = self._match_table.cellWidget(row, 1)
+        fp = combo.currentText().strip() if combo else ""
+        valid = fp and fp != "—" and Path(fp).exists()
+        status = self._match_table.item(row, 2)
+        if status:
+            if valid:
+                status.setText(self.tr("✓ 已匹配"))
+                status.setForeground(QColor("green"))
+            else:
+                status.setText(self.tr("未匹配"))
+                status.setForeground(QColor("orange"))
+
+    def _build_datasource_map(self):
+        from src.datasource import DataSource
+        result = {}
+        for row in range(self._match_table.rowCount()):
+            sheet_name = self._match_table.item(row, 0).text()
+            combo = self._match_table.cellWidget(row, 1)
+            fp = combo.currentText().strip() if combo else ""
+            if fp and fp != "—" and Path(fp).exists():
+                try:
+                    result[sheet_name] = DataSource.from_path(fp)
+                except Exception as e:
+                    self._log(f"⚠ {sheet_name} 数据源加载失败: {e}")
+        return result
 
     def _init_theme_selector(self):
         """填充主题下拉框并选中当前主题。"""
@@ -185,18 +377,6 @@ class MainWindow(QMainWindow):
         }
         """
         self.app.setStyleSheet(self.app.styleSheet() + qss)
-        csv_path = self._settings.value("csv_path", "")
-        template_path = self._settings.value("template_path", "")
-        output_dir = self._settings.value("output_dir", str(Path.cwd() / "output"))
-
-        if csv_path and Path(csv_path).exists():
-            self.ui.editCsvPath.setText(csv_path)
-        if template_path and Path(template_path).exists():
-            self.ui.editTemplatePath.setText(template_path)
-        if output_dir:
-            self.ui.editOutputDir.setText(output_dir)
-
-        self.ui.editOutputName.setText("antenna_report.xlsx")
 
     def _connect_signals(self):
         """连接所有信号/槽。"""
@@ -296,7 +476,7 @@ class MainWindow(QMainWindow):
         self._lag_config.add_single(angle)
         self._sync_quick_buttons()
         self._update_lag_display()
-        self._log(self.tr(f"添加单角度: {angle}°"))
+        self._log(f"添加单角度: {angle}°")
 
     def _on_step_generate(self):
         start = self.ui.spinStepStart.value()
@@ -317,7 +497,7 @@ class MainWindow(QMainWindow):
             return  # 已存在，跳过
         self._lag_config.add_range(lo, hi)
         self._update_lag_display()
-        self._log(self.tr(f"添加 LAG 范围: ({lo}°-{hi}°)"))
+        self._log(f"添加 LAG 范围: ({lo}°-{hi}°)")
 
     def _on_load_from_template(self):
         template_path = self.ui.editTemplatePath.text()
@@ -340,11 +520,11 @@ class MainWindow(QMainWindow):
                     self._lag_config = merged
                     self._sync_quick_buttons()
                     self._update_lag_display()
-                    self._log(self.tr(f"从模板加载: {len(sheets)} 个工作表"))
+                    self._log(f"从模板加载: {len(sheets)} 个工作表")
                     for si in sheets:
                         self._log(f"  {si.name}: 单角度={si.lag_config.singles_sorted}, 范围={si.lag_config.ranges_sorted}")
                 else:
-                    self._log(self.tr("模板中未检测到 LAG 列"))
+                    self._log("模板中未检测到 LAG 列")
         except Exception as e:
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"读取模板失败: {e}"))
 
@@ -352,7 +532,7 @@ class MainWindow(QMainWindow):
         self._lag_config.clear()
         self._sync_quick_buttons()
         self._update_lag_display()
-        self._log(self.tr("LAG 配置已清空"))
+        self._log("LAG 配置已清空")
 
     def _on_save_preset(self):
         path, _ = QFileDialog.getSaveFileName(
@@ -361,7 +541,7 @@ class MainWindow(QMainWindow):
         )
         if path:
             self._lag_config.save_preset(Path(path))
-            self._log(self.tr(f"预设已保存: {path}"))
+            self._log(f"预设已保存: {path}")
 
     def _on_load_preset(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -373,7 +553,7 @@ class MainWindow(QMainWindow):
                 self._lag_config = LagConfig.load_preset(Path(path))
                 self._sync_quick_buttons()
                 self._update_lag_display()
-                self._log(self.tr(f"预设已加载: {path}"))
+                self._log(f"预设已加载: {path}")
             except Exception as e:
                 QMessageBox.critical(self, self.tr("错误"), self.tr(f"加载预设失败: {e}"))
 
@@ -385,7 +565,12 @@ class MainWindow(QMainWindow):
 
     def _update_lag_display(self):
         """刷新已配置项 — 每项带删除按钮。"""
-        layout = self.ui.configItemsLayout
+        widget = self.ui.configItemsWidget
+        layout = widget.layout()
+        if layout is None:
+            from PySide6.QtWidgets import QVBoxLayout
+            layout = QVBoxLayout(widget)
+            layout.setContentsMargins(0, 0, 0, 0)
         # 清除所有旧 widget
         while layout.count():
             child = layout.takeAt(0)
@@ -461,38 +646,44 @@ class MainWindow(QMainWindow):
     # ==================================================================
 
     def _on_start(self):
-        """启动后台处理。"""
-        csv_path = self.ui.editCsvPath.text().strip()
+        """启动后台处理。支持单文件或多文件模式。"""
+        if self._running:
+            return
+        input_path = self.ui.editCsvPath.text().strip()
         template_path = self.ui.editTemplatePath.text().strip()
         output_dir = self.ui.editOutputDir.text().strip() or str(Path.cwd() / "output")
         output_name = self.ui.editOutputName.text().strip() or "antenna_report.xlsx"
+        output_name = output_name.replace("\\", "").replace("/", "")
 
-        # 验证
-        if not csv_path:
-            QMessageBox.warning(self, self.tr("警告"), self.tr("请选择 CSV 输入文件。"))
-            return
-        if not Path(csv_path).exists():
+        use_multi = bool(self._data_file_paths and self._match_table.rowCount() > 0)
+
+        if not use_multi and not input_path:
             QMessageBox.warning(self, self.tr("警告"),
-                self.tr(f"CSV 文件不存在:\n{csv_path}"))
+                self.tr("请添加数据文件或选择输入文件。"))
             return
+
         if not template_path:
-            QMessageBox.warning(self, self.tr("警告"), self.tr("请选择模板 Excel 文件。"))
+            QMessageBox.warning(self, self.tr("警告"),
+                self.tr("请选择模板 Excel 文件。"))
             return
         if not Path(template_path).exists():
             QMessageBox.warning(self, self.tr("警告"),
-                self.tr(f"模板文件不存在:\n{template_path}"))
+                self.tr("模板文件不存在"))
+            return
+        template_ext = Path(template_path).suffix.lower()
+        if template_ext not in (".xlsx", ".xls"):
+            QMessageBox.warning(self, self.tr("警告"),
+                self.tr("模板文件必须是 Excel 格式 (.xlsx .xls)"))
             return
 
         os.makedirs(output_dir, exist_ok=True)
         output_path = str(Path(output_dir) / output_name)
 
-        # 完整报告路径
         full_report_path: Optional[str] = None
         if self.ui.checkFullReport.isChecked():
             path_text = self.ui.editFullReportPath.text().strip()
             full_report_path = path_text if path_text else str(Path(output_dir) / "full_report.xlsx")
 
-        # 构建 PlotConfig
         plot_config = PlotConfig(
             elev=self.ui.spinElev.value(),
             azim=self.ui.spinAzim.value(),
@@ -501,48 +692,57 @@ class MainWindow(QMainWindow):
             save_png_folder=str(Path(output_dir) / "png") if self.ui.checkSavePng.isChecked() else None,
         )
 
-        # 清理上次
+        datasource = None
+        datasource_map = None
+
+        if use_multi:
+            datasource_map = self._build_datasource_map()
+            if not datasource_map:
+                QMessageBox.warning(self, self.tr("警告"),
+                    self.tr("没有有效的工作表↔文件匹配，请先执行自动匹配。"))
+                return
+            self._log(f"多源模式: {len(datasource_map)} 个工作表")
+            for sn, ds in datasource_map.items():
+                self._log(f"  {sn} ← {type(ds).__name__}")
+        else:
+            if not Path(input_path).exists():
+                QMessageBox.warning(self, self.tr("警告"),
+                    self.tr("输入文件不存在"))
+                return
+            input_ext = Path(input_path).suffix.lower()
+            if input_ext not in (".csv", ".xlsx", ".xls"):
+                QMessageBox.warning(self, self.tr("警告"),
+                    self.tr("不支持的输入文件格式"))
+                return
+            from src.datasource import DataSource
+            try:
+                datasource = DataSource.from_path(input_path)
+                self._log(f"数据源: {Path(input_path).name}")
+            except Exception as e:
+                QMessageBox.critical(self, self.tr("错误"),
+                    self.tr("无法读取输入文件"))
+                return
+
         self.ui.logOutput.clear()
         self.ui.progressBar.setValue(0)
         self.ui.lblProgressMsg.setText(self.tr("启动中..."))
 
-        # 创建 Worker + Thread
         self._thread = QThread(self)
         self._worker = ProcessingWorker(
-            csv_path=csv_path,
+            datasource=datasource,
+            datasource_map=datasource_map,
             template_path=template_path,
             output_path=output_path,
             lag_config=self._lag_config,
             plot_config=plot_config,
             full_report_path=full_report_path,
+            extrapolate_theta=self._check_extrapolate.isChecked(),
         )
-        self._worker.moveToThread(self._thread)
-
-        # 连接信号
-        self._thread.started.connect(self._worker.run)
-        self._worker.progress.connect(self._on_progress)
-        self._worker.log.connect(self._on_worker_log)
-        self._worker.finished.connect(self._on_finished)
-        self._worker.error.connect(self._on_error)
-        self._thread.finished.connect(self._thread.deleteLater)
-
-        # 设置运行状态
-        self._running = True
-        self.ui.btnStart.setEnabled(False)
-        self.ui.btnStop.setEnabled(True)
-
-        self._thread.start()
-        self._log(self.tr(f"▶ 开始处理: {csv_path}"))
-        self._log(self.tr(f"  模板: {template_path}"))
-        self._log(self.tr(f"  输出: {output_path}"))
-        if full_report_path:
-            self._log(self.tr(f"  完整报告: {full_report_path}"))
-
     def _on_stop(self):
         """停止处理。"""
         if self._worker:
             self._worker.cancel()
-        self._log(self.tr("⏹ 用户请求停止..."))
+        self._log("⏹ 用户请求停止...")
         self.ui.btnStop.setEnabled(False)
 
     def _on_progress(self, current: int, total: int, message: str):
@@ -563,17 +763,17 @@ class MainWindow(QMainWindow):
         # 统计
         total_rows = sum(len(v) for v in results.values())
         total_imgs = sum(len(v) for v in images.values())
-        self._log(self.tr(f"\n{'='*50}"))
-        self._log(self.tr(f"✓ 全部完成! 共 {len(results)} 个工作表, {total_rows} 行数据"))
+        self._log(f"\n{'='*50}")
+        self._log(f"✓ 全部完成! 共 {len(results)} 个工作表, {total_rows} 行数据")
         if total_imgs:
-            self._log(self.tr(f"  生成 {total_imgs} 张 3D 方向图"))
+            self._log(f"  生成 {total_imgs} 张 3D 方向图")
         self._update_status()
 
     def _on_error(self, message: str):
         self._running = False
         self.ui.btnStart.setEnabled(True)
         self.ui.btnStop.setEnabled(False)
-        self._log(self.tr(f"✗ 错误: {message}"))
+        self._log(f"✗ 错误: {message}")
         QMessageBox.critical(self, self.tr("处理错误"), message)
 
     # ==================================================================
@@ -635,8 +835,12 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """窗口关闭时停止线程。"""
-        if self._running and self._worker:
-            self._worker.cancel()
+        if self._thread and self._thread.isRunning():
+            if self._worker:
+                self._worker.cancel()
             self._thread.quit()
-            self._thread.wait(3000)
+            if not self._thread.wait(5000):
+                self._thread.terminate()
+                self._thread.wait()
+        self._running = False
         event.accept()
