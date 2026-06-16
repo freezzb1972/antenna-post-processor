@@ -171,6 +171,22 @@
         <property name="spacing"><number>10</number></property>
        </layout>
       </widget>
+      <widget class="QWidget" name="tabResults">
+       <attribute name="title">
+        <string>📊 参数结果</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="vTabResults">
+        <property name="spacing"><number>10</number></property>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tabCharts">
+       <attribute name="title">
+        <string>📈 图形展示</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="vTabCharts">
+        <property name="spacing"><number>10</number></property>
+       </layout>
+      </widget>
      </widget>
     </item>
 

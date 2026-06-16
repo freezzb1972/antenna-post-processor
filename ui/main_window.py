@@ -930,7 +930,6 @@ class MainWindow(QMainWindow):
         self.ui.progressBar.setValue(self.ui.progressBar.maximum())
         self.ui.lblProgressMsg.setText(self.tr("✓ 处理完成"))
 
-        # 统计
         total_rows = sum(len(v) for v in results.values())
         total_imgs = sum(len(v) for v in images.values())
         self._log(f"\n{'='*50}")
@@ -938,6 +937,100 @@ class MainWindow(QMainWindow):
         if total_imgs:
             self._log(f"  生成 {total_imgs} 张 3D 方向图")
         self._update_status()
+
+        # 填充参数结果表
+        self._populate_results_table(results)
+        # 生成图形展示
+        self._populate_charts(results)
+
+    def _populate_results_table(self, results):
+        """填充参数结果表格。"""
+        vtab = self.ui.vTabResults
+        # 清除旧内容
+        while vtab.count():
+            item = vtab.takeAt(0)
+            if item.widget(): item.widget().deleteLater()
+
+        if not results: return
+        # 取第一个 sheet 的数据
+        first_sheet = next(iter(results.values()))
+        if not first_sheet: return
+        # 收集所有参数列 (排除内部 error key)
+        keys = sorted(k for k in first_sheet[0].keys() if not k.startswith('_'))
+        # 可读列名映射
+        KEY_LABELS = {
+            "frequency":"Frequency (MHz)","gain":"Gain (dBi)","directivity":"Directivity (dBi)",
+            "efficiency_pct":"Efficiency (%)","efficiency_db":"Efficiency (dB)",
+            "trp":"TRP (dBm)","peak_eirp":"Peak EIRP (dBm)",
+            "nhprp_45":"NHPRP ±45°","nhprp_30":"NHPRP ±30°","nhprp_225":"NHPRP ±22.5°",
+            "uh_prp":"Upper Hem. PRP","lh_prp":"Lower Hem. PRP","prp_120":"PRP 0-120°",
+            "max_power":"Max Power","min_power":"Min Power",
+            "avg_gain":"Avg Gain (dB)","avg_power":"Avg Power (dBm)",
+            "boresight_theta":"Boresight θ°","boresight_phi":"Boresight φ°",
+        }
+
+        table = QTableWidget()
+        table.setColumnCount(len(keys))
+        table.setHorizontalHeaderLabels([KEY_LABELS.get(k, k) for k in keys])
+        table.setRowCount(len(first_sheet))
+        table.setAlternatingRowColors(True)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        table.setMinimumHeight(300)
+
+        for ri, row in enumerate(first_sheet):
+            for ci, key in enumerate(keys):
+                val = row.get(key, "")
+                if isinstance(val, float):
+                    item = QTableWidgetItem(f"{val:.4f}")
+                else:
+                    item = QTableWidgetItem(str(val) if val is not None else "")
+                table.setItem(ri, ci, item)
+
+        vtab.addWidget(table)
+        self._log(self.tr(f"📊 参数表格已更新: {len(keys)} 列 × {len(first_sheet)} 行"))
+
+    def _populate_charts(self, results):
+        """在图形展示Tab生成 Matplotlib 图表。"""
+        vtab = self.ui.vTabCharts
+        while vtab.count():
+            item = vtab.takeAt(0)
+            if item.widget(): item.widget().deleteLater()
+
+        if not results: return
+        for sn, rows in results.items():
+            if not rows: continue
+            freqs = [r.get("frequency", 0) for r in rows]
+            # Gain@0-70 曲线
+            lag_keys = [k for k in rows[0].keys() if k.startswith("lag_range_")]
+            if lag_keys:
+                lag_vals = [r.get(lag_keys[0], 0) or 0 for r in rows]
+                self._add_result_chart(vtab, f"{sn}: Gain at Theta range vs Freq",
+                    freqs, lag_vals, "Frequency (MHz)", "Gain (dB)", 'b')
+            # Efficiency 曲线
+            if "efficiency_pct" in rows[0]:
+                eff_vals = [r.get("efficiency_pct", 0) or 0 for r in rows]
+                self._add_result_chart(vtab, f"{sn}: Efficiency vs Freq",
+                    freqs, eff_vals, "Frequency (MHz)", "Efficiency (%)", 'g')
+            break  # 只展示第一个 sheet
+
+    def _add_result_chart(self, parent_layout, title, x, y, xlabel, ylabel, color):
+        """添加一个 matplotlib 图表到布局。"""
+        import matplotlib
+        matplotlib.use('QtAgg')
+        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+        from matplotlib.figure import Figure
+
+        fig = Figure(figsize=(8, 4), dpi=100)
+        ax = fig.add_subplot(111)
+        ax.plot(x, y, f'{color}-', linewidth=1.5)
+        ax.set_title(title);
+        ax.set_xlabel(xlabel); ax.set_ylabel(ylabel)
+        ax.grid(True, alpha=0.3)
+        if ylabel == "Gain (dB)": ax.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
+
+        canvas = FigureCanvas(fig)
+        canvas.setMinimumHeight(250)
+        parent_layout.addWidget(canvas)
 
     def _on_error(self, message: str):
         self._running = False
