@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Antenna Post-Processor — 项目回顾与质量保障体系</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --card: #16213e;
+    --accent: #0f3460;
+    --text: #e0e0e0;
+    --red: #e74c3c;
+    --green: #2ecc71;
+    --yellow: #f39c12;
+    --blue: #3498db;
+    --purple: #9b59b6;
+    --code-bg: #0d1117;
+    --border: #2a2a4a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  h1 { font-size: 1.8em; text-align: center; margin: 20px 0 10px; color: #fff; }
+  h2 {
+    font-size: 1.3em;
+    border-left: 4px solid var(--blue);
+    padding-left: 12px;
+    margin: 40px 0 16px;
+    color: #fff;
+  }
+  h3 { font-size: 1.1em; margin: 24px 0 8px; color: #ccc; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+  .issue {
+    border-left: 4px solid var(--red);
+    background: var(--card);
+    padding: 14px 18px;
+    margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .issue.fixed { border-left-color: var(--green); }
+  .issue.root { border-left-color: var(--yellow); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 0.92em;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+  }
+  th { background: var(--accent); color: #fff; font-weight: 600; }
+  tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+  code {
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 14px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.85em;
+    line-height: 1.5;
+    margin: 10px 0;
+  }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.78em;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .tag-red { background: var(--red); color: #fff; }
+  .tag-green { background: var(--green); color: #fff; }
+  .tag-yellow { background: var(--yellow); color: #000; }
+  .tag-blue { background: var(--blue); color: #fff; }
+  .tag-purple { background: var(--purple); color: #fff; }
+  ul, ol { margin-left: 24px; }
+  li { margin: 4px 0; }
+  .summary-box {
+    background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+    border: 2px solid var(--blue);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 24px 0;
+  }
+  .toc { font-size: 0.92em; }
+  .toc a { color: var(--blue); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<h1>Antenna Post-Processor</h1>
+<p style="text-align:center;color:#888;margin-bottom:30px">项目回顾 · 反复问题分析 · 质量保障体系设计<br>2026-06-16</p>
+
+<nav class="toc card">
+  <strong>目录</strong>
+  <ol>
+    <li><a href="#s1">反复出现的问题及根因分析</a></li>
+    <li><a href="#s2">为什么这些问题难以发现和修复</a></li>
+    <li><a href="#s3">质量保障体系（Harness &amp; Process）</a></li>
+    <li><a href="#s4">Skill 设计：GUI 完整性守护</a></li>
+    <li><a href="#s5">Skill 设计：打包体积门禁</a></li>
+    <li><a href="#s6">Skill 设计：E2E 冒烟自动化</a></li>
+    <li><a href="#s7">预提交检查清单</a></li>
+  </ol>
+</nav>
+
+<!-- ================================================================== -->
+<h2 id="s1">1. 反复出现的问题及根因分析</h2>
+
+<div class="issue">
+  <span class="tag tag-red">#1 反复 6 次</span>
+  <strong>GUI 布局损坏 — widget 被压缩/重叠/不可见</strong>
+  <p style="margin-top:6px">
+    <em>现象：</em>文件列表太窄看不清、输出框被挤没、匹配表文字重叠、LAG 配置项上下粘连。<br>
+    <em>每次修复：</em>调一个具体数字（maxHeight=65→100、间距 3→4），修好这个坏那个。<br>
+    <em>真正根因：</em><code>tabFile</code> / <code>tabLag</code> 是普通 <code>QWidget</code>，内容多了 Qt 自动压缩所有子控件。
+    只有最后一次修复（包进 <code>QScrollArea</code>）才解决了根因。
+  </p>
+</div>
+
+<div class="issue">
+  <span class="tag tag-red">#2 反复 4 次</span>
+  <strong>git checkout 丢失代码 — 再通过正则补回去产生语法错误</strong>
+  <p style="margin-top:6px">
+    <em>现象：</em><code>git checkout -- ui/main_window.py</code> 抹掉 ~400 行多文件 UI 代码。
+    用 Python 正则脚本重注入，导致 f-string 括号不匹配、layout null-check 丢失。
+    <em>每次修复：</em>手工数括号、补 null-check。<br>
+    <em>真正根因：</em>手写代码和编译 UI 紧耦合但没有隔离层。没有 diff 验证步骤。
+  </p>
+</div>
+
+<div class="issue">
+  <span class="tag tag-red">#3 反复 3 次</span>
+  <strong>线程/signal 不完整 — 点 Start 无反应</strong>
+  <p style="margin-top:6px">
+    <em>现象：</em><code>_on_start()</code> 创建了 <code>QThread</code> + <code>ProcessingWorker</code> 但缺少
+    <code>moveToThread()</code>、信号连接、<code>thread.start()</code>。<br>
+    <em>每次修复：</em>手工加回缺失的 7 行代码。<br>
+    <em>真正根因：</em>线程启动是一个多步骤协议（create → move → connect → start），但没有封装成单一方法或 hook。代码补丁不完整时无自动检测。
+  </p>
+</div>
+
+<div class="issue">
+  <span class="tag tag-red">#4 反复 2 次</span>
+  <strong>FormLayout FieldRole/LabelRole 错乱</strong>
+  <p style="margin-top:6px">
+    <em>现象：</em>编译后的 UI 文件有 8 处用了 <code>LabelRole</code> 而非 <code>FieldRole</code>，
+    导致 "Cell already occupied" 警告和布局错位。<br>
+    <em>真正根因：</em>Qt Designer → pyuic 编译过程中 form layout 角色标记错误。
+    没有自动检查 form layout 完整性的步骤。
+  </p>
+</div>
+
+<div class="issue">
+  <span class="tag tag-red">#5 反复 2 次</span>
+  <strong>EXE 体积膨胀 — 从 73MB 涨到 187MB</strong>
+  <p style="margin-top:6px">
+    <em>现象：</em>spec 文件在迭代中丢了 <code>excludes</code> 列表 + 加了冗余 <code>hiddenimports</code>，
+    WSL 环境的 chromadb/openai/huggingface 等包被自动拉入。<br>
+    <em>真正根因：</em>没有 EXE 体积门禁。没有 spec 文件 diff/review 流程。
+  </p>
+</div>
+
+<div class="issue">
+  <span class="tag tag-red">#6 反复 3 次</span>
+  <strong>测试与新 UI 脱节 — 改 UI 后测试挂掉</strong>
+  <p style="margin-top:6px">
+    <em>现象：</em>隐藏 <code>editCsvPath</code> 后 5 个测试失败。测试引用了已删除的方法
+    <code>_on_browse_csv()</code>。<br>
+    <em>真正根因：</em>测试与 widget 名称紧耦合。没有 "UI 契约测试" 来验证 widget 存在性/可见性。
+  </p>
+</div>
+
+<!-- ================================================================== -->
+<h2 id="s2">2. 为什么这些问题难以发现和修复</h2>
+
+<table>
+  <tr><th>机制缺陷</th><th>后果</th><th>影响的问题</th></tr>
+  <tr>
+    <td><strong>无 GUI 布局自动化验证</strong></td>
+    <td>只看代码看不出 widget 是否被压缩</td>
+    <td>#1, #4</td>
+  </tr>
+  <tr>
+    <td><strong>无 git 操作前后 diff 检查</strong></td>
+    <td>checkout/rebase 丢代码后无人察觉</td>
+    <td>#2, #3</td>
+  </tr>
+  <tr>
+    <td><strong>线程创建无封装/无 hook</strong></td>
+    <td>每次都手工写 7 行协议代码，缺一行就挂</td>
+    <td>#3</td>
+  </tr>
+  <tr>
+    <td><strong>无 EXE 体积回归检测</strong></td>
+    <td>体积翻倍才发现</td>
+    <td>#5</td>
+  </tr>
+  <tr>
+    <td><strong>无 spec 文件变更审查</strong></td>
+    <td>删了 excludes 没人知道</td>
+    <td>#5</td>
+  </tr>
+  <tr>
+    <td><strong>测试用旧 widget 名硬编码</strong></td>
+    <td>改 UI 后测试批量挂</td>
+    <td>#6</td>
+  </tr>
+  <tr>
+    <td><strong>无 E2E "点 Start 看结果" 测试</strong></td>
+    <td>线程不启动这种致命 bug 在手工测试才发现</td>
+    <td>#3</td>
+  </tr>
+</table>
+
+<!-- ================================================================== -->
+<h2 id="s3">3. 质量保障体系</h2>
+
+<div class="summary-box">
+  <h3 style="margin-top:0">三层门禁模型</h3>
+  <table style="margin-top:12px">
+    <tr><th>层级</th><th>检查内容</th><th>触发时机</th><th>阻塞级别</th></tr>
+    <tr>
+      <td><span class="tag tag-green">L1</span></td>
+      <td>语法 + 导入 + 单元测试</td>
+      <td>每次保存 / 每次修改后</td>
+      <td><strong>GATE</strong> — 不通过不能继续</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-yellow">L2</span></td>
+      <td>GUI 布局完整性 + FormLayout 角色 + widget 可见性 + 线程信号连接</td>
+      <td>修改 UI 代码后</td>
+      <td><strong>GATE</strong> — 不通过不能提交</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-blue">L3</span></td>
+      <td>EXE 体积 + spec 文件 diff + E2E 冒烟</td>
+      <td>打包前 / 提交前</td>
+      <td><strong>GATE</strong> — 不通过不能发布</td>
+    </tr>
+  </table>
+</div>
+
+<h3>Harness 1: GUI 完整性守护</h3>
+<div class="card">
+  <p>设计目标：任何 GUI 代码变更后，自动验证以下 6 项：</p>
+  <ol>
+    <li><strong>FormLayout 角色检查</strong> — 扫描编译 UI 文件，确保每个 <code>setLayout(row, FieldRole, ...)</code> 前有对应的 <code>setWidget(row, LabelRole, ...)</code></li>
+    <li><strong>Widget 存在性检查</strong> — 实例化 MainWindow 后，关键 widget（_file_list_widget, _match_table, editOutputName, btnStart）不为 None</li>
+    <li><strong>Widget 可见性检查</strong> — 不应隐藏的 widget 未隐藏（如 editOutputName），应隐藏的已隐藏（如 editCsvPath）</li>
+    <li><strong>最小尺寸检查</strong> — 关键 widget 的 minimumHeight/minimumWidth > 阈值</li>
+    <li><strong>信号连接检查</strong> — btnStart.clicked 连接到 _on_start，_on_start 内 thread.started 连接到 worker.run</li>
+    <li><strong>ScrollArea 包装检查</strong> — tabFile 和 tabLag 的内容已包在 QScrollArea 中</li>
+  </ol>
+  <pre># 触发方式
+python3 gui_integrity_check.py          # 完整检查
+python3 gui_integrity_check.py --quick  # 仅 L1+L2 (10s)</pre>
+</div>
+
+<h3>Harness 2: 打包体积门禁</h3>
+<div class="card">
+  <p>设计目标：EXE 体积不超过预算，spec 文件变更有审查。</p>
+  <ol>
+    <li><strong>体积上限</strong> — Windows ≤ 80MB，Linux ≤ 110MB</li>
+    <li><strong>体积趋势</strong> — 每次构建记录体积，超出上次 10% 时告警</li>
+    <li><strong>Spec diff</strong> — 对比当前 spec 与基线（已知良好版本），标记新增/删除的 hiddenimports 和 excludes</li>
+    <li><strong>污染包扫描</strong> — 检查 TOC 中是否出现 pandas/sqlalchemy/pydantic/torch 等禁用包</li>
+  </ol>
+  <pre># 触发方式
+python3 build_size_gate.py              # 构建后自动运行
+python3 build_size_gate.py --baseline   # 更新基线</pre>
+</div>
+
+<h3>Harness 3: E2E 冒烟自动化</h3>
+<div class="card">
+  <p>设计目标：验证 "加载数据 → 点 Start → 出结果" 完整链路。</p>
+  <ol>
+    <li><strong>数据源加载</strong> — DataSource.from_path() 正常打开 CSV 和 FinalSummary</li>
+    <li><strong>管线运行</strong> — run_pipeline() 产生 ≥ 预期行数的结果</li>
+    <li><strong>GUI 线程启动</strong> — 创建 MainWindow → 模拟点击 Start → 验证 _running=True 且 thread.isRunning()</li>
+    <li><strong>输出文件</strong> — 生成的 Excel 文件存在且大小 > 0</li>
+  </ol>
+  <pre># 触发方式
+python3 _e2e_verify.py                  # 完整 E2E
+python3 _e2e_verify.py --quick          # 仅管线（不启动 GUI）</pre>
+</div>
+
+<!-- ================================================================== -->
+<h2 id="s4">4. Skill 设计：GUI 完整性守护 <code>/gui-check</code></h2>
+
+<div class="card">
+  <h3>触发条件</h3>
+  <ul>
+    <li>修改 <code>ui/main_window.py</code> 后</li>
+    <li>修改 <code>ui/compiled/ui_main_window.py</code> 后</li>
+    <li>修改 <code>antenna_post_processor.spec</code> 后</li>
+    <li>打包前 / 提交前</li>
+    <li>用户说 "检查 GUI" / "/gui-check"</li>
+  </ul>
+
+  <h3>检查阶段</h3>
+  <table>
+    <tr><th>阶段</th><th>检查项</th><th>耗时</th><th>阻塞</th></tr>
+    <tr>
+      <td>G1 Widget 树</td>
+      <td>关键 widget 存在性 + 可见性 + 最小尺寸</td>
+      <td>2s</td>
+      <td><span class="tag tag-red">GATE</span></td>
+    </tr>
+    <tr>
+      <td>G2 FormLayout</td>
+      <td>LabelRole/FieldRole 成对出现，无不匹配</td>
+      <td>1s</td>
+      <td><span class="tag tag-red">GATE</span></td>
+    </tr>
+    <tr>
+      <td>G3 信号链路</td>
+      <td>btnStart→_on_start→thread.start 完整</td>
+      <td>1s</td>
+      <td><span class="tag tag-red">GATE</span></td>
+    </tr>
+    <tr>
+      <td>G4 ScrollArea</td>
+      <td>tabFile、tabLag 已包装在 QScrollArea</td>
+      <td>1s</td>
+      <td><span class="tag tag-yellow">WARN</span></td>
+    </tr>
+    <tr>
+      <td>G5 线程启动</td>
+      <td>模拟 Start → 验证 thread 真正运行</td>
+      <td>3s</td>
+      <td><span class="tag tag-red">GATE</span></td>
+    </tr>
+  </table>
+
+  <h3>检查代码示例</h3>
+  <pre># G3: 信号链路检查
+def _check_signal_chain(source_code: str) -> List[str]:
+    errors = []
+    # 1. btnStart 必须连接 _on_start
+    if "self.ui.btnStart.clicked.connect(self._on_start)" not in source_code:
+        errors.append("MISSING: btnStart.clicked → _on_start")
+    # 2. _on_start 必须创建 thread + worker
+    if "QThread(self)" not in source_code:
+        errors.append("MISSING: QThread creation in _on_start")
+    # 3. 必须有 moveToThread
+    if "moveToThread" not in source_code:
+        errors.append("MISSING: worker.moveToThread(thread)")
+    # 4. 必须连接 started → worker.run
+    if "self._thread.started.connect(self._worker.run)" not in source_code:
+        errors.append("MISSING: thread.started → worker.run")
+    # 5. 必须 thread.start()
+    if "self._thread.start()" not in source_code:
+        errors.append("MISSING: thread.start()")
+    return errors
+
+# G5: 线程启动冒烟测试
+def _smoke_test_thread_start():
+    from ui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow(app)
+    # 模拟最小化启动
+    w._data_file_paths = ["dummy.csv"]
+    w._match_table.setRowCount(1)
+    # ...设置匹配项...
+    w._on_start()
+    assert w._running, "Start did not set _running = True"
+    assert w._thread.isRunning(), "Thread not started!"
+    w._on_stop()
+    w._thread.wait(3000)</pre>
+</div>
+
+<!-- ================================================================== -->
+<h2 id="s5">5. Skill 设计：打包体积门禁 <code>/size-gate</code></h2>
+
+<div class="card">
+  <h3>触发条件</h3>
+  <ul>
+    <li>PyInstaller 构建完成后自动触发</li>
+    <li>修改 <code>antenna_post_processor.spec</code> 后</li>
+    <li>用户说 "/size-gate"</li>
+  </ul>
+
+  <h3>检查项</h3>
+  <table>
+    <tr><th>阶段</th><th>检查项</th><th>阻塞</th></tr>
+    <tr>
+      <td>S1 体积上限</td>
+      <td>Windows ≤ 80MB, Linux ≤ 110MB</td>
+      <td><span class="tag tag-red">GATE</span></td>
+    </tr>
+    <tr>
+      <td>S2 体积趋势</td>
+      <td>不超过上次构建的 110%</td>
+      <td><span class="tag tag-yellow">WARN</span></td>
+    </tr>
+    <tr>
+      <td>S3 污染包</td>
+      <td>TOC 中无 pandas/sqlalchemy/pydantic/torch/chromadb</td>
+      <td><span class="tag tag-red">GATE</span></td>
+    </tr>
+    <tr>
+      <td>S4 Spec 完整</td>
+      <td>excludes 列表 ≥ 30 项，hiddenimports ≤ 10 项</td>
+      <td><span class="tag tag-red">GATE</span></td>
+    </tr>
+    <tr>
+      <td>S5 必需模块</td>
+      <td>PySide6.QtCore/Gui/Widgets, numpy, matplotlib, openpyxl 都在</td>
+      <td><span class="tag tag-red">GATE</span></td>
+    </tr>
+  </table>
+
+  <pre># S3: 污染包扫描
+FORBIDDEN = ['pandas', 'sqlalchemy', 'pydantic', 'torch', 'chromadb',
+             'openai', 'huggingface', 'tokenizers', 'transformers', 'tqdm', 'rich']
+def check_toc_clean(toc_path: str) -> List[str]:
+    with open(toc_path) as f:
+        content = f.read()
+    found = [pkg for pkg in FORBIDDEN if pkg in content]
+    return found  # 任何匹配都是 GATE 失败</pre>
+</div>
+
+<!-- ================================================================== -->
+<h2 id="s6">6. Skill 设计：E2E 冒烟自动化 <code>/e2e-smoke</code></h2>
+
+<div class="card">
+  <h3>触发条件</h3>
+  <ul>
+    <li>每次代码修改后（由 verify-py 驱动）</li>
+    <li>打包前</li>
+    <li>用户说 "/e2e-smoke"</li>
+  </ul>
+
+  <h3>测试阶段</h3>
+  <table>
+    <tr><th>阶段</th><th>测试</th><th>耗时</th></tr>
+    <tr>
+      <td>E1 数据源</td>
+      <td>CSV 加载 + FinalSummary 加载 + from_path 工厂</td>
+      <td>2s</td>
+    </tr>
+    <tr>
+      <td>E2 管线</td>
+      <td>single mode 360 rows + multi mode N rows</td>
+      <td>5s</td>
+    </tr>
+    <tr>
+      <td>E3 GUI 启动</td>
+      <td>MainWindow 实例化 + 所有 widget 非空</td>
+      <td>3s</td>
+    </tr>
+    <tr>
+      <td>E4 线程</td>
+      <td>模拟 Start → 验证 thread.isRunning() → Stop → 验证 thread 停止</td>
+      <td>3s</td>
+    </tr>
+    <tr>
+      <td>E5 输出</td>
+      <td>生成的 Excel 文件存在、大小 > 1KB</td>
+      <td>1s</td>
+    </tr>
+  </table>
+  <p><strong>总计 ~14s</strong> — 足够快，每次修改后都可以跑。</p>
+</div>
+
+<!-- ================================================================== -->
+<h2 id="s7">7. 预提交检查清单</h2>
+
+<div class="card">
+  <table>
+    <tr><th>#</th><th>检查项</th><th>命令</th></tr>
+    <tr>
+      <td>1</td>
+      <td>所有测试通过</td>
+      <td><code>python3 -m pytest tests/ -q</code></td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>GUI 完整性守护</td>
+      <td><code>python3 gui_integrity_check.py</code></td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>E2E 冒烟</td>
+      <td><code>python3 _e2e_verify.py</code></td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>EXE 体积门禁</td>
+      <td><code>python3 build_size_gate.py</code></td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>git diff --stat 审查</td>
+      <td>确认未改到编译 UI / spec 未丢 excludes</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>CHANGELOG 更新</td>
+      <td>记录本次变更摘要</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ================================================================== -->
+<h2 style="margin-top:50px">附录：问题模式速查表</h2>
+
+<table>
+  <tr><th>症状</th><th>常见根因</th><th>快速诊断</th></tr>
+  <tr>
+    <td>点 Start 无反应</td>
+    <td>线程未启动（缺 moveToThread / connect / start）</td>
+    <td><code>grep "thread.start()" ui/main_window.py</code></td>
+  </tr>
+  <tr>
+    <td>Widget 被压缩/不可见</td>
+    <td>Tab 不是 QScrollArea</td>
+    <td><code>grep "QScrollArea" ui/main_window.py</code></td>
+  </tr>
+  <tr>
+    <td>"Cell already occupied" 警告</td>
+    <td>FormLayout LabelRole/FieldRole 错配</td>
+    <td>检查 compiled UI 的 setWidget/setLayout 角色</td>
+  </tr>
+  <tr>
+    <td>EXE 突然变大</td>
+    <td>环境污染包被拉入（pandas/chromadb 等）</td>
+    <td><code>grep "pandas" build/*/warn-*.txt</code></td>
+  </tr>
+  <tr>
+    <td>测试批量失败</td>
+    <td>UI 改了 widget 名/方法名</td>
+    <td>检查测试中的 widget 引用是否匹配新 UI</td>
+  </tr>
+  <tr>
+    <td>git checkout 丢代码</td>
+    <td>手写代码和编译 UI 无隔离</td>
+    <td><code>git diff --stat</code> 确认变更范围</td>
+  </tr>
+</table>
+
+<p style="text-align:center;color:#555;margin-top:40px;font-size:0.85em">
+  Generated by Claude Code · Antenna Post-Processor Project · 2026-06-16
+</p>
+
+</body>
+</html>

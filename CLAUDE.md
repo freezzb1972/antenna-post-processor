@@ -48,11 +48,41 @@ main.py → ui/main_window.py (PySide6 GUI)
 6. 多文件模式: 工作表名 ↔ 文件名通过 `sheet_file_matcher.py` 的 `extract_key()` 匹配
 7. 所有计算值 `round(val, 6)` 保留 6 位小数
 
+### 质量门禁（自动触发）
+
+修改以下文件后，**必须**运行对应的 harness。Harness 已内置在项目中，
+对**任意 Python 项目**使用 `--init` 可生成项目配置，之后自动适配。
+
+| 触发文件 | Skill | 命令 |
+|---------|-------|------|
+| `ui/main_window.py` | `/gui-check` | `python3 gui_integrity_check.py` |
+| `ui/compiled/ui_main_window.py` | `/gui-check` | `python3 gui_integrity_check.py` |
+| `*.spec` | `/size-gate` | `python3 build_size_gate.py --spec-only` |
+| PyInstaller 构建后 | `/size-gate` | `python3 build_size_gate.py` |
+| 任何 `.py` 变更 | E2E | `python3 _e2e_verify.py` |
+
+对**任意 Python 项目**使用这些 skill：
+```bash
+# 初始化（首次）
+python3 ~/.claude/skills/gui-check/gui_integrity_check.py --init    # 生成 .gui-check.json
+python3 ~/.claude/skills/size-gate/build_size_gate.py --init        # 生成 .size-gate.json
+# 编辑 .gui-check.json / .size-gate.json 定制规则
+# 正常运行
+python3 ~/.claude/skills/gui-check/gui_integrity_check.py
+python3 ~/.claude/skills/size-gate/build_size_gate.py --spec-only
+```
+
 ### 验证命令
 
 ```bash
 # 测试
 python3 -m pytest tests/ -q
+
+# GUI 完整性
+python3 gui_integrity_check.py
+
+# 体积门禁
+python3 build_size_gate.py
 
 # E2E
 python3 -c "

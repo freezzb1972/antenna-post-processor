@@ -1,0 +1,43 @@
+{
+  "_comment": "Antenna Post-Processor — GUI 完整性检查配置",
+  "framework": "PySide6",
+  "required_visible": [
+    "editOutputName",
+    "editOutputDir",
+    "editTemplatePath",
+    "btnStart",
+    "btnStop",
+    "progressBar",
+    "logOutput"
+  ],
+  "required_hidden": [
+    "editCsvPath",
+    "btnBrowseCsv",
+    "lblCsv"
+  ],
+  "min_sizes": {
+    "editOutputName": [200, 0],
+    "editOutputDir": [200, 0],
+    "editFullReportPath": [200, 0]
+  },
+  "required_custom_widgets": [
+    "_file_list_widget",
+    "_match_table",
+    "_btn_add_files",
+    "_btn_auto_match",
+    "_check_extrapolate"
+  ],
+  "thread_patterns": [
+    "QThread(self)",
+    "ProcessingWorker(",
+    "moveToThread(",
+    "self._thread.started.connect(self._worker.run)",
+    "self._worker.progress.connect(self._on_progress)",
+    "self._worker.log.connect(self._on_worker_log)",
+    "self._worker.finished.connect(self._on_finished)",
+    "self._worker.error.connect(self._on_error)",
+    "self._thread.start()",
+    "self._running = True"
+  ],
+  "scroll_area_tabs": ["tabFile", "tabLag"]
+}

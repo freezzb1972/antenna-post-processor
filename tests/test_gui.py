@@ -41,21 +41,23 @@ def window(qapp, monkeypatch, qtbot):
 
 
 class TestFileInput:
-    """Bug #1: 输入文件支持 csv/xlsx/xls"""
+    """Bug #1: 输入文件支持 csv/xlsx/xls — 通过多文件添加"""
 
-    def test_accepts_csv(self, window, qtbot):
-        window.ui.editCsvPath.clear()
-        window.ui.editCsvPath.setText("/tmp/test.csv")
-        assert window.ui.editCsvPath.text() == "/tmp/test.csv"
+    def test_csv_field_hidden(self, window, qtbot):
+        """旧的单文件输入框已隐藏，由多文件 Widget 替代。"""
+        assert window.ui.editCsvPath.isHidden(), "Old CSV path field should be hidden"
+        assert window.ui.btnBrowseCsv.isHidden(), "Old CSV browse button should be hidden"
 
-    def test_accepts_xlsx(self, window, qtbot):
-        window.ui.editCsvPath.clear()
-        window.ui.editCsvPath.setText("/tmp/test.xlsx")
-        assert window.ui.editCsvPath.text() == "/tmp/test.xlsx"
+    def test_multi_file_widget_exists(self, window, qtbot):
+        """多文件选择 Widget 已创建。"""
+        assert window._file_list_widget is not None
+        assert window._btn_add_files is not None
+        assert window._match_table is not None
 
-    def test_placeholder_updated(self, window):
-        assert "csv" in window.ui.editCsvPath.placeholderText().lower()
-        assert "xlsx" in window.ui.editCsvPath.placeholderText().lower()
+    def test_add_data_files_button_text(self, window):
+        """添加数据文件按钮存在。"""
+        assert window._btn_add_files is not None
+        assert "添加" in window._btn_add_files.text() or "add" in window._btn_add_files.text().lower()
 
 
 class TestFileDisplay:
@@ -102,13 +104,14 @@ class TestStartValidation:
     """Bug #4: 输入检测 — 提示语匹配实际格式"""
 
     def test_empty_input_shows_warning(self, window, qtbot):
-        window.ui.editCsvPath.clear()
+        window._data_file_paths.clear()
+        window._file_list_widget.clear()
+        window._match_table.setRowCount(0)
         window.ui.editTemplatePath.setText("/tmp/template.xlsx")
         window._on_start()
         QMessageBox.warning.assert_called_once()
         args = QMessageBox.warning.call_args[0]
-        assert "输入文件" in args[2] or ".csv" in args[2] or ".xlsx" in args[2]
+        assert "数据文件" in args[2] or "匹配" in args[2]
 
     def test_input_label_is_generic(self, window):
-        assert window.ui.lblCsv.text() != "EMQuest CSV："
-        assert "输入" in window.ui.lblCsv.text()
+        assert window.ui.lblCsv.isHidden() or "输入" in window.ui.lblCsv.text()

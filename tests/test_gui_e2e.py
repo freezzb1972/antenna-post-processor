@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QPalette
-from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QComboBox, QFileDialog, QMessageBox, QTableWidgetItem
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -119,72 +119,66 @@ class TestLagDisplayVisibility:
 class TestFileInput:
     """Bug: CSV 输入文件加载后点击开始就消失"""
 
-    def test_csv_path_preserved_after_start(self, window):
-        """输入路径在 _on_start 调用后不会被清空。"""
-        window.ui.editCsvPath.setText("/tmp/test.csv")
+    def test_file_list_preserved_after_start(self, window):
+        """多文件列表在 _on_start 调用后不会被清空。"""
+        window._data_file_paths = ["/tmp/test.csv"]
+        window._refresh_data_file_ui()
         window.ui.editTemplatePath.setText("/tmp/template.xlsx")
-        assert window.ui.editCsvPath.text() == "/tmp/test.csv"
+        assert len(window._data_file_paths) == 1
 
-        # _on_start 应该因为文件不存在而弹窗警告，但不应清空路径
+        # _on_start 应该因为无匹配而弹窗警告，但不应清空文件列表
         window._on_start()
-        assert window.ui.editCsvPath.text() == "/tmp/test.csv", (
-            "CSV path was cleared after _on_start() — this is the bug!"
+        assert len(window._data_file_paths) == 1, (
+            "File list was cleared after _on_start() — this is the bug!"
         )
 
     def test_csv_filter_in_dialog(self, window, monkeypatch):
-        """文件浏览对话框的运行时 filter 以 CSV 开头。"""
+        """文件浏览对话框的运行时 filter 支持 CSV/Excel。"""
         from unittest.mock import ANY
         filters_captured = []
 
         def capture_filter(*args, **kwargs):
-            # args: (self, title, dir, filter)
             if len(args) >= 4:
                 filters_captured.append(args[3])
             return ("/tmp/test.csv", "")
 
-        monkeypatch.setattr(QFileDialog, "getOpenFileName", capture_filter)
-        window._on_browse_csv()
-        assert len(filters_captured) > 0, "getOpenFileName should have been called"
+        monkeypatch.setattr(QFileDialog, "getOpenFileNames", capture_filter)
+        window._on_add_data_files()
+        assert len(filters_captured) > 0, "getOpenFileNames should have been called"
         actual_filter = filters_captured[0]
-        # 第一个（默认）filter 应该是 CSV
-        assert actual_filter.startswith("CSV 文件 (*.csv)"), (
-            f"Default filter should be CSV, got: {actual_filter}"
+        assert "csv" in actual_filter.lower(), (
+            f"Filter should include CSV, got: {actual_filter}"
         )
-        assert "Excel 文件 (*.xlsx *.xls)" in actual_filter, (
-            f"Filter should also contain Excel option, got: {actual_filter}"
+        assert "xlsx" in actual_filter.lower(), (
+            f"Filter should include xlsx, got: {actual_filter}"
+        )
+        assert "xls" in actual_filter.lower(), (
+            f"Filter should include xls, got: {actual_filter}"
         )
 
     def test_empty_input_shows_warning(self, window):
         """空输入时弹窗警告。"""
-        window.ui.editCsvPath.clear()
+        window._data_file_paths.clear()
+        window._file_list_widget.clear()
+        window._match_table.setRowCount(0)
         window.ui.editTemplatePath.setText("/tmp/template.xlsx")
         window._on_start()
         QMessageBox.warning.assert_called()
         args = QMessageBox.warning.call_args[0]
-        assert "输入文件" in args[2] or ".csv" in args[2]
-
-    def test_invalid_input_extension_shows_warning(self, window, monkeypatch):
-        """不支持的输入文件格式弹窗警告。"""
-        from pathlib import Path
-        # Create temp file with .txt extension
-        import tempfile
-        tmp = tempfile.NamedTemporaryFile(suffix=".txt", delete=False)
-        tmp.close()
-        monkeypatch.setattr(Path, "exists", lambda self: True)
-
-        window.ui.editCsvPath.setText(tmp.name)
-        window.ui.editTemplatePath.setText("/tmp/template.xlsx")
-        window._on_start()
-        QMessageBox.warning.assert_called()
-        args = QMessageBox.warning.call_args[0]
-        assert "不支持" in args[2] or "格式" in args[2]
-
-        Path(tmp.name).unlink()
+        assert "数据文件" in args[2] or "匹配" in args[2]
 
     def test_template_not_excel_shows_warning(self, window, monkeypatch):
         """模板不是 Excel 格式时弹窗警告。"""
         from pathlib import Path
-        window.ui.editCsvPath.setText("/tmp/test.csv")
+        window._data_file_paths = ["/tmp/test.csv"]
+        window._match_table.setRowCount(1)
+        window._match_table.setItem(0, 0, QTableWidgetItem("Sheet1"))
+        from PySide6.QtWidgets import QComboBox
+        combo = QComboBox()
+        combo.addItem("/tmp/test.csv")
+        combo.setCurrentIndex(0)
+        window._match_table.setCellWidget(0, 1, combo)
+        window._match_table.setItem(0, 2, QTableWidgetItem("✓ 已匹配"))
         window.ui.editTemplatePath.setText("/tmp/bad_template.txt")
         monkeypatch.setattr(Path, "exists", lambda self: True)
         window._on_start()
@@ -232,18 +226,21 @@ class TestFormLayoutIntegrity:
         assert idx > group_idx, "file label should be after groupInput"
 
     def test_edit_fields_accessible(self, window):
-        """editCsvPath 和 editTemplatePath 可以直接访问和修改。"""
-        # Set text
-        window.ui.editCsvPath.setText("/tmp/hello.csv")
-        assert window.ui.editCsvPath.text() == "/tmp/hello.csv"
+        """多文件列表和模板路径可以直接访问和修改。"""
+        # 文件列表
+        window._data_file_paths = ["/tmp/hello.csv"]
+        window._refresh_data_file_ui()
+        assert window._file_list_widget.count() == 1
+        assert "hello" in window._file_list_widget.item(0).text()
+
+        # 模板路径
         window.ui.editTemplatePath.setText("/tmp/template.xlsx")
         assert window.ui.editTemplatePath.text() == "/tmp/template.xlsx"
 
-        # Clear and re-set
-        window.ui.editCsvPath.clear()
-        assert window.ui.editCsvPath.text() == ""
-        window.ui.editCsvPath.setText("/tmp/new.csv")
-        assert window.ui.editCsvPath.text() == "/tmp/new.csv"
+        # 清除文件列表
+        window._on_clear_data_files()
+        assert len(window._data_file_paths) == 0
+        assert window._file_list_widget.count() == 0
 
 
 # =========================================================================
@@ -286,10 +283,11 @@ class TestDragDrop:
 class TestPlaceholderText:
     """输入框提示语"""
 
-    def test_csv_placeholder_mentions_all_formats(self, window):
-        pt = window.ui.editCsvPath.placeholderText().lower()
-        assert "csv" in pt
-        assert "xlsx" in pt or "xls" in pt
+    def test_multi_file_widget_visible(self, window):
+        """多文件输入 Widget 已创建且可见。"""
+        assert window._data_file_widget is not None
+        assert window._btn_add_files is not None
+        assert "添加" in window._btn_add_files.text() or "add" in window._btn_add_files.text().lower()
 
     def test_template_placeholder_mentions_xlsx(self, window):
         pt = window.ui.editTemplatePath.placeholderText().lower()

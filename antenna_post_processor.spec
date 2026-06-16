@@ -16,8 +16,6 @@ PyInstaller 打包配置
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files
-
 block_cipher = None
 
 PROJECT_ROOT = Path(SPECPATH).resolve()
@@ -34,31 +32,8 @@ a = Analysis(
         (str(PROJECT_ROOT / 'config' / 'bands.json'), 'config'),
         # 模板文件（可选，打包后也可以在运行时选择外部模板）
         (str(PROJECT_ROOT / 'data' / 'template_5G1.xlsx'), 'templates'),
-        # qt-material 主题文件
-        *collect_data_files('qt_material'),
     ],
     hiddenimports=[
-        # ---- 项目内部模块 ----
-        # PyInstaller 静态分析会追踪大多数导入，但以下模块使用
-        # 懒加载 / from_path 工厂 / 动态 import，需显式声明。
-        'src.calculator',
-        'src.datasource',
-        'src.excel_reader',
-        'src.exporter',
-        'src.finalsummary_reader',
-        'src.lag_config',
-        'src.parser',
-        'src.pipeline',
-        'src.plot_config',
-        'src.plotter',
-        'src.report_exporter',
-        'src.worker',
-        'ui.main_window',
-        'ui.theme_manager',
-        'ui.compiled',
-        'ui.compiled.ui_main_window',
-        'i18n.i18n_manager',
-
         # ---- PySide6 — 仅引用实际使用的模块，避免 collect_submodules 拉入全部 426MB ----
         'PySide6.QtCore',
         'PySide6.QtGui',
@@ -67,19 +42,12 @@ a = Analysis(
         # ---- matplotlib backends（Agg 必需，SVG 可选但小） ----
         'matplotlib.backends.backend_agg',
         'matplotlib.backends.backend_svg',
-        'matplotlib.cm',
 
         # ---- numpy ----
         'numpy.lib.format',
 
         # ---- openpyxl ----
         'openpyxl.cell._writer',
-        'openpyxl.styles',
-        'openpyxl.utils',
-        'openpyxl.drawing.image',
-
-        # ---- qt-material（主题引擎） ----
-        'qt_material',
     ],
     hookspath=[],
     hooksconfig={},
@@ -134,6 +102,51 @@ a = Analysis(
         'matplotlib.backends.backend_tkagg',
         'matplotlib.backends.backend_wxagg',
         'matplotlib.backends.backend_gtk3agg',
+        # openpyxl 可选依赖（自动降级到 stdlib xml，不影响功能）
+        'lxml',
+        'lxml.*',
+        # 排除环境中的污染包（chromadb/openai/huggingface 等间接引入）
+        # 注意：不排除 PIL（matplotlib 保存图片需要）和 lxml（openpyxl 可选优化）
+        'pandas',
+        'pandas.*',
+        'sqlalchemy',
+        'sqlalchemy.*',
+        'pydantic',
+        'pydantic.*',
+        'tqdm',
+        'tqdm.*',
+        'rich',
+        'rich.*',
+        'chromadb',
+        'chromadb.*',
+        'openai',
+        'openai.*',
+        'huggingface_hub',
+        'huggingface_hub.*',
+        'tokenizers',
+        'tokenizers.*',
+        'transformers',
+        'transformers.*',
+        'torch',
+        'torch.*',
+        'scipy',
+        'scipy.*',
+        'pyarrow',
+        'pyarrow.*',
+        'numba',
+        'numba.*',
+        'numexpr',
+        'numexpr.*',
+        'pydantic_core',
+        'pydantic_core.*',
+        'dotenv',
+        'dotenv.*',
+        'google',
+        'google.*',
+        'grpc',
+        'grpc.*',
+        'yaml',
+        'yaml.*',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

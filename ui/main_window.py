@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
@@ -103,12 +104,9 @@ class MainWindow(QMainWindow):
 
     def _init_file_paths(self):
         """从 QSettings 恢复上次路径。"""
-        csv_path = self._settings.value("csv_path", "")
         template_path = self._settings.value("template_path", "")
         output_dir = self._settings.value("output_dir", str(Path.cwd() / "output"))
 
-        if csv_path and Path(csv_path).exists():
-            self.ui.editCsvPath.setText(csv_path)
         if template_path and Path(template_path).exists():
             self.ui.editTemplatePath.setText(template_path)
         if output_dir:
@@ -119,14 +117,26 @@ class MainWindow(QMainWindow):
 
     def _init_multi_file_ui(self):
         """构建多文件选择 + 自动匹配 UI（动态插入到 vTabFile）。"""
+        # ---- 隐藏旧的单文件输入行（与多文件功能重复） ----
+        self.ui.lblCsv.hide()
+        self.ui.editCsvPath.hide()
+        self.ui.btnBrowseCsv.hide()
+        self.ui.groupInput.setTitle(self.tr("模板文件"))
+
+        # ---- 输出字段加最小宽度，防止被压缩 ----
+        self.ui.editOutputDir.setMinimumWidth(200)
+        self.ui.editOutputName.setMinimumWidth(200)
+        self.ui.editFullReportPath.setMinimumWidth(200)
+
         self._data_file_widget = QWidget()
         layout = QVBoxLayout(self._data_file_widget)
         layout.setContentsMargins(0, 4, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(6)
 
+        # 数据文件按钮行
         btn_row = QHBoxLayout()
         self._btn_add_files = QPushButton(self.tr("📂 添加数据文件..."))
-        self._btn_add_files.setToolTip(self.tr("选择多个数据文件 (Ctrl+点击多选)"))
+        self._btn_add_files.setToolTip(self.tr("选择多个数据文件 (Ctrl+点击多选 / 拖拽)"))
         self._btn_clear_files = QPushButton(self.tr("清除"))
         self._btn_add_files.clicked.connect(self._on_add_data_files)
         self._btn_clear_files.clicked.connect(self._on_clear_data_files)
@@ -135,37 +145,51 @@ class MainWindow(QMainWindow):
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
+        # 文件列表 — 可滚动、自适应高度
         self._file_list_widget = QListWidget()
-        self._file_list_widget.setMaximumHeight(65)
+        self._file_list_widget.setMinimumHeight(80)
+        self._file_list_widget.setMaximumHeight(160)
+        self._file_list_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self._file_list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self._file_list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self._file_list_widget.setAlternatingRowColors(True)
         layout.addWidget(self._file_list_widget)
 
+        # 匹配表
         self._match_table = QTableWidget()
         self._match_table.setColumnCount(3)
         self._match_table.setHorizontalHeaderLabels([
             self.tr("工作表"), self.tr("数据文件"), self.tr("状态")
         ])
         self._match_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self._match_table.setMaximumHeight(140)
+        self._match_table.verticalHeader().setDefaultSectionSize(28)
+        self._match_table.verticalHeader().setVisible(False)
+        self._match_table.setMinimumHeight(100)
+        self._match_table.setMaximumHeight(200)
+        self._match_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self._match_table.setAlternatingRowColors(True)
         layout.addWidget(self._match_table)
 
+        # 自动匹配按钮行
         match_row = QHBoxLayout()
         self._btn_auto_match = QPushButton(self.tr("🔗 自动匹配"))
         self._btn_auto_match.clicked.connect(self._on_auto_match)
         self._btn_auto_match.setToolTip(self.tr("按文件命名自动匹配工作表"))
         self._lbl_match_status = QLabel("")
-        self._lbl_match_status.setStyleSheet("font-size: 12px;")
+        self._lbl_match_status.setMinimumHeight(22)
+        self._lbl_match_status.setStyleSheet("font-size: 12px; padding: 2px 0;")
         match_row.addWidget(self._btn_auto_match)
         match_row.addWidget(self._lbl_match_status)
         match_row.addStretch()
         layout.addLayout(match_row)
 
+        # 插入到 groupInput 之后
         vtab = self.ui.vTabFile
         idx = vtab.indexOf(self.ui.groupInput)
         if idx >= 0:
             vtab.insertWidget(idx + 1, self._data_file_widget)
 
+        # Theta 外推复选框
         self._check_extrapolate = QCheckBox(self.tr("Theta 外推到 180°（启用后 Directivity 约低 0.04 dB）"))
         self._check_extrapolate.setChecked(False)
         self._check_extrapolate.setToolTip(
@@ -176,6 +200,36 @@ class MainWindow(QMainWindow):
         if out_idx >= 0:
             vtab.insertWidget(out_idx + 1, self._check_extrapolate)
 
+        # 完整报告路径显示/隐藏
+        self.ui.checkFullReport.toggled.connect(self._on_full_report_toggled)
+        self._on_full_report_toggled(self.ui.checkFullReport.isChecked())
+
+        # ---- 将整个 Tab 的内容包裹在可滚动区域中，防止内容溢出被压缩 ----
+        self._make_tab_scrollable(self.ui.tabFile)
+        self._make_tab_scrollable(self.ui.tabLag)
+
+    def _make_tab_scrollable(self, tab: QWidget):
+        """将指定 Tab 的内容包裹在 QScrollArea 中，防止内容溢出被压缩。"""
+        layout = tab.layout()
+        if layout is None:
+            return
+        # 创建 scroll area
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        # 创建内容 widget，移入 layout
+        content = QWidget()
+        content.setLayout(layout)
+        scroll.setWidget(content)
+        # 替换 tab
+        tc = self.ui.tabConfig
+        for i in range(tc.count()):
+            if tc.widget(i) is tab:
+                title = tc.tabText(i)
+                tc.removeTab(i)
+                tc.insertTab(i, scroll, title)
+                break
+
     # ==================================================================
     # 多文件操作
     # ==================================================================
@@ -184,7 +238,7 @@ class MainWindow(QMainWindow):
         paths, _ = QFileDialog.getOpenFileNames(
             self, self.tr("选择数据文件 (可多选)"),
             self._settings.value("csv_path", ""),
-            self.tr("CSV 文件 (*.csv);;Excel 文件 (*.xlsx *.xls);;所有文件 (*)")
+            self.tr("所有支持格式 (*.csv *.xlsx *.xls);;CSV 文件 (*.csv);;Excel 新版 (*.xlsx);;Excel 旧版 (*.xls);;所有文件 (*)")
         )
         if not paths:
             return
@@ -250,6 +304,7 @@ class MainWindow(QMainWindow):
     def _populate_match_table(self, matches):
         self._match_table.setRowCount(len(matches))
         for i, m in enumerate(matches):
+            self._match_table.setRowHeight(i, 28)
             self._match_table.setItem(i, 0, QTableWidgetItem(m.sheet_name))
             combo = QComboBox()
             combo.addItem("—")
@@ -384,7 +439,6 @@ class MainWindow(QMainWindow):
         self.ui.cmbThemeSelector.currentIndexChanged.connect(self._on_theme_changed)
 
         # 文件浏览
-        self.ui.btnBrowseCsv.clicked.connect(self._on_browse_csv)
         self.ui.btnBrowseTemplate.clicked.connect(self._on_browse_template)
         self.ui.btnBrowseOutput.clicked.connect(self._on_browse_output)
         self.ui.btnBrowseFullReport.clicked.connect(self._on_browse_full_report)
@@ -417,15 +471,11 @@ class MainWindow(QMainWindow):
     # 文件浏览
     # ==================================================================
 
-    def _on_browse_csv(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("选择 EMQuest CSV 文件"),
-            self._settings.value("csv_path", ""),
-            self.tr("CSV 文件 (*.csv);;Excel 文件 (*.xlsx *.xls);;所有文件 (*)")
-        )
-        if path:
-            self.ui.editCsvPath.setText(path)
-            self._settings.setValue("csv_path", path)
+    def _on_full_report_toggled(self, checked: bool):
+        """完整报告复选框切换 → 显示/隐藏路径输入框。"""
+        self.ui.lblFullReportPath.setVisible(checked)
+        self.ui.editFullReportPath.setVisible(checked)
+        self.ui.btnBrowseFullReport.setVisible(checked)
 
     def _on_browse_template(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -593,13 +643,15 @@ class MainWindow(QMainWindow):
             layout.addWidget(header)
             for a in singles:
                 row = QWidget()
+                row.setMinimumHeight(30)
                 h = QHBoxLayout(row)
-                h.setContentsMargins(8, 3, 0, 3)
+                h.setContentsMargins(8, 4, 0, 4)
                 h.setSpacing(8)
                 lbl = QLabel(f"  {a}°")
                 lbl.setStyleSheet("font-size: 13px;")
+                lbl.setMinimumHeight(24)
                 btn = QPushButton(" ✕ ")
-                btn.setFixedHeight(26)
+                btn.setFixedHeight(24)
                 btn.setToolTip(self.tr("移除此角度"))
                 btn.setStyleSheet("font-size: 11px; padding: 2px 6px;")
                 btn.clicked.connect(lambda checked, angle=a: self._remove_single(angle))
@@ -615,13 +667,15 @@ class MainWindow(QMainWindow):
             layout.addWidget(header)
             for lo, hi in ranges:
                 row = QWidget()
+                row.setMinimumHeight(30)
                 h = QHBoxLayout(row)
-                h.setContentsMargins(8, 3, 0, 3)
+                h.setContentsMargins(8, 4, 0, 4)
                 h.setSpacing(8)
                 lbl = QLabel(f"  ({lo}° - {hi}°)")
                 lbl.setStyleSheet("font-size: 13px;")
+                lbl.setMinimumHeight(24)
                 btn = QPushButton(" ✕ ")
-                btn.setFixedHeight(26)
+                btn.setFixedHeight(24)
                 btn.setToolTip(self.tr("移除此范围"))
                 btn.setStyleSheet("font-size: 11px; padding: 2px 6px;")
                 btn.clicked.connect(lambda checked, lo=lo, hi=hi: self._remove_range(lo, hi))
@@ -649,18 +703,15 @@ class MainWindow(QMainWindow):
         """启动后台处理。支持单文件或多文件模式。"""
         if self._running:
             return
-        input_path = self.ui.editCsvPath.text().strip()
+        if not self._data_file_paths:
+            QMessageBox.warning(self, self.tr("警告"),
+                self.tr("请添加数据文件后执行自动匹配。"))
+            return
+
         template_path = self.ui.editTemplatePath.text().strip()
         output_dir = self.ui.editOutputDir.text().strip() or str(Path.cwd() / "output")
         output_name = self.ui.editOutputName.text().strip() or "antenna_report.xlsx"
         output_name = output_name.replace("\\", "").replace("/", "")
-
-        use_multi = bool(self._data_file_paths and self._match_table.rowCount() > 0)
-
-        if not use_multi and not input_path:
-            QMessageBox.warning(self, self.tr("警告"),
-                self.tr("请添加数据文件或选择输入文件。"))
-            return
 
         if not template_path:
             QMessageBox.warning(self, self.tr("警告"),
@@ -693,35 +744,14 @@ class MainWindow(QMainWindow):
         )
 
         datasource = None
-        datasource_map = None
-
-        if use_multi:
-            datasource_map = self._build_datasource_map()
-            if not datasource_map:
-                QMessageBox.warning(self, self.tr("警告"),
-                    self.tr("没有有效的工作表↔文件匹配，请先执行自动匹配。"))
-                return
-            self._log(f"多源模式: {len(datasource_map)} 个工作表")
-            for sn, ds in datasource_map.items():
-                self._log(f"  {sn} ← {type(ds).__name__}")
-        else:
-            if not Path(input_path).exists():
-                QMessageBox.warning(self, self.tr("警告"),
-                    self.tr("输入文件不存在"))
-                return
-            input_ext = Path(input_path).suffix.lower()
-            if input_ext not in (".csv", ".xlsx", ".xls"):
-                QMessageBox.warning(self, self.tr("警告"),
-                    self.tr("不支持的输入文件格式"))
-                return
-            from src.datasource import DataSource
-            try:
-                datasource = DataSource.from_path(input_path)
-                self._log(f"数据源: {Path(input_path).name}")
-            except Exception as e:
-                QMessageBox.critical(self, self.tr("错误"),
-                    self.tr("无法读取输入文件"))
-                return
+        datasource_map = self._build_datasource_map()
+        if not datasource_map:
+            QMessageBox.warning(self, self.tr("警告"),
+                self.tr("没有有效的工作表↔文件匹配，请先执行自动匹配。"))
+            return
+        self._log(f"多源模式: {len(datasource_map)} 个工作表")
+        for sn, ds in datasource_map.items():
+            self._log(f"  {sn} ← {type(ds).__name__}")
 
         self.ui.logOutput.clear()
         self.ui.progressBar.setValue(0)
@@ -738,6 +768,28 @@ class MainWindow(QMainWindow):
             full_report_path=full_report_path,
             extrapolate_theta=self._check_extrapolate.isChecked(),
         )
+        self._worker.moveToThread(self._thread)
+
+        # 连接信号
+        self._thread.started.connect(self._worker.run)
+        self._worker.progress.connect(self._on_progress)
+        self._worker.log.connect(self._on_worker_log)
+        self._worker.finished.connect(self._on_finished)
+        self._worker.error.connect(self._on_error)
+        self._thread.finished.connect(self._thread.deleteLater)
+
+        # 设置运行状态
+        self._running = True
+        self.ui.btnStart.setEnabled(False)
+        self.ui.btnStop.setEnabled(True)
+
+        self._thread.start()
+        self._log(self.tr(f"▶ 开始处理"))
+        self._log(self.tr(f"  模板: {template_path}"))
+        self._log(self.tr(f"  输出: {output_path}"))
+        if full_report_path:
+            self._log(self.tr(f"  完整报告: {full_report_path}"))
+
     def _on_stop(self):
         """停止处理。"""
         if self._worker:
