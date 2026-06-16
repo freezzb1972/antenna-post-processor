@@ -604,7 +604,7 @@ class Ui_MainWindow(object):
         self.btnClearConfig.setText(QCoreApplication.translate("MainWindow", u"\U0001f5d1 \U00006e05\U00007a7a", None))
         self.btnSavePreset.setText(QCoreApplication.translate("MainWindow", u"\U0001f4be \U00004fdd\U00005b58\U00009884\U00008bbe", None))
         self.btnLoadPreset.setText(QCoreApplication.translate("MainWindow", u"\U0001f4c2 \U000052a0\U00008f7d\U00009884\U00008bbe", None))
-        self.tabConfig.setTabText(self.tabConfig.indexOf(self.tabLag), QCoreApplication.translate("MainWindow", u"\U0001f4d0 LAG \U0000914d\U00007f6e", None))
+        self.tabConfig.setTabText(self.tabConfig.indexOf(self.tabLag), QCoreApplication.translate("MainWindow", u"\U0001f4d0 \U00005904\U00007406\U000053c2\U00006570\U0000914d\U00007f6e", None))
         self.groupGenImg.setTitle(QCoreApplication.translate("MainWindow", u"\u751f\u6210\u9009\u9879", None))
         self.checkEmbedExcel.setText(QCoreApplication.translate("MainWindow", u"\u5d4c\u5165 Excel \u5de5\u4f5c\u8868", None))
         self.checkSavePng.setText(QCoreApplication.translate("MainWindow", u"\u5355\u72ec\u4fdd\u5b58 PNG \u6587\u4ef6\uff08\u5230\u8f93\u51fa\u76ee\u5f55\u4e0b\u7684 png/ \u6587\u4ef6\u5939\uff09", None))

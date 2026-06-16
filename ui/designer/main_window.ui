@@ -68,9 +68,9 @@
        </layout>
       </widget>
 
-      <!-- Tab 1: LAG 配置 -->
+      <!-- Tab 1: 处理参数配置 -->
       <widget class="QWidget" name="tabLag">
-       <attribute name="title"><string>📐 LAG 配置</string></attribute>
+       <attribute name="title"><string>📐 处理参数配置</string></attribute>
        <layout class="QVBoxLayout" name="vTabLag"><property name="spacing"><number>10</number></property>
         <item>
          <widget class="QGroupBox" name="groupQuickSingle">

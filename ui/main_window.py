@@ -97,6 +97,7 @@ class MainWindow(QMainWindow):
         self._init_file_paths()
         self._init_multi_file_ui()
         self._init_params_tab()
+        self._init_param_overview()
         self._connect_signals()
         self._update_lag_display()
         self._log("天线参数后处理工具已启动")
@@ -257,6 +258,30 @@ class MainWindow(QMainWindow):
         vtab.addStretch()
 
         self._make_tab_scrollable(self.ui.tabCalc)
+
+    def _init_param_overview(self):
+        """在处理参数配置 Tab 顶部插入参数分类概览面板。"""
+        vtab = self.ui.vTabLag
+
+        overview = QGroupBox(self.tr("计算参数分类"))
+        ov_layout = QVBoxLayout(overview)
+        ov_layout.setSpacing(3)
+
+        params = [
+            ("📡", self.tr("无源参数"), self.tr("Gain, Directivity, Efficiency")),
+            ("📏", self.tr("LAG 参数"), self.tr("单角度 + 角度范围平均增益")),
+            ("🔄", self.tr("轴比参数 (AR)"), self.tr("单角度 + 范围 AR（需相位数据）")),
+            ("📶", self.tr("有源参数"), self.tr("TRP, NHPRP ±45°, NHPRP ±30°")),
+        ]
+        for icon, name, desc in params:
+            row = QHBoxLayout()
+            lbl = QLabel(f"{icon} {name}: {desc}")
+            lbl.setStyleSheet("font-size: 12px; color: #aaa;")
+            row.addWidget(lbl)
+            row.addStretch()
+            ov_layout.addLayout(row)
+
+        vtab.insertWidget(0, overview)
 
     def _make_tab_scrollable(self, tab: QWidget):
         """将指定 Tab 的内容包裹在 QScrollArea 中，防止内容溢出被压缩。"""

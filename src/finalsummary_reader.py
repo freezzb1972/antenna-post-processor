@@ -99,28 +99,29 @@ class FinalSummarySource(DataSource):
                 except (ValueError, TypeError):
                     self._phi.append(float(len(self._phi)))
 
-        # ---- 探测 Phi Polarization 节（需要明确的节标题） ----
+        # ---- 探测节结构：用已知偏移 + 兜底扫描 ----
+        self._has_phase = False
+        self._theta_phase_start = 0
         self._has_phi_pol = False
         self._phi_pol_start = 0
-        after_theta = self._theta_start_row + self._n_phi
-        for row in ws0.iter_rows(min_row=after_theta,
-                                 max_row=after_theta + 10,
-                                 min_col=1, max_col=2, values_only=True):
-            v = row[0]
-            v2 = row[1] if len(row) > 1 else None
-            # 必须是节标题（col A 是文本且 col B 为空或也是文本），不是数据行的 "Theta/Phi"
-            if v and isinstance(v, str) and "phi polarization" in v.lower():
-                self._has_phi_pol = True
-                break
-            # 空行 + 后面有数据 → 可能是 Phi Pol 节
-            if v is None and v2 is not None:
-                self._phi_pol_start += 1
-            elif v is not None and _is_numeric(v):
-                break  # 遇到数值 = 仍是数据行，非 Phi Pol 节
-            else:
-                self._phi_pol_start += 1
-        if self._has_phi_pol:
-            self._phi_pol_start = after_theta + self._phi_pol_start + 1
+        self._phi_phase_start = 0
+
+        # 快速扫描: 只读 Theta 振幅段后 20 行, 看是否有 "Phase" 标签
+        after_amp = self._theta_start_row + self._n_phi
+        tail_rows = list(ws0.iter_rows(min_row=after_amp, max_row=after_amp + 20, min_col=1, max_col=1, values_only=True))
+        has_phase_label = any(r[0] and isinstance(r[0], str) and 'phase' in r[0].lower() for r in tail_rows)
+
+        if has_phase_label:
+            # AFN 格式: Theta amp → Theta phase → Phi amp → Phi phase
+            self._has_phase = True
+            self._has_phi_pol = True
+            # 偏移常量 (AFN 标准布局)
+            d_phase = 364    # Theta amp→Theta phase 偏移
+            d_phi_amp = 730  # Theta amp→Phi amp 偏移
+            d_phi_phase = 1094  # Theta amp→Phi phase 偏移
+            self._theta_phase_start = self._theta_start_row + d_phase
+            self._phi_pol_start = self._theta_start_row + d_phi_amp
+            self._phi_phase_start = self._theta_start_row + d_phi_phase
 
         # ---- 缓存 ----
         self._cache: Dict[float, tuple] = {}
@@ -171,7 +172,7 @@ class FinalSummarySource(DataSource):
 
         theta_start_row = theta_header_row + 1
 
-        # ---- 探测 n_phi —— 快速确认数据格式后用 max_row 估算 ----
+        # ---- 探测 n_phi —— 找振幅段真实边界（遇到空行/标签行停止） ----
         max_r = ws.max_row or 2000
         preview_phi_count = 0
         for row in ws.iter_rows(min_row=theta_start_row, max_row=min(theta_start_row + 9, max_r),
@@ -182,8 +183,15 @@ class FinalSummarySource(DataSource):
             elif preview_phi_count > 0:
                 break
         if preview_phi_count >= 5:
-            # 连续 5 行以上数据 → 后面全按数据算
-            phi_count = max_r - theta_start_row + 1
+            # 扫描找真实边界：第一个空行/文本行出现的位置
+            phi_count = 0
+            for row in ws.iter_rows(min_row=theta_start_row, max_row=max_r, values_only=True):
+                col_a = row[0] if len(row) > 0 else None
+                has_data = any(v is not None and _is_numeric(v) for v in row[1:])
+                if has_data:
+                    phi_count += 1
+                else:
+                    break  # 空行或标签行 = 节边界
         else:
             phi_count = preview_phi_count
 
@@ -211,7 +219,7 @@ class FinalSummarySource(DataSource):
         freq = self._freqs[freq_index]
 
         if freq in self._cache:
-            tl, pl = self._cache[freq]
+            tl, pl, tp_data, pp_data = self._cache[freq]
         else:
             sn = _freq_sheet_name(freq)
             if sn not in self._wb.sheetnames:
@@ -219,45 +227,54 @@ class FinalSummarySource(DataSource):
 
             ws = self._wb[sn]
             ntheta = self._n_theta
-
-            # 对本 sheet 做快速结构探测（可能结构不同）
             thr, tsr, nphi, ntheta2, dt = self._probe_structure(ws)
             if ntheta2 > 0:
                 ntheta = min(ntheta, ntheta2)
 
-            # 读 Theta Polarization 矩阵
+            # 读 Theta Pol 幅度
             tl = _read_matrix(ws, tsr, nphi, ntheta)
             if dt == "complex":
                 tl = _complex_to_logmag(tl)
+            valid_tl = tl[tl > -900]
+            if valid_tl.size > 0:
+                med = np.median(valid_tl); mad = np.median(np.abs(valid_tl - med))
+                tl = np.clip(tl, med - 4.0 * max(mad, 1.0), med + 3.0 * max(mad, 1.0))
 
-            # 读 Phi Polarization（如果存在）
+            # 读 Theta Pol 相位（如有 Phase 段）
+            tp_data = None
+            if self._has_phase and self._theta_phase_start > 0:
+                try:
+                    tp_data = _read_matrix(ws, self._theta_phase_start, nphi, ntheta)
+                except Exception:
+                    tp_data = None
+
+            # 读 Phi Pol 幅度
             if self._has_phi_pol and self._phi_pol_start > 0:
                 pl = _read_matrix(ws, self._phi_pol_start, nphi, ntheta)
                 if dt == "complex":
                     pl = _complex_to_logmag(pl)
+                valid_pl = pl[pl > -900]
+                if valid_pl.size > 0:
+                    med_p = np.median(valid_pl); mad_p = np.median(np.abs(valid_pl - med_p))
+                    pl = np.clip(pl, med_p - 4.0 * max(mad_p, 1.0), med_p + 3.0 * max(mad_p, 1.0))
             else:
-                pl = np.full_like(tl, -999.0)  # 单极化：phi = 全零 (不贡献增益)
+                pl = np.full_like(tl, -999.0)
 
-            # 鲁棒裁剪：基于中位数 + 3×MAD，排除 null 伪影
-            valid_tl = tl[tl > -900]
-            if valid_tl.size > 0:
-                med = np.median(valid_tl)
-                mad = np.median(np.abs(valid_tl - med))
-                lo = med - 4.0 * max(mad, 1.0)
-                hi = med + 3.0 * max(mad, 1.0)
-                tl = np.clip(tl, lo, hi)
-            valid_pl = pl[pl > -900]
-            if valid_pl.size > 0:
-                med_p = np.median(valid_pl)
-                mad_p = np.median(np.abs(valid_pl - med_p))
-                pl = np.clip(pl, med_p - 4.0 * max(mad_p, 1.0), med_p + 3.0 * max(mad_p, 1.0))
-            self._cache[freq] = (tl, pl)
+            # 读 Phi Pol 相位（如有 Phase 段）
+            pp_data = None
+            if self._has_phase and self._phi_phase_start > 0:
+                try:
+                    pp_data = _read_matrix(ws, self._phi_phase_start, nphi, ntheta)
+                except Exception:
+                    pp_data = None
+
+            self._cache[freq] = (tl, pl, tp_data, pp_data)
 
         return {
             "theta_logmag": tl,
-            "theta_phase": None,
+            "theta_phase": tp_data,
             "phi_logmag": pl,
-            "phi_phase": None,
+            "phi_phase": pp_data,
         }
 
     def close(self):
