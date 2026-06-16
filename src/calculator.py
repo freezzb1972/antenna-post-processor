@@ -631,6 +631,58 @@ def compute_ar_range(
 # 高精度求和
 # ======================================================================
 
+def compute_power_ratios(
+    max_power_dbm: float, min_power_dbm: float, avg_power_dbm: float,
+) -> Dict[str, float]:
+    """计算功率比: Max/Min, Max/Avg, Min/Avg (dB)。"""
+    return {
+        "max_min_ratio_db": round(max_power_dbm - min_power_dbm, 2),
+        "max_avg_ratio_db": round(max_power_dbm - avg_power_dbm, 2),
+        "min_avg_ratio_db": round(min_power_dbm - avg_power_dbm, 2),
+    }
+
+
+def compute_beamwidth(
+    gain_linear: np.ndarray, theta_deg: np.ndarray, phi_deg: np.ndarray
+) -> Dict[str, float]:
+    """计算3dB波束宽度 (theta 和 phi 方向)。
+
+    Returns:
+        {"theta_bw_deg": ..., "phi_bw_deg": ..., "front_back_ratio_db": ...}
+    """
+    peak = np.max(gain_linear)
+    if peak <= 0: return {"theta_bw_deg": 0, "phi_bw_deg": 0, "front_back_ratio_db": 0}
+    threshold_lin = peak / 2.0  # -3 dB
+
+    # Theta BW: 在 phi=boresight_phi 的 cut 上
+    bs_phi_idx = np.argmax(np.max(gain_linear, axis=1))
+    theta_cut = gain_linear[bs_phi_idx, :]
+    above = theta_cut >= threshold_lin
+    theta_bw = 0.0
+    if np.any(above):
+        indices = np.where(above)[0]
+        theta_bw = abs(theta_deg[indices[-1]] - theta_deg[indices[0]])
+
+    # Phi BW: 在 theta=boresight_theta 的 cut 上
+    bs_theta_idx = np.argmax(np.max(gain_linear, axis=0))
+    phi_cut = gain_linear[:, bs_theta_idx]
+    above_p = phi_cut >= threshold_lin
+    phi_bw = 0.0
+    if np.any(above_p):
+        indices_p = np.where(above_p)[0]
+        phi_bw = abs(phi_deg[indices_p[-1]] - phi_deg[indices_p[0]])
+
+    # Front/Back ratio: max(0-90°) / max(90-180°)
+    front_mask = (theta_deg >= 0) & (theta_deg <= 90)
+    back_mask = (theta_deg >= 90) & (theta_deg <= 180)
+    front_max = np.max(gain_linear[:, front_mask]) if np.any(front_mask) else peak
+    back_max = np.max(gain_linear[:, back_mask]) if np.any(back_mask) else 1e-15
+    fb_ratio = float(10 * np.log10(front_max / max(back_max, 1e-15)))
+
+    return {"theta_bw_deg": round(theta_bw, 1), "phi_bw_deg": round(phi_bw, 1),
+            "front_back_ratio_db": round(fb_ratio, 2)}
+
+
 def _kahan_mean(arr: np.ndarray) -> float:
     """Kahan 补偿求和的均值——消除浮点累加误差。
 

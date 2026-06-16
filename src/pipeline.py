@@ -19,25 +19,13 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import numpy as np
 
 from .calculator import (
-    compute_ar_at_angles,
-    compute_ar_range,
-    compute_average_gain_db,
-    compute_average_power_dbm,
-    compute_axial_ratio,
-    compute_boresight,
-    compute_directivity,
-    compute_efficiency,
-    compute_lag_at_angles,
-    compute_lag_ranges,
-    compute_lower_hemisphere_prp,
-    compute_min_power_dbm,
-    compute_nhprp,
-    compute_nhprp_flex,
-    compute_peak_eirp,
-    compute_partial_prp,
-    compute_prp_trp_ratio,
-    compute_total_gain_linear,
-    compute_trp,
+    compute_ar_at_angles, compute_ar_range, compute_average_gain_db,
+    compute_average_power_dbm, compute_axial_ratio, compute_beamwidth,
+    compute_boresight, compute_directivity, compute_efficiency,
+    compute_lag_at_angles, compute_lag_ranges, compute_lower_hemisphere_prp,
+    compute_min_power_dbm, compute_nhprp, compute_nhprp_flex,
+    compute_peak_eirp, compute_partial_prp, compute_power_ratios,
+    compute_prp_trp_ratio, compute_total_gain_linear, compute_trp,
     compute_upper_hemisphere_prp,
 )
 import copy
@@ -219,6 +207,16 @@ def _process_one_frequency(
     if "min_power" in need or not need: row["min_power"] = round(compute_min_power_dbm(gain_linear), 2)
     if "avg_gain" in need or not need: row["avg_gain"] = round(compute_average_gain_db(gain_linear), 2)
     if "avg_power" in need or not need: row["avg_power"] = round(compute_average_power_dbm(gain_linear), 2)
+
+    # Power ratios + Beamwidth
+    if any(c in need for c in ("max_min_ratio", "max_avg_ratio", "min_avg_ratio",
+                                 "theta_bw", "phi_bw", "front_back_ratio")) or not need:
+        max_p = float(np.max(gain_linear)); min_p = float(np.min(gain_linear[gain_linear>1e-15]) if np.any(gain_linear>1e-15) else 1e-15)
+        avg_p = float(np.mean(gain_linear))
+        ratios = compute_power_ratios(10*np.log10(max(max_p,1e-15)), 10*np.log10(max(min_p,1e-15)), 10*np.log10(max(avg_p,1e-15)))
+        for k, v in ratios.items(): row[k] = v
+        bw = compute_beamwidth(gain_linear, theta_deg, phi_angles_deg)
+        for k, v in bw.items(): row[k] = v if v is not None else 0
 
     # Axial Ratio (仅当有 Phase 数据且模板需要 AR 列)
     ar_need = need & {"axial_ratio", "ar_single", "ar_range"}
