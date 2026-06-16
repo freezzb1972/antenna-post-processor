@@ -45,10 +45,12 @@ def is_efficiency_column(header: str) -> bool:
 
 
 def is_gain_column(header: str) -> bool:
-    """峰值增益列（不是 LAG / Average Gain）。"""
+    """峰值增益列（不是 LAG / Average Gain / Gain at Theta）。"""
     h = _normalize_key(header)
-    # 排除 "average gain" — 那是 LAG，不是峰值增益
+    # 排除 "average gain" 和 "gain at theta" — 那些是 LAG
     if "average" in h:
+        return False
+    if "theta" in h:
         return False
     return h.startswith("gain") or h in ("g(dbi)", "peakgain", "peakeirp")
 
@@ -188,11 +190,18 @@ def _parse_sheet(ws) -> Optional[SheetInfo]:
                 ctype = "lag_single"
             elif "average" in norm.lower() and "gain" in norm.lower():
                 # "Average Gain (dB)" ≈ LAG — 从列头尝试提取角度范围
-                _avg_range = re.search(r"(\d+)\s*[-–—]\s*(\d+)\s*deg", norm)
+                _avg_range = re.search(r"(\d+)\s*[-–—~]\s*(\d+)\s*deg", norm)
                 if _avg_range:
                     ctype = "lag_range"
                 else:
                     ctype = "gain_avg"
+            elif "gain" in norm.lower() and "theta" in norm.lower():
+                # "Gain at Theta=0~70 (dB)" → LAG range
+                _t_range = re.search(r"(\d+)\s*[-–—~]\s*(\d+)", norm)
+                if _t_range:
+                    ctype = "lag_range"
+                else:
+                    ctype = "unknown"
             else:
                 ctype = "unknown"
 

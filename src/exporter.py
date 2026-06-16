@@ -257,10 +257,7 @@ def export_results(
 
 
 def _add_charts(wb, sheet_results, info_map, log_callback=None):
-    """在对应的 sheet 中嵌入图表。"""
-    from openpyxl.chart import ScatterChart, Reference, Series
-    from openpyxl.chart.axis import NumericAxis
-
+    """在对应的 sheet 中嵌入图表。自动检测列类型匹配图表。"""
     for sheet_name, rows in sheet_results.items():
         if not rows or sheet_name not in wb.sheetnames:
             continue
@@ -275,36 +272,26 @@ def _add_charts(wb, sheet_results, info_map, log_callback=None):
             continue
         data_end = data_start + n_rows - 1
 
-        # 确定 X 列 (Frequency)
-        freq_col = None
-        for cinfo in info.columns:
-            if cinfo.col_type == "frequency":
-                freq_col = cinfo.col_index
-                break
+        freq_col = next((c.col_index for c in info.columns if c.col_type == "frequency"), None)
         if freq_col is None:
             continue
 
-        # 图表 1: 无源测试 → Efficiency vs Frequency
-        eff_col = None
-        for cinfo in info.columns:
-            if cinfo.col_type == "efficiency_pct":
-                eff_col = cinfo.col_index
-                break
+        chart_offset = 0
+
+        # Efficiency vs Frequency (无源测试)
+        eff_col = next((c.col_index for c in info.columns if c.col_type == "efficiency_pct"), None)
         if eff_col is not None:
             _add_scatter_chart(ws, "Efficiency vs Frequency", freq_col, eff_col,
-                              data_start, data_end, n_rows + 5, freq_col + 2)
+                              data_start, data_end, n_rows + 5 + chart_offset, freq_col + 2)
+            chart_offset += 18
 
-        # 图表 2: 有源测试 → Gain at Theta=0~70 vs Frequency (Y轴步进=1)
-        lag_col = None
-        for cinfo in info.columns:
-            if cinfo.col_type == "lag_range":
-                lag_col = cinfo.col_index
-                break
+        # Gain at Theta range vs Frequency (有源测试), Y轴步进=1
+        lag_col = next((c.col_index for c in info.columns if c.col_type == "lag_range"), None)
         if lag_col is not None:
-            chart = _add_scatter_chart(ws, "Gain at Theta=0~70 vs Frequency",
-                                       freq_col, lag_col, data_start, data_end,
-                                       n_rows + 5, lag_col + 2,
-                                       y_step=1.0, y_min=None)
+            _add_scatter_chart(ws, "Gain at Theta=0~70 vs Frequency", freq_col, lag_col,
+                              data_start, data_end, n_rows + 5 + chart_offset, lag_col + 2,
+                              y_step=1.0)
+            chart_offset += 18
 
 
 def _add_scatter_chart(ws, title, x_col, y_col, data_start, data_end,
