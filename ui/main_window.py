@@ -100,6 +100,8 @@ class MainWindow(QMainWindow):
         self._init_param_overview()
         self._connect_signals()
         self._update_lag_display()
+        self._init_menu()
+        self._hide_settings_tabs()
         self._log("天线参数后处理工具已启动")
         self._log(self.tr("默认 LAG 配置: 单角度 [60°, 70°, 80°, 90°], 范围 [(0-90°), (60-90°)]"))
 
@@ -304,6 +306,54 @@ class MainWindow(QMainWindow):
                 tc.removeTab(i)
                 tc.insertTab(i, scroll, title)
                 break
+
+    # ==================================================================
+    # 菜单
+    # ==================================================================
+
+    def _init_menu(self):
+        from PySide6.QtGui import QAction, QKeySequence
+        menubar = self.menuBar()
+        fm = menubar.addMenu(self.tr("&文件"))
+        fm.addAction(self.tr("选择模板..."), self._on_browse_template, QKeySequence("Ctrl+O"))
+        fm.addAction(self.tr("保存结果..."), self._on_browse_output, QKeySequence("Ctrl+S"))
+        fm.addSeparator(); fm.addAction(self.tr("退出"), self.close, QKeySequence("Ctrl+Q"))
+        sm = menubar.addMenu(self.tr("&设置"))
+        sm.addAction(self.tr("数据源配置..."), self._show_data_source_dialog)
+        sm.addAction(self.tr("计算参数配置..."), self._show_calc_params_dialog)
+        sm.addAction(self.tr("图形配置..."), self._show_plot_config_dialog)
+        pm = menubar.addMenu(self.tr("&处理"))
+        pm.addAction(self.tr("▶ 开始处理"), self._on_start, QKeySequence("F5"))
+        pm.addAction(self.tr("⏹ 停止"), self._on_stop, QKeySequence("Esc"))
+        hm = menubar.addMenu(self.tr("&帮助"))
+        hm.addAction(self.tr("使用说明"), self._on_help, QKeySequence("F1"))
+        hm.addAction(self.tr("关于..."), self._on_about)
+
+    def _hide_settings_tabs(self):
+        tc = self.ui.tabConfig
+        for tab, idx in [(self.ui.tabFile, 0), (self.ui.tabLag, 1), (self.ui.tabPlot, 2), (self.ui.tabCalc, 3)]:
+            if idx < tc.count(): tc.setTabVisible(idx, False)
+
+    def _show_data_source_dialog(self):
+        from ui.dialogs import DataSourceDialog
+        DataSourceDialog(self).exec()
+
+    def _show_calc_params_dialog(self):
+        from ui.dialogs import CalcParamsDialog
+        CalcParamsDialog(self).exec()
+
+    def _show_plot_config_dialog(self):
+        from ui.dialogs import PlotConfigDialog
+        PlotConfigDialog(self).exec()
+
+    def _on_help(self):
+        import webbrowser, os
+        guide = os.path.join(os.path.dirname(__file__), "..", "USER_GUIDE.html")
+        if os.path.exists(guide): webbrowser.open(f"file://{os.path.abspath(guide)}")
+
+    def _on_about(self):
+        QMessageBox.about(self, self.tr("关于"),
+            self.tr("天线参数后处理工具 v2.0\n\n从 EMQuest 数据计算天线参数\nGitHub: freezzb1972/antenna-post-processor"))
 
     # ==================================================================
     # 多文件操作
