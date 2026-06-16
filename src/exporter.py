@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 from typing import Any, Callable, Dict, List, Optional
 
 import openpyxl
@@ -225,15 +226,27 @@ def export_results(
                 elif key == "peak_eirp":
                     _write_cell(ws, excel_row, col_map, "peak_eirp", value)
                 elif key.startswith("lag_single_"):
-                    # key: "lag_single_60.0" → 匹配 theta=60 的 LAG 列
                     angle_str = key[len("lag_single_"):]
                     _write_lag_single(ws, excel_row, col_map, float(angle_str), value)
                 elif key.startswith("lag_range_"):
-                    # key: "lag_range_0.0_90.0" → 匹配 (0, 90) 范围 LAG 列
                     parts = key[len("lag_range_"):].split("_")
                     if len(parts) == 2:
                         lo, hi = float(parts[0]), float(parts[1])
                         _write_lag_range(ws, excel_row, col_map, lo, hi, value)
+                elif key.startswith("ar_single_"):
+                    angle_str = key[len("ar_single_"):]
+                    _write_ar_single(ws, excel_row, col_map, float(angle_str), value)
+                elif key.startswith("ar_range_"):
+                    parts = key[len("ar_range_"):].split("_")
+                    if len(parts) == 2:
+                        lo, hi = float(parts[0]), float(parts[1])
+                        _write_ar_range(ws, excel_row, col_map, lo, hi, value)
+                elif key in ("nhprp_225", "uh_prp", "lh_prp", "prp_120",
+                             "max_power", "min_power", "avg_gain", "avg_power",
+                             "boresight_theta", "boresight_phi"):
+                    _write_cell(ws, excel_row, col_map, key, value)
+                elif key.endswith("_ratio_db") or key.endswith("_ratio_pct"):
+                    _write_cell(ws, excel_row, col_map, key, value)
 
             current += 1
             if progress_callback:
@@ -361,6 +374,30 @@ def _build_col_map(info: SheetInfo) -> Dict[str, List[ColumnInfo]]:
     return m
 
 
+def _write_ar_single(ws, row, col_map, angle, value):
+    """写入 AR 单角度到匹配的列。"""
+    for cinfo in col_map.get("ar_single", []):
+        norm = normalize_header(cinfo.raw_header)
+        m = re.search(r"(\d+)\s*deg", norm) or re.search(r"theta[= ]*(\d+)", norm, re.IGNORECASE)
+        if m and abs(float(m.group(1)) - angle) < 0.01:
+            cell = ws.cell(row, cinfo.col_index)
+            cell.value = round(value, 6) if isinstance(value, float) else value
+            return
+
+
+def _write_ar_range(ws, row, col_map, lo, hi, value):
+    """写入 AR 范围到匹配的列。"""
+    for cinfo in col_map.get("ar_range", []):
+        norm = normalize_header(cinfo.raw_header)
+        m = re.search(r"(\d+)\s*[~\-–—]\s*(\d+)", norm)
+        if m:
+            clo, chi = float(m.group(1)), float(m.group(2))
+            if abs(clo - lo) < 0.01 and abs(chi - hi) < 0.01:
+                cell = ws.cell(row, cinfo.col_index)
+                cell.value = round(value, 6) if isinstance(value, float) else value
+                return
+
+
 def _write_cell(
     ws,
     row: int,
@@ -392,12 +429,12 @@ def _write_lag_single(
         m = _RE_LAG_SINGLE.search(norm)
         if not m:
             m = _RE_LAG_SINGLE_NO_PREFIX.search(norm)
+        if not m:
+            # "Gain at Theta=30\nLAG" 格式
+            m = re.search(r"theta[= ]*(\d+)", norm, re.IGNORECASE)
         if m and abs(float(m.group(1)) - angle) < 0.01:
             cell = ws.cell(row, cinfo.col_index)
-            if isinstance(value, float):
-                cell.value = round(value, 6)
-            else:
-                cell.value = value
+            cell.value = round(value, 6) if isinstance(value, float) else value
             return
 
 
@@ -409,14 +446,14 @@ def _write_lag_range(
     for cinfo in col_map.get("lag_range", []):
         norm = normalize_header(cinfo.raw_header)
         m = _RE_LAG_RANGE.search(norm) or _RE_LAG_RANGE_NO_PREFIX.search(norm)
+        if not m:
+            # "Gain at Theta=0~70 (dB)" 格式
+            m = re.search(r"theta[= ]*(\d+)\s*[~\-–—]\s*(\d+)", norm, re.IGNORECASE)
         if m:
             clo, chi = float(m.group(1)), float(m.group(2))
             if abs(clo - lo) < 0.01 and abs(chi - hi) < 0.01:
                 cell = ws.cell(row, cinfo.col_index)
-                if isinstance(value, float):
-                    cell.value = round(value, 6)
-                else:
-                    cell.value = value
+                cell.value = round(value, 6) if isinstance(value, float) else value
                 return
 
 

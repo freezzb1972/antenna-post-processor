@@ -19,15 +19,26 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import numpy as np
 
 from .calculator import (
+    compute_ar_at_angles,
+    compute_ar_range,
+    compute_average_gain_db,
+    compute_average_power_dbm,
     compute_axial_ratio,
+    compute_boresight,
     compute_directivity,
     compute_efficiency,
     compute_lag_at_angles,
     compute_lag_ranges,
+    compute_lower_hemisphere_prp,
+    compute_min_power_dbm,
     compute_nhprp,
+    compute_nhprp_flex,
     compute_peak_eirp,
+    compute_partial_prp,
+    compute_prp_trp_ratio,
     compute_total_gain_linear,
     compute_trp,
+    compute_upper_hemisphere_prp,
 )
 import copy
 import re
@@ -171,8 +182,47 @@ def _process_one_frequency(
         if ct in need or not need:
             row[ct] = round(fn(), 2)
 
-    # Axial Ratio
-    if "axial_ratio" in need or not need:
+    # ---- Extended antenna parameters (NHPRP flex, PRP, ratios, boresight, averages) ----
+    n_phi = phi_lm.shape[0]
+    phi_angles_deg = np.linspace(0, 360, n_phi, endpoint=False)
+
+    nhprp_225 = compute_nhprp_flex(gain_linear, theta_rad, 22.5)
+    nhprp_45_flex = compute_nhprp_flex(gain_linear, theta_rad, 45.0)
+    nhprp_30_flex = compute_nhprp_flex(gain_linear, theta_rad, 30.0)
+    if "nhprp_225" in need or not need:
+        row["nhprp_225"] = round(nhprp_225, 2)
+
+    uh_prp = compute_upper_hemisphere_prp(gain_linear, theta_rad)
+    lh_prp = compute_lower_hemisphere_prp(gain_linear, theta_rad)
+    if "uh_prp" in need or not need: row["uh_prp"] = round(uh_prp, 2)
+    if "lh_prp" in need or not need: row["lh_prp"] = round(lh_prp, 2)
+
+    prp_120 = compute_partial_prp(gain_linear, theta_rad, 0, 120)
+    if "prp_120" in need or not need: row["prp_120"] = round(prp_120, 2)
+
+    ratio_need = need & {"nhprp45_ratio", "nhprp30_ratio", "nhprp225_ratio", "uh_ratio", "lh_ratio"}
+    if ratio_need or not need:
+        trp_val = compute_trp(gain_linear, theta_rad)
+        for ratio_key, prp_val in [("nhprp45", nhprp_45_flex), ("nhprp30", nhprp_30_flex),
+                                    ("nhprp225", nhprp_225), ("uh", uh_prp), ("lh", lh_prp)]:
+            rdb, rpct = compute_prp_trp_ratio(prp_val, trp_val)
+            if f"{ratio_key}_ratio_db" in need or not need: row[f"{ratio_key}_ratio_db"] = round(rdb, 2)
+            if f"{ratio_key}_ratio_pct" in need or not need: row[f"{ratio_key}_ratio_pct"] = round(rpct, 2)
+
+    bs_need = need & {"boresight_phi", "boresight_theta"}
+    if bs_need or not need:
+        bs_theta, bs_phi = compute_boresight(gain_linear, theta_deg, phi_angles_deg)
+        if "boresight_theta" in need or not need: row["boresight_theta"] = round(bs_theta, 1)
+        if "boresight_phi" in need or not need: row["boresight_phi"] = round(bs_phi, 1)
+
+    if "max_power" in need or not need: row["max_power"] = round(compute_peak_eirp(gain_linear), 2)
+    if "min_power" in need or not need: row["min_power"] = round(compute_min_power_dbm(gain_linear), 2)
+    if "avg_gain" in need or not need: row["avg_gain"] = round(compute_average_gain_db(gain_linear), 2)
+    if "avg_power" in need or not need: row["avg_power"] = round(compute_average_power_dbm(gain_linear), 2)
+
+    # Axial Ratio (仅当有 Phase 数据且模板需要 AR 列)
+    ar_need = need & {"axial_ratio", "ar_single", "ar_range"}
+    if ar_need or not need:
         tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
         if tp is not None and pp is not None:
             try:
@@ -181,7 +231,19 @@ def _process_one_frequency(
                     _, pp = extrapolate_theta(theta_orig, pp, "constant")
                 ar = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
                 if ar is not None and ar.size > 0:
-                    row["axial_ratio"] = round(float(np.mean(ar[0, :5])), 6)
+                    # AR 单角度 (使用 lag_config 的角度列表)
+                    ar_singles = lag_config.singles_sorted
+                    if ar_singles:
+                        for angle, val in compute_ar_at_angles(ar, theta_deg, ar_singles).items():
+                            row[f"ar_single_{angle}"] = round(val, 6)
+                    # AR 范围
+                    ar_ranges = lag_config.ranges_sorted
+                    if ar_ranges:
+                        for (lo, hi), val in [(r, compute_ar_range(ar, theta_deg, r[0], r[1])) for r in ar_ranges]:
+                            row[f"ar_range_{lo}_{hi}"] = round(val, 6)
+                    # 向后兼容的 axial_ratio 字段
+                    if "axial_ratio" in need or not need:
+                        row["axial_ratio"] = round(float(np.mean(ar[0, :5])), 6)
             except Exception as e:
                 row["axial_ratio_error"] = str(e)
 

@@ -259,49 +259,43 @@ def compute_trp(
 
 
 def compute_nhprp(
-    eirp_linear: np.ndarray,  # (n_phi, n_theta)  mW
+    gain_linear: np.ndarray,  # (n_phi, n_theta)  mW
     theta_rad: np.ndarray,    # (n_theta,) 弧度
-    edge_deg: float,          # 边界角度（度），如 45 表示 ±45°
+    edge_deg: float = 45.0,   # 边界角度（度），默认 45°
 ) -> float:
-    """CTIA 近地平线部分辐射功率 (NHPRP)。
+    """CTIA 近地平线部分辐射功率 (NHPRP)，默认 ±45°。
 
-    theta ∈ [90-edge, 90+edge] 区间内的 TRP。
+    委托给 `compute_nhprp_flex`，保留旧签名以向后兼容。
 
     Args:
-        eirp_linear: 总 EIRP 线性值 (mW)。
+        gain_linear: 总增益线性值 (mW)。
         theta_rad:   θ 角度 (弧度)。
-        edge_deg:    地平线边界角度（度）。
+        edge_deg:    地平线边界角度（度），默认 45°。
 
     Returns:
         NHPRP (dBm)。
     """
-    n_phi, n_theta = eirp_linear.shape
-    theta_deg = np.rad2deg(theta_rad)
-    edge_rad = np.deg2rad(90.0 - edge_deg)  # theta_min
+    return compute_nhprp_flex(gain_linear, theta_rad, edge_deg)
 
-    theta_min = 90.0 - edge_deg
-    theta_max = 90.0 + edge_deg
 
-    # 找到区间内的 theta 索引
-    mask = (theta_deg >= theta_min - 1e-9) & (theta_deg <= theta_max + 1e-9)
-    indices = np.where(mask)[0]
-    if len(indices) == 0:
-        return -999.0
+def compute_nhprp_flex(
+    gain_linear: np.ndarray,  # (n_phi, n_theta)  mW
+    theta_rad: np.ndarray,    # (n_theta,) 弧度
+    edge_deg: float,          # 边界角度（度）
+) -> float:
+    """近地平线部分辐射功率 (NHPRP)，可指定任意边界角度。
 
-    # 裁剪 eirp 和 theta 到该区间
-    eirp_sub = eirp_linear[:, indices]
-    theta_sub = theta_rad[indices]
+    theta ∈ [90-edge, 90+edge] 区间内的 PRP。
 
-    n_sub = len(indices)
-    w = _clenshaw_curtis_weights(n_sub)
+    Args:
+        gain_linear: 总增益线性值 (mW)。
+        theta_rad:   θ 角度 (弧度)。
+        edge_deg:    地平线边界角度（度），如 45 表示 ±45°。
 
-    # NHPRP 使用完整的 theta 区间权重，但仅累加区间内的 theta
-    cut = np.mean(eirp_sub, axis=0)  # (n_sub,)
-
-    nhprp_lin = 0.5 * np.sum(w * cut)
-    if nhprp_lin <= 1e-15:
-        return -999.0
-    return float(10.0 * np.log10(nhprp_lin))
+    Returns:
+        NHPRP (dBm)。
+    """
+    return compute_partial_prp(gain_linear, theta_rad, 90.0 - edge_deg, 90.0 + edge_deg)
 
 
 def compute_peak_eirp(
@@ -319,6 +313,210 @@ def compute_peak_eirp(
     if peak <= 1e-15:
         return -999.0
     return float(10.0 * np.log10(peak))
+
+
+# ======================================================================
+# PRP — 部分辐射功率（Clenshaw-Curtis 加权积分）
+# ======================================================================
+
+def compute_upper_hemisphere_prp(
+    gain_linear: np.ndarray,  # (n_phi, n_theta)  mW
+    theta_rad: np.ndarray,    # (n_theta,) 弧度
+) -> float:
+    """上半球部分辐射功率 (Upper Hemisphere PRP)。
+
+    theta ∈ [0°, 90°] 区间内的 PRP，复用 Clenshaw-Curtis 加权积分。
+
+    Args:
+        gain_linear: 总增益线性值 (mW)。
+        theta_rad:   θ 角度 (弧度)。
+
+    Returns:
+        Upper Hemisphere PRP (dBm)。
+    """
+    theta_deg = np.rad2deg(theta_rad)
+    mask = theta_deg <= 90.0 + 1e-9
+    indices = np.where(mask)[0]
+    if len(indices) == 0:
+        return -999.0
+
+    gain_sub = gain_linear[:, indices]
+    theta_sub = theta_rad[indices]
+
+    n_sub = len(indices)
+    w = _clenshaw_curtis_weights(n_sub)
+    cut = np.mean(gain_sub, axis=0)
+
+    prp_lin = 0.5 * np.sum(w * cut)
+    if prp_lin <= 1e-15:
+        return -999.0
+    return float(10.0 * np.log10(prp_lin))
+
+
+def compute_lower_hemisphere_prp(
+    gain_linear: np.ndarray,  # (n_phi, n_theta)  mW
+    theta_rad: np.ndarray,    # (n_theta,) 弧度
+) -> float:
+    """下半球部分辐射功率 (Lower Hemisphere PRP)。
+
+    theta ∈ [90°, 180°] 区间内的 PRP，复用 Clenshaw-Curtis 加权积分。
+
+    Args:
+        gain_linear: 总增益线性值 (mW)。
+        theta_rad:   θ 角度 (弧度)。
+
+    Returns:
+        Lower Hemisphere PRP (dBm)。
+    """
+    theta_deg = np.rad2deg(theta_rad)
+    mask = theta_deg >= 90.0 - 1e-9
+    indices = np.where(mask)[0]
+    if len(indices) == 0:
+        return -999.0
+
+    gain_sub = gain_linear[:, indices]
+    theta_sub = theta_rad[indices]
+
+    n_sub = len(indices)
+    w = _clenshaw_curtis_weights(n_sub)
+    cut = np.mean(gain_sub, axis=0)
+
+    prp_lin = 0.5 * np.sum(w * cut)
+    if prp_lin <= 1e-15:
+        return -999.0
+    return float(10.0 * np.log10(prp_lin))
+
+
+def compute_partial_prp(
+    gain_linear: np.ndarray,   # (n_phi, n_theta)  mW
+    theta_rad: np.ndarray,     # (n_theta,) 弧度
+    theta_start_deg: float,
+    theta_end_deg: float,
+) -> float:
+    """指定 θ 范围内的部分辐射功率 (Partial PRP)。
+
+    复用 Clenshaw-Curtis 加权积分方法。
+    上层函数（如 `compute_nhprp_flex`）可通过此函数实现。
+
+    Args:
+        gain_linear:     总增益线性值 (mW)。
+        theta_rad:       θ 角度 (弧度)。
+        theta_start_deg: 起始 θ 角度（度）。
+        theta_end_deg:   结束 θ 角度（度）。
+
+    Returns:
+        Partial PRP (dBm)。
+    """
+    theta_deg = np.rad2deg(theta_rad)
+    mask = (theta_deg >= theta_start_deg - 1e-9) & (theta_deg <= theta_end_deg + 1e-9)
+    indices = np.where(mask)[0]
+    if len(indices) == 0:
+        return -999.0
+
+    gain_sub = gain_linear[:, indices]
+    n_sub = len(indices)
+    w = _clenshaw_curtis_weights(n_sub)
+    cut = np.mean(gain_sub, axis=0)
+
+    prp_lin = 0.5 * np.sum(w * cut)
+    if prp_lin <= 1e-15:
+        return -999.0
+    return float(10.0 * np.log10(prp_lin))
+
+
+def compute_prp_trp_ratio(
+    prp_dbm: float,
+    trp_dbm: float,
+) -> Tuple[float, float]:
+    """PRP 与 TRP 之比。
+
+    Args:
+        prp_dbm: PRP 值 (dBm)。
+        trp_dbm: TRP 值 (dBm)。
+
+    Returns:
+        (ratio_db, ratio_pct)
+        ratio_db:   PRP - TRP (dB)。
+        ratio_pct:  10^(ratio_db/10) × 100 (%)。
+    """
+    ratio_db = prp_dbm - trp_dbm
+    ratio_pct = 10.0 ** (ratio_db / 10.0) * 100.0
+    return ratio_db, ratio_pct
+
+
+# ======================================================================
+# 波束指向与统计
+# ======================================================================
+
+def compute_boresight(
+    gain_linear: np.ndarray,        # (n_phi, n_theta)  mW
+    theta_angles_deg: np.ndarray,   # (n_theta,) 度
+    phi_angles_deg: np.ndarray,     # (n_phi,) 度
+) -> Tuple[float, float]:
+    """查找主波束指向（最大增益方向）。
+
+    Args:
+        gain_linear:      总增益线性值 (mW)。
+        theta_angles_deg: θ 角度数组 (度)。
+        phi_angles_deg:   φ 角度数组 (度)。
+
+    Returns:
+        (boresight_theta_deg, boresight_phi_deg)
+    """
+    flat_idx = int(np.argmax(gain_linear))
+    phi_idx, theta_idx = np.unravel_index(flat_idx, gain_linear.shape)
+    return (float(theta_angles_deg[theta_idx]), float(phi_angles_deg[phi_idx]))
+
+
+def compute_min_power_dbm(
+    gain_linear: np.ndarray,  # (n_phi, n_theta)  mW
+) -> float:
+    """方向图中非零功率最小值。
+
+    Args:
+        gain_linear: 总增益线性值 (mW)。
+
+    Returns:
+        最小功率 (dBm)，仅考虑非零值 (>1e-15)。
+    """
+    mask = gain_linear > 1e-15
+    if not np.any(mask):
+        return -999.0
+    min_val = float(np.min(gain_linear[mask]))
+    return float(10.0 * np.log10(min_val))
+
+
+def compute_average_gain_db(
+    gain_linear: np.ndarray,  # (n_phi, n_theta)  mW
+) -> float:
+    """平均增益（线性域均值转 dB）。
+
+    Args:
+        gain_linear: 总增益线性值 (mW)。
+
+    Returns:
+        平均增益 (dB)。
+    """
+    mean_lin = float(np.mean(gain_linear))
+    if mean_lin <= 1e-15:
+        return -999.0
+    return float(10.0 * np.log10(mean_lin))
+
+
+def compute_average_power_dbm(
+    gain_linear: np.ndarray,  # (n_phi, n_theta)  mW
+) -> float:
+    """平均功率（线性域均值转 dBm）。
+
+    与 `compute_average_gain_db` 公式相同（功率/增益在 dB 标度一致）。
+
+    Args:
+        gain_linear: 总增益线性值 (mW)。
+
+    Returns:
+        平均功率 (dBm)。
+    """
+    return compute_average_gain_db(gain_linear)
 
 
 # ======================================================================
@@ -386,6 +584,47 @@ def compute_axial_ratio(
     ar_linear = (abs_rhcp + abs_lhcp) / denom
     # EMQuest AxR 输出线性值（不是 dB），保持线性；调用方可自行转换
     return ar_linear  # (n_phi, n_theta) AR 线性值
+
+
+def compute_ar_at_angles(
+    ar_linear: np.ndarray,
+    theta_angles_deg: np.ndarray,
+    target_angles_deg: List[float],
+) -> Dict[float, float]:
+    """批量计算多个 θ 角的 AR（取 phi 均值）。
+
+    Returns:
+        {theta_deg: ar_linear, ...}
+    """
+    results: Dict[float, float] = {}
+    for target in target_angles_deg:
+        idx = int(np.argmin(np.abs(theta_angles_deg - target)))
+        results[target] = float(np.mean(ar_linear[:, idx]))
+    return results
+
+
+def compute_ar_range(
+    ar_linear: np.ndarray,
+    theta_angles_deg: np.ndarray,
+    theta_start: float,
+    theta_end: float,
+) -> float:
+    """指定 θ 范围内的 AR 均值（线性域平均）。
+
+    Args:
+        ar_linear: AR 线性值，形状 (n_phi, n_theta)。
+        theta_angles_deg: θ 角度 (度)。
+        theta_start, theta_end: 范围 (度)。
+
+    Returns:
+        范围平均 AR (线性值)。
+    """
+    mask = (theta_angles_deg >= theta_start) & (theta_angles_deg <= theta_end + 1e-9)
+    indices = np.where(mask)[0]
+    if len(indices) == 0:
+        return 1.0
+    subset = ar_linear[:, indices]
+    return float(np.mean(subset))
 
 
 # ======================================================================
