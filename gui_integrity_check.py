@@ -197,6 +197,37 @@ def check_g5_dialog_flow() -> List[str]:
     return errors
 
 
+def check_g5b_dialog_state() -> List[str]:
+    """G5b: 对话框 widget 状态验证 — 复选框启用、路径完整。"""
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication(sys.argv)
+    from ui.main_window import MainWindow
+    w = MainWindow(app)
+    errors = []
+
+    # 数据源对话框 — 文件列表尺寸验证
+    from ui.dialogs import DataSourceDialog
+    d = DataSourceDialog(w)
+    if d._file_list.maximumHeight() < 500 and d._file_list.maximumHeight() > 0:
+        errors.append(f"DataSourceDialog: file_list maxHeight={d._file_list.maximumHeight()} should be larger or unset")
+    if d.minimumWidth() < 500:
+        errors.append(f"DataSourceDialog: minWidth={d.minimumWidth()} too small")
+
+    # 计算参数对话框 — 复选框状态验证
+    from ui.dialogs import CalcParamsDialog
+    d2 = CalcParamsDialog(w)
+    if not hasattr(d2, '_param_checkboxes'):
+        errors.append("CalcParamsDialog: _param_checkboxes not found")
+    else:
+        for key, cb in d2._param_checkboxes.items():
+            if not cb.isEnabled():
+                errors.append(f"CalcParamsDialog: checkbox '{key}' is DISABLED")
+            if not cb.isChecked():
+                errors.append(f"CalcParamsDialog: checkbox '{key}' is UNCHECKED")
+
+    return errors
+
+
 def check_g6_gui_flow() -> List[str]:
     """G6: 完整GUI流程 — 对话框写入状态→_on_start→验证线程启动。"""
     from PySide6.QtWidgets import QApplication, QComboBox, QTableWidgetItem
@@ -261,7 +292,8 @@ def run_all(quick: bool = False) -> Tuple[bool, dict]:
         ("G1", "Widget 树", check_g1_widget_tree, [window]),
         ("G2", "FormLayout", check_g2_formlayout, []),
         ("G3", "信号链路", check_g3_signal_chain, []),
-        ("G5", "对话框流程", check_g5_dialog_flow, []),
+        ("G5", "对话框创建", check_g5_dialog_flow, []),
+        ("G5b", "对话框状态", check_g5b_dialog_state, []),
     ]
     if not quick:
         phases += [
