@@ -35,8 +35,8 @@ class DataSourceDialog(QDialog):
         super().__init__(parent)
         self._mw = parent
         self.setWindowTitle("数据源配置")
-        self.setMinimumSize(650, 550)
-        self.resize(700, 600)
+        self.setMinimumSize(680, 600)
+        self.resize(750, 650)
         self._setup_ui()
         self._load_state()
 
@@ -55,8 +55,10 @@ class DataSourceDialog(QDialog):
         grp_data = QGroupBox("数据文件")
         data_layout = QVBoxLayout(grp_data)
         btn_row = QHBoxLayout()
-        self._btn_add = QPushButton("📂 添加数据文件..."); self._btn_add.clicked.connect(self._on_add_files)
-        btn_clear = QPushButton("清除"); btn_clear.clicked.connect(self._on_clear_files)
+        self._btn_add = QPushButton("📂 添加数据文件..."); self._btn_add.setMinimumHeight(32)
+        self._btn_add.clicked.connect(self._on_add_files)
+        btn_clear = QPushButton("清除"); btn_clear.setMinimumHeight(32)
+        btn_clear.clicked.connect(self._on_clear_files)
         btn_row.addWidget(self._btn_add); btn_row.addWidget(btn_clear); btn_row.addStretch()
         data_layout.addLayout(btn_row)
 
@@ -75,7 +77,8 @@ class DataSourceDialog(QDialog):
         data_layout.addWidget(self._match_table)
 
         match_row = QHBoxLayout()
-        self._btn_match = QPushButton("🔗 自动匹配"); self._btn_match.clicked.connect(self._on_auto_match)
+        self._btn_match = QPushButton("🔗 自动匹配"); self._btn_match.setMinimumHeight(32)
+        self._btn_match.clicked.connect(self._on_auto_match)
         self._lbl_status = QLabel("")
         match_row.addWidget(self._btn_match); match_row.addWidget(self._lbl_status); match_row.addStretch()
         data_layout.addLayout(match_row)
