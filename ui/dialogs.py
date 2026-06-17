@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-    QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
-    QHeaderView, QLabel, QLineEdit,
+    QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox,
+    QHBoxLayout, QHeaderView, QLabel, QLineEdit,
     QListWidget, QMessageBox, QPushButton,
     QSizePolicy, QSpinBox, QTableWidget, QTableWidgetItem,
     QTabWidget, QVBoxLayout, QWidget,

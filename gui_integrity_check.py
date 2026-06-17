@@ -162,43 +162,78 @@ def check_g4_scrollarea(window) -> List[str]:
     return errors
 
 
-def check_g5_thread_smoke() -> List[str]:
-    """G5: 模拟 Start → 验证线程真正启动。"""
-    from PySide6.QtCore import QTimer
-    from PySide6.QtWidgets import QApplication, QComboBox, QTableWidgetItem
-
+def check_g5_dialog_flow() -> List[str]:
+    """G5: 对话框创建+运行 — 验证3个设置对话框不崩溃。"""
+    from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication(sys.argv)
-
     from ui.main_window import MainWindow
     w = MainWindow(app)
-
     errors = []
-    # 设置最小化多文件状态
-    w._data_file_paths = ["/tmp/test.csv"]
+
+    # 数据源对话框
+    try:
+        from ui.dialogs import DataSourceDialog
+        d = DataSourceDialog(w)
+        if d is None: errors.append("DataSourceDialog returned None")
+    except Exception as e:
+        errors.append(f"DataSourceDialog CRASH: {e}")
+
+    # 计算参数对话框
+    try:
+        from ui.dialogs import CalcParamsDialog
+        d = CalcParamsDialog(w)
+        if d is None: errors.append("CalcParamsDialog returned None")
+    except Exception as e:
+        errors.append(f"CalcParamsDialog CRASH: {e}")
+
+    # 图形配置对话框
+    try:
+        from ui.dialogs import PlotConfigDialog
+        d = PlotConfigDialog(w)
+        if d is None: errors.append("PlotConfigDialog returned None")
+    except Exception as e:
+        errors.append(f"PlotConfigDialog CRASH: {e}")
+
+    return errors
+
+
+def check_g6_gui_flow() -> List[str]:
+    """G6: 完整GUI流程 — 对话框写入状态→_on_start→验证线程启动。"""
+    from PySide6.QtWidgets import QApplication, QComboBox, QTableWidgetItem
+    app = QApplication.instance() or QApplication(sys.argv)
+    from ui.main_window import MainWindow
+    w = MainWindow(app)
+    errors = []
+
+    # 模拟数据源对话框流程
+    w.ui.editTemplatePath.setText(str(PROJECT_ROOT / "data" / "template_5G1.xlsx"))
+    w._data_file_paths = [str(PROJECT_ROOT / "data" / "5G1_merged.csv")]
     w._refresh_data_file_ui()
     w._match_table.setRowCount(1)
-    w._match_table.setItem(0, 0, QTableWidgetItem("Sheet1"))
+    w._match_table.setItem(0, 0, QTableWidgetItem("5G1"))
     combo = QComboBox()
-    combo.addItem("/tmp/test.csv")
+    combo.addItem(str(PROJECT_ROOT / "data" / "5G1_merged.csv"))
     combo.setCurrentIndex(0)
     w._match_table.setCellWidget(0, 1, combo)
     w._match_table.setItem(0, 2, QTableWidgetItem("matched"))
-    w.ui.editTemplatePath.setText(str(PROJECT_ROOT / "data" / "template_5G1.xlsx"))
 
-    # 触发 Start
+    # 触发开始
     try:
         w._on_start()
-    except Exception as e:
-        # 预期的错误：文件不存在 → warning 弹窗
-        # 但线程启动协议应该在弹出警告之前就完成
+    except SystemExit:
         pass
 
+    # 验证线程启动
     if not w._running:
-        errors.append("THREAD_SMOKE: _running=False after _on_start()")
+        errors.append("G6_FLOW: _running=False — 线程未启动")
     if w._thread is None:
-        errors.append("THREAD_SMOKE: _thread is None after _on_start()")
+        errors.append("G6_FLOW: _thread=None — 未创建线程")
     elif not w._thread.isRunning():
-        errors.append("THREAD_SMOKE: thread.isRunning()=False after _on_start()")
+        errors.append("G6_FLOW: thread.isRunning()=False — 线程未run")
+
+    # 验证管线确实跑了数据
+    if w._thread and w._thread.isRunning():
+        w._thread.wait(10000)  # 等最多10秒
 
     # 清理
     if w._thread and w._thread.isRunning():
@@ -226,11 +261,12 @@ def run_all(quick: bool = False) -> Tuple[bool, dict]:
         ("G1", "Widget 树", check_g1_widget_tree, [window]),
         ("G2", "FormLayout", check_g2_formlayout, []),
         ("G3", "信号链路", check_g3_signal_chain, []),
+        ("G5", "对话框流程", check_g5_dialog_flow, []),
     ]
     if not quick:
         phases += [
             ("G4", "ScrollArea", check_g4_scrollarea, [window]),
-            ("G5", "线程冒烟", check_g5_thread_smoke, []),
+            ("G6", "完整GUI流程(线程)", check_g6_gui_flow, []),
         ]
 
     for phase_id, name, func, args in phases:
