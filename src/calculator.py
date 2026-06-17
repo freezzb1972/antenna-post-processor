@@ -231,6 +231,18 @@ def _clenshaw_curtis_weights(n: int) -> np.ndarray:
     return c / n
 
 
+def _weighted_prp(gain_sub: np.ndarray, theta_sub: np.ndarray) -> float:
+    """计算 sin(θ) 加权 + Clenshaw-Curtis 积分的部分辐射功率 (线性值)。
+
+    PRP_lin = ½ Σ w_i · mean_φ(gain) · sin(θ_i)
+    """
+    n_theta = len(theta_sub)
+    w = _clenshaw_curtis_weights(n_theta)
+    cut = np.mean(gain_sub, axis=0) * np.sin(theta_sub)
+    prp_lin = 0.5 * np.sum(w * cut)
+    return max(prp_lin, 1e-15)
+
+
 def compute_trp(
     eirp_linear: np.ndarray,  # (n_phi, n_theta)  mW
     theta_rad: np.ndarray,    # (n_theta,) 弧度
@@ -246,16 +258,7 @@ def compute_trp(
     Returns:
         TRP (dBm)。
     """
-    n_phi, n_theta = eirp_linear.shape
-    w = _clenshaw_curtis_weights(n_theta)
-
-    # cut_i = mean over phi at each theta, with sin(theta) weighting
-    sin_theta = np.sin(theta_rad)
-    cut = np.mean(eirp_linear, axis=0) * sin_theta  # (n_theta,)
-
-    trp_lin = 0.5 * np.sum(w * cut)
-    if trp_lin <= 1e-15:
-        return -999.0
+    trp_lin = _weighted_prp(eirp_linear, theta_rad)
     return float(10.0 * np.log10(trp_lin))
 
 
@@ -342,15 +345,7 @@ def compute_upper_hemisphere_prp(
         return -999.0
 
     gain_sub = gain_linear[:, indices]
-    theta_sub = theta_rad[indices]
-
-    n_sub = len(indices)
-    w = _clenshaw_curtis_weights(n_sub)
-    cut = np.mean(gain_sub, axis=0) * np.sin(theta_sub)
-
-    prp_lin = 0.5 * np.sum(w * cut)
-    if prp_lin <= 1e-15:
-        return -999.0
+    prp_lin = _weighted_prp(gain_sub, theta_rad[indices])
     return float(10.0 * np.log10(prp_lin))
 
 
@@ -376,15 +371,7 @@ def compute_lower_hemisphere_prp(
         return -999.0
 
     gain_sub = gain_linear[:, indices]
-    theta_sub = theta_rad[indices]
-
-    n_sub = len(indices)
-    w = _clenshaw_curtis_weights(n_sub)
-    cut = np.mean(gain_sub, axis=0) * np.sin(theta_sub)
-
-    prp_lin = 0.5 * np.sum(w * cut)
-    if prp_lin <= 1e-15:
-        return -999.0
+    prp_lin = _weighted_prp(gain_sub, theta_rad[indices])
     return float(10.0 * np.log10(prp_lin))
 
 
@@ -415,14 +402,7 @@ def compute_partial_prp(
         return -999.0
 
     gain_sub = gain_linear[:, indices]
-    theta_sub = theta_rad[indices]
-    n_sub = len(indices)
-    w = _clenshaw_curtis_weights(n_sub)
-    cut = np.mean(gain_sub, axis=0) * np.sin(theta_sub)
-
-    prp_lin = 0.5 * np.sum(w * cut)
-    if prp_lin <= 1e-15:
-        return -999.0
+    prp_lin = _weighted_prp(gain_sub, theta_rad[indices])
     return float(10.0 * np.log10(prp_lin))
 
 
