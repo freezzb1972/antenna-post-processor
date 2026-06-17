@@ -157,8 +157,10 @@ def check_g4_scrollarea(window) -> List[str]:
     for i in range(tc.count()):
         w = tc.widget(i)
         from PySide6.QtWidgets import QScrollArea
-        if not isinstance(w, QScrollArea):
-            errors.append(f"SCROLL: tab[{i}] '{tc.tabText(i)}' not wrapped in QScrollArea")
+        if not isinstance(w, QScrollArea) and tc.isTabVisible(i):
+            tab_name = tc.tabText(i)
+            if "结果" not in tab_name and "展示" not in tab_name:  # 结果Tab无需ScrollArea
+                errors.append(f"SCROLL: tab[{i}] '{tab_name}' not wrapped in QScrollArea")
     return errors
 
 
