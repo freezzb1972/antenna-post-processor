@@ -35,7 +35,8 @@ class DataSourceDialog(QDialog):
         super().__init__(parent)
         self._mw = parent
         self.setWindowTitle("数据源配置")
-        self.setMinimumSize(650, 500)
+        self.setMinimumSize(650, 550)
+        self.resize(700, 600)
         self._setup_ui()
         self._load_state()
 
@@ -60,7 +61,8 @@ class DataSourceDialog(QDialog):
         data_layout.addLayout(btn_row)
 
         self._file_list = QListWidget()
-        self._file_list.setMinimumHeight(100); self._file_list.setMaximumHeight(200)
+        self._file_list.setMinimumHeight(120)
+        self._file_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._file_list.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self._file_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self._file_list.setAlternatingRowColors(True)
@@ -120,10 +122,11 @@ class DataSourceDialog(QDialog):
             self._check_chart_eff.setChecked(mw._check_chart_eff.isChecked())
             self._check_chart_lag.setChecked(mw._check_chart_lag.isChecked())
         # 多文件列表
-        if hasattr(mw, '_data_file_paths'):
+        if hasattr(mw, '_data_file_paths') and mw._data_file_paths:
             self._file_list.clear()
             for p in mw._data_file_paths:
-                self._file_list.addItem(f"📄 {Path(p).name}")
+                self._file_list.addItem(p)
+                self._file_list.item(self._file_list.count()-1).setToolTip(p)
         if hasattr(mw, '_match_table') and mw._match_table:
             self._copy_match_table()
 
@@ -149,7 +152,8 @@ class DataSourceDialog(QDialog):
         paths, _ = QFileDialog.getOpenFileNames(self, "选择数据文件", "",
             "所有支持格式 (*.csv *.xlsx *.xls);;CSV (*.csv);;Excel (*.xlsx *.xls)")
         for p in paths:
-            self._file_list.addItem(f"📄 {Path(p).name}")
+            self._file_list.addItem(p)  # 存完整路径
+            self._file_list.item(self._file_list.count()-1).setToolTip(p)
 
     def _on_clear_files(self): self._file_list.clear(); self._match_table.setRowCount(0)
 
@@ -161,12 +165,8 @@ class DataSourceDialog(QDialog):
         from src.sheet_file_matcher import auto_match
         try:
             sheets = read_template(tpl)
-            data_files = [self._file_list.item(i).text().replace("📄 ", "") for i in range(self._file_list.count())]
-            full_paths = []
-            for name in data_files:
-                for p in (getattr(self._mw, '_data_file_paths', []) or []):
-                    if Path(p).name == name: full_paths.append(p); break
-            matches = auto_match([s.name for s in sheets], full_paths or data_files)
+            data_files = [self._file_list.item(i).text() for i in range(self._file_list.count())]
+            matches = auto_match([s.name for s in sheets], data_files)
             self._match_table.setRowCount(len(matches))
             for i, m in enumerate(matches):
                 self._match_table.setItem(i, 0, QTableWidgetItem(m.sheet_name))
@@ -201,17 +201,12 @@ class DataSourceDialog(QDialog):
         if hasattr(mw, '_check_chart_eff'):
             mw._check_chart_eff.setChecked(self._check_chart_eff.isChecked())
             mw._check_chart_lag.setChecked(self._check_chart_lag.isChecked())
-        # 更新数据文件列表
-        data_files = [self._file_list.item(i).text().replace("📄 ", "") for i in range(self._file_list.count())]
+        # 更新数据文件列表 (存完整路径)
+        data_files = [self._file_list.item(i).text() for i in range(self._file_list.count())]
         if hasattr(mw, '_data_file_paths'):
-            if data_files:
-                mw._data_file_paths = [p for p in (getattr(mw, '_data_file_paths', []) or []) if Path(p).name in data_files]
-                for name in data_files:
-                    found = any(Path(p).name == name for p in mw._data_file_paths)
-                    if not found:
-                        mw._data_file_paths.append(name)
-            else:
-                mw._data_file_paths.clear()
+            mw._data_file_paths = data_files
+        if data_files and hasattr(mw, '_file_list_widget'):
+            mw._refresh_data_file_ui()
         self.accept()
 
 
@@ -301,9 +296,10 @@ class CalcParamsDialog(QDialog):
             ]),
         ]
         for grp_name, items in param_groups:
-            grp = QGroupBox(grp_name); gl = QVBoxLayout(grp)
+            grp = QGroupBox(grp_name); grp.setEnabled(True)
+            gl = QVBoxLayout(grp)
             for key, label in items:
-                cb = QCheckBox(label); cb.setChecked(True)
+                cb = QCheckBox(label); cb.setChecked(True); cb.setEnabled(True)
                 gl.addWidget(cb)
                 self._param_checkboxes[key] = cb
             pl.addWidget(grp)
