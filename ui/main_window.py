@@ -76,6 +76,9 @@ class MainWindow(QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
+        # 允许拖拽文件到窗口 (优先级2)
+        self.setAcceptDrops(True)
+
         # ---- 状态 ----
         self._lag_config = LagConfig(
             single_angles=[60, 70, 80, 90],
@@ -85,6 +88,10 @@ class MainWindow(QMainWindow):
         self._worker: Optional[ProcessingWorker] = None
         self._running = False
         self._settings = QSettings("AntennaPP", "AntennaPostProcessor")
+
+        # 恢复窗口大小/位置 (优先级3)
+        geo = self._settings.value("window_geometry")
+        if geo: self.restoreGeometry(geo)
         self._data_file_paths: List[str] = []
         self._data_file_widget: Optional[QWidget] = None
         self._file_list_widget: Optional[QListWidget] = None
@@ -558,72 +565,33 @@ class MainWindow(QMainWindow):
                 break
 
     def _apply_custom_qss(self):
-        """加载自定义 QSS 微调样式（不破坏 qt-material 主题）。"""
-        qss = """
-        /* 圆角卡片风格 — GroupBox 标题增强 */
-        QGroupBox {
-            border: 1px solid rgba(128, 128, 128, 60);
-            border-radius: 8px;
-            margin-top: 12px;
-            padding-top: 16px;
+        """统一配色/字体微调。qt-material 主题已覆盖大部分样式。"""
+        base_font = "font-size: 13px;"
+        qss = f"""
+        * {{ {base_font} }}
+        QGroupBox {{
+            border: 1px solid rgba(128,128,128,50);
+            border-radius: 6px;
+            margin-top: 10px;
+            padding-top: 14px;
             font-weight: bold;
-            font-size: 12px;
-        }
-        QGroupBox::title {
+        }}
+        QGroupBox::title {{
             subcontrol-origin: margin;
-            left: 12px;
-            padding: 0 6px;
-        }
-        /* 按钮悬停过渡 */
-        QPushButton {
+            left: 10px;
+            padding: 0 4px;
+        }}
+        QPlainTextEdit {{
             border-radius: 4px;
-            padding: 4px 12px;
-            transition: background-color 0.2s;
-        }
-        QPushButton:hover {
-            border: 1px solid rgba(128, 128, 128, 100);
-        }
-        /* 日志输出区 */
-        QPlainTextEdit {
-            border-radius: 6px;
-            border: 1px solid rgba(128, 128, 128, 50);
-            font-family: "Consolas", "Courier New", monospace;
-            font-size: 11px;
-        }
-        /* 进度条圆角 */
-        QProgressBar {
-            border-radius: 4px;
-            text-align: center;
-            height: 18px;
-        }
-        QProgressBar::chunk {
-            border-radius: 3px;
-        }
-        /* Tab 标签 */
-        QTabWidget::pane {
-            border-radius: 6px;
-        }
-        QTabBar::tab {
-            border-radius: 4px;
-            padding: 6px 16px;
-        }
-        /* 输入框 */
-        QLineEdit, QDoubleSpinBox, QSpinBox {
-            border-radius: 4px;
-            padding: 3px 6px;
-        }
-        /* 主题选择下拉框 */
-        QComboBox {
-            border-radius: 4px;
-            padding: 3px 8px;
-            min-width: 140px;
-        }
-        /* 开始按钮高亮 */
-        QPushButton#btnStart {
+            font-family: "Consolas","Courier New",monospace;
+            font-size: 12px;
+        }}
+        QPushButton#btnStart {{
             font-size: 14px;
             font-weight: bold;
             letter-spacing: 1px;
-        }
+        }}
+        QPushButton#btnStop {{ font-size: 14px; }}
         """
         self.app.setStyleSheet(self.app.styleSheet() + qss)
 
@@ -1033,6 +1001,8 @@ class MainWindow(QMainWindow):
         self._populate_results_table(results)
         # 生成图形展示
         self._populate_charts(results)
+        # 自动切到结果Tab (优先级4)
+        self.ui.tabConfig.setCurrentIndex(0)  # 参数结果Tab
 
     def _populate_results_table(self, results):
         """填充参数结果表格。"""
@@ -1187,8 +1157,34 @@ class MainWindow(QMainWindow):
             self.tr(f"LAG: {singles} 单角度 + {ranges} 范围 | 就绪")
         )
 
+    # ==================================================================
+    # 拖拽文件 (优先级2)
+    # ==================================================================
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event: QDropEvent):
+        paths = [u.toLocalFile() for u in event.mimeData().urls()]
+        valid = [p for p in paths if Path(p).suffix.lower() in ('.csv','.xlsx','.xls')]
+        if valid:
+            existing = set(self._data_file_paths)
+            new = [p for p in valid if p not in existing]
+            if new:
+                self._data_file_paths.extend(new)
+                self._refresh_data_file_ui()
+                self._log(f"📂 拖拽添加 {len(new)} 个文件")
+                if self.ui.editTemplatePath.text().strip():
+                    self._on_auto_match()
+
+    # ==================================================================
+    # 窗口关闭
+    # ==================================================================
+
     def closeEvent(self, event):
-        """窗口关闭时停止线程。"""
+        """窗口关闭时停止线程 + 保存位置。"""
+        self._settings.setValue("window_geometry", self.saveGeometry())
         if self._thread and self._thread.isRunning():
             if self._worker:
                 self._worker.cancel()
