@@ -249,8 +249,9 @@ def compute_trp(
     n_phi, n_theta = eirp_linear.shape
     w = _clenshaw_curtis_weights(n_theta)
 
-    # cut_i = mean over phi at each theta
-    cut = np.mean(eirp_linear, axis=0)  # (n_theta,)
+    # cut_i = mean over phi at each theta, with sin(theta) weighting
+    sin_theta = np.sin(theta_rad)
+    cut = np.mean(eirp_linear, axis=0) * sin_theta  # (n_theta,)
 
     trp_lin = 0.5 * np.sum(w * cut)
     if trp_lin <= 1e-15:
@@ -335,7 +336,7 @@ def compute_upper_hemisphere_prp(
         Upper Hemisphere PRP (dBm)。
     """
     theta_deg = np.rad2deg(theta_rad)
-    mask = theta_deg <= 90.0 + 1e-9
+    mask = theta_deg < 90.0  # 不含90°避免与lower双计
     indices = np.where(mask)[0]
     if len(indices) == 0:
         return -999.0
@@ -345,7 +346,7 @@ def compute_upper_hemisphere_prp(
 
     n_sub = len(indices)
     w = _clenshaw_curtis_weights(n_sub)
-    cut = np.mean(gain_sub, axis=0)
+    cut = np.mean(gain_sub, axis=0) * np.sin(theta_sub)
 
     prp_lin = 0.5 * np.sum(w * cut)
     if prp_lin <= 1e-15:
@@ -369,7 +370,7 @@ def compute_lower_hemisphere_prp(
         Lower Hemisphere PRP (dBm)。
     """
     theta_deg = np.rad2deg(theta_rad)
-    mask = theta_deg >= 90.0 - 1e-9
+    mask = theta_deg >= 90.0  # 不含90°避免与upper双计
     indices = np.where(mask)[0]
     if len(indices) == 0:
         return -999.0
@@ -379,7 +380,7 @@ def compute_lower_hemisphere_prp(
 
     n_sub = len(indices)
     w = _clenshaw_curtis_weights(n_sub)
-    cut = np.mean(gain_sub, axis=0)
+    cut = np.mean(gain_sub, axis=0) * np.sin(theta_sub)
 
     prp_lin = 0.5 * np.sum(w * cut)
     if prp_lin <= 1e-15:
@@ -414,9 +415,10 @@ def compute_partial_prp(
         return -999.0
 
     gain_sub = gain_linear[:, indices]
+    theta_sub = theta_rad[indices]
     n_sub = len(indices)
     w = _clenshaw_curtis_weights(n_sub)
-    cut = np.mean(gain_sub, axis=0)
+    cut = np.mean(gain_sub, axis=0) * np.sin(theta_sub)
 
     prp_lin = 0.5 * np.sum(w * cut)
     if prp_lin <= 1e-15:
