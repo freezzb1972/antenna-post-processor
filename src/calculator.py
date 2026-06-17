@@ -338,15 +338,7 @@ def compute_upper_hemisphere_prp(
     Returns:
         Upper Hemisphere PRP (dBm)。
     """
-    theta_deg = np.rad2deg(theta_rad)
-    mask = theta_deg < 90.0  # 不含90°避免与lower双计
-    indices = np.where(mask)[0]
-    if len(indices) == 0:
-        return -999.0
-
-    gain_sub = gain_linear[:, indices]
-    prp_lin = _weighted_prp(gain_sub, theta_rad[indices])
-    return float(10.0 * np.log10(prp_lin))
+    return compute_partial_prp(gain_linear, theta_rad, 0.0, 90.0)
 
 
 def compute_lower_hemisphere_prp(
@@ -355,7 +347,7 @@ def compute_lower_hemisphere_prp(
 ) -> float:
     """下半球部分辐射功率 (Lower Hemisphere PRP)。
 
-    theta ∈ [90°, 180°] 区间内的 PRP，复用 Clenshaw-Curtis 加权积分。
+    theta ∈ [90°, 180°] 区间内的 PRP，委托 compute_partial_prp。
 
     Args:
         gain_linear: 总增益线性值 (mW)。
@@ -364,15 +356,7 @@ def compute_lower_hemisphere_prp(
     Returns:
         Lower Hemisphere PRP (dBm)。
     """
-    theta_deg = np.rad2deg(theta_rad)
-    mask = theta_deg >= 90.0  # 不含90°避免与upper双计
-    indices = np.where(mask)[0]
-    if len(indices) == 0:
-        return -999.0
-
-    gain_sub = gain_linear[:, indices]
-    prp_lin = _weighted_prp(gain_sub, theta_rad[indices])
-    return float(10.0 * np.log10(prp_lin))
+    return compute_partial_prp(gain_linear, theta_rad, 90.0, 180.0)
 
 
 def compute_partial_prp(
@@ -396,7 +380,7 @@ def compute_partial_prp(
         Partial PRP (dBm)。
     """
     theta_deg = np.rad2deg(theta_rad)
-    mask = (theta_deg >= theta_start_deg - 1e-9) & (theta_deg <= theta_end_deg + 1e-9)
+    mask = (theta_deg >= theta_start_deg) & (theta_deg < theta_end_deg + 1e-9)  # [start, end)
     indices = np.where(mask)[0]
     if len(indices) == 0:
         return -999.0
