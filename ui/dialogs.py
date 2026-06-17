@@ -171,7 +171,7 @@ class DataSourceDialog(QDialog):
             for i, m in enumerate(matches):
                 self._match_table.setItem(i, 0, QTableWidgetItem(m.sheet_name))
                 combo = QComboBox(); combo.addItem("—")
-                for fp in (full_paths or data_files): combo.addItem(fp)
+                for fp in data_files: combo.addItem(fp)
                 if m.file_path:
                     idx = combo.findText(m.file_path)
                     if idx >= 0: combo.setCurrentIndex(idx)
@@ -221,7 +221,9 @@ class CalcParamsDialog(QDialog):
         super().__init__(parent)
         self._mw = parent
         self.setWindowTitle("计算参数配置")
-        self.setMinimumSize(550, 450)
+        self.setMinimumSize(550, 480)
+        self.resize(600, 520)
+        self.setEnabled(True)
         self._setup_ui()
         self._load_state()
 
