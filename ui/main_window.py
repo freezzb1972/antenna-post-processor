@@ -322,7 +322,6 @@ class MainWindow(QMainWindow):
         from PySide6.QtGui import QAction, QKeySequence
         menubar = self.menuBar()
         fm = menubar.addMenu(self.tr("&文件"))
-        fm.addAction(self.tr("选择模板..."), self._on_browse_template, QKeySequence("Ctrl+O"))
         fm.addAction(self.tr("保存结果..."), self._on_browse_output, QKeySequence("Ctrl+S"))
         fm.addSeparator(); fm.addAction(self.tr("退出"), self.close, QKeySequence("Ctrl+Q"))
         sm = menubar.addMenu(self.tr("&设置"))
@@ -876,8 +875,15 @@ class MainWindow(QMainWindow):
             return
         if not self._data_file_paths:
             QMessageBox.warning(self, self.tr("警告"),
-                self.tr("请添加数据文件后执行自动匹配。"))
+                self.tr("请先通过「设置→数据源配置」添加数据文件并执行自动匹配。"))
             return
+
+        # 自动触发匹配
+        if self._match_table.rowCount() == 0 and self._data_file_paths:
+            try:
+                self._on_auto_match()
+            except Exception:
+                pass
 
         template_path = self.ui.editTemplatePath.text().strip()
         output_dir = self.ui.editOutputDir.text().strip() or str(Path.cwd() / "output")

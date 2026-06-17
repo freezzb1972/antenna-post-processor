@@ -59,7 +59,10 @@ class DataSourceDialog(QDialog):
         btn_row.addWidget(self._btn_add); btn_row.addWidget(btn_clear); btn_row.addStretch()
         data_layout.addLayout(btn_row)
 
-        self._file_list = QListWidget(); self._file_list.setMaximumHeight(100)
+        self._file_list = QListWidget()
+        self._file_list.setMinimumHeight(100); self._file_list.setMaximumHeight(200)
+        self._file_list.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self._file_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self._file_list.setAlternatingRowColors(True)
         data_layout.addWidget(self._file_list)
 
@@ -320,21 +323,21 @@ class CalcParamsDialog(QDialog):
 
         grp_custom = QGroupBox("自定义角度")
         cl = QHBoxLayout(grp_custom)
-        self._spin_custom = self._mw.ui.spinCustomAngle if hasattr(self._mw.ui, 'spinCustomAngle') else None
-        cl.addWidget(QLabel("角度:"))
-        if self._spin_custom: cl.addWidget(self._spin_custom)
+        self._spin_custom = QDoubleSpinBox(); self._spin_custom.setRange(0, 180)
+        self._spin_custom.setValue(0); self._spin_custom.setSuffix("°")
+        cl.addWidget(QLabel("角度:")); cl.addWidget(self._spin_custom)
         btn_add = QPushButton("+"); btn_add.clicked.connect(self._add_angle)
         cl.addWidget(btn_add); cl.addStretch()
         al.addWidget(grp_custom)
 
         grp_range = QGroupBox("角度范围")
         rl = QHBoxLayout(grp_range)
-        self._spin_start = self._mw.ui.spinRStart if hasattr(self._mw.ui, 'spinRStart') else None
-        self._spin_end = self._mw.ui.spinREnd if hasattr(self._mw.ui, 'spinREnd') else None
-        rl.addWidget(QLabel("起始:"))
-        if self._spin_start: rl.addWidget(self._spin_start)
-        rl.addWidget(QLabel("结束:"))
-        if self._spin_end: rl.addWidget(self._spin_end)
+        self._spin_start = QDoubleSpinBox(); self._spin_start.setRange(0, 180)
+        self._spin_start.setValue(0); self._spin_start.setSuffix("°")
+        self._spin_end = QDoubleSpinBox(); self._spin_end.setRange(0, 180)
+        self._spin_end.setValue(90); self._spin_end.setSuffix("°")
+        rl.addWidget(QLabel("起始:")); rl.addWidget(self._spin_start)
+        rl.addWidget(QLabel("结束:")); rl.addWidget(self._spin_end)
         btn_range = QPushButton("添加范围"); rl.addWidget(btn_range); rl.addStretch()
         al.addWidget(grp_range)
 
@@ -468,14 +471,12 @@ class PlotConfigDialog(QDialog):
         # Tab 3: 图形参数
         tab_par = QWidget(); tabs.addTab(tab_par, "图形参数")
         fl = QFormLayout(tab_par)
-        self._spin_elev = self._mw.ui.spinElev if hasattr(self._mw.ui, 'spinElev') else None
-        self._spin_azim = self._mw.ui.spinAzim if hasattr(self._mw.ui, 'spinAzim') else None
-        self._spin_dpi = self._mw.ui.spinDpi if hasattr(self._mw.ui, 'spinDpi') else None
+        self._spin_elev = QDoubleSpinBox(); self._spin_elev.setRange(-90,90); self._spin_elev.setValue(30); self._spin_elev.setSuffix("°")
+        self._spin_azim = QDoubleSpinBox(); self._spin_azim.setRange(-180,180); self._spin_azim.setValue(-60); self._spin_azim.setSuffix("°")
+        self._spin_dpi = QSpinBox(); self._spin_dpi.setRange(72,300); self._spin_dpi.setValue(150)
         self._check_embed = QCheckBox("嵌入 Excel"); self._check_embed.setChecked(True)
         self._check_png = QCheckBox("保存 PNG 文件")
-        if self._spin_elev: fl.addRow("仰角:", self._spin_elev)
-        if self._spin_azim: fl.addRow("方位角:", self._spin_azim)
-        if self._spin_dpi: fl.addRow("DPI:", self._spin_dpi)
+        fl.addRow("仰角:", self._spin_elev); fl.addRow("方位角:", self._spin_azim); fl.addRow("DPI:", self._spin_dpi)
         fl.addRow("", self._check_embed); fl.addRow("", self._check_png)
 
         layout.addWidget(tabs)
