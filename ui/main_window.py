@@ -1163,7 +1163,9 @@ class MainWindow(QMainWindow):
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
-            event.acceptProposedAction()
+            valid = any(Path(u.toLocalFile()).suffix.lower() in ('.csv','.xlsx','.xls')
+                       for u in event.mimeData().urls())
+            if valid: event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent):
         paths = [u.toLocalFile() for u in event.mimeData().urls()]
