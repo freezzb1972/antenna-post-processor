@@ -379,6 +379,7 @@ class MainWindow(QMainWindow):
         tm.addAction(self.tr("步进重采样..."), self._on_tool_resample)
         hm = menubar.addMenu(self.tr("&帮助"))
         hm.addAction(self.tr("使用说明"), self._on_help, QKeySequence("F1"))
+        hm.addAction(self.tr("许可管理..."), self._on_license)
         hm.addAction(self.tr("关于..."), self._on_about)
 
     def _hide_settings_tabs(self):
@@ -487,6 +488,46 @@ class MainWindow(QMainWindow):
     def _on_tool_resample(self):
         from ui.dialogs import ResampleDialog
         ResampleDialog(self).exec()
+
+    def _on_license(self):
+        from src.license import LicenseManager, get_machine_id
+        mgr = LicenseManager()
+        mgr.auto_load()
+
+        # 构建信息文本
+        mid = get_machine_id()
+        status = mgr.status_text
+        info = mgr.license_info
+
+        if info and mgr.is_valid:
+            msg = (
+                f"许可状态: {status}\n"
+                f"被许可方: {info.licensee}\n"
+                f"到期日期: {info.expiry}\n"
+                f"功能: {', '.join(info.features)}\n"
+                f"签发日期: {info.issued}\n"
+                f"\n当前机器 ID: {mid}"
+            )
+        elif info:
+            msg = (
+                f"许可状态: {status}\n"
+                f"被许可方: {info.licensee}\n"
+                f"到期日期: {info.expiry}\n"
+                f"错误: {mgr.error_message}\n"
+                f"\n当前机器 ID: {mid}"
+            )
+        else:
+            msg = (
+                f"许可状态: 未找到有效许可\n\n"
+                f"请将许可文件 (license.json) 放置到:\n"
+                f"  • 程序同级目录\n"
+                f"  • 用户目录 (~/.antenna_pp_license.json)\n"
+                f"\n当前机器 ID: {mid}\n"
+                f"\n如需获取许可，请联系软件提供商并\n"
+                f"提供上述机器 ID（如需绑定机器）。"
+            )
+
+        QMessageBox.information(self, "许可管理", msg)
 
     def _on_about(self):
         QMessageBox.about(self, self.tr("关于"),
