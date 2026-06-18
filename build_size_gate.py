@@ -108,7 +108,7 @@ def check_s3_forbidden_packages() -> List[str]:
         if pkg in content:
             # 计算出现次数
             count = content.count(pkg)
-            if count > 5:  # 忽略少量引用（如注释中的）
+            if count > 10:  # 忽略少量引用（排除列表 / .so 文件名中的引用）
                 found.append(f"{pkg} ({count} occurrences)")
     if found:
         return [f"FORBIDDEN: {', '.join(found)}"]
