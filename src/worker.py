@@ -42,6 +42,7 @@ class ProcessingWorker(QObject):
         robust_peak: bool = False,
         extra_params: Optional[set] = None,
         chart_config_obj: Optional[ChartConfig] = None,
+        ar_lag_config: Optional[LagConfig] = None,
     ):
         super().__init__()
         self.csv_path = csv_path
@@ -50,6 +51,7 @@ class ProcessingWorker(QObject):
         self.datasource = datasource
         self.datasource_map = datasource_map
         self.lag_config = lag_config
+        self.ar_lag_config = ar_lag_config
         self.plot_config = plot_config or PlotConfig()
         self.full_report_path = full_report_path
         self.extrapolate_theta = extrapolate_theta
@@ -79,6 +81,7 @@ class ProcessingWorker(QObject):
                 template_path=self.template_path,
                 output_path=self.output_path,
                 lag_config_override=self.lag_config,
+                ar_lag_config_override=self.ar_lag_config,
                 plot_config=self.plot_config,
                 full_report_path=self.full_report_path,
                 extrapolate_theta=self.extrapolate_theta,

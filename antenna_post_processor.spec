@@ -32,6 +32,8 @@ a = Analysis(
         (str(PROJECT_ROOT / 'config' / 'bands.json'), 'config'),
         # 模板文件（可选，打包后也可以在运行时选择外部模板）
         (str(PROJECT_ROOT / 'data' / 'template_5G1.xlsx'), 'templates'),
+        # 帮助手册
+        (str(PROJECT_ROOT / 'USER_GUIDE.html'), '.'),
     ],
     hiddenimports=[
         # ---- PySide6 — 仅引用实际使用的模块，避免 collect_submodules 拉入全部 426MB ----

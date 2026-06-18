@@ -64,7 +64,11 @@ class MainWindow(QMainWindow):
     # 快捷按钮角度映射（单一定义，_connect_signals 和 _sync_quick_buttons 共享）
     _QUICK_ANGLES: dict = {
         0.0: "btnQuick0",
+        10.0: "btnQuick10",
+        20.0: "btnQuick20",
         30.0: "btnQuick30",
+        40.0: "btnQuick40",
+        50.0: "btnQuick50",
         60.0: "btnQuick60",
         70.0: "btnQuick70",
         80.0: "btnQuick80",
@@ -100,6 +104,8 @@ class MainWindow(QMainWindow):
         self._lbl_match_status: Optional[QLabel] = None
         self._required_params: set = set()   # 用户确认的报告必需参数
         self._extra_params: set = set()      # 用户额外选择的计算参数
+        self._test_mode: int = 0             # 0=passive, 1=TRP, 2=TIS
+        self._ar_lag_config = LagConfig()    # AR 独立角度配置
         self._nh_edge_deg: float = 45.0      # NHPRP/NHPIS 自定义地平线边界角
         self._chart_config_required = None   # ChartConfig: 报告需要
         self._chart_config_extra = None      # ChartConfig: 额外(full_report)
@@ -109,6 +115,7 @@ class MainWindow(QMainWindow):
         self._apply_custom_qss()
         self._init_file_paths()
         self._init_multi_file_ui()
+        self._init_quick_angle_buttons()  # 添加编译 UI 中缺失的快捷角度按钮
         self._init_params_tab()
         self._init_param_overview()
         self._connect_signals()
@@ -121,6 +128,34 @@ class MainWindow(QMainWindow):
     # ==================================================================
     # 初始化
     # ==================================================================
+
+    def _init_quick_angle_buttons(self):
+        """为编译 UI 中缺失的快捷角度按钮动态创建并插入布局。"""
+        layout = self.ui.hQuickSingle
+        # 已存在: 0, 30, 60, 70, 80, 90
+        # 需添加: 10, 20, 40, 50
+        existing = {"btnQuick0", "btnQuick30", "btnQuick60", "btnQuick70", "btnQuick80", "btnQuick90"}
+        # 找到插入位置 (0 和 30 之间, 30 和 60 之间, etc.)
+        insert_map = {
+            "btnQuick10": ("btnQuick0", 10),
+            "btnQuick20": ("btnQuick10", 20),
+            "btnQuick40": ("btnQuick30", 40),
+            "btnQuick50": ("btnQuick40", 50),
+        }
+        for attr_name, (after_attr, angle) in insert_map.items():
+            if hasattr(self.ui, attr_name):
+                continue  # already exists
+            btn = QPushButton(f"{angle}°")
+            btn.setObjectName(attr_name)
+            btn.setCheckable(True)
+            setattr(self.ui, attr_name, btn)
+            # 找到 after_attr 按钮的索引，在其后插入
+            after_btn = getattr(self.ui, after_attr)
+            idx = layout.indexOf(after_btn)
+            if idx >= 0:
+                layout.insertWidget(idx + 1, btn)
+            else:
+                layout.addWidget(btn)
 
     def _init_file_paths(self):
         """从 QSettings 恢复上次路径。"""
@@ -327,6 +362,8 @@ class MainWindow(QMainWindow):
         from PySide6.QtGui import QAction, QKeySequence
         menubar = self.menuBar()
         fm = menubar.addMenu(self.tr("&文件"))
+        fm.addAction(self.tr("系统设置..."), self._show_system_settings)
+        fm.addSeparator()
         fm.addAction(self.tr("保存结果..."), self._on_browse_output, QKeySequence("Ctrl+S"))
         fm.addSeparator(); fm.addAction(self.tr("退出"), self.close, QKeySequence("Ctrl+Q"))
         sm = menubar.addMenu(self.tr("&设置"))
@@ -339,6 +376,7 @@ class MainWindow(QMainWindow):
         tm = menubar.addMenu(self.tr("&工具"))
         tm.addAction(self.tr("数据转换 (Raw→标准)..."), self._on_tool_convert)
         tm.addAction(self.tr("数据合并 (多段拼接)..."), self._on_tool_merge)
+        tm.addAction(self.tr("步进重采样..."), self._on_tool_resample)
         hm = menubar.addMenu(self.tr("&帮助"))
         hm.addAction(self.tr("使用说明"), self._on_help, QKeySequence("F1"))
         hm.addAction(self.tr("关于..."), self._on_about)
@@ -347,6 +385,10 @@ class MainWindow(QMainWindow):
         tc = self.ui.tabConfig
         for tab, idx in [(self.ui.tabFile, 0), (self.ui.tabLag, 1), (self.ui.tabPlot, 2), (self.ui.tabCalc, 3)]:
             if idx < tc.count(): tc.setTabVisible(idx, False)
+
+    def _show_system_settings(self):
+        from ui.dialogs import SystemSettingsDialog
+        SystemSettingsDialog(self).exec()
 
     def _show_data_source_dialog(self):
         from ui.dialogs import DataSourceDialog
@@ -441,6 +483,10 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self._log(f"✗ 合并失败: {e}")
             QMessageBox.critical(self, self.tr("错误"), str(e))
+
+    def _on_tool_resample(self):
+        from ui.dialogs import ResampleDialog
+        ResampleDialog(self).exec()
 
     def _on_about(self):
         QMessageBox.about(self, self.tr("关于"),
@@ -586,6 +632,25 @@ class MainWindow(QMainWindow):
                     self._log(f"⚠ {Path(fp).name} 加载失败: {e}")
 
         return result
+
+    @staticmethod
+    def _auto_rename_if_exists(filepath: str) -> str:
+        """如果文件已存在，自动添加 _YYYYMMDD_NN 后缀避免覆盖。"""
+        p = Path(filepath)
+        if not p.exists():
+            return filepath
+        from datetime import date
+        today = date.today().strftime("%Y%m%d")
+        stem = p.stem
+        ext = p.suffix
+        parent = p.parent
+        seq = 1
+        while True:
+            new_name = f"{stem}_{today}_{seq:02d}{ext}"
+            new_path = parent / new_name
+            if not new_path.exists():
+                return str(new_path)
+            seq += 1
 
     def _derive_new_sheet_name(self, reference_name: str, target_key: str) -> str:
         """从参考工作表名推导新工作表名: "5G1"+"G2" → "5G2" """
@@ -950,11 +1015,13 @@ class MainWindow(QMainWindow):
 
         os.makedirs(output_dir, exist_ok=True)
         output_path = str(Path(output_dir) / output_name)
+        output_path = self._auto_rename_if_exists(output_path)
 
         full_report_path: Optional[str] = None
         if self.ui.checkFullReport.isChecked():
             path_text = self.ui.editFullReportPath.text().strip()
             full_report_path = path_text if path_text else str(Path(output_dir) / "full_report.xlsx")
+            full_report_path = self._auto_rename_if_exists(full_report_path)
 
         plot_config = PlotConfig(
             elev=self.ui.spinElev.value(),
@@ -1008,6 +1075,7 @@ class MainWindow(QMainWindow):
             robust_peak=self._check_robust_peak.isChecked(),
             extra_params=self._extra_params if self._extra_params else None,
             chart_config_obj=full_chart_config,
+            ar_lag_config=self._ar_lag_config if hasattr(self, '_ar_lag_config') and not self._ar_lag_config.is_empty() else None,
         )
         self._worker.moveToThread(self._thread)
 

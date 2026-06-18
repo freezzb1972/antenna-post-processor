@@ -128,6 +128,7 @@ def _process_one_frequency(
     needed_params: set = None,
     extra_params: set = None,
     chart_config: "ChartConfig" = None,
+    ar_lag_config: "LagConfig" = None,
 ) -> Dict[str, Any]:
     """处理单个频点。按 needed_params（模板列）+ extra_params（用户额外）计算。"""
     theta_lm = raw["theta_logmag"]
@@ -250,13 +251,14 @@ def _process_one_frequency(
                     _, pp = extrapolate_theta(theta_orig, pp, "constant")
                 ar = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
                 if ar is not None and ar.size > 0:
-                    # AR 单角度 (使用 lag_config 的角度列表)
-                    ar_singles = lag_config.singles_sorted
+                    # AR 使用独立的 ar_lag_config 或 fallback 到 lag_config
+                    ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else lag_config
+                    ar_singles = ar_cfg.singles_sorted
                     if ar_singles:
                         for angle, val in compute_ar_at_angles(ar, theta_deg, ar_singles).items():
                             row[f"ar_single_{angle}"] = round(val, 6)
                     # AR 范围
-                    ar_ranges = lag_config.ranges_sorted
+                    ar_ranges = ar_cfg.ranges_sorted
                     if ar_ranges:
                         for (lo, hi), val in [(r, compute_ar_range(ar, theta_deg, r[0], r[1])) for r in ar_ranges]:
                             row[f"ar_range_{lo}_{hi}"] = round(val, 6)
@@ -486,6 +488,7 @@ def _load_and_compute(
     parallel: int,
     extra_params: set = None,
     chart_config: "ChartConfig" = None,
+    ar_lag_config: "LagConfig" = None,
     cancel_callback=None,
     progress_callback=None,
     log_callback=None,
@@ -507,7 +510,7 @@ def _load_and_compute(
             break
         raw = task_ds.read_sections(csv_idx)
         theta_list = list(task_ds.theta_angles)
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config))
+        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config, ar_lag_config))
         if (i + 1) % 20 == 0 or (i + 1) == total:
             _report(progress_callback, i + 1, progress_max, f"读取中 {i + 1}/{total}")
 
@@ -544,12 +547,12 @@ def _run_compute_serial(
     cancel_callback, progress_callback,
 ):
     """串行逐频点计算（单进程或 parallel=1）。"""
-    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg) in enumerate(compute_tasks):
+    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg) in enumerate(compute_tasks):
         if cancel_callback and cancel_callback():
             break
         try:
             theta_arr = np.array(theta_list)
-            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg)
+            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg)
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
@@ -585,6 +588,7 @@ def run_pipeline(
     *,
     datasource_map: Optional[Dict[str, DataSource]] = None,
     lag_config_override: Optional[LagConfig] = None,
+    ar_lag_config_override: Optional[LagConfig] = None,
     plot_config: Optional[PlotConfig] = None,
     full_report_path: Optional[str] = None,
     extrapolate_theta: bool = False,
@@ -655,6 +659,7 @@ def run_pipeline(
     sheet_results = _load_and_compute(
         tasks, sheets_info, extrapolate_theta, robust_peak, parallel,
         extra_params=extra_params, chart_config=chart_config_obj,
+        ar_lag_config=ar_lag_config_override,
         cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,
     )
     _close_datasources(use_multi_ds, datasource, datasource_map)
@@ -751,11 +756,11 @@ def _compute_chunk(
     """
     import numpy as np
     results = []
-    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg in compute_tasks:
+    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg in compute_tasks:
         try:
             theta_raw = np.array(theta_list)
             row = _process_one_frequency(raw, freq, theta_raw, lag_cfg,
-                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg)
+                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg)
             results.append((sheet_name, row))
         except Exception as e:
             results.append((sheet_name, {"frequency": freq, "_error": str(e)}))

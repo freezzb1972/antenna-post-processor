@@ -257,14 +257,33 @@ class HelpEngine:
         self._rag_settings = RAGSettings()
 
         if html_path is None:
-            # 默认路径: 项目根目录下的 USER_GUIDE.html
-            html_path = str(
-                Path(__file__).parent.parent / "USER_GUIDE.html")
+            # 查找 USER_GUIDE.html: PyInstaller bundle → 项目根目录
+            html_path = self._find_guide()
 
-        if os.path.exists(html_path):
+        if html_path and os.path.exists(html_path):
             self._chunks = chunk_document(html_path)
             if self._chunks:
                 self._bm25.build(self._chunks)
+
+    @staticmethod
+    def _find_guide() -> Optional[str]:
+        """查找 USER_GUIDE.html 路径（支持 PyInstaller 打包和开发模式）。"""
+        import sys
+        # PyInstaller 打包后 sys._MEIPASS 指向临时解压目录
+        if getattr(sys, 'frozen', False):
+            base = sys._MEIPASS
+        else:
+            base = str(Path(__file__).parent.parent)
+        # 尝试几个可能的位置
+        candidates = [
+            os.path.join(base, 'USER_GUIDE.html'),
+            os.path.join(base, '..', 'USER_GUIDE.html'),
+            str(Path(__file__).parent.parent / 'USER_GUIDE.html'),
+        ]
+        for p in candidates:
+            if os.path.exists(p):
+                return p
+        return None
                 # 语义索引延迟构建（首次搜索时）
 
     @property

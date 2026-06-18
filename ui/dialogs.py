@@ -317,12 +317,15 @@ class CalcParamsDialog(QDialog):
 
         # ── 状态 ──
         self._template_params: set = set()
-        self._angle_singles: List[float] = []
-        self._angle_ranges: List[tuple] = []
+        self._angle_singles: List[float] = []       # Gain 单角度
+        self._angle_ranges: List[tuple] = []         # Gain 范围
+        self._ar_angle_singles: List[float] = []     # AR 单角度
+        self._ar_angle_ranges: List[tuple] = []      # AR 范围
         self._nh_edge_deg: float = 45.0
         self._extrapolate: bool = False
         self._robust_peak: bool = False
         self._active_tab: int = 0
+        self._test_mode: int = 0  # 0=passive, 1=TRP, 2=TIS
 
         # ── 动态 widget 引用（按 tab 切换时重建） ──
         self._left_checkboxes: Dict[str, QCheckBox] = {}
@@ -341,6 +344,18 @@ class CalcParamsDialog(QDialog):
     def _setup_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(8)
+
+        # ── 测试模式选择 ──
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("<b>测试模式:</b>"))
+        self._cmb_test_mode = QComboBox()
+        self._cmb_test_mode.addItem("📡 无源天线", 0)
+        self._cmb_test_mode.addItem("📶 有源发射 TRP", 1)
+        self._cmb_test_mode.addItem("📻 有源接收 TIS", 2)
+        self._cmb_test_mode.currentIndexChanged.connect(self._on_mode_changed)
+        mode_row.addWidget(self._cmb_test_mode)
+        mode_row.addStretch()
+        main_layout.addLayout(mode_row)
 
         # ── 顶部: 三个 Tab ──
         self._tabs = QTabWidget()
@@ -374,74 +389,29 @@ class CalcParamsDialog(QDialog):
 
         main_layout.addLayout(splitter, 1)
 
-        # ── 角度配置 ──
-        angle_grp = QGroupBox("角度配置（Gain / AR 共用）")
-        angle_layout = QVBoxLayout(angle_grp)
-        angle_layout.setSpacing(4)
+        # ── 角度配置: Gain/AR 切换 ──
+        angle_grp = QGroupBox("角度配置")
+        angle_outer = QVBoxLayout(angle_grp)
+        angle_outer.setSpacing(4)
 
-        # 快捷按钮行
-        quick_row = QHBoxLayout()
-        quick_row.addWidget(QLabel("预设:"))
-        self._angle_buttons: Dict[float, QPushButton] = {}
-        for a in [0, 30, 60, 70, 80, 90]:
-            btn = QPushButton(f"{a}°")
-            btn.setCheckable(True)
-            btn.setFixedWidth(48)
-            btn.clicked.connect(lambda checked, angle=a: self._toggle_quick_angle(angle))
-            quick_row.addWidget(btn)
-            self._angle_buttons[a] = btn
-        quick_row.addStretch()
-        angle_layout.addLayout(quick_row)
+        # 切换按钮
+        toggle_row = QHBoxLayout()
+        toggle_row.addWidget(QLabel("<b>当前编辑:</b>"))
+        self._btn_gain_angle = QPushButton("📡 Gain 角度")
+        self._btn_gain_angle.setCheckable(True); self._btn_gain_angle.setChecked(True)
+        self._btn_gain_angle.clicked.connect(lambda: self._on_angle_target_changed(0))
+        toggle_row.addWidget(self._btn_gain_angle)
+        self._btn_ar_angle = QPushButton("🔄 AR 角度")
+        self._btn_ar_angle.setCheckable(True)
+        self._btn_ar_angle.clicked.connect(lambda: self._on_angle_target_changed(1))
+        toggle_row.addWidget(self._btn_ar_angle)
+        toggle_row.addStretch()
+        angle_outer.addLayout(toggle_row)
+        self._active_angle_tab: int = 0
 
-        # 自定义 + 步进行
-        custom_row = QHBoxLayout()
-        custom_row.addWidget(QLabel("自定义:"))
-        self._spin_custom = QDoubleSpinBox()
-        self._spin_custom.setRange(0, 180); self._spin_custom.setValue(0)
-        self._spin_custom.setSuffix("°"); self._spin_custom.setFixedWidth(80)
-        custom_row.addWidget(self._spin_custom)
-        btn_custom_add = QPushButton("+")
-        btn_custom_add.setFixedWidth(32)
-        btn_custom_add.clicked.connect(self._add_custom_angle)
-        custom_row.addWidget(btn_custom_add)
-        custom_row.addSpacing(12)
-        custom_row.addWidget(QLabel("步进:"))
-        self._spin_step_start = QDoubleSpinBox()
-        self._spin_step_start.setRange(0, 180); self._spin_step_start.setValue(0)
-        self._spin_step_start.setSuffix("°"); self._spin_step_start.setFixedWidth(80)
-        custom_row.addWidget(self._spin_step_start)
-        custom_row.addWidget(QLabel("—"))
-        self._spin_step_end = QDoubleSpinBox()
-        self._spin_step_end.setRange(0, 180); self._spin_step_end.setValue(90)
-        self._spin_step_end.setSuffix("°"); self._spin_step_end.setFixedWidth(80)
-        custom_row.addWidget(self._spin_step_end)
-        custom_row.addWidget(QLabel("步长:"))
-        self._spin_step_by = QDoubleSpinBox()
-        self._spin_step_by.setRange(1, 90); self._spin_step_by.setValue(10)
-        self._spin_step_by.setSuffix("°"); self._spin_step_by.setFixedWidth(70)
-        custom_row.addWidget(self._spin_step_by)
-        btn_step_gen = QPushButton("生成")
-        btn_step_gen.clicked.connect(self._on_step_generate)
-        custom_row.addWidget(btn_step_gen)
-        custom_row.addStretch()
-        angle_layout.addLayout(custom_row)
-
-        # 范围行
-        range_row = QHBoxLayout()
-        range_row.addWidget(QLabel("角度范围:"))
-        self._spin_range_start = QDoubleSpinBox()
-        self._spin_range_start.setRange(0, 180); self._spin_range_start.setValue(0)
-        self._spin_range_start.setSuffix("°"); self._spin_range_start.setFixedWidth(80)
-        range_row.addWidget(QLabel("起始:")); range_row.addWidget(self._spin_range_start)
-        self._spin_range_end = QDoubleSpinBox()
-        self._spin_range_end.setRange(0, 180); self._spin_range_end.setValue(90)
-        self._spin_range_end.setSuffix("°"); self._spin_range_end.setFixedWidth(80)
-        range_row.addWidget(QLabel("结束:")); range_row.addWidget(self._spin_range_end)
-        btn_add_range = QPushButton("添加范围")
-        btn_add_range.clicked.connect(self._on_add_range)
-        range_row.addWidget(btn_add_range)
-        range_row.addStretch()
-        angle_layout.addLayout(range_row)
+        # 共享角度控件
+        self._build_angle_control_widget()
+        angle_outer.addWidget(self._angle_ctrl_widget)
 
         # NHPRP/NHPIS 地平线角度 (TRP/TIS Tab 时显示)
         self._grp_nh = QGroupBox("NHPRP / NHPIS 地平线边界角度")
@@ -453,15 +423,15 @@ class CalcParamsDialog(QDialog):
         nh_layout.addWidget(self._spin_nh_edge)
         nh_layout.addWidget(QLabel("（自定义 NHPRP/NHPIS 的地平线边界）"))
         nh_layout.addStretch()
-        self._grp_nh.setVisible(False)  # 仅在 TRP/TIS Tab 可见
-        angle_layout.addWidget(self._grp_nh)
+        self._grp_nh.setVisible(False)
+        angle_outer.addWidget(self._grp_nh)
 
         # 已选择区域
         self._selected_widget = QWidget()
         self._selected_layout = QVBoxLayout(self._selected_widget)
         self._selected_layout.setContentsMargins(0, 0, 0, 0)
         self._selected_layout.setSpacing(2)
-        angle_layout.addWidget(self._selected_widget)
+        angle_outer.addWidget(self._selected_widget)
 
         main_layout.addWidget(angle_grp)
 
@@ -518,8 +488,14 @@ class CalcParamsDialog(QDialog):
         else:
             return common + list(CalcParamsDialog._TIS_PARAMS)
 
+    def _on_mode_changed(self, index: int):
+        self._test_mode = index
+        # 同步切换 Tab: test_mode 0→Tab0, 1→Tab1, 2→Tab2
+        self._tabs.setCurrentIndex(index)
+
     def _on_tab_changed(self, index: int):
         self._active_tab = index
+        self._cmb_test_mode.setCurrentIndex(index)
         self._grp_nh.setVisible(index in (1, 2))  # NH 配置仅 TRP/TIS Tab 显示
         self._rebuild_param_columns()
 
@@ -565,21 +541,109 @@ class CalcParamsDialog(QDialog):
         self._right_scroll.setWidget(right_content)
 
     # ═══════════════════════════════════════════════════════════
-    # 角度配置方法
+    # 角度配置 — 共享 UI, 切换 Gain / AR 状态
     # ═══════════════════════════════════════════════════════════
 
+    def _on_angle_target_changed(self, index: int):
+        self._active_angle_tab = index
+        self._btn_gain_angle.setChecked(index == 0)
+        self._btn_ar_angle.setChecked(index == 1)
+        self._sync_angle_buttons()
+        self._update_selected_display()
+
+    @property
+    def _cur_singles(self) -> List[float]:
+        return self._ar_angle_singles if self._active_angle_tab == 1 else self._angle_singles
+
+    @property
+    def _cur_ranges(self) -> List[tuple]:
+        return self._ar_angle_ranges if self._active_angle_tab == 1 else self._angle_ranges
+
+    def _build_angle_control_widget(self):
+        """构建角度设置共享控件（Gain 和 AR 共用）。"""
+        self._angle_ctrl_widget = QWidget()
+        layout = QVBoxLayout(self._angle_ctrl_widget)
+        layout.setSpacing(4)
+
+        # 快捷按钮行
+        quick_row = QHBoxLayout()
+        quick_row.addWidget(QLabel("预设:"))
+        self._angle_buttons: Dict[float, QPushButton] = {}
+        for a in [0, 10, 20, 30, 40, 50, 60, 70, 80, 90]:
+            btn = QPushButton(f"{a}°")
+            btn.setCheckable(True)
+            btn.setFixedWidth(48)
+            btn.clicked.connect(lambda checked, angle=a: self._toggle_quick_angle(angle))
+            quick_row.addWidget(btn)
+            self._angle_buttons[a] = btn
+        quick_row.addStretch()
+        layout.addLayout(quick_row)
+
+        # 自定义 + 步进行
+        custom_row = QHBoxLayout()
+        custom_row.addWidget(QLabel("自定义:"))
+        self._spin_custom = QDoubleSpinBox()
+        self._spin_custom.setRange(0, 180); self._spin_custom.setValue(0)
+        self._spin_custom.setSuffix("°"); self._spin_custom.setFixedWidth(80)
+        custom_row.addWidget(self._spin_custom)
+        btn_custom_add = QPushButton("+")
+        btn_custom_add.setFixedWidth(32)
+        btn_custom_add.clicked.connect(self._add_custom_angle)
+        custom_row.addWidget(btn_custom_add)
+        custom_row.addSpacing(12)
+        custom_row.addWidget(QLabel("步进:"))
+        self._spin_step_start = QDoubleSpinBox()
+        self._spin_step_start.setRange(0, 180); self._spin_step_start.setValue(0)
+        self._spin_step_start.setSuffix("°"); self._spin_step_start.setFixedWidth(80)
+        custom_row.addWidget(self._spin_step_start)
+        custom_row.addWidget(QLabel("—"))
+        self._spin_step_end = QDoubleSpinBox()
+        self._spin_step_end.setRange(0, 180); self._spin_step_end.setValue(90)
+        self._spin_step_end.setSuffix("°"); self._spin_step_end.setFixedWidth(80)
+        custom_row.addWidget(self._spin_step_end)
+        custom_row.addWidget(QLabel("步长:"))
+        self._spin_step_by = QDoubleSpinBox()
+        self._spin_step_by.setRange(1, 90); self._spin_step_by.setValue(10)
+        self._spin_step_by.setSuffix("°"); self._spin_step_by.setFixedWidth(70)
+        custom_row.addWidget(self._spin_step_by)
+        btn_step_gen = QPushButton("生成")
+        btn_step_gen.clicked.connect(self._on_step_generate)
+        custom_row.addWidget(btn_step_gen)
+        custom_row.addStretch()
+        layout.addLayout(custom_row)
+
+        # 范围行
+        range_row = QHBoxLayout()
+        range_row.addWidget(QLabel("角度范围:"))
+        self._spin_range_start = QDoubleSpinBox()
+        self._spin_range_start.setRange(0, 180); self._spin_range_start.setValue(0)
+        self._spin_range_start.setSuffix("°"); self._spin_range_start.setFixedWidth(80)
+        range_row.addWidget(QLabel("起始:")); range_row.addWidget(self._spin_range_start)
+        self._spin_range_end = QDoubleSpinBox()
+        self._spin_range_end.setRange(0, 180); self._spin_range_end.setValue(90)
+        self._spin_range_end.setSuffix("°"); self._spin_range_end.setFixedWidth(80)
+        range_row.addWidget(QLabel("结束:")); range_row.addWidget(self._spin_range_end)
+        btn_add_range = QPushButton("添加范围")
+        btn_add_range.clicked.connect(self._on_add_range)
+        range_row.addWidget(btn_add_range)
+        range_row.addStretch()
+        layout.addLayout(range_row)
+        layout.addStretch()
+
     def _toggle_quick_angle(self, angle: float):
-        if angle in self._angle_singles:
-            self._angle_singles.remove(angle)
+        singles = self._cur_singles
+        if angle in singles:
+            singles.remove(angle)
         else:
-            self._angle_singles.append(angle)
+            singles.append(angle)
         self._sync_angle_buttons()
         self._update_selected_display()
 
     def _add_custom_angle(self):
         a = self._spin_custom.value()
-        if a not in self._angle_singles:
-            self._angle_singles.append(a)
+        singles = self._cur_singles
+        if a not in singles:
+            singles.append(a)
             self._sync_angle_buttons()
             self._update_selected_display()
 
@@ -590,11 +654,12 @@ class CalcParamsDialog(QDialog):
         if step <= 0:
             return
         lo, hi = min(start, end), max(start, end)
+        singles = self._cur_singles
         a = lo
         while a <= hi + 1e-9:
             rounded = round(a, 6)
-            if rounded not in self._angle_singles:
-                self._angle_singles.append(rounded)
+            if rounded not in singles:
+                singles.append(rounded)
             a += step
         self._sync_angle_buttons()
         self._update_selected_display()
@@ -603,85 +668,86 @@ class CalcParamsDialog(QDialog):
         lo = self._spin_range_start.value()
         hi = self._spin_range_end.value()
         key = (min(lo, hi), max(lo, hi))
-        if key not in self._angle_ranges:
-            self._angle_ranges.append(key)
+        ranges = self._cur_ranges
+        if key not in ranges:
+            ranges.append(key)
             self._update_selected_display()
 
     def _remove_single(self, angle: float):
-        if angle in self._angle_singles:
-            self._angle_singles.remove(angle)
+        singles = self._cur_singles  # from which tab the angle was
+        if angle in singles:
+            singles.remove(angle)
+        # Also try the other list
+        other = self._ar_angle_singles if self._active_angle_tab == 0 else self._angle_singles
+        if angle in other:
+            other.remove(angle)
         self._sync_angle_buttons()
         self._update_selected_display()
 
     def _remove_range(self, lo: float, hi: float):
         key = (lo, hi)
-        if key in self._angle_ranges:
-            self._angle_ranges.remove(key)
+        for rlist in [self._angle_ranges, self._ar_angle_ranges]:
+            if key in rlist:
+                rlist.remove(key)
         self._update_selected_display()
 
     def _sync_angle_buttons(self):
+        singles = self._cur_singles
         for a, btn in self._angle_buttons.items():
-            btn.setChecked(a in self._angle_singles)
+            btn.setChecked(a in singles)
 
     def _update_selected_display(self):
-        """刷新「已选择」区域。"""
+        """刷新「已选择」区域 — 显示 Gain 和 AR 的角度。"""
         layout = self._selected_layout
-        # 清除旧内容
         while layout.count():
             child = layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
 
-        singles = sorted(set(self._angle_singles))
-        ranges = sorted(set(self._angle_ranges))
+        gain_singles = sorted(set(self._angle_singles))
+        gain_ranges = sorted(set(self._angle_ranges))
+        ar_singles = sorted(set(self._ar_angle_singles))
+        ar_ranges = sorted(set(self._ar_angle_ranges))
 
-        if not singles and not ranges:
+        has_gain = gain_singles or gain_ranges
+        has_ar = ar_singles or ar_ranges
+
+        if not has_gain and not has_ar:
             lbl = QLabel("（未选择角度）")
             lbl.setStyleSheet("font-size: 12px; color: #888; padding: 4px;")
             layout.addWidget(lbl)
             return
 
-        if singles:
+        def _add_tags(label_text, singles, ranges, color):
             row = QHBoxLayout()
-            row.addWidget(QLabel("单角度:"))
+            row.addWidget(QLabel(f"{label_text}:"))
             for a in singles:
                 tag = QWidget()
-                tag_layout = QHBoxLayout(tag)
-                tag_layout.setContentsMargins(4, 2, 4, 2)
-                tag_layout.setSpacing(2)
-                tag_label = QLabel(f"{a}°")
-                tag_label.setStyleSheet("font-size: 12px; background: #3a6fb5; color: white; "
-                                        "border-radius: 3px; padding: 1px 4px;")
-                tag_layout.addWidget(tag_label)
-                btn_x = QPushButton("✕")
-                btn_x.setFixedSize(18, 18)
-                btn_x.setStyleSheet("font-size: 10px; padding: 0;")
+                tl = QHBoxLayout(tag); tl.setContentsMargins(4,2,4,2); tl.setSpacing(2)
+                tlabel = QLabel(f"{a}°")
+                tlabel.setStyleSheet(f"font-size:12px;background:{color};color:white;border-radius:3px;padding:1px 4px;")
+                tl.addWidget(tlabel)
+                btn_x = QPushButton("✕"); btn_x.setFixedSize(18,18)
+                btn_x.setStyleSheet("font-size:10px;padding:0;")
                 btn_x.clicked.connect(lambda checked, angle=a: self._remove_single(angle))
-                tag_layout.addWidget(btn_x)
-                row.addWidget(tag)
+                tl.addWidget(btn_x); row.addWidget(tag)
+            for lo, hi in ranges:
+                tag = QWidget()
+                tl = QHBoxLayout(tag); tl.setContentsMargins(4,2,4,2); tl.setSpacing(2)
+                tlabel = QLabel(f"({lo}°–{hi}°)")
+                tlabel.setStyleSheet(f"font-size:12px;background:{color};color:white;border-radius:3px;padding:1px 4px;")
+                tl.addWidget(tlabel)
+                btn_x = QPushButton("✕"); btn_x.setFixedSize(18,18)
+                btn_x.setStyleSheet("font-size:10px;padding:0;")
+                btn_x.clicked.connect(lambda checked, l=lo, h=hi: self._remove_range(l, h))
+                tl.addWidget(btn_x); row.addWidget(tag)
             row.addStretch()
             layout.addLayout(row)
 
-        if ranges:
-            row = QHBoxLayout()
-            row.addWidget(QLabel("范围:"))
-            for lo, hi in ranges:
-                tag = QWidget()
-                tag_layout = QHBoxLayout(tag)
-                tag_layout.setContentsMargins(4, 2, 4, 2)
-                tag_layout.setSpacing(2)
-                tag_label = QLabel(f"({lo}°–{hi}°)")
-                tag_label.setStyleSheet("font-size: 12px; background: #5a9e6f; color: white; "
-                                        "border-radius: 3px; padding: 1px 4px;")
-                tag_layout.addWidget(tag_label)
-                btn_x = QPushButton("✕")
-                btn_x.setFixedSize(18, 18)
-                btn_x.setStyleSheet("font-size: 10px; padding: 0;")
-                btn_x.clicked.connect(lambda checked, l=lo, h=hi: self._remove_range(l, h))
-                tag_layout.addWidget(btn_x)
-                row.addWidget(tag)
-            row.addStretch()
-            layout.addLayout(row)
+        if has_gain:
+            _add_tags("Gain", gain_singles, gain_ranges, "#3a6fb5")
+        if has_ar:
+            _add_tags("AR", ar_singles, ar_ranges, "#b53a6f")
 
     # ═══════════════════════════════════════════════════════════
     # 加载 / 保存状态
@@ -689,12 +755,21 @@ class CalcParamsDialog(QDialog):
 
     def _load_state(self):
         mw = self._mw
-        # 角度
+        # 测试模式
+        if hasattr(mw, '_test_mode'):
+            self._test_mode = mw._test_mode
+            self._cmb_test_mode.setCurrentIndex(mw._test_mode)
+            self._tabs.setCurrentIndex(mw._test_mode)
+        # 角度 — Gain
         if hasattr(mw, '_lag_config'):
             self._angle_singles = list(mw._lag_config.single_angles)
             self._angle_ranges = list(mw._lag_config.ranges)
-            self._sync_angle_buttons()
-            self._update_selected_display()
+        # 角度 — AR
+        if hasattr(mw, '_ar_lag_config'):
+            self._ar_angle_singles = list(mw._ar_lag_config.single_angles)
+            self._ar_angle_ranges = list(mw._ar_lag_config.ranges)
+        self._sync_angle_buttons()
+        self._update_selected_display()
         # 频点
         if hasattr(mw, '_cmb_freq_source') and mw._cmb_freq_source:
             self._cmb_freq_src.setCurrentIndex(mw._cmb_freq_source.currentIndex())
@@ -713,7 +788,9 @@ class CalcParamsDialog(QDialog):
 
     def _on_accept(self):
         mw = self._mw
-        # 同步角度到主窗口 LagConfig
+        # 测试模式
+        mw._test_mode = self._cmb_test_mode.currentData() if hasattr(self, '_cmb_test_mode') else 0
+        # 同步 Gain 角度
         if hasattr(mw, '_lag_config'):
             mw._lag_config.clear()
             for a in sorted(set(self._angle_singles)):
@@ -722,6 +799,15 @@ class CalcParamsDialog(QDialog):
                 mw._lag_config.add_range(lo, hi)
             mw._sync_quick_buttons()
             mw._update_lag_display()
+        # 同步 AR 角度
+        if not hasattr(mw, '_ar_lag_config'):
+            from src.lag_config import LagConfig
+            mw._ar_lag_config = LagConfig()
+        mw._ar_lag_config.clear()
+        for a in sorted(set(self._ar_angle_singles)):
+            mw._ar_lag_config.add_single(a)
+        for lo, hi in sorted(set(self._ar_angle_ranges)):
+            mw._ar_lag_config.add_range(lo, hi)
         # 保存额外参数 & 必需参数
         required = set(k for k, cb in self._left_checkboxes.items() if cb.isChecked())
         extra = set(k for k, cb in self._right_checkboxes.items() if cb.isChecked())
@@ -1054,11 +1140,18 @@ class HelpDialog(QDialog):
                 f"✅ RAG 已配置 (Model: {self._rag_settings.model})")
 
     def _on_open_browser(self):
-        import webbrowser
+        import webbrowser, sys
         from pathlib import Path
-        guide = str(Path(__file__).parent.parent / "USER_GUIDE.html")
+        # 查找 USER_GUIDE.html（支持 PyInstaller 打包）
+        if getattr(sys, 'frozen', False):
+            base = sys._MEIPASS
+            guide = os.path.join(base, 'USER_GUIDE.html')
+        else:
+            guide = str(Path(__file__).parent.parent / "USER_GUIDE.html")
         if os.path.exists(guide):
             webbrowser.open(f"file://{Path(guide).absolute()}")
+        else:
+            QMessageBox.warning(self, "提示", "帮助文件未找到。请确认 USER_GUIDE.html 存在。")
 
     def _load_rag_settings(self):
         try:
@@ -1157,3 +1250,350 @@ class RAGSettingsDialog(QDialog):
             model=self._cmb_model.currentText().strip(),
         )
         self.accept()
+
+
+# ═══════════════════════════════════════════════════════════════
+# 系统设置对话框 — 整合主题/语言/字体/LLM
+# ═══════════════════════════════════════════════════════════════
+
+class SystemSettingsDialog(QDialog):
+    """系统设置: 字体大小 + 主题 + 语言 + LLM API。"""
+
+    def __init__(self, parent: "MainWindow"):
+        super().__init__(parent)
+        self._mw = parent
+        self.setWindowTitle("系统设置")
+        self.setMinimumSize(480, 360)
+        self._setup_ui()
+        self._load_state()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        # ── 字体大小 ──
+        font_grp = QGroupBox("字体大小")
+        font_layout = QHBoxLayout(font_grp)
+        font_layout.addWidget(QLabel("A"))
+        self._spin_font = QSpinBox()
+        self._spin_font.setRange(8, 24)
+        self._spin_font.setValue(13)
+        self._spin_font.setSuffix(" px")
+        font_layout.addWidget(self._spin_font)
+        font_layout.addWidget(QLabel("A 大"))
+        font_layout.addStretch()
+        btn_font = QPushButton("应用字体")
+        btn_font.clicked.connect(self._on_apply_font)
+        font_layout.addWidget(btn_font)
+        layout.addWidget(font_grp)
+
+        # ── 主题 ──
+        theme_grp = QGroupBox("主题")
+        theme_layout = QHBoxLayout(theme_grp)
+        self._cmb_theme = QComboBox()
+        self._cmb_theme.setMinimumWidth(200)
+        theme_layout.addWidget(QLabel("主题:"))
+        theme_layout.addWidget(self._cmb_theme)
+        theme_layout.addStretch()
+        layout.addWidget(theme_grp)
+
+        # ── 语言 ──
+        lang_grp = QGroupBox("语言 / Language")
+        lang_layout = QHBoxLayout(lang_grp)
+        self._btn_lang = QPushButton("中文 / English")
+        self._btn_lang.clicked.connect(self._on_toggle_lang)
+        lang_layout.addWidget(self._btn_lang)
+        lang_layout.addStretch()
+        layout.addWidget(lang_grp)
+
+        # ── LLM API ──
+        llm_grp = QGroupBox("LLM API (RAG 问答)")
+        llm_layout = QFormLayout(llm_grp)
+        llm_layout.setSpacing(6)
+
+        self._check_llm = QCheckBox("启用 RAG AI 问答")
+        llm_layout.addRow("", self._check_llm)
+
+        self._edit_api_base = QLineEdit()
+        self._edit_api_base.setPlaceholderText("https://api.anthropic.com/v1/messages")
+        llm_layout.addRow("API URL:", self._edit_api_base)
+
+        self._edit_api_key = QLineEdit()
+        self._edit_api_key.setEchoMode(QLineEdit.Password)
+        self._edit_api_key.setPlaceholderText("sk-ant-... 或 sk-...")
+        llm_layout.addRow("API Key:", self._edit_api_key)
+
+        self._cmb_model = QComboBox()
+        self._cmb_model.setEditable(True)
+        for m in ["claude-sonnet-4-6", "claude-opus-4-8", "gpt-4o", "gpt-4o-mini", "deepseek-chat"]:
+            self._cmb_model.addItem(m)
+        llm_layout.addRow("Model:", self._cmb_model)
+
+        layout.addWidget(llm_grp)
+
+        layout.addStretch()
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _load_state(self):
+        mw = self._mw
+        # 字体
+        app = QApplication.instance()
+        font = app.font()
+        self._spin_font.setValue(font.pointSize() if font.pointSize() > 0 else 13)
+        # 主题
+        from ui.theme_manager import ThemeManager
+        for theme_id, name in ThemeManager.ALL_THEMES:
+            self._cmb_theme.addItem(name, theme_id)
+        cur = ThemeManager.current_theme()
+        for i in range(self._cmb_theme.count()):
+            if self._cmb_theme.itemData(i) == cur:
+                self._cmb_theme.setCurrentIndex(i)
+                break
+        # 语言
+        from i18n.i18n_manager import I18nManager
+        lang = I18nManager.current_language()
+        self._btn_lang.setText("English" if lang == "zh_CN" else "中文")
+        # LLM
+        from PySide6.QtCore import QSettings
+        s = QSettings("AntennaPP", "AntennaPostProcessor")
+        self._check_llm.setChecked(s.value("rag/enabled", False, type=bool))
+        self._edit_api_base.setText(s.value("rag/api_base", "https://api.anthropic.com/v1/messages"))
+        self._edit_api_key.setText(s.value("rag/api_key", ""))
+        model = s.value("rag/model", "claude-sonnet-4-6")
+        idx = self._cmb_model.findText(model)
+        if idx >= 0:
+            self._cmb_model.setCurrentIndex(idx)
+        else:
+            self._cmb_model.setCurrentText(model)
+
+    def _on_apply_font(self):
+        size = self._spin_font.value()
+        app = QApplication.instance()
+        font = app.font()
+        font.setPointSize(size)
+        app.setFont(font)
+
+    def _on_toggle_lang(self):
+        from i18n.i18n_manager import I18nManager
+        new_lang = "en_US" if I18nManager.current_language() == "zh_CN" else "zh_CN"
+        I18nManager.switch(QApplication.instance(), new_lang)
+        self._btn_lang.setText("English" if new_lang == "zh_CN" else "中文")
+
+    def _on_accept(self):
+        # 字体
+        self._on_apply_font()
+        # 主题
+        theme_id = self._cmb_theme.currentData()
+        if theme_id:
+            from ui.theme_manager import ThemeManager
+            ThemeManager.apply(theme_id)
+            ThemeManager.save_theme(theme_id)
+        # LLM 设置保存
+        from PySide6.QtCore import QSettings
+        s = QSettings("AntennaPP", "AntennaPostProcessor")
+        s.setValue("rag/enabled", self._check_llm.isChecked())
+        s.setValue("rag/api_base", self._edit_api_base.text().strip())
+        s.setValue("rag/api_key", self._edit_api_key.text().strip())
+        s.setValue("rag/model", self._cmb_model.currentText().strip())
+        self.accept()
+
+
+# ═══════════════════════════════════════════════════════════════
+# 步进重采样对话框
+# ═══════════════════════════════════════════════════════════════
+
+class ResampleDialog(QDialog):
+    """步进重采样: 从源文件按指定步进批量导出重采样 CSV。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("步进重采样 — 数据提取")
+        self.setMinimumSize(520, 380)
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        # ── 源文件 ──
+        src_grp = QGroupBox("源文件")
+        src_row = QHBoxLayout(src_grp)
+        self._edit_src = QLineEdit()
+        self._edit_src.setPlaceholderText("选择 merged CSV 文件...")
+        src_row.addWidget(self._edit_src, 1)
+        btn_src = QPushButton("浏览...")
+        btn_src.clicked.connect(self._on_browse_src)
+        src_row.addWidget(btn_src)
+        layout.addWidget(src_grp)
+
+        # ── 输出目录 ──
+        out_grp = QGroupBox("输出目录")
+        out_row = QHBoxLayout(out_grp)
+        self._edit_dir = QLineEdit()
+        self._edit_dir.setPlaceholderText("默认: 源文件所在目录")
+        out_row.addWidget(self._edit_dir, 1)
+        btn_dir = QPushButton("浏览...")
+        btn_dir.clicked.connect(self._on_browse_dir)
+        out_row.addWidget(btn_dir)
+        layout.addWidget(out_grp)
+
+        # ── 目标步进 ──
+        step_grp = QGroupBox("目标步进（度）— 多个步进用逗号分隔")
+        step_layout = QVBoxLayout(step_grp)
+        self._edit_steps = QLineEdit("5, 10, 15")
+        self._edit_steps.setPlaceholderText("如: 5, 10, 15, 20")
+        step_layout.addWidget(self._edit_steps)
+
+        # 快捷步进按钮
+        quick_row = QHBoxLayout()
+        for s in [2, 5, 10, 15, 20, 30, 45]:
+            btn = QPushButton(f"{s}°")
+            btn.setFixedWidth(48)
+            btn.clicked.connect(lambda checked, val=s: self._add_step(val))
+            quick_row.addWidget(btn)
+        quick_row.addStretch()
+        step_layout.addLayout(quick_row)
+
+        # 预览
+        self._lbl_preview = QLabel("")
+        self._lbl_preview.setStyleSheet("font-size: 11px; color: #888;")
+        step_layout.addWidget(self._lbl_preview)
+
+        layout.addWidget(step_grp)
+
+        # ── 源文件信息 ──
+        self._lbl_info = QLabel("")
+        self._lbl_info.setStyleSheet("font-size: 11px; color: #666;")
+        layout.addWidget(self._lbl_info)
+
+        layout.addStretch()
+
+        # ── 按钮 ──
+        btn_row = QHBoxLayout()
+        self._btn_run = QPushButton("▶ 开始批量导出")
+        self._btn_run.clicked.connect(self._on_run)
+        self._btn_run.setMinimumHeight(36)
+        btn_row.addWidget(self._btn_run)
+        btn_row.addStretch()
+        btn_cancel = QPushButton("关闭")
+        btn_cancel.clicked.connect(self.reject)
+        btn_row.addWidget(btn_cancel)
+        layout.addLayout(btn_row)
+
+        # 连接信号
+        self._edit_src.textChanged.connect(self._on_src_changed)
+
+    def _on_browse_src(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "选择源 CSV 文件", "",
+            "CSV 文件 (*.csv);;所有文件 (*)")
+        if path:
+            self._edit_src.setText(path)
+
+    def _on_browse_dir(self):
+        d = QFileDialog.getExistingDirectory(self, "选择输出目录")
+        if d:
+            self._edit_dir.setText(d)
+
+    def _add_step(self, val: int):
+        current = self._edit_steps.text().strip()
+        if not current:
+            self._edit_steps.setText(str(val))
+            return
+        steps = [s.strip() for s in current.split(",") if s.strip()]
+        if str(val) not in steps:
+            steps.append(str(val))
+            self._edit_steps.setText(", ".join(steps))
+        self._update_preview()
+
+    def _on_src_changed(self):
+        path = self._edit_src.text().strip()
+        if path and os.path.exists(path):
+            try:
+                from src.step_resampler import _read_all
+                _, theta, phi, sfreqs = _read_all(path)
+                freqs = list(sfreqs.values())[0] if sfreqs else []
+                t_step = theta[1] - theta[0] if len(theta) > 1 else "?"
+                p_step = phi[1] - phi[0] if len(phi) > 1 else "?"
+                self._lbl_info.setText(
+                    f"源文件: θ={theta[0]:.0f}~{theta[-1]:.0f}° (步进{t_step}°), "
+                    f"φ={phi[0]:.0f}~{phi[-1]:.0f}° (步进{p_step}°), {len(freqs)} 频点")
+            except Exception as e:
+                self._lbl_info.setText(f"读取失败: {e}")
+        self._update_preview()
+
+    def _update_preview(self):
+        path = self._edit_src.text().strip()
+        steps_str = self._edit_steps.text().strip()
+        if not path or not os.path.exists(path) or not steps_str:
+            self._lbl_preview.setText("")
+            return
+        steps = _parse_steps(steps_str)
+        if not steps:
+            self._lbl_preview.setText("")
+            return
+        stem = Path(path).stem
+        names = []
+        for s in steps:
+            s_str = str(int(s)) if s == int(s) else str(s).replace(".", "p")
+            names.append(f"{stem}_step{s_str}deg.csv")
+        self._lbl_preview.setText("输出文件: " + ", ".join(names))
+
+    def _on_run(self):
+        path = self._edit_src.text().strip()
+        if not path or not os.path.exists(path):
+            QMessageBox.warning(self, "提示", "请选择有效的源 CSV 文件。")
+            return
+
+        steps_str = self._edit_steps.text().strip()
+        if not steps_str:
+            QMessageBox.warning(self, "提示", "请输入目标步进值。")
+            return
+
+        steps = _parse_steps(steps_str)
+        if not steps:
+            QMessageBox.warning(self, "提示", "无法解析步进值。请使用逗号分隔的数字，如: 5, 10, 15")
+            return
+
+        out_dir = self._edit_dir.text().strip()
+        if not out_dir:
+            out_dir = str(Path(path).parent)
+        os.makedirs(out_dir, exist_ok=True)
+
+        try:
+            from src.step_resampler import batch_resample
+            self._btn_run.setEnabled(False)
+            self._btn_run.setText("处理中...")
+            QApplication.processEvents()
+
+            outputs = batch_resample(path, out_dir, steps)
+
+            self._btn_run.setText("▶ 开始批量导出")
+            self._btn_run.setEnabled(True)
+            QMessageBox.information(self, "完成",
+                f"成功导出 {len(outputs)} 个文件:\n" +
+                "\n".join(f"  • {Path(o).name}" for o in outputs))
+        except Exception as e:
+            self._btn_run.setText("▶ 开始批量导出")
+            self._btn_run.setEnabled(True)
+            QMessageBox.critical(self, "错误", f"重采样失败: {e}")
+
+
+def _parse_steps(text: str) -> List[float]:
+    """解析步进字符串: '5, 10, 15' → [5.0, 10.0, 15.0]"""
+    steps = []
+    for part in text.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            val = float(part)
+            if val > 0:
+                steps.append(val)
+        except ValueError:
+            pass
+    return steps
