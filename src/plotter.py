@@ -1,54 +1,41 @@
 """
-3D 辐射方向图生成器
-====================
-仿 EMQuest 风格的球面 3D 辐射方向图。
-
-特性:
-  - 3D 球面曲面图（plot_surface + wireframe）
-  - jet/rainbow colormap（蓝→青→绿→黄→红）
-  - 标题含频率、θ 角度/范围信息
-  - 可设仰角/方位角视角
-  - colorbar 含 dB 标尺
-  - 输出 PNG buffer → 可直接嵌入 Excel
-
-注意: 当前 pipeline 未调用绘图函数（通过 PlotConfig 控制），
-      函数保留供后续启用。不要当作死代码删除。
+辐射方向图生成器
+================
+封装 renderer 模块，提供向后兼容的绘图函数 + 批量生成。
 """
 
 from __future__ import annotations
 
 import io
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
-import matplotlib
-matplotlib.use("Agg")  # 非交互式后端（PyInstaller 兼容）
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import cm
+
+from .chart_config import ChartConfig
+from .renderer import BaseRenderer, MatplotlibRenderer, CloudRenderer
+
+# 模块级默认渲染器（可通过 set_renderer 切换）
+_renderer: BaseRenderer = MatplotlibRenderer()
+
+
+def set_renderer(renderer: BaseRenderer):
+    """切换渲染引擎。"""
+    global _renderer
+    _renderer = renderer
+
+
+def get_renderer() -> BaseRenderer:
+    return _renderer
 
 
 # ---------------------------------------------------------------------------
-# 内部辅助
-# ---------------------------------------------------------------------------
-
-def _fig_to_png_buffer(fig, dpi: int) -> io.BytesIO:
-    """将 matplotlib figure 渲染为 PNG buffer，关闭 figure 释放内存。"""
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight",
-                facecolor="white", edgecolor="none")
-    buf.seek(0)
-    plt.close(fig)
-    return buf
-
-
-# ---------------------------------------------------------------------------
-# 主绘图函数
+# 向后兼容的独立绘图函数
 # ---------------------------------------------------------------------------
 
 def generate_3d_pattern(
-    theta_deg: np.ndarray,         # (n_theta,)  0-110°
-    phi_deg: np.ndarray,            # (n_phi,)    0-359°
-    gain_dbi: np.ndarray,           # (n_phi, n_theta)  总增益 dB
+    theta_deg: np.ndarray,
+    phi_deg: np.ndarray,
+    gain_dbi: np.ndarray,
     freq_mhz: float,
     *,
     elev: float = 30.0,
@@ -58,58 +45,12 @@ def generate_3d_pattern(
     title: Optional[str] = None,
     antenna_name: str = "",
 ) -> io.BytesIO:
-    """生成 3D 球面辐射方向图 PNG。
-
-    仿 EMQuest 风格 — 球面坐标系下绘制 Total Gain 曲面。
-    Theta 为极角 (0°=天顶)，Phi 为方位角。
-
-    Returns:
-        PNG buffer (BytesIO)，可直接嵌入 Excel。
-    """
-    # ---- 球面 → 直角坐标 ----
-    theta = np.deg2rad(theta_deg)
-    phi = np.deg2rad(phi_deg)
-    TH, PH = np.meshgrid(theta, phi)  # (n_phi, n_theta)
-
-    # 坐标转换: θ=极角, φ=方位角
-    # x = sinθ·cosφ, y = sinθ·sinφ, z = cosθ
-    R = np.abs(gain_dbi)
-    X = R * np.sin(TH) * np.cos(PH)
-    Y = R * np.sin(TH) * np.sin(PH)
-    Z = R * np.cos(TH)
-
-    # ---- 创建图形 ----
-    fig = plt.figure(figsize=figsize, dpi=dpi)
-    ax = fig.add_subplot(111, projection="3d")
-
-    # ---- 曲面 ----
-    norm = plt.Normalize(gain_dbi.min(), gain_dbi.max())
-    surf = ax.plot_surface(
-        X, Y, Z,
-        facecolors=cm.jet(norm(gain_dbi)),
-        rstride=1, cstride=1,
-        alpha=0.85, shade=True,
-        linewidth=0, antialiased=True,
+    """生成 3D 球面辐射方向图 PNG。委托给当前渲染器。"""
+    return _renderer.render_3d_pattern(
+        theta_deg, phi_deg, gain_dbi, freq_mhz,
+        elev=elev, azim=azim, dpi=dpi,
+        title=title or "", antenna_name=antenna_name,
     )
-
-    # ---- wireframe 叠加 (增强立体感) ----
-    # 稀疏采样避免过于密集
-    stride = max(1, min(len(phi_deg), len(theta_deg)) // 30)
-    ax.plot_wireframe(X, Y, Z, rstride=stride, cstride=stride,
-                      color="black", linewidth=0.3, alpha=0.3)
-
-    # ---- colorbar ----
-    mappable = cm.ScalarMappable(norm=norm, cmap=cm.jet)
-    mappable.set_array(gain_dbi)
-    cbar = fig.colorbar(mappable, ax=ax, shrink=0.6, aspect=20, pad=0.08)
-    cbar.set_label("Gain (dBi)", fontsize=8, labelpad=6)
-    cbar.ax.tick_params(labelsize=7)
-
-    # ---- 布局 ----
-    fig.tight_layout(pad=0.5)
-
-    # ---- 输出到 buffer ----
-    return _fig_to_png_buffer(fig, dpi)
 
 
 def generate_2d_polar_cut(
@@ -121,42 +62,11 @@ def generate_2d_polar_cut(
     dpi: int = 150,
     antenna_name: str = "",
 ) -> io.BytesIO:
-    """生成 2D 极坐标切面图。
-
-    Args:
-        angles_deg: 角度数组 (°)，通常为 theta。
-        gain_dbi:   增益 (dBi)，shape 与 angles_deg 相同。
-        freq_mhz:   频率 (MHz)。
-        cut_label:  切面标签（如 "φ=0°"）。
-        dpi:        输出分辨率。
-        antenna_name: 天线名称。
-
-    Returns:
-        PNG buffer。
-    """
-    theta_rad = np.deg2rad(angles_deg)
-    fig, ax = plt.subplots(subplot_kw={"projection": "polar"}, dpi=dpi, figsize=(7, 6))
-
-    ax.plot(theta_rad, gain_dbi, "b-", linewidth=1.2)
-    ax.fill(theta_rad, gain_dbi, alpha=0.1, color="blue")
-
-    ax.set_theta_zero_location("N")
-    ax.set_theta_direction(-1)
-    ax.set_thetagrids(range(0, 360, 30))
-
-    title_parts = []
-    if antenna_name:
-        title_parts.append(antenna_name)
-    title_parts.append(f"{freq_mhz:.0f} MHz")
-    if cut_label:
-        title_parts.append(cut_label)
-    ax.set_title(" — ".join(title_parts), fontsize=12, pad=18)
-
-    ax.set_ylabel("Gain (dBi)", fontsize=9, labelpad=20)
-    ax.grid(True, alpha=0.4)
-
-    fig.tight_layout(pad=1.5)
-    return _fig_to_png_buffer(fig, dpi)
+    """生成 2D 极坐标切面图。"""
+    return _renderer.render_2d_polar(
+        angles_deg, gain_dbi, freq_mhz,
+        cut_label=cut_label, dpi=dpi, antenna_name=antenna_name,
+    )
 
 
 def generate_2d_rectangular_cut(
@@ -169,27 +79,112 @@ def generate_2d_rectangular_cut(
     dpi: int = 150,
     antenna_name: str = "",
 ) -> io.BytesIO:
-    """生成 2D 直角坐标切面图。
+    """生成 2D 直角坐标切面图。"""
+    return _renderer.render_2d_rect(
+        angles_deg, gain_dbi, freq_mhz,
+        xlabel=xlabel, cut_label=cut_label, dpi=dpi,
+        antenna_name=antenna_name,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 批量生成
+# ---------------------------------------------------------------------------
+
+def generate_all_for_frequency(
+    theta_deg: np.ndarray,
+    phi_deg: np.ndarray,
+    gain_dbi: np.ndarray,
+    freq_mhz: float,
+    chart_config: ChartConfig,
+    *,
+    ar_linear: Optional[np.ndarray] = None,
+    antenna_name: str = "",
+) -> Dict[str, io.BytesIO]:
+    """根据 ChartConfig 为一个频点生成所有需要的图形。
+
+    Args:
+        theta_deg:    θ 角度数组 (°)，(n_theta,)
+        phi_deg:      φ 角度数组 (°)，(n_phi,)
+        gain_dbi:     总增益 (dB)，(n_phi, n_theta)
+        freq_mhz:     频率 (MHz)
+        chart_config: 图形配置
+        ar_linear:    轴比线性值，(n_phi, n_theta)，3D AR 需要
+        antenna_name: 天线名称
 
     Returns:
-        PNG buffer。
+        {"3d_gain": buf, "2d_polar_phi0": buf, "2d_rect_phi0": buf, ...}
     """
-    fig, ax = plt.subplots(dpi=dpi, figsize=(8, 5))
+    images: Dict[str, io.BytesIO] = {}
 
-    ax.plot(angles_deg, gain_dbi, "b-", linewidth=1.2)
-    ax.fill_between(angles_deg, gain_dbi, gain_dbi.min() - 5, alpha=0.08, color="blue")
+    # ── A 类: 3D 方向图 ──
+    if chart_config.pattern_3d_gain:
+        images["3d_gain"] = _renderer.render_3d_pattern(
+            theta_deg, phi_deg, gain_dbi, freq_mhz,
+            elev=chart_config.elev, azim=chart_config.azim,
+            dpi=chart_config.dpi,
+            title="3D Gain Pattern", antenna_name=antenna_name,
+            colormap="emquest",
+        )
 
-    ax.set_xlabel(xlabel, fontsize=10)
-    ax.set_ylabel("Gain (dBi)", fontsize=10)
-    ax.grid(True, alpha=0.3)
+    if chart_config.pattern_3d_eirp:
+        images["3d_eirp"] = _renderer.render_3d_pattern(
+            theta_deg, phi_deg, gain_dbi, freq_mhz,
+            elev=chart_config.elev, azim=chart_config.azim,
+            dpi=chart_config.dpi,
+            title="3D EIRP Pattern", antenna_name=antenna_name,
+            colormap="emquest",
+        )
 
-    title_parts = []
-    if antenna_name:
-        title_parts.append(antenna_name)
-    title_parts.append(f"{freq_mhz:.0f} MHz")
-    if cut_label:
-        title_parts.append(cut_label)
-    ax.set_title(" — ".join(title_parts), fontsize=12)
+    if chart_config.pattern_3d_ar and ar_linear is not None:
+        ar_db = 20.0 * np.log10(np.maximum(ar_linear, 1e-15))
+        images["3d_ar"] = _renderer.render_3d_pattern(
+            theta_deg, phi_deg, ar_db, freq_mhz,
+            elev=chart_config.elev, azim=chart_config.azim,
+            dpi=chart_config.dpi,
+            title="3D Axial Ratio", antenna_name=antenna_name,
+            colormap="emquest",
+        )
 
-    fig.tight_layout(pad=1.2)
-    return _fig_to_png_buffer(fig, dpi)
+    # ── C 类: 2D 切面图 ──
+    if chart_config.cut_2d_polar or chart_config.cut_2d_rect:
+        n_phi = len(phi_deg)
+        if n_phi > 0:
+            # φ=0° 切面
+            phi0_idx = 0
+            cut_gain = gain_dbi[phi0_idx, :]
+
+            if chart_config.cut_2d_polar:
+                images["2d_polar_phi0"] = _renderer.render_2d_polar(
+                    theta_deg, cut_gain, freq_mhz,
+                    cut_label="φ=0°", dpi=chart_config.dpi,
+                    antenna_name=antenna_name,
+                )
+
+            if chart_config.cut_2d_rect:
+                images["2d_rect_phi0"] = _renderer.render_2d_rect(
+                    theta_deg, cut_gain, freq_mhz,
+                    xlabel="Theta (deg)", cut_label="φ=0°",
+                    dpi=chart_config.dpi, antenna_name=antenna_name,
+                )
+
+            # φ=90° 切面
+            phi90_idx = min(n_phi // 4, n_phi - 1)
+            if n_phi >= 4:
+                cut_gain_90 = gain_dbi[phi90_idx, :]
+
+                if chart_config.cut_2d_polar:
+                    images["2d_polar_phi90"] = _renderer.render_2d_polar(
+                        theta_deg, cut_gain_90, freq_mhz,
+                        cut_label="φ=90°", dpi=chart_config.dpi,
+                        antenna_name=antenna_name,
+                    )
+
+                if chart_config.cut_2d_rect:
+                    images["2d_rect_phi90"] = _renderer.render_2d_rect(
+                        theta_deg, cut_gain_90, freq_mhz,
+                        xlabel="Theta (deg)", cut_label="φ=90°",
+                        dpi=chart_config.dpi, antenna_name=antenna_name,
+                    )
+
+    return images

@@ -37,6 +37,7 @@ from .exporter import export_results
 from .lag_config import LagConfig
 from .parser import MergedCSVParser
 from .plot_config import PlotConfig
+from .chart_config import ChartConfig
 from .report_exporter import export_full_report
 
 
@@ -125,11 +126,15 @@ def _process_one_frequency(
     do_extrapolate: bool = False,
     robust_peak: bool = False,
     needed_params: set = None,
+    extra_params: set = None,
+    chart_config: "ChartConfig" = None,
 ) -> Dict[str, Any]:
-    """处理单个频点。按模板列需求 (needed_params) 跳过不需要的参数。"""
+    """处理单个频点。按 needed_params（模板列）+ extra_params（用户额外）计算。"""
     theta_lm = raw["theta_logmag"]
     phi_lm = raw["phi_logmag"]
     need = needed_params or set()
+    extra = extra_params or set()
+    compute_set = need | extra  # 实际计算: 模板需求 + 用户额外
 
     need_extrap = do_extrapolate and theta_deg[-1] < 175
     if need_extrap:
@@ -143,23 +148,23 @@ def _process_one_frequency(
     row: Dict[str, Any] = {"frequency": freq}
 
     # Gain (always include if template has it)
-    if "gain" in need or "peak_eirp" in need or not need:
+    if "gain" in need or "peak_eirp" in compute_set or not need:
         row["gain"] = round(peak_dbi, 6)
 
     # Directivity
     directivity_dbi = None
-    if "directivity" in need or not need:
+    if "directivity" in compute_set or not need:
         directivity_dbi = compute_directivity(gain_linear, theta_rad)
         row["directivity"] = round(directivity_dbi, 6)
 
     # Efficiency
-    if "efficiency_pct" in need or "efficiency_db" in need or not need:
+    if "efficiency_pct" in need or "efficiency_db" in compute_set or not need:
         if directivity_dbi is None:
             directivity_dbi = compute_directivity(gain_linear, theta_rad)
         eff_pct, eff_db = compute_efficiency(peak_dbi, directivity_dbi)
-        if "efficiency_pct" in need or not need:
+        if "efficiency_pct" in compute_set or not need:
             row["efficiency_pct"] = round(eff_pct, 6)
-        if "efficiency_db" in need or not need:
+        if "efficiency_db" in compute_set or not need:
             row["efficiency_db"] = round(eff_db, 6)
 
     # TRP / NHPRP / Peak EIRP
@@ -167,7 +172,7 @@ def _process_one_frequency(
                    ("nhprp_45", lambda: compute_nhprp(gain_linear, theta_rad, 45.0)),
                    ("nhprp_30", lambda: compute_nhprp(gain_linear, theta_rad, 30.0)),
                    ("peak_eirp", lambda: compute_peak_eirp(gain_linear))]:
-        if ct in need or not need:
+        if ct in compute_set or not need:
             row[ct] = round(fn(), 2)
 
     # ---- Extended antenna parameters (NHPRP flex, PRP, ratios, boresight, averages) ----
@@ -177,30 +182,30 @@ def _process_one_frequency(
     nhprp_225 = compute_nhprp_flex(gain_linear, theta_rad, 22.5)
     nhprp_45_flex = compute_nhprp_flex(gain_linear, theta_rad, 45.0)
     nhprp_30_flex = compute_nhprp_flex(gain_linear, theta_rad, 30.0)
-    if "nhprp_225" in need or not need: row["nhprp_225"] = round(nhprp_225, 2)
+    if "nhprp_225" in compute_set or not need: row["nhprp_225"] = round(nhprp_225, 2)
 
     # TIS = TRP (同公式, 不同测量模式)
-    if "tis" in need or not need: row["tis"] = round(compute_trp(gain_linear, theta_rad), 2)
+    if "tis" in compute_set or not need: row["tis"] = round(compute_trp(gain_linear, theta_rad), 2)
     # NHPIS = NHPRP (同公式, 不同测量模式)
     for label, edge in [("nhpis_45", 45.0), ("nhpis_30", 30.0), ("nhpis_225", 22.5)]:
-        if label in need or not need: row[label] = round(compute_nhprp_flex(gain_linear, theta_rad, edge), 2)
+        if label in compute_set or not need: row[label] = round(compute_nhprp_flex(gain_linear, theta_rad, edge), 2)
     # Custom NHPRP/NHPIS angle
-    if "nhprp_custom" in need or not need: row["nhprp_custom"] = round(compute_nhprp_flex(gain_linear, theta_rad, 45.0), 2)
-    if "nhpis_custom" in need or not need: row["nhpis_custom"] = round(compute_nhprp_flex(gain_linear, theta_rad, 45.0), 2)
+    if "nhprp_custom" in compute_set or not need: row["nhprp_custom"] = round(compute_nhprp_flex(gain_linear, theta_rad, 45.0), 2)
+    if "nhpis_custom" in compute_set or not need: row["nhpis_custom"] = round(compute_nhprp_flex(gain_linear, theta_rad, 45.0), 2)
 
     uh_prp = compute_upper_hemisphere_prp(gain_linear, theta_rad)
     lh_prp = compute_lower_hemisphere_prp(gain_linear, theta_rad)
-    if "uh_prp" in need or not need: row["uh_prp"] = round(uh_prp, 2)
-    if "lh_prp" in need or not need: row["lh_prp"] = round(lh_prp, 2)
-    if "uh_pis" in need or not need: row["uh_pis"] = round(uh_prp, 2)
-    if "lh_pis" in need or not need: row["lh_pis"] = round(lh_prp, 2)
+    if "uh_prp" in compute_set or not need: row["uh_prp"] = round(uh_prp, 2)
+    if "lh_prp" in compute_set or not need: row["lh_prp"] = round(lh_prp, 2)
+    if "uh_pis" in compute_set or not need: row["uh_pis"] = round(uh_prp, 2)
+    if "lh_pis" in compute_set or not need: row["lh_pis"] = round(lh_prp, 2)
 
     prp_120 = compute_partial_prp(gain_linear, theta_rad, 0, 120)
-    if "prp_120" in need or not need: row["prp_120"] = round(prp_120, 2)
-    if "pis_120" in need or not need: row["pis_120"] = round(prp_120, 2)
+    if "prp_120" in compute_set or not need: row["prp_120"] = round(prp_120, 2)
+    if "pis_120" in compute_set or not need: row["pis_120"] = round(prp_120, 2)
 
-    ratio_need = need & {"nhprp45_ratio", "nhprp30_ratio", "nhprp225_ratio", "nhpis45_ratio",
-                          "nhpis30_ratio", "nhpis225_ratio", "uh_ratio", "lh_ratio"}
+    ratio_need = compute_set & {"nhprp45_ratio", "nhprp30_ratio", "nhprp225_ratio", "nhpis45_ratio",
+                                  "nhpis30_ratio", "nhpis225_ratio", "uh_ratio", "lh_ratio"}
     if ratio_need or not need:
         trp_val = compute_trp(gain_linear, theta_rad)
         tis_val = trp_val  # same formula
@@ -210,22 +215,22 @@ def _process_one_frequency(
             ("nhpis30", nhprp_30_flex, tis_val), ("nhpis225", nhprp_225, tis_val),
             ("uh", uh_prp, trp_val), ("lh", lh_prp, trp_val)]:
             rdb, rpct = compute_prp_trp_ratio(prp_val, ref_val)
-            if f"{ratio_key}_ratio_db" in need or not need: row[f"{ratio_key}_ratio_db"] = round(rdb, 2)
-            if f"{ratio_key}_ratio_pct" in need or not need: row[f"{ratio_key}_ratio_pct"] = round(rpct, 2)
+            if f"{ratio_key}_ratio_db" in compute_set or not need: row[f"{ratio_key}_ratio_db"] = round(rdb, 2)
+            if f"{ratio_key}_ratio_pct" in compute_set or not need: row[f"{ratio_key}_ratio_pct"] = round(rpct, 2)
 
-    bs_need = need & {"boresight_phi", "boresight_theta"}
+    bs_need = compute_set & {"boresight_phi", "boresight_theta"}
     if bs_need or not need:
         bs_theta, bs_phi = compute_boresight(gain_linear, theta_deg, phi_angles_deg)
-        if "boresight_theta" in need or not need: row["boresight_theta"] = round(bs_theta, 1)
-        if "boresight_phi" in need or not need: row["boresight_phi"] = round(bs_phi, 1)
+        if "boresight_theta" in compute_set or not need: row["boresight_theta"] = round(bs_theta, 1)
+        if "boresight_phi" in compute_set or not need: row["boresight_phi"] = round(bs_phi, 1)
 
-    if "max_power" in need or not need: row["max_power"] = round(compute_peak_eirp(gain_linear), 2)
-    if "min_power" in need or not need: row["min_power"] = round(compute_min_power_dbm(gain_linear), 2)
-    if "avg_gain" in need or not need: row["avg_gain"] = round(compute_average_gain_db(gain_linear), 2)
-    if "avg_power" in need or not need: row["avg_power"] = round(compute_average_power_dbm(gain_linear), 2)
+    if "max_power" in compute_set or not need: row["max_power"] = round(compute_peak_eirp(gain_linear), 2)
+    if "min_power" in compute_set or not need: row["min_power"] = round(compute_min_power_dbm(gain_linear), 2)
+    if "avg_gain" in compute_set or not need: row["avg_gain"] = round(compute_average_gain_db(gain_linear), 2)
+    if "avg_power" in compute_set or not need: row["avg_power"] = round(compute_average_power_dbm(gain_linear), 2)
 
     # Power ratios + Beamwidth
-    if any(c in need for c in ("max_min_ratio", "max_avg_ratio", "min_avg_ratio",
+    if any(c in compute_set for c in ("max_min_ratio", "max_avg_ratio", "min_avg_ratio",
                                  "theta_bw", "phi_bw", "front_back_ratio")) or not need:
         max_p = float(np.max(gain_linear)); min_p = float(np.min(gain_linear[gain_linear>1e-15]) if np.any(gain_linear>1e-15) else 1e-15)
         avg_p = float(np.mean(gain_linear))
@@ -234,8 +239,8 @@ def _process_one_frequency(
         bw = compute_beamwidth(gain_linear, theta_deg, phi_angles_deg)
         for k, v in bw.items(): row[k] = v if v is not None else 0
 
-    # Axial Ratio (仅当有 Phase 数据且模板需要 AR 列)
-    ar_need = need & {"axial_ratio", "ar_single", "ar_range"}
+    # Axial Ratio (仅当有 Phase 数据且需要 AR 列)
+    ar_need = compute_set & {"axial_ratio", "ar_single", "ar_range"}
     if ar_need or not need:
         tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
         if tp is not None and pp is not None:
@@ -256,7 +261,7 @@ def _process_one_frequency(
                         for (lo, hi), val in [(r, compute_ar_range(ar, theta_deg, r[0], r[1])) for r in ar_ranges]:
                             row[f"ar_range_{lo}_{hi}"] = round(val, 6)
                     # 向后兼容的 axial_ratio 字段
-                    if "axial_ratio" in need or not need:
+                    if "axial_ratio" in compute_set or not need:
                         row["axial_ratio"] = round(float(np.mean(ar[0, :5])), 6)
             except Exception as e:
                 row["axial_ratio_error"] = str(e)
@@ -270,6 +275,31 @@ def _process_one_frequency(
     if ranges:
         for (lo, hi), val in compute_lag_ranges(gain_linear, theta_deg, ranges).items():
             row[f"lag_range_{lo}_{hi}"] = round(val, 6)
+
+    # ── 图形生成 (A/C 类: 每频点 PNG) ──
+    if chart_config is not None and chart_config.has_any_pattern_or_cut:
+        try:
+            from .plotter import generate_all_for_frequency
+            n_phi = phi_lm.shape[0]
+            phi_angles = np.linspace(0, 360, n_phi, endpoint=False)
+            # AR 线性值（如果有）
+            ar_lin = None
+            if chart_config.pattern_3d_ar and "axial_ratio" not in str(row.get("axial_ratio_error", "")):
+                # 尝试从已计算的 AR 获取
+                tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
+                if tp is not None and pp is not None:
+                    ar = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
+                    if ar is not None:
+                        ar_lin = ar
+            images = generate_all_for_frequency(
+                theta_deg, phi_angles, 10.0 * np.log10(np.maximum(gain_linear, 1e-15)),
+                freq, chart_config, ar_linear=ar_lin,
+                antenna_name="",
+            )
+            if images:
+                row["_images"] = images
+        except Exception:
+            pass  # 图形生成失败不阻塞数据处理
 
     return row
 
@@ -454,6 +484,8 @@ def _load_and_compute(
     extrapolate_theta: bool,
     robust_peak: bool,
     parallel: int,
+    extra_params: set = None,
+    chart_config: "ChartConfig" = None,
     cancel_callback=None,
     progress_callback=None,
     log_callback=None,
@@ -475,7 +507,7 @@ def _load_and_compute(
             break
         raw = task_ds.read_sections(csv_idx)
         theta_list = list(task_ds.theta_angles)
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params))
+        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config))
         if (i + 1) % 20 == 0 or (i + 1) == total:
             _report(progress_callback, i + 1, progress_max, f"读取中 {i + 1}/{total}")
 
@@ -512,12 +544,12 @@ def _run_compute_serial(
     cancel_callback, progress_callback,
 ):
     """串行逐频点计算（单进程或 parallel=1）。"""
-    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams) in enumerate(compute_tasks):
+    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg) in enumerate(compute_tasks):
         if cancel_callback and cancel_callback():
             break
         try:
             theta_arr = np.array(theta_list)
-            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams)
+            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg)
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
@@ -560,7 +592,9 @@ def run_pipeline(
     trim_start: int = 0,
     trim_end: int = 0,
     chart_config: Optional[Dict[str, bool]] = None,
+    chart_config_obj: Optional[ChartConfig] = None,
     robust_peak: bool = False,
+    extra_params: Optional[set] = None,
     parallel: int = 1,
     cancel_callback: Optional[Callable[[], bool]] = None,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
@@ -620,7 +654,8 @@ def run_pipeline(
     tasks = _collect_tasks(sheets_info, datasource, datasource_map, freq_source, trim_start, trim_end, log_callback)
     sheet_results = _load_and_compute(
         tasks, sheets_info, extrapolate_theta, robust_peak, parallel,
-        cancel_callback, progress_callback, log_callback,
+        extra_params=extra_params, chart_config=chart_config_obj,
+        cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,
     )
     _close_datasources(use_multi_ds, datasource, datasource_map)
 
@@ -637,6 +672,7 @@ def run_pipeline(
         pattern_images=None,
         sheets_info=sheets_info,
         chart_config=chart_config or {},
+        chart_config_obj=chart_config_obj,
         log_callback=log_callback,
     )
     _report(progress_callback, progress_max - 1, progress_max, "Excel 写入完成")
@@ -715,11 +751,11 @@ def _compute_chunk(
     """
     import numpy as np
     results = []
-    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams in compute_tasks:
+    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg in compute_tasks:
         try:
             theta_raw = np.array(theta_list)
             row = _process_one_frequency(raw, freq, theta_raw, lag_cfg,
-                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams)
+                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg)
             results.append((sheet_name, row))
         except Exception as e:
             results.append((sheet_name, {"frequency": freq, "_error": str(e)}))

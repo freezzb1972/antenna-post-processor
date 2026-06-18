@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 from PySide6.QtCore import QObject, Signal
 from .lag_config import LagConfig
 from .plot_config import PlotConfig
+from .chart_config import ChartConfig
 from .pipeline import run_pipeline, run_batch_pipeline
 from .datasource import DataSource
 
@@ -39,6 +40,8 @@ class ProcessingWorker(QObject):
         chart_eff: bool = True,
         chart_lag: bool = True,
         robust_peak: bool = False,
+        extra_params: Optional[set] = None,
+        chart_config_obj: Optional[ChartConfig] = None,
     ):
         super().__init__()
         self.csv_path = csv_path
@@ -56,6 +59,8 @@ class ProcessingWorker(QObject):
         self.chart_eff = chart_eff
         self.chart_lag = chart_lag
         self.robust_peak = robust_peak
+        self.extra_params = extra_params
+        self.chart_config_obj = chart_config_obj
         self._cancelled = False
 
     def cancel(self):
@@ -82,6 +87,8 @@ class ProcessingWorker(QObject):
                 trim_end=self.trim_end,
                 chart_config={"eff": self.chart_eff, "lag": self.chart_lag},
                 robust_peak=self.robust_peak,
+                extra_params=self.extra_params,
+                chart_config_obj=self.chart_config_obj,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
                 log_callback=self._on_log,

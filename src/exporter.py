@@ -136,6 +136,7 @@ def export_results(
     chart_config: Optional[Dict[str, bool]] = None,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
     log_callback: Optional[Callable[[str], None]] = None,
+    **kwargs,
 ) -> str:
     """基于模板填充数据 + 嵌入图片。
 
@@ -265,6 +266,12 @@ def export_results(
         chart_config = {}
     _add_charts(wb, sheet_results, info_map, chart_config, log_callback)
 
+    # ---- 嵌入 A/C 类图形（PNG 图片） ----
+    from .chart_config import ChartConfig
+    chart_obj = kwargs.get("chart_config_obj")
+    if chart_obj is not None and chart_obj.has_any_pattern_or_cut:
+        _embed_pattern_images(wb, sheet_results, info_map, chart_obj, log_callback)
+
     # 保存
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     wb.save(output_path)
@@ -273,7 +280,9 @@ def export_results(
 
 
 def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
-    """在对应的 sheet 中嵌入图表。根据 chart_config 控制生成哪些图。"""
+    """在对应的 sheet 中嵌入图表。优先使用 ChartConfig 对象，fallback 到旧 dict。"""
+    from .chart_config import ChartConfig
+
     for sheet_name, rows in sheet_results.items():
         if not rows or sheet_name not in wb.sheetnames:
             continue
@@ -294,22 +303,162 @@ def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
 
         chart_offset = 0
 
-        # Efficiency vs Frequency — 受 chart_config["eff"] 控制
-        if chart_config.get("eff", True):
+        # 判断使用 ChartConfig 还是旧 dict
+        if isinstance(chart_config, ChartConfig):
+            cc = chart_config
+            eff_on = cc.chart_eff_freq
+            gain_on = cc.chart_gain_freq
+            dir_on = cc.chart_dir_freq
+            lag_on = cc.chart_lag_freq
+            trp_on = cc.chart_trp_freq
+            trp_nh_on = cc.chart_trp_nhprp
+            ar_on = cc.chart_ar_freq
+        else:
+            cc = None
+            eff_on = chart_config.get("eff", True)
+            gain_on = chart_config.get("gain", False)
+            dir_on = chart_config.get("dir", False)
+            lag_on = chart_config.get("lag", True)
+            trp_on = chart_config.get("trp", False)
+            trp_nh_on = chart_config.get("trp_nhprp", False)
+            ar_on = chart_config.get("ar", False)
+
+        # Efficiency vs Frequency
+        if eff_on:
             eff_col = next((c.col_index for c in info.columns if c.col_type == "efficiency_pct"), None)
             if eff_col is not None:
                 _add_scatter_chart(ws, "Efficiency vs Frequency", freq_col, eff_col,
                                   data_start, data_end, n_rows + 5 + chart_offset, freq_col + 2)
                 chart_offset += 18
 
-        # Gain at Theta range vs Frequency — 受 chart_config["lag"] 控制
-        if chart_config.get("lag", True):
+        # Peak Gain vs Frequency
+        if gain_on:
+            gain_col = next((c.col_index for c in info.columns if c.col_type == "gain"), None)
+            if gain_col is not None:
+                _add_scatter_chart(ws, "Peak Gain vs Frequency", freq_col, gain_col,
+                                  data_start, data_end, n_rows + 5 + chart_offset, gain_col + 2)
+                chart_offset += 18
+
+        # Directivity vs Frequency
+        if dir_on:
+            dir_col = next((c.col_index for c in info.columns if c.col_type == "directivity"), None)
+            if dir_col is not None:
+                _add_scatter_chart(ws, "Directivity vs Frequency", freq_col, dir_col,
+                                  data_start, data_end, n_rows + 5 + chart_offset, dir_col + 2)
+                chart_offset += 18
+
+        # Gain at Theta range vs Frequency
+        if lag_on:
             lag_col = next((c.col_index for c in info.columns if c.col_type == "lag_range"), None)
             if lag_col is not None:
-                _add_scatter_chart(ws, "Gain at Theta=0~70 vs Frequency", freq_col, lag_col,
+                _add_scatter_chart(ws, "Gain at Theta Range vs Frequency", freq_col, lag_col,
                                   data_start, data_end, n_rows + 5 + chart_offset, lag_col + 2,
                                   y_step=1.0)
                 chart_offset += 18
+
+        # TRP vs Frequency
+        if trp_on:
+            trp_col = next((c.col_index for c in info.columns if c.col_type == "trp"), None)
+            if trp_col is not None:
+                _add_scatter_chart(ws, "TRP vs Frequency", freq_col, trp_col,
+                                  data_start, data_end, n_rows + 5 + chart_offset, trp_col + 2)
+                chart_offset += 18
+
+        # TRP + NHPRP 多线图
+        if trp_nh_on:
+            trp_col2 = next((c.col_index for c in info.columns if c.col_type == "trp"), None)
+            nh45_col = next((c.col_index for c in info.columns if c.col_type == "nhprp_45"), None)
+            nh30_col = next((c.col_index for c in info.columns if c.col_type == "nhprp_30"), None)
+            if trp_col2 is not None:
+                _add_multi_line_chart(ws, "TRP / NHPRP vs Frequency", freq_col,
+                                     [trp_col2, nh45_col, nh30_col],
+                                     ["TRP", "NHPRP ±45°", "NHPRP ±30°"],
+                                     data_start, data_end,
+                                     n_rows + 5 + chart_offset, trp_col2 + 2)
+                chart_offset += 18
+
+        # AR vs Frequency
+        if ar_on:
+            ar_col = next((c.col_index for c in info.columns if c.col_type == "ar_single"), None)
+            if ar_col is not None:
+                _add_scatter_chart(ws, "Axial Ratio vs Frequency", freq_col, ar_col,
+                                  data_start, data_end, n_rows + 5 + chart_offset, ar_col + 2)
+                chart_offset += 18
+
+
+def _add_multi_line_chart(ws, title, x_col, y_cols, series_names,
+                         data_start, data_end, anchor_row, anchor_col):
+    """添加多线散点图到工作表。"""
+    from openpyxl.chart import ScatterChart, Reference, Series
+    from openpyxl.utils import get_column_letter
+
+    chart = ScatterChart()
+    chart.title = title
+    chart.style = 2
+    chart.width = 20
+    chart.height = 12
+
+    x_letter = get_column_letter(x_col)
+    x_values = Reference(ws, min_col=x_col, min_row=data_start,
+                         max_row=data_end, max_col=x_col)
+
+    colors = ["0000CC", "CC0000", "00AA00", "CC8800"]
+    for i, (y_col, name) in enumerate(zip(y_cols, series_names)):
+        if y_col is None:
+            continue
+        y_values = Reference(ws, min_col=y_col, min_row=data_start,
+                             max_row=data_end, max_col=y_col)
+        series = Series(y_values, x_values, title=name)
+        series.marker.symbol = ['circle', 'diamond', 'square', 'triangle'][i % 4]
+        series.marker.size = 4
+        series.graphicalProperties.line.width = 18000
+        chart.series.append(series)
+
+    chart.x_axis.title = 'Frequency (MHz)'
+    chart.x_axis.numFmt = '0'
+    chart.y_axis.title = 'dBm'
+
+    anchor_cell = f"{get_column_letter(anchor_col)}{anchor_row}"
+    ws.add_chart(chart, anchor_cell)
+    return chart
+
+
+def _embed_pattern_images(wb, sheet_results, info_map, chart_config, log_callback=None):
+    """嵌入 A/C 类逐频点 PNG 图形到 Excel。"""
+    from openpyxl.drawing.image import Image as XLImage
+    from openpyxl.utils import get_column_letter
+
+    for sheet_name, rows in sheet_results.items():
+        if not rows or sheet_name not in wb.sheetnames:
+            continue
+        ws = wb[sheet_name]
+        info = info_map.get(sheet_name)
+        if info is None:
+            continue
+
+        max_col = max((c.col_index for c in info.columns), default=10)
+        image_col = max_col + 3
+        image_row = info.data_start_row
+
+        for row_data in rows:
+            images = row_data.get("_images", {})
+            if not images:
+                continue
+
+            for img_key, buf in images.items():
+                try:
+                    buf.seek(0)
+                    img = XLImage(buf)
+                    img.width = 300
+                    img.height = 225
+                    cell = f"{get_column_letter(image_col)}{image_row}"
+                    ws.add_image(img, cell)
+                    ws.row_dimensions[image_row].height = 170
+                    image_row += 22
+                except Exception as e:
+                    if log_callback:
+                        log_callback(f"  ⚠ 图片嵌入失败 ({img_key}): {e}")
+            break  # 每 sheet 只嵌入第一个频点的图（避免 Excel 过大）
 
 
 def _add_scatter_chart(ws, title, x_col, y_col, data_start, data_end,

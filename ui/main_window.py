@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (
 from i18n.i18n_manager import I18nManager
 from src.lag_config import LagConfig, PRESET_AUTOMOTIVE
 from src.plot_config import PlotConfig
+from src.chart_config import ChartConfig
 from src.worker import ProcessingWorker
 from ui.compiled.ui_main_window import Ui_MainWindow
 from ui.theme_manager import ThemeManager
@@ -97,6 +98,11 @@ class MainWindow(QMainWindow):
         self._file_list_widget: Optional[QListWidget] = None
         self._match_table: Optional[QTableWidget] = None
         self._lbl_match_status: Optional[QLabel] = None
+        self._required_params: set = set()   # 用户确认的报告必需参数
+        self._extra_params: set = set()      # 用户额外选择的计算参数
+        self._nh_edge_deg: float = 45.0      # NHPRP/NHPIS 自定义地平线边界角
+        self._chart_config_required = None   # ChartConfig: 报告需要
+        self._chart_config_extra = None      # ChartConfig: 额外(full_report)
 
         # ---- 初始化 ----
         self._init_theme_selector()
@@ -277,10 +283,9 @@ class MainWindow(QMainWindow):
         ov_layout.setSpacing(3)
 
         params = [
-            ("📡", self.tr("无源参数"), self.tr("Gain, Directivity, Efficiency")),
-            ("📏", self.tr("LAG 参数"), self.tr("单角度 + 角度范围平均增益")),
-            ("🔄", self.tr("轴比参数 (AR)"), self.tr("单角度 + 范围 AR（需相位数据）")),
-            ("📶", self.tr("有源参数"), self.tr("TRP, NHPRP ±45°, NHPRP ±30°")),
+            ("📡", self.tr("无源天线参数"), self.tr("Gain, Directivity, Efficiency, LAG, AR, 波束, 功率统计")),
+            ("📶", self.tr("有源发射 TRP"), self.tr("TRP, Peak EIRP, NHPRP, 半球 PRP, 比率")),
+            ("📻", self.tr("有源接收 TIS"), self.tr("TIS, NHPIS, 半球 PIS, 比率")),
         ]
         for icon, name, desc in params:
             row = QHBoxLayout()
@@ -349,16 +354,55 @@ class MainWindow(QMainWindow):
 
     def _show_calc_params_dialog(self):
         from ui.dialogs import CalcParamsDialog
-        CalcParamsDialog(self).exec()
+        dlg = CalcParamsDialog(self)
+        # 传递模板自动识别的参数
+        tp = self._get_template_params()
+        if tp:
+            dlg.set_template_params(tp)
+        if dlg.exec():
+            # 状态由对话框在 _on_accept 中直接写入 self._mw
+            pass
+
+    def _get_template_params(self) -> set:
+        """读取模板，提取所有 Sheet 的列类型集合。"""
+        tp = self.ui.editTemplatePath.text().strip()
+        if not tp or not Path(tp).exists():
+            return set()
+        try:
+            from src.excel_reader import read_template
+            sheets = read_template(tp)
+            params = set()
+            for si in sheets:
+                for c in si.columns:
+                    params.add(c.col_type)
+            return params - {"unknown", "frequency"}
+        except Exception:
+            return set()
 
     def _show_plot_config_dialog(self):
         from ui.dialogs import PlotConfigDialog
-        PlotConfigDialog(self).exec()
+        from src.chart_config import ChartConfig
+
+        # 首次打开时，从模板自动检测图形需求
+        if self._chart_config_required is None:
+            tp = self.ui.editTemplatePath.text().strip()
+            if tp and Path(tp).exists():
+                try:
+                    self._chart_config_required = ChartConfig.from_template(tp)
+                except Exception:
+                    self._chart_config_required = ChartConfig()
+            else:
+                self._chart_config_required = ChartConfig()
+        if self._chart_config_extra is None:
+            self._chart_config_extra = ChartConfig()
+
+        dlg = PlotConfigDialog(self)
+        dlg.exec()
 
     def _on_help(self):
-        import webbrowser, os
-        guide = os.path.join(os.path.dirname(__file__), "..", "USER_GUIDE.html")
-        if os.path.exists(guide): webbrowser.open(f"file://{os.path.abspath(guide)}")
+        from ui.dialogs import HelpDialog
+        dlg = HelpDialog(self)
+        dlg.exec()
 
     def _on_tool_convert(self):
         path, _ = QFileDialog.getOpenFileName(self, self.tr("选择 Raw CSV 文件"), "",
@@ -935,6 +979,18 @@ class MainWindow(QMainWindow):
         self.ui.lblProgressMsg.setText(self.tr("启动中..."))
 
         self._thread = QThread(self)
+        # 合并图表配置（报告需要 + 额外）
+        full_chart_config = None
+        if self._chart_config_required is not None or self._chart_config_extra is not None:
+            req = self._chart_config_required or ChartConfig()
+            xtr = self._chart_config_extra or ChartConfig()
+            full_chart_config = req.merge(xtr)
+            if hasattr(plot_config, 'save_png_folder'):
+                png_dir = plot_config.save_png_folder
+            else:
+                png_dir = str(Path(output_dir) / "png") if self.ui.checkSavePng.isChecked() else None
+            full_chart_config.save_png_folder = png_dir
+
         self._worker = ProcessingWorker(
             datasource=datasource,
             datasource_map=datasource_map,
@@ -950,6 +1006,8 @@ class MainWindow(QMainWindow):
             chart_eff=self._check_chart_eff.isChecked(),
             chart_lag=self._check_chart_lag.isChecked(),
             robust_peak=self._check_robust_peak.isChecked(),
+            extra_params=self._extra_params if self._extra_params else None,
+            chart_config_obj=full_chart_config,
         )
         self._worker.moveToThread(self._thread)
 
@@ -1057,28 +1115,115 @@ class MainWindow(QMainWindow):
         self._log(self.tr(f"📊 参数表格已更新: {len(keys)} 列 × {len(first_sheet)} 行"))
 
     def _populate_charts(self, results):
-        """在图形展示Tab生成 Matplotlib 图表。"""
+        """在图形展示 Tab 动态渲染图表：B 类曲线 + A/C 类已生成图像。"""
         vtab = self.ui.vTabCharts
         while vtab.count():
             item = vtab.takeAt(0)
             if item.widget(): item.widget().deleteLater()
 
         if not results: return
+
+        import matplotlib
+        matplotlib.use('QtAgg')
+        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+        from matplotlib.figure import Figure
+
+        # 收集所有 results 中的图像
+        all_images = {}  # freq_mhz -> {img_key: BytesIO}
         for sn, rows in results.items():
             if not rows: continue
+            for r in rows:
+                freq = r.get("frequency", 0)
+                imgs = r.get("_images", {})
+                if imgs:
+                    all_images[freq] = imgs
+
+        # ── B 类: 频点曲线（Matplotlib 动态绘制） ──
+        for sn, rows in results.items():
+            if not rows: continue
+            if len(rows) < 2: continue
             freqs = [r.get("frequency", 0) for r in rows]
-            # Gain@0-70 曲线
-            lag_keys = [k for k in rows[0].keys() if k.startswith("lag_range_")]
-            if lag_keys:
-                lag_vals = [r.get(lag_keys[0], 0) or 0 for r in rows]
-                self._add_result_chart(vtab, f"{sn}: Gain at Theta range vs Freq",
-                    freqs, lag_vals, "Frequency (MHz)", "Gain (dB)", 'b')
-            # Efficiency 曲线
+
+            # Efficiency vs Freq
             if "efficiency_pct" in rows[0]:
                 eff_vals = [r.get("efficiency_pct", 0) or 0 for r in rows]
                 self._add_result_chart(vtab, f"{sn}: Efficiency vs Freq",
                     freqs, eff_vals, "Frequency (MHz)", "Efficiency (%)", 'g')
-            break  # 只展示第一个 sheet
+
+            # Peak Gain vs Freq
+            if "gain" in rows[0]:
+                gain_vals = [r.get("gain", 0) or 0 for r in rows]
+                self._add_result_chart(vtab, f"{sn}: Peak Gain vs Freq",
+                    freqs, gain_vals, "Frequency (MHz)", "Gain (dBi)", 'b')
+
+            # TRP vs Freq
+            if "trp" in rows[0]:
+                trp_vals = [r.get("trp", -999) or -999 for r in rows]
+                self._add_result_chart(vtab, f"{sn}: TRP vs Freq",
+                    freqs, trp_vals, "Frequency (MHz)", "TRP (dBm)", 'r')
+
+            # Directivity vs Freq
+            if "directivity" in rows[0]:
+                dir_vals = [r.get("directivity", 0) or 0 for r in rows]
+                self._add_result_chart(vtab, f"{sn}: Directivity vs Freq",
+                    freqs, dir_vals, "Frequency (MHz)", "Directivity (dBi)", 'm')
+
+            break  # 只展示第一个 sheet 的 B 类曲线
+
+        # ── A/C 类: 逐频点图像（显示第一个频点的图） ──
+        if all_images:
+            # 频点选择控件
+            freq_list = sorted(all_images.keys())
+            freq_row = QHBoxLayout()
+            freq_row.addWidget(QLabel(self.tr("频点:")))
+            freq_combo = QComboBox()
+            for f in freq_list:
+                freq_combo.addItem(f"{f:.1f} MHz", f)
+            freq_row.addWidget(freq_combo)
+            freq_row.addStretch()
+            vtab.addLayout(freq_row)
+
+            # 图像展示容器
+            img_container = QWidget()
+            img_layout = QVBoxLayout(img_container)
+            vtab.addWidget(img_container, 1)
+
+            def _show_images_for_freq(freq_mhz):
+                # 清除旧图
+                while img_layout.count():
+                    child = img_layout.takeAt(0)
+                    if child.widget(): child.widget().deleteLater()
+
+                imgs = all_images.get(freq_mhz, {})
+                if not imgs:
+                    lbl = QLabel(self.tr("此频点无图形"))
+                    img_layout.addWidget(lbl)
+                    return
+
+                # 每个图用 matplotlib 渲染到 canvas
+                for img_key in sorted(imgs.keys()):
+                    buf = imgs[img_key]
+                    buf.seek(0)
+                    # 将 PNG buffer 显示为 QLabel pixmap
+                    from PySide6.QtGui import QPixmap
+                    from PySide6.QtCore import QByteArray
+                    pixmap = QPixmap()
+                    pixmap.loadFromData(buf.read())
+                    if not pixmap.isNull():
+                        scaled = pixmap.scaled(450, 350,
+                            Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        lbl = QLabel()
+                        lbl.setPixmap(scaled)
+                        lbl.setAlignment(Qt.AlignCenter)
+                        img_layout.addWidget(lbl)
+                    buf.seek(0)
+
+            freq_combo.currentIndexChanged.connect(
+                lambda idx: _show_images_for_freq(freq_combo.itemData(idx)))
+            if freq_list:
+                _show_images_for_freq(freq_list[0])
+        else:
+            vtab.addWidget(QLabel(self.tr("（未生成图形 — 请在图形配置中启用）")))
 
     def _add_result_chart(self, parent_layout, title, x, y, xlabel, ylabel, color):
         """添加一个 matplotlib 图表到布局。"""

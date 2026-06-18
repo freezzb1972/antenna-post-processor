@@ -215,17 +215,23 @@ def check_g5b_dialog_state() -> List[str]:
     if d.minimumWidth() < 500:
         errors.append(f"DataSourceDialog: minWidth={d.minimumWidth()} too small")
 
-    # 计算参数对话框 — 复选框状态验证
+    # 计算参数对话框 — 复选框状态验证（双列结构）
     from ui.dialogs import CalcParamsDialog
     d2 = CalcParamsDialog(w)
-    if not hasattr(d2, '_param_checkboxes'):
-        errors.append("CalcParamsDialog: _param_checkboxes not found")
+    if not hasattr(d2, '_left_checkboxes') or not hasattr(d2, '_right_checkboxes'):
+        errors.append("CalcParamsDialog: _left_checkboxes or _right_checkboxes not found")
     else:
-        for key, cb in d2._param_checkboxes.items():
+        for key, cb in d2._left_checkboxes.items():
             if not cb.isEnabled():
-                errors.append(f"CalcParamsDialog: checkbox '{key}' is DISABLED")
-            if not cb.isChecked():
-                errors.append(f"CalcParamsDialog: checkbox '{key}' is UNCHECKED")
+                errors.append(f"CalcParamsDialog: left checkbox '{key}' is DISABLED")
+        for key, cb in d2._right_checkboxes.items():
+            if not cb.isEnabled():
+                errors.append(f"CalcParamsDialog: right checkbox '{key}' is DISABLED")
+        # 验证双列有内容
+        if len(d2._left_checkboxes) == 0:
+            errors.append("CalcParamsDialog: _left_checkboxes is empty (should have params)")
+        if len(d2._right_checkboxes) == 0:
+            errors.append("CalcParamsDialog: _right_checkboxes is empty (should have params)")
 
     return errors
 
