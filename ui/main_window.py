@@ -673,6 +673,30 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 self, self.tr("选择 V-pol RSP 校准文件 (Theta 分量)"), "",
                 self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
 
+        if (rsp_h_path or rsp_v_path) and realimag_files:
+            # RSP 频率覆盖检查: 仅对需转换的 aborted 文件
+            from src.raw_converter import parse_rsp_csv, batch_check_rsp_coverage
+            rsp_h = parse_rsp_csv(rsp_h_path) if rsp_h_path else {}
+            rsp_v = parse_rsp_csv(rsp_v_path) if rsp_v_path else {}
+            cov = batch_check_rsp_coverage(realimag_files, rsp_h, rsp_v, only_fmt='aborted')
+            if not cov.ok:
+                warn_text = (
+                    self.tr("RSP 校准文件频率范围:\n"
+                            f"  H-pol: {cov.rsp_h_bounds}\n"
+                            f"  V-pol: {cov.rsp_v_bounds}\n\n"
+                            "以下实部/虚部格式文件频率超出 RSP 范围:\n") +
+                    "\n".join(cov.warnings[:10]) +
+                    ("\n..." if len(cov.warnings) > 10 else "") +
+                    self.tr("\n\n超出部分将使用 RSP 边界值外推。\n"
+                            "建议确保外推误差在可接受范围内。")
+                )
+                reply = QMessageBox.warning(
+                    self, self.tr("⚠ RSP 频率范围不足"),
+                    warn_text,
+                    QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Cancel)
+                if reply != QMessageBox.Ok:
+                    return
+
         # Step 5: 选择输出目录
         out_dir = QFileDialog.getExistingDirectory(
             self, self.tr("选择输出目录"), str(Path(paths[0]).parent))
