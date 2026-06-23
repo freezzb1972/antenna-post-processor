@@ -124,6 +124,7 @@
       "_file_list_widget",
       "_lag_scroll",
       "_lbl_match_status",
+      "_lbl_naming_mode",
       "_match_table",
       "_thread",
       "_cmb_naming_mode"

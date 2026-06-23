@@ -114,6 +114,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._file_list_widget: Optional[QTableWidget] = None
         self._match_table: Optional[QTableWidget] = None
         self._lbl_match_status: Optional[QLabel] = None
+        self._lbl_naming_mode: Optional[QLabel] = None
+        self._cmb_naming_mode: Optional[QComboBox] = None
         self._required_params: set = set()   # 用户确认的报告必需参数
         self._extra_params: set = set()      # 用户额外选择的计算参数
         self._test_mode: int = 0             # 0=passive, 1=TRP, 2=TIS
@@ -300,17 +302,19 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._lbl_match_status.setStyleSheet("padding: 2px 0;")
         match_row.addWidget(self._btn_auto_match)
         match_row.addWidget(self._lbl_match_status)
-        match_row.addStretch()
-        # 工作表命名选项
-        match_row.addWidget(QLabel(self.tr("工作表名:")))
+        match_row.addSpacing(12)
+        # 工作表命名选项 — 紧跟在匹配按钮后面，stretch 之前
+        self._lbl_naming_mode = QLabel(self.tr("工作表命名:"))
+        match_row.addWidget(self._lbl_naming_mode)
         self._cmb_naming_mode = QComboBox()
         self._cmb_naming_mode.addItem(self.tr("保留原模板工作表名"), 0)
         self._cmb_naming_mode.addItem(self.tr("用数据源名替换"), 1)
         self._cmb_naming_mode.setToolTip(
             self.tr("多数据源时，选择工作表命名方式：保留原模板名称 或 用数据源文件名替换"))
-        self._cmb_naming_mode.setFixedWidth(180)
+        self._cmb_naming_mode.setFixedWidth(190)
         self._cmb_naming_mode.currentIndexChanged.connect(self._on_naming_mode_changed)
         match_row.addWidget(self._cmb_naming_mode)
+        match_row.addStretch()
         layout.addLayout(match_row)
 
         # 图表选择行
