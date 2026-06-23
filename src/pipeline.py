@@ -418,17 +418,25 @@ def _expand_template_sheets(
         datasource_map: {sheet_name: DataSource}。
         freq_source:    "datasource" → 新 sheet 用数据源频点；
                         "template" → 新 sheet 用模板最近邻匹配。
-        use_raw_name:   True → 直接用 datasource_map 的键作工作表名;
+        use_raw_name:   True → 直接用 datasource_map 的键作工作表名，
+                        丢弃旧工作表名，为每个数据源创建新工作表；
                         False → 从键名推导工作表名。
 
     Returns:
         扩展后的 SheetInfo 列表。
     """
-    if len(sheets_info) >= len(datasource_map):
-        return list(sheets_info)
-
     ref = sheets_info[0]
-    matched_names = {si.name for si in sheets_info}
+
+    if use_raw_name:
+        # 文件名模式：丢弃旧工作表名，为每个数据源创建新工作表
+        expanded: List[SheetInfo] = []
+        matched_names: set = set()
+    else:
+        if len(sheets_info) >= len(datasource_map):
+            return list(sheets_info)
+        expanded = list(sheets_info)
+        matched_names = {si.name for si in sheets_info}
+
     existing_ds_names = set(datasource_map.keys())
 
     # 找出有 datasource 但没对应 sheet 的名称
