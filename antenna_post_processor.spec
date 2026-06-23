@@ -46,9 +46,11 @@ a = Analysis(
         'PySide6.QtGui',
         'PySide6.QtWidgets',
 
-        # ---- matplotlib backends（Agg 必需，SVG 可选但小） ----
+        # ---- matplotlib backends（Agg 必需；QtAgg 用于 GUI 交互式 3D 图） ----
         'matplotlib.backends.backend_agg',
         'matplotlib.backends.backend_svg',
+        'matplotlib.backends.backend_qtagg',
+        'matplotlib.backends.backend_qt',
 
         # ---- numpy ----
         'numpy.lib.format',
@@ -110,8 +112,7 @@ a = Analysis(
         'PySide6.QtTextToSpeech',
         'PySide6.QtWebSockets',
         'PySide6.QtWebView',
-        # 排除不需要的 matplotlib backends
-        'matplotlib.backends.backend_qt',
+        # 排除不需要的 matplotlib backends（backend_qt 已放入 hiddenimports）
         'matplotlib.backends.backend_tkagg',
         'matplotlib.backends.backend_wxagg',
         'matplotlib.backends.backend_gtk3agg',
