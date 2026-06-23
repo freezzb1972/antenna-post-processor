@@ -18,7 +18,7 @@ from __future__ import annotations
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from PySide6.QtCore import QEvent, QSettings, Qt, QThread
 from PySide6.QtGui import QColor, QDragEnterEvent, QDropEvent, QPalette, QTextCursor
@@ -41,24 +41,27 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
+    QAbstractItemView,
     QVBoxLayout,
     QWidget,
 )
 
 from i18n.i18n_manager import I18nManager
+from src.file_entry import FileEntry, mode_name, infer_mode_from_sheet
 from src.lag_config import LagConfig, PRESET_AUTOMOTIVE
-from src.plot_config import PlotConfig
-from src.chart_config import ChartConfig
-from src.worker import ProcessingWorker
+from src.scale_manager import ScaleManager, AdaptiveWidgetMixin
 from ui.compiled.ui_main_window import Ui_MainWindow
 from ui.theme_manager import ThemeManager
+
+if TYPE_CHECKING:
+    from src.worker import ProcessingWorker
 
 
 # ---------------------------------------------------------------------------
 # 主窗口
 # ---------------------------------------------------------------------------
 
-class MainWindow(QMainWindow):
+class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     """天线参数后处理工具主窗口。"""
 
     # 快捷按钮角度映射（单一定义，_connect_signals 和 _sync_quick_buttons 共享）
@@ -78,6 +81,8 @@ class MainWindow(QMainWindow):
     def __init__(self, app: QApplication):
         super().__init__()
         self.app = app
+        # 全分辨率自适应引擎
+        self.init_scale_manager(base_width=1920)
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
@@ -92,38 +97,55 @@ class MainWindow(QMainWindow):
         self._thread: Optional[QThread] = None
         self._worker: Optional[ProcessingWorker] = None
         self._running = False
-        self._settings = QSettings("AntennaPP", "AntennaPostProcessor")
+        self._data_stale = True  # 数据是否为上次计算遗留 (用于自动清除)
+        # 使用统一配置管理器 (antenna_config.json)
+        from src.config_manager import get_config_manager
+        self._cfg = get_config_manager()
 
         # 恢复窗口大小/位置 (优先级3)
-        geo = self._settings.value("window_geometry")
-        if geo: self.restoreGeometry(geo)
+        from PySide6.QtCore import QByteArray
+        geo_str = self._cfg.config.window_geometry
+        if geo_str:
+            geo = QByteArray.fromBase64(bytes(geo_str, 'utf-8'))
+            self.restoreGeometry(geo)
         self._data_file_paths: List[str] = []
+        self._file_entries: List[FileEntry] = []  # Phase 1: FileEntry 并行列表
         self._data_file_widget: Optional[QWidget] = None
-        self._file_list_widget: Optional[QListWidget] = None
+        self._file_list_widget: Optional[QTableWidget] = None
         self._match_table: Optional[QTableWidget] = None
         self._lbl_match_status: Optional[QLabel] = None
         self._required_params: set = set()   # 用户确认的报告必需参数
         self._extra_params: set = set()      # 用户额外选择的计算参数
         self._test_mode: int = 0             # 0=passive, 1=TRP, 2=TIS
+        self._mode_states = [{}, {}, {}]     # 三种测试模式独立参数状态
         self._ar_lag_config = LagConfig()    # AR 独立角度配置
-        self._nh_edge_deg: float = 45.0      # NHPRP/NHPIS 自定义地平线边界角
+        self._nh_custom_angles: List[float] = []  # NHPRP/NHPIS 自定义角度列表
+        self._ar_output_db: bool = True     # AR 默认输出 dB
         self._chart_config_required = None   # ChartConfig: 报告需要
         self._chart_config_extra = None      # ChartConfig: 额外(full_report)
+        self._cached_template_path: Optional[str] = None  # 模板路径缓存
+        self._cached_template_mtime: float = 0           # 模板文件 mtime 缓存
+        self._cached_template_params: set = set()        # 模板参数缓存
 
         # ---- 初始化 ----
         self._init_theme_selector()
-        self._apply_custom_qss()
+        self._custom_qss = self._make_custom_qss()
         self._init_file_paths()
         self._init_multi_file_ui()
-        self._init_quick_angle_buttons()  # 添加编译 UI 中缺失的快捷角度按钮
+        self._init_quick_angle_buttons()
         self._init_params_tab()
         self._init_param_overview()
         self._connect_signals()
         self._update_lag_display()
         self._init_menu()
         self._hide_settings_tabs()
+        # 基础 QSS = 主题(已去字号) + 自定义样式; ScaleManager 动态叠加
+        self._theme_qss = self.app.styleSheet()
+        self.set_base_qss(self._theme_qss + self._custom_qss)
+        # setStyleSheet 会重置子控件的 minimumWidth → 重新应用
+        self._apply_minimum_sizes()
         self._log("天线参数后处理工具已启动")
-        self._log(self.tr("默认 LAG 配置: 单角度 [60°, 70°, 80°, 90°], 范围 [(0-90°), (60-90°)]"))
+        self._log_current_params()
 
     # ==================================================================
     # 初始化
@@ -158,17 +180,49 @@ class MainWindow(QMainWindow):
                 layout.addWidget(btn)
 
     def _init_file_paths(self):
-        """从 QSettings 恢复上次路径。"""
-        template_path = self._settings.value("template_path", "")
-        output_dir = self._settings.value("output_dir", str(Path.cwd() / "output"))
+        """从配置管理器恢复上次路径 + 字体大小 + 初始化模板管理 UI。"""
+        from src.template_manager import TemplateManager
 
-        if template_path and Path(template_path).exists():
+        self._tm = TemplateManager()
+
+        # 恢复上次字体大小 — 从配置管理器
+        cfg = self._cfg.config
+        saved_font_size = cfg.font_size
+        if saved_font_size:
+            ScaleManager._font_scale = int(saved_font_size) / ScaleManager.BASE_FONT_SIZE
+
+        template_path = cfg.last_template_path
+        output_dir = cfg.last_output_dir
+
+        # 始终恢复上次模板路径（即使文件暂时不存在，保留引用）
+        if template_path:
             self.ui.editTemplatePath.setText(template_path)
-        if output_dir:
+        # 恢复输出目录，无保存值时自动设为数据源目录（后续 _on_add_data_files 触发更新）
+        if output_dir and Path(output_dir).exists():
             self.ui.editOutputDir.setText(output_dir)
+        elif self._data_file_paths:
+            self.ui.editOutputDir.setText(str(Path(self._data_file_paths[0]).parent))
+        else:
+            self.ui.editOutputDir.setText(str(Path.cwd() / "output"))
 
-        self.ui.editOutputName.setText("antenna_report.xlsx")
+        # 输出文件名: 优先模板名+日期+序号
+        if template_path:
+            tpl_name = Path(template_path).stem
+            from src.template_manager import TemplateManager as TM
+            out_dir = self.ui.editOutputDir.text() or str(Path.cwd() / "output")
+            fname = TM.next_available_filename(out_dir, tpl_name)
+            self.ui.editOutputName.setText(fname)
+        else:
+            self.ui.editOutputName.setText("antenna_report.xlsx")
 
+        # 模板预设管理已移至「文件→系统设置」对话框
+
+
+    def _apply_minimum_sizes(self):
+        """设置关键输入框的最小宽度 — setStyleSheet 后会重置,需独立调用。"""
+        self.ui.editOutputDir.setMinimumWidth(200)
+        self.ui.editOutputName.setMinimumWidth(200)
+        self.ui.editFullReportPath.setMinimumWidth(200)
 
     def _init_multi_file_ui(self):
         """构建多文件选择 + 自动匹配 UI（动态插入到 vTabFile）。"""
@@ -178,10 +232,7 @@ class MainWindow(QMainWindow):
         self.ui.btnBrowseCsv.hide()
         self.ui.groupInput.setTitle(self.tr("模板文件"))
 
-        # ---- 输出字段加最小宽度，防止被压缩 ----
-        self.ui.editOutputDir.setMinimumWidth(200)
-        self.ui.editOutputName.setMinimumWidth(200)
-        self.ui.editFullReportPath.setMinimumWidth(200)
+        self._apply_minimum_sizes()
 
         self._data_file_widget = QWidget()
         layout = QVBoxLayout(self._data_file_widget)
@@ -192,22 +243,34 @@ class MainWindow(QMainWindow):
         btn_row = QHBoxLayout()
         self._btn_add_files = QPushButton(self.tr("📂 添加数据文件..."))
         self._btn_add_files.setToolTip(self.tr("选择多个数据文件 (Ctrl+点击多选 / 拖拽)"))
-        self._btn_clear_files = QPushButton(self.tr("清除"))
+        self._btn_clear_selected = QPushButton(self.tr("清除选中"))
+        self._btn_clear_all = QPushButton(self.tr("全部清除"))
         self._btn_add_files.clicked.connect(self._on_add_data_files)
-        self._btn_clear_files.clicked.connect(self._on_clear_data_files)
+        self._btn_clear_selected.clicked.connect(self._on_clear_selected_files)
+        self._btn_clear_all.clicked.connect(self._on_clear_all_files)
         btn_row.addWidget(self._btn_add_files)
-        btn_row.addWidget(self._btn_clear_files)
+        btn_row.addWidget(self._btn_clear_selected)
+        btn_row.addWidget(self._btn_clear_all)
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
         # 文件列表 — 可滚动、自适应高度
-        self._file_list_widget = QListWidget()
+        self._file_list_widget = QTableWidget()
+        self._file_list_widget.setColumnCount(2)
+        self._file_list_widget.setHorizontalHeaderLabels([
+            self.tr("数据源文件"), self.tr("测试模式")
+        ])
+        self._file_list_widget.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self._file_list_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        self._file_list_widget.setColumnWidth(1, 140)
+        self._file_list_widget.verticalHeader().setDefaultSectionSize(28)
+        self._file_list_widget.verticalHeader().setVisible(False)
         self._file_list_widget.setMinimumHeight(80)
-        self._file_list_widget.setMaximumHeight(160)
+        self._file_list_widget.setMaximumHeight(180)
         self._file_list_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._file_list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self._file_list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self._file_list_widget.setAlternatingRowColors(True)
+        self._file_list_widget.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self._file_list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
         layout.addWidget(self._file_list_widget)
 
         # 匹配表
@@ -232,7 +295,7 @@ class MainWindow(QMainWindow):
         self._btn_auto_match.setToolTip(self.tr("按文件命名自动匹配工作表"))
         self._lbl_match_status = QLabel("")
         self._lbl_match_status.setMinimumHeight(22)
-        self._lbl_match_status.setStyleSheet("font-size: 12px; padding: 2px 0;")
+        self._lbl_match_status.setStyleSheet("padding: 2px 0;")
         match_row.addWidget(self._btn_auto_match)
         match_row.addWidget(self._lbl_match_status)
         match_row.addStretch()
@@ -325,7 +388,7 @@ class MainWindow(QMainWindow):
         for icon, name, desc in params:
             row = QHBoxLayout()
             lbl = QLabel(f"{icon} {name}: {desc}")
-            lbl.setStyleSheet("font-size: 12px; color: #aaa;")
+            lbl.setStyleSheet("color: #aaa;")
             row.addWidget(lbl)
             row.addStretch()
             ov_layout.addLayout(row)
@@ -363,6 +426,7 @@ class MainWindow(QMainWindow):
         menubar = self.menuBar()
         fm = menubar.addMenu(self.tr("&文件"))
         fm.addAction(self.tr("系统设置..."), self._show_system_settings)
+        fm.addAction(self.tr("LLM 智能设置..."), self._show_llm_settings)
         fm.addSeparator()
         fm.addAction(self.tr("保存结果..."), self._on_browse_output, QKeySequence("Ctrl+S"))
         fm.addSeparator(); fm.addAction(self.tr("退出"), self.close, QKeySequence("Ctrl+Q"))
@@ -374,9 +438,12 @@ class MainWindow(QMainWindow):
         pm.addAction(self.tr("▶ 开始处理"), self._on_start, QKeySequence("F5"))
         pm.addAction(self.tr("⏹ 停止"), self._on_stop, QKeySequence("Esc"))
         tm = menubar.addMenu(self.tr("&工具"))
-        tm.addAction(self.tr("数据转换 (Raw→标准)..."), self._on_tool_convert)
+        tm.addAction(self.tr("数据检查与转换..."), self._on_tool_batch_check)
+        tm.addAction(self.tr("路径损耗补偿..."), self._on_tool_calibrate)
         tm.addAction(self.tr("数据合并 (多段拼接)..."), self._on_tool_merge)
         tm.addAction(self.tr("步进重采样..."), self._on_tool_resample)
+        tm.addSeparator()
+        tm.addAction(self.tr("EMQuest 数据导出..."), self._on_tool_emq_export)
         hm = menubar.addMenu(self.tr("&帮助"))
         hm.addAction(self.tr("使用说明"), self._on_help, QKeySequence("F1"))
         hm.addAction(self.tr("许可管理..."), self._on_license)
@@ -384,12 +451,20 @@ class MainWindow(QMainWindow):
 
     def _hide_settings_tabs(self):
         tc = self.ui.tabConfig
+        # 文件设置/处理参数/3D图形/参数设置 均通过菜单访问 (设置→数据源配置, 文件→系统设置等)
         for tab, idx in [(self.ui.tabFile, 0), (self.ui.tabLag, 1), (self.ui.tabPlot, 2), (self.ui.tabCalc, 3)]:
             if idx < tc.count(): tc.setTabVisible(idx, False)
 
     def _show_system_settings(self):
         from ui.dialogs import SystemSettingsDialog
         SystemSettingsDialog(self).exec()
+
+    def _show_llm_settings(self):
+        """打开系统设置并自动滚动到 AI 辅助设置区域。"""
+        from ui.dialogs import SystemSettingsDialog
+        dlg = SystemSettingsDialog(self)
+        dlg.scroll_to_ai_settings()
+        dlg.exec()
 
     def _show_data_source_dialog(self):
         from ui.dialogs import DataSourceDialog
@@ -398,19 +473,70 @@ class MainWindow(QMainWindow):
     def _show_calc_params_dialog(self):
         from ui.dialogs import CalcParamsDialog
         dlg = CalcParamsDialog(self)
-        # 传递模板自动识别的参数
         tp = self._get_template_params()
         if tp:
             dlg.set_template_params(tp)
+        # 从模板自动配置 Gain/AR 角度
+        template_path = self.ui.editTemplatePath.text().strip()
+        if template_path and Path(template_path).exists():
+            try:
+                from src.excel_reader import read_template
+                from src.lag_config import LagConfig
+                sheets = read_template(template_path)
+                headers = []
+                for si in sheets:
+                    for c in si.columns:
+                        headers.append(c.raw_header)
+                lag_cfg = LagConfig.from_template_headers(headers)
+                if not lag_cfg.is_empty():
+                    dlg.set_angle_config(lag_cfg, is_ar=False)
+                ar_cfg = LagConfig.from_ar_headers(headers)
+                if not ar_cfg.is_empty():
+                    dlg.set_angle_config(ar_cfg, is_ar=True)
+            except Exception:
+                pass
+
+        # LLM 辅助兜底: 模板识别检测到 <2 参数类型时调用 LLM
+        if template_path and Path(template_path).exists() and len(tp) < 2:
+            from src.llm_assist import LLMAssist
+            llm_params = LLMAssist.suggest_template_params(
+                template_path, logger=self._log
+            )
+            if llm_params:
+                dlg.set_template_params(tp | llm_params)
+                self._log(
+                    f"🤖 LLM 辅助: 补充识别到 {len(llm_params)} 个参数"
+                )
         if dlg.exec():
-            # 状态由对话框在 _on_accept 中直接写入 self._mw
-            pass
+            self._log_current_params()
 
     def _get_template_params(self) -> set:
-        """读取模板，提取所有 Sheet 的列类型集合。"""
+        """读取模板，提取所有 Sheet 的列类型集合（结果缓存，仅路径变化时重读）。"""
         tp = self.ui.editTemplatePath.text().strip()
         if not tp or not Path(tp).exists():
+            self._cached_template_path = None
+            self._cached_template_params = set()
             return set()
+        # 缓存命中: 路径相同且文件未修改
+        mtime = Path(tp).stat().st_mtime
+        if getattr(self, '_cached_template_path', None) == tp and \
+           getattr(self, '_cached_template_mtime', 0) == mtime:
+            return self._cached_template_params
+        # 大文件检测 — 模板通常 <1MB, >10MB 可能是源数据文件
+        size_mb = Path(tp).stat().st_size / (1024 * 1024)
+        if size_mb > 10:
+            reply = QMessageBox.question(
+                self, self.tr("模板文件异常"),
+                self.tr(f"选择的模板文件大小为 {size_mb:.0f} MB，\n"
+                        "通常模板文件不超过 1 MB。\n\n"
+                        "可能误选了源数据文件（如 RawData / FinalSummary），\n"
+                        "继续解析可能需要较长时间。\n\n"
+                        "是否仍然使用此文件作为模板？"),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            )
+            if reply == QMessageBox.No:
+                self._cached_template_params = set()
+                return set()
         try:
             from src.excel_reader import read_template
             sheets = read_template(tp)
@@ -418,7 +544,11 @@ class MainWindow(QMainWindow):
             for si in sheets:
                 for c in si.columns:
                     params.add(c.col_type)
-            return params - {"unknown", "frequency"}
+            result = params - {"unknown", "frequency"}
+            self._cached_template_path = tp
+            self._cached_template_mtime = mtime
+            self._cached_template_params = result
+            return result
         except Exception:
             return set()
 
@@ -447,86 +577,428 @@ class MainWindow(QMainWindow):
         dlg = HelpDialog(self)
         dlg.exec()
 
-    def _on_tool_convert(self):
-        path, _ = QFileDialog.getOpenFileName(self, self.tr("选择 Raw CSV 文件"), "",
+    def _on_tool_batch_check(self):
+        """数据检查与转换: 检查文件格式，自动发现实部/虚部文件并提供批量转换。"""
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, self.tr("选择要检查的 CSV 文件 (可多选)"), "",
+            self.tr("CSV 文件 (*.csv);;所有文件 (*)"))
+        if not paths: return
+
+        # Step 1: 扫描格式
+        from src.raw_converter import _detect_format
+        standard_files, realimag_files, unknown_files = [], [], []
+        for p in paths:
+            try:
+                fmt = _detect_format(p)
+            except Exception:
+                fmt = 'unknown'
+            if fmt == 'standard':
+                standard_files.append(p)
+            elif fmt == 'aborted':
+                realimag_files.append(p)
+            else:
+                unknown_files.append(p)
+
+        # Step 2: 显示检测结果
+        lines = [f"共检测 {len(paths)} 个文件:", ""]
+        if standard_files:
+            lines.append(f"✅ 对数域格式 (LogMag/Phase): {len(standard_files)} 个")
+            for f in standard_files:
+                lines.append(f"      {Path(f).name}")
+        if realimag_files:
+            lines.append(f"⚠️  实部/虚部格式 — 需转换: {len(realimag_files)} 个")
+            for f in realimag_files:
+                lines.append(f"      {Path(f).name}")
+        if unknown_files:
+            lines.append(f"❌ 无法识别: {len(unknown_files)} 个")
+            for f in unknown_files:
+                lines.append(f"      {Path(f).name}")
+
+        msg = "\n".join(lines)
+
+        if not realimag_files:
+            QMessageBox.information(self, self.tr("格式检查结果"), msg)
+            return
+
+        # Step 3: 实部/虚部文件存在 → 询问是否批量转换
+        msg += "\n\n是否批量转换为对数域格式 (LogMag/Phase)？"
+        reply = QMessageBox.question(self, self.tr("格式检查结果"), msg,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if reply != QMessageBox.Yes:
+            return
+
+        # Step 4: 询问是否加载 RSP 校准
+        rsp_h_path = None
+        rsp_v_path = None
+        rsp_reply = QMessageBox.question(
+            self, self.tr("路径损耗校准"),
+            self.tr("是否加载 RSP 路径损耗校准文件？\n\n"
+                    "标准对数域数据通常已包含路径损耗补偿，\n"
+                    "此校准仅对转换后的实部/虚部数据生效。\n\n"
+                    "(选择「否」将仅转换格式，不应用路径损耗补偿)"),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if rsp_reply == QMessageBox.Yes:
+            rsp_h_path, _ = QFileDialog.getOpenFileName(
+                self, self.tr("选择 H-pol RSP 校准文件 (Phi 分量)"), "",
+                self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
+            rsp_v_path, _ = QFileDialog.getOpenFileName(
+                self, self.tr("选择 V-pol RSP 校准文件 (Theta 分量)"), "",
+                self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
+
+        # Step 5: 选择输出目录
+        out_dir = QFileDialog.getExistingDirectory(
+            self, self.tr("选择输出目录"), str(Path(paths[0]).parent))
+        if not out_dir:
+            return
+
+        # Step 6: 执行批量转换
+        self._enter_busy(self.tr("⏳ 数据转换中..."))
+        try:
+            from src.raw_converter import batch_check_and_convert
+            self._log(f"🔄 批量转换: {len(realimag_files)} 个实部/虚部格式文件")
+            if rsp_h_path:
+                self._log(f"  H-pol RSP: {Path(rsp_h_path).name}")
+            if rsp_v_path:
+                self._log(f"  V-pol RSP: {Path(rsp_v_path).name}")
+
+            result = batch_check_and_convert(
+                paths, out_dir,
+                rsp_h_path=rsp_h_path, rsp_v_path=rsp_v_path,
+                progress_callback=lambda c, t, m: self._on_progress(c, t, m))
+
+            ok = len(result['converted'])
+            fail = len(result['failed'])
+            self._log(f"✓ 批量转换完成: {ok} 成功, {fail} 失败")
+
+            summary = f"批量转换完成:\n\n✅ 成功: {ok} 个\n❌ 失败: {fail} 个"
+            if ok > 0:
+                summary += f"\n\n输出目录:\n{out_dir}"
+            if fail > 0:
+                summary += "\n\n失败详情:\n"
+                for f in result['failed']:
+                    summary += f"  • {Path(f['source']).name}: {f['error']}\n"
+            QMessageBox.information(self, self.tr("完成"), summary)
+        except Exception as e:
+            self._log(f"✗ 批量转换失败: {e}")
+            QMessageBox.critical(self, self.tr("错误"), str(e))
+        finally:
+            self._exit_busy()
+
+    def _on_tool_calibrate(self):
+        """路径损耗补偿: 加载 RSP 校准文件，对 CSV 应用路径损耗校准。"""
+        # Step 1: 选择输入文件
+        path, _ = QFileDialog.getOpenFileName(self, self.tr("选择待校准的 CSV 文件"), "",
             self.tr("CSV 文件 (*.csv);;所有文件 (*)"))
         if not path: return
-        out = str(Path(path).parent / f"{Path(path).stem}_converted.csv")
-        out_path, _ = QFileDialog.getSaveFileName(self, self.tr("保存转换结果"), out,
+
+        # Step 1b: 检测格式 — 标准格式通常已含路径损耗补偿，再次校准会导致双重补偿
+        from src.raw_converter import _detect_format
+        fmt = _detect_format(path)
+        if fmt == 'standard':
+            reply = QMessageBox.warning(
+                self, self.tr("⚠ 格式提醒"),
+                self.tr("此文件已是标准对数域格式 (LogMag/Phase)，\n"
+                        "通常已包含路径损耗补偿。\n\n"
+                        "再次应用 RSP 校准会导致双重补偿，\n"
+                        "使 Gain 值偏高 ~60-70 dB。\n\n"
+                        "确定要继续吗？"),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply != QMessageBox.Yes:
+                return
+
+        # Step 2: 选择 RSP H-pol 文件
+        rsp_h_path, _ = QFileDialog.getOpenFileName(self, self.tr("选择 H-pol RSP 校准文件 (可选)"), "",
+            self.tr("CSV 文件 (*.csv);;所有文件 (*)"))
+        # 允许跳过
+
+        # Step 3: 选择 RSP V-pol 文件
+        rsp_v_path, _ = QFileDialog.getOpenFileName(self, self.tr("选择 V-pol RSP 校准文件 (可选)"), "",
+            self.tr("CSV 文件 (*.csv);;所有文件 (*)"))
+        # 允许跳过
+
+        if not rsp_h_path and not rsp_v_path:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("未选择任何 RSP 校准文件，操作取消。"))
+            return
+
+        # Step 4: 选择输出路径
+        out = str(Path(path).parent / f"{Path(path).stem}_calibrated.csv")
+        out_path, _ = QFileDialog.getSaveFileName(self, self.tr("保存校准结果"), out,
             self.tr("CSV 文件 (*.csv)"))
         if not out_path: return
+
+        self._enter_busy(self.tr("⏳ 路径损耗校准中..."))
         try:
-            from src.raw_converter import convert_aborted_to_normal
-            self._log(f"🔄 数据转换: {Path(path).name}")
-            result = convert_aborted_to_normal(path, out_path,
+            from src.raw_converter import apply_path_loss_calibration
+            self._log(f"📡 路径损耗补偿: {Path(path).name}")
+            if rsp_h_path:
+                self._log(f"  H-pol RSP: {Path(rsp_h_path).name}")
+            if rsp_v_path:
+                self._log(f"  V-pol RSP: {Path(rsp_v_path).name}")
+            result = apply_path_loss_calibration(
+                path, rsp_h_path or None, rsp_v_path or None, out_path,
                 progress_callback=lambda c, t, m: self._on_progress(c, t, m))
-            self._log(f"✓ 转换完成: {result}")
-            QMessageBox.information(self, self.tr("完成"), self.tr(f"转换完成:\n{result}"))
+            self._log(f"✓ 校准完成: {result}")
+            QMessageBox.information(self, self.tr("完成"), self.tr(f"校准完成:\n{result}"))
         except Exception as e:
-            self._log(f"✗ 转换失败: {e}")
+            self._log(f"✗ 校准失败: {e}")
             QMessageBox.critical(self, self.tr("错误"), str(e))
+        finally:
+            self._exit_busy()
 
     def _on_tool_merge(self):
         paths, _ = QFileDialog.getOpenFileNames(self, self.tr("选择要合并的 CSV 文件 (可多选)"), "",
             self.tr("CSV 文件 (*.csv);;所有文件 (*)"))
         if len(paths) < 2: return
+
+        # 检测是否包含实部/虚部格式文件，提示可加载 RSP 校准
+        has_realimag = False
+        try:
+            from src.raw_converter import _detect_format
+            for p in paths:
+                if _detect_format(p) == 'aborted':
+                    has_realimag = True
+                    break
+        except Exception:
+            pass
+
+        rsp_h_path = None
+        rsp_v_path = None
+        if has_realimag:
+            reply = QMessageBox.question(
+                self, self.tr("路径损耗校准"),
+                self.tr("检测到实部/虚部格式文件 (线性域)。\n\n"
+                        "此类文件包含原始未校准的 Real/Imaginary 数据，\n"
+                        "直接转换后的 LogMag 值与已校准数据相差 ~60-70 dB。\n\n"
+                        "是否加载 RSP 路径损耗校准文件？"),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+            if reply == QMessageBox.Yes:
+                rsp_h_path, _ = QFileDialog.getOpenFileName(
+                    self, self.tr("选择 H-pol RSP 校准文件 (Phi 分量)"), "",
+                    self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
+                rsp_v_path, _ = QFileDialog.getOpenFileName(
+                    self, self.tr("选择 V-pol RSP 校准文件 (Theta 分量)"), "",
+                    self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
+                if not rsp_h_path and not rsp_v_path:
+                    self._log("⚠ 未选择 RSP 文件，跳过路径损耗校准")
+            else:
+                warn = QMessageBox.warning(
+                    self, self.tr("⚠ 跳过校准"),
+                    self.tr("未加载 RSP 校准文件！\n\n"
+                            "合并结果中实部/虚部格式文件的数据将是未校准的原始值，\n"
+                            "与其他对数域格式文件之间存在 ~60-70 dB 的系统偏差，\n"
+                            "后续计算 Gain/Directivity 等参数将不准确。\n\n"
+                            "建议: 先用 EMQuest 导出 .rsp CSV，再重新合并。"),
+                    QMessageBox.Ok)
+                self._log("⚠ 跳过 RSP 校准 — 实部/虚部格式文件数据未经校准，结果可能有 ~60+ dB 偏差")
+
         out = str(Path(paths[0]).parent / "merged.csv")
         out_path, _ = QFileDialog.getSaveFileName(self, self.tr("保存合并结果"), out,
             self.tr("CSV 文件 (*.csv)"))
         if not out_path: return
+        self._enter_busy(self.tr("⏳ 数据合并中..."))
         try:
             from src.raw_converter import merge_csv_files
             self._log(f"🔗 数据合并: {len(paths)} 个文件")
+            if rsp_h_path:
+                self._log(f"  H-pol RSP: {Path(rsp_h_path).name}")
+            if rsp_v_path:
+                self._log(f"  V-pol RSP: {Path(rsp_v_path).name}")
             result = merge_csv_files(paths, out_path,
+                rsp_h_path=rsp_h_path, rsp_v_path=rsp_v_path,
                 progress_callback=lambda c, t, m: self._on_progress(c, t, m))
             self._log(f"✓ 合并完成: {result}")
             QMessageBox.information(self, self.tr("完成"), self.tr(f"合并完成:\n{result}"))
         except Exception as e:
             self._log(f"✗ 合并失败: {e}")
             QMessageBox.critical(self, self.tr("错误"), str(e))
+        finally:
+            self._exit_busy()
 
     def _on_tool_resample(self):
         from ui.dialogs import ResampleDialog
         ResampleDialog(self).exec()
 
+    def _on_tool_emq_export(self):
+        """EMQuest 数据导出: 将 .raw 文件通过 EMQuest CLI 导出为 CSV/Excel/JSON。"""
+        # Step 1: 选择文件或文件夹
+        from PySide6.QtWidgets import QButtonGroup, QRadioButton, QDialog, QVBoxLayout, \
+            QHBoxLayout, QPushButton, QComboBox, QLabel, QLineEdit, QFileDialog as FD, QGroupBox
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("EMQuest 数据导出"))
+        dlg.setMinimumWidth(500)
+        layout = QVBoxLayout(dlg)
+
+        # --- 导出格式选择 ---
+        fmt_group = QGroupBox(self.tr("导出格式"))
+        fmt_layout = QHBoxLayout(fmt_group)
+        fmt_combo = QComboBox()
+        fmt_combo.addItems(["CSV (数据)", "Excel (数据)", "JSON (数据+参数)"])
+        fmt_combo.setCurrentIndex(0)
+        fmt_layout.addWidget(QLabel(self.tr("格式:")))
+        fmt_layout.addWidget(fmt_combo)
+        fmt_layout.addStretch()
+        layout.addWidget(fmt_group)
+
+        # --- 文件选择 ---
+        file_group = QGroupBox(self.tr("源文件"))
+        file_layout = QVBoxLayout(file_group)
+        h1 = QHBoxLayout()
+        file_radio = QRadioButton(self.tr("选择 .raw 文件"))
+        folder_radio = QRadioButton(self.tr("选择文件夹 (递归扫描 .raw)"))
+        file_radio.setChecked(True)
+        h1.addWidget(file_radio)
+        h1.addWidget(folder_radio)
+        h1.addStretch()
+        file_layout.addLayout(h1)
+        h2 = QHBoxLayout()
+        path_edit = QLineEdit()
+        path_edit.setReadOnly(True)
+        browse_btn = QPushButton(self.tr("浏览..."))
+        h2.addWidget(path_edit)
+        h2.addWidget(browse_btn)
+        file_layout.addLayout(h2)
+        layout.addWidget(file_group)
+
+        # --- 输出目录 ---
+        out_group = QGroupBox(self.tr("输出目录"))
+        out_layout = QHBoxLayout(out_group)
+        out_edit = QLineEdit()
+        out_edit.setReadOnly(True)
+        out_browse = QPushButton(self.tr("浏览..."))
+        out_layout.addWidget(QLabel(self.tr("输出到:")))
+        out_layout.addWidget(out_edit)
+        out_layout.addWidget(out_browse)
+        layout.addWidget(out_group)
+
+        # --- 状态标签 ---
+        status_label = QLabel("")
+        layout.addWidget(status_label)
+
+        # --- 按钮 ---
+        btn_layout = QHBoxLayout()
+        ok_btn = QPushButton(self.tr("开始导出"))
+        cancel_btn = QPushButton(self.tr("取消"))
+        btn_layout.addStretch()
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+        selected_paths = []
+
+        def on_browse():
+            nonlocal selected_paths
+            if file_radio.isChecked():
+                files, _ = FD.getOpenFileNames(dlg, self.tr("选择 .raw 文件"), "",
+                    self.tr("Raw 文件 (*.raw);;所有文件 (*)"))
+                if files:
+                    selected_paths = list(files)
+                    path_edit.setText(f"{len(files)} 个文件已选择")
+                    if not out_edit.text():
+                        out_edit.setText(str(Path(files[0]).parent))
+            else:
+                folder = FD.getExistingDirectory(dlg, self.tr("选择包含 .raw 文件的文件夹"))
+                if folder:
+                    from src.emquest_exporter import discover_raw_files
+                    selected_paths = discover_raw_files(folder, recursive=True)
+                    path_edit.setText(f"{folder} ({len(selected_paths)} 个 .raw)")
+                    if not out_edit.text():
+                        out_edit.setText(folder)
+
+        def on_out_browse():
+            folder = FD.getExistingDirectory(dlg, self.tr("选择输出目录"))
+            if folder:
+                out_edit.setText(folder)
+
+        browse_btn.clicked.connect(on_browse)
+        out_browse.clicked.connect(on_out_browse)
+
+        def on_ok():
+            if not selected_paths:
+                status_label.setText("⚠ 请先选择 .raw 文件")
+                return
+            if not out_edit.text():
+                status_label.setText("⚠ 请选择输出目录")
+                return
+            dlg.accept()
+
+        ok_btn.clicked.connect(on_ok)
+        cancel_btn.clicked.connect(dlg.reject)
+
+        if dlg.exec() != QDialog.Accepted:
+            return
+
+        # 检查大文件
+        large_files = []
+        for fp in selected_paths:
+            size_mb = os.path.getsize(fp) / (1024 * 1024)
+            if size_mb > 100:
+                large_files.append((Path(fp).name, size_mb))
+
+        if large_files:
+            warning = self.tr("检测到大文件 (EMQuest 为 32 位，内存上限约 4GB):\n\n")
+            for name, size in large_files[:5]:
+                warning += f"  • {name} ({size:.0f} MB)\n"
+            if len(large_files) > 5:
+                warning += f"  ... 共 {len(large_files)} 个大文件\n"
+            warning += (f"\nCLI 模式下大文件可能因内存不足而导出失败。\n"
+                        f"建议: 打开 EMQuest GUI → File → Export 手动导出大文件。\n\n"
+                        f"是否仍要继续尝试 CLI 导出？")
+            reply = QMessageBox.warning(self, self.tr("⚠ 大文件警告"), warning,
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply != QMessageBox.No:
+                # 仍然继续
+                pass
+            else:
+                return
+
+        # Step 2: 执行导出
+        fmt_idx = fmt_combo.currentIndex()
+        fmt_keys = ["csv", "excel", "json"]
+        export_fmt = fmt_keys[fmt_idx]
+        output_dir = out_edit.text()
+
+        try:
+            from src.emquest_exporter import export_raw_files
+            self._enter_busy(self.tr("⏳ EMQuest 导出中..."))
+            self._log(f"📦 EMQuest 导出: {len(selected_paths)} 个 .raw → {export_fmt.upper()}")
+            self._log(f"  输出目录: {output_dir}")
+            self._log(f"  EMQuest 后台运行 (-s silent mode)")
+            self._log(f"  NI 弹窗自动处理: 已启用")
+
+            result = export_raw_files(
+                selected_paths, export_fmt, output_dir,
+                progress_callback=lambda c, t, m: self._on_progress(c, t, m))
+
+            ok = len(result["exported"])
+            fail = len(result["failed"])
+            self._log(f"✓ 导出完成: {ok} 成功, {fail} 失败")
+
+            summary = f"EMQuest 导出完成:\n\n✅ 成功: {ok} 个\n❌ 失败: {fail} 个"
+            if ok > 0:
+                total_mb = sum(e["size_mb"] for e in result["exported"])
+                summary += f"\n总大小: {total_mb:.1f} MB\n\n输出目录:\n{output_dir}"
+            if fail > 0:
+                summary += "\n\n失败详情:\n"
+                for f in result["failed"]:
+                    summary += f"  • {Path(f['source']).name}: {f['error']}\n"
+            QMessageBox.information(self, self.tr("完成"), summary)
+        except Exception as e:
+            self._log(f"✗ 导出失败: {e}")
+            QMessageBox.critical(self, self.tr("错误"), str(e))
+        finally:
+            self._exit_busy()
+
     def _on_license(self):
         from src.license import LicenseManager, get_machine_id
         mgr = LicenseManager()
         mgr.auto_load()
-
-        # 构建信息文本
         mid = get_machine_id()
-        status = mgr.status_text
         info = mgr.license_info
-
         if info and mgr.is_valid:
-            msg = (
-                f"许可状态: {status}\n"
-                f"被许可方: {info.licensee}\n"
-                f"到期日期: {info.expiry}\n"
-                f"功能: {', '.join(info.features)}\n"
-                f"签发日期: {info.issued}\n"
-                f"\n当前机器 ID: {mid}"
-            )
-        elif info:
-            msg = (
-                f"许可状态: {status}\n"
-                f"被许可方: {info.licensee}\n"
-                f"到期日期: {info.expiry}\n"
-                f"错误: {mgr.error_message}\n"
-                f"\n当前机器 ID: {mid}"
-            )
+            msg = (f"许可状态: {mgr.status_text}\n被许可方: {info.licensee}\n到期: {info.expiry}\n机器ID: {mid}")
         else:
-            msg = (
-                f"许可状态: 未找到有效许可\n\n"
-                f"请将许可文件 (license.json) 放置到:\n"
-                f"  • 程序同级目录\n"
-                f"  • 用户目录 (~/.antenna_pp_license.json)\n"
-                f"\n当前机器 ID: {mid}\n"
-                f"\n如需获取许可，请联系软件提供商并\n"
-                f"提供上述机器 ID（如需绑定机器）。"
-            )
-
+            msg = (f"许可状态: 未找到有效许可\n\n将 license.json 放到程序目录\n机器ID: {mid}")
         QMessageBox.information(self, "许可管理", msg)
 
     def _on_about(self):
@@ -540,37 +1012,108 @@ class MainWindow(QMainWindow):
     def _on_add_data_files(self):
         paths, _ = QFileDialog.getOpenFileNames(
             self, self.tr("选择数据文件 (可多选)"),
-            self._settings.value("csv_path", ""),
+            self._cfg.config.last_csv_paths[0] if self._cfg.config.last_csv_paths else "",
             self.tr("所有支持格式 (*.csv *.xlsx *.xls);;CSV 文件 (*.csv);;Excel 新版 (*.xlsx);;Excel 旧版 (*.xls);;所有文件 (*)")
         )
         if not paths:
             return
+        # 自动清除上次计算遗留的陈旧数据
+        if self._data_stale and self._data_file_paths:
+            self._log(f"🗑 自动清除上次计算遗留的 {len(self._data_file_paths)} 个文件")
+            self._data_file_paths.clear()
+            self._file_entries.clear()
+            self._file_list_widget.setRowCount(0)
+            self._match_table.setRowCount(0)
+            self._lbl_match_status.setText("")
         existing = set(self._data_file_paths)
         new_paths = [p for p in paths if p not in existing]
         if not new_paths:
             return
         self._data_file_paths.extend(new_paths)
-        self._settings.setValue("csv_path", new_paths[0])
+        self._data_stale = False
+        self._sync_file_entries()
+        self._cfg.config.last_csv_paths = [new_paths[0]] if new_paths else []
+        self._cfg._dirty = True
         self._refresh_data_file_ui()
+        # 无预设模板时，输出目录自动设为数据源目录
+        if not self.ui.editOutputDir.text().strip() or self.ui.editOutputDir.text() == str(Path.cwd() / "output"):
+            self.ui.editOutputDir.setText(str(Path(new_paths[0]).parent))
         if self.ui.editTemplatePath.text().strip():
             self._on_auto_match()
 
-    def _on_clear_data_files(self):
+    def _on_clear_selected_files(self):
+        """清除选中数据行。"""
+        rows = sorted({idx.row() for idx in self._file_list_widget.selectedIndexes()}, reverse=True)
+        if not rows:
+            QMessageBox.information(self, self.tr("提示"), self.tr("请先在文件列表中选中要清除的行。"))
+            return
+        for r in rows:
+            if r < len(self._data_file_paths):
+                del self._data_file_paths[r]
+                if r < len(self._file_entries):
+                    del self._file_entries[r]
+        # 重建 UI (行索引已变)
+        self._refresh_data_file_ui()
+        if not self._data_file_paths:
+            self._match_table.setRowCount(0)
+            self._lbl_match_status.setText("")
+            self._data_stale = True
+        else:
+            # 剩余文件 → 重建匹配表，移除已删除文件的旧条目
+            self._data_stale = False
+            template_path = self.ui.editTemplatePath.text().strip()
+            if template_path and Path(template_path).exists():
+                self._on_auto_match()
+        self._log(f"🗑 已清除 {len(rows)} 行, 剩余 {len(self._data_file_paths)} 个文件")
+
+    def _on_clear_all_files(self):
         self._data_file_paths.clear()
-        self._file_list_widget.clear()
+        self._file_entries.clear()
+        self._file_list_widget.setRowCount(0)
         self._match_table.setRowCount(0)
         self._lbl_match_status.setText("")
+        self._data_stale = True
+
+    def _sync_file_entries(self):
+        """同步 _file_entries 与 _data_file_paths，保留已设置的 test_mode。"""
+        old_map = {e.path: e for e in self._file_entries}
+        self._file_entries = []
+        for p in self._data_file_paths:
+            if p in old_map:
+                self._file_entries.append(old_map[p])
+            else:
+                self._file_entries.append(FileEntry(path=p, test_mode=self._test_mode))
 
     def _refresh_data_file_ui(self):
         if self._file_list_widget is None:
             return
-        self._file_list_widget.clear()
-        for p in self._data_file_paths:
+        t = self._file_list_widget
+        t.setRowCount(len(self._data_file_paths))
+        for i, p in enumerate(self._data_file_paths):
             try:
                 size_mb = Path(p).stat().st_size / (1024 * 1024)
-                self._file_list_widget.addItem(f"📄 {Path(p).name}  ({size_mb:.1f} MB)")
+                label = f"📄 {Path(p).name}  ({size_mb:.1f} MB)"
             except OSError:
-                self._file_list_widget.addItem(f"📄 {Path(p).name}")
+                label = f"📄 {Path(p).name}"
+            item = QTableWidgetItem(label)
+            item.setToolTip(p)
+            t.setItem(i, 0, item)
+            # 测试模式下拉
+            mode_combo = QComboBox()
+            for mode_val in [0, 1, 2]:
+                mode_combo.addItem(mode_name(mode_val), mode_val)
+            if i < len(self._file_entries):
+                mode_combo.setCurrentIndex(self._file_entries[i].test_mode)
+            mode_combo.currentIndexChanged.connect(
+                lambda idx, row=i: self._on_file_mode_changed(row))
+            t.setCellWidget(i, 1, mode_combo)
+            t.setRowHeight(i, 28)
+
+    def _on_file_mode_changed(self, row: int):
+        """文件行测试模式变更回调。"""
+        combo = self._file_list_widget.cellWidget(row, 1)
+        if combo and row < len(self._file_entries):
+            self._file_entries[row].test_mode = combo.currentData()
 
     def _on_auto_match(self):
         template_path = self.ui.editTemplatePath.text().strip()
@@ -597,6 +1140,15 @@ class MainWindow(QMainWindow):
 
         matches = auto_match(sheet_names, self._data_file_paths)
         self._populate_match_table(matches)
+
+        # 根据匹配的工作表名称自动推断文件测试模式
+        for m in matches:
+            if m.file_path:
+                inferred = infer_mode_from_sheet(m.sheet_name)
+                for e in self._file_entries:
+                    if e.path == m.file_path and e.test_mode == 0:
+                        e.test_mode = inferred
+        self._refresh_data_file_ui()
 
         matched = sum(1 for m in matches if m.file_path is not None)
         self._lbl_match_status.setText(
@@ -641,10 +1193,13 @@ class MainWindow(QMainWindow):
                 status.setText(self.tr("未匹配"))
                 status.setForeground(QColor("orange"))
 
-    def _build_datasource_map(self):
+    def _build_datasource_map(self, progress_callback=None):
         from src.datasource import DataSource
         from src.sheet_file_matcher import extract_key
         result = {}
+
+        total_files = max(self._match_table.rowCount(), 1)
+        file_idx = 0
 
         # 已匹配的行
         matched_files = set()
@@ -653,6 +1208,10 @@ class MainWindow(QMainWindow):
             combo = self._match_table.cellWidget(row, 1)
             fp = combo.currentText().strip() if combo else ""
             if fp and fp != "—" and Path(fp).exists():
+                if progress_callback:
+                    file_idx += 1
+                    progress_callback(file_idx, total_files,
+                                     f"Loading {Path(fp).name}...")
                 try:
                     result[sheet_name] = DataSource.from_path(fp)
                     matched_files.add(fp)
@@ -666,6 +1225,10 @@ class MainWindow(QMainWindow):
             for fp in unmatched:
                 key = extract_key(fp).lstrip("0123456789")
                 sheet_name = self._derive_new_sheet_name(ref_name, key)
+                if progress_callback:
+                    file_idx += 1
+                    progress_callback(file_idx, total_files,
+                                     f"Loading {Path(fp).name}...")
                 try:
                     result[sheet_name] = DataSource.from_path(fp)
                     self._log(f"  ↗ 自动添加: {sheet_name} ← {Path(fp).name}")
@@ -702,6 +1265,56 @@ class MainWindow(QMainWindow):
             return reference_name[:m.start()] + tk.group(0).upper() + reference_name[m.end():]
         return target_key
 
+    def _retry_unmatched_files(self):
+        """LLM 辅助: 自动匹配后仍有未匹配文件时尝试 LLM 建议。"""
+        if self._match_table.rowCount() == 0:
+            return
+        matched_files = set()
+        for row in range(self._match_table.rowCount()):
+            combo = self._match_table.cellWidget(row, 1)
+            fp = combo.currentText().strip() if combo else ""
+            if fp and fp != "—" and Path(fp).exists():
+                matched_files.add(fp)
+        unmatched = [f for f in self._data_file_paths if f not in matched_files]
+        if not unmatched:
+            return
+        try:
+            from src.llm_assist import LLMAssist
+            sheet_names = []
+            for row in range(self._match_table.rowCount()):
+                item = self._match_table.item(row, 0)
+                if item:
+                    sheet_names.append(item.text())
+            suggestions = LLMAssist.suggest_file_matches(
+                sheet_names, self._data_file_paths,
+                current_matches=None, logger=self._log,
+            )
+            if suggestions:
+                for sn, fp in suggestions.items():
+                    self._log(f"🤖 LLM 建议: {sn} ← {Path(fp).name}")
+        except Exception as e:
+            self._log(f"LLM 匹配建议失败: {e}")
+
+    def _build_sheet_mode_map(self, datasource_map: dict) -> dict:
+        """从 _file_entries 和 _match_table 构建 sheet→test_mode 映射。
+
+        遍历匹配表，查找每个已匹配文件的 test_mode 并关联到工作表名。
+        未映射到的 sheet 使用当前 _test_mode 作为默认值。
+        """
+        sheet_mode_map: Dict[str, int] = {}
+        file_mode_lookup = {e.path: e.test_mode for e in self._file_entries}
+        for row in range(self._match_table.rowCount()):
+            sn = self._match_table.item(row, 0)
+            combo = self._match_table.cellWidget(row, 1)
+            if sn and combo:
+                fp = combo.currentText().strip()
+                if fp and fp != "—" and fp in file_mode_lookup:
+                    sheet_mode_map[sn.text()] = file_mode_lookup[fp]
+        for sn in datasource_map:
+            if sn not in sheet_mode_map:
+                sheet_mode_map[sn] = self._test_mode
+        return sheet_mode_map
+
     def _init_theme_selector(self):
         """填充主题下拉框并选中当前主题。"""
         cmb = self.ui.cmbThemeSelector
@@ -713,36 +1326,29 @@ class MainWindow(QMainWindow):
                 cmb.setCurrentIndex(i)
                 break
 
-    def _apply_custom_qss(self):
-        """统一配色/字体微调。qt-material 主题已覆盖大部分样式。"""
-        base_font = "font-size: 13px;"
-        qss = f"""
-        * {{ {base_font} }}
-        QGroupBox {{
+    @staticmethod
+    def _make_custom_qss() -> str:
+        """生成自定义 QSS（不立即应用, 由 set_base_qss 统一处理）。"""
+        return """
+        QGroupBox {
             border: 1px solid rgba(128,128,128,50);
             border-radius: 6px;
             margin-top: 10px;
             padding-top: 14px;
             font-weight: bold;
-        }}
-        QGroupBox::title {{
+        }
+        QGroupBox::title {
             subcontrol-origin: margin;
             left: 10px;
             padding: 0 4px;
-        }}
-        QPlainTextEdit {{
+        }
+        QPlainTextEdit {
             border-radius: 4px;
             font-family: "Consolas","Courier New",monospace;
-            font-size: 12px;
-        }}
-        QPushButton#btnStart {{
-            font-size: 14px;
-            font-weight: bold;
-            letter-spacing: 1px;
-        }}
-        QPushButton#btnStop {{ font-size: 14px; }}
+        }
+        QPushButton#btnStart { font-weight: bold; letter-spacing: 1px; }
+        QPushButton#btnStop { font-weight: bold; }
         """
-        self.app.setStyleSheet(self.app.styleSheet() + qss)
 
     def _connect_signals(self):
         """连接所有信号/槽。"""
@@ -799,13 +1405,14 @@ class MainWindow(QMainWindow):
 
     def _on_browse_template(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("选择模板 Excel 文件"),
-            self._settings.value("template_path", ""),
-            self.tr("Excel 文件 (*.xlsx *.xls);;所有文件 (*)")
+            self, self.tr("选择模板文件"),
+            self._cfg.config.last_template_path or "",
+            self.tr("所有支持格式 (*.xlsx *.xls *.csv *.docx);;Excel 新版 (*.xlsx);;Excel 旧版 (*.xls);;CSV (*.csv);;Word (*.docx);;所有文件 (*)")
         )
         if path:
             self.ui.editTemplatePath.setText(path)
-            self._settings.setValue("template_path", path)
+            self._cfg.config.last_template_path = path
+            self._cfg._dirty = True
 
     def _on_browse_output(self):
         start_dir = self.ui.editOutputDir.text() or str(Path.cwd() / "output")
@@ -814,7 +1421,8 @@ class MainWindow(QMainWindow):
         )
         if path:
             self.ui.editOutputDir.setText(path)
-            self._settings.setValue("output_dir", path)
+            self._cfg.config.last_output_dir = path
+            self._cfg._dirty = True
 
     def _on_browse_full_report(self):
         start_dir = self.ui.editFullReportPath.text() or str(Path.cwd() / "output")
@@ -825,6 +1433,59 @@ class MainWindow(QMainWindow):
         )
         if path:
             self.ui.editFullReportPath.setText(path)
+
+    # ==================================================================
+    # 模板预设管理
+    # ==================================================================
+
+    def apply_template_preset(self, path: str, output_dir: str = "", tpl_name: str = ""):
+        """应用模板预设: 设置模板路径 + 输出目录 + 文件名。"""
+        self.ui.editTemplatePath.setText(path)
+        self._save_template_path(path)
+        if output_dir:
+            self.ui.editOutputDir.setText(output_dir)
+        elif self._data_file_paths:
+            self.ui.editOutputDir.setText(str(Path(self._data_file_paths[0]).parent))
+        if tpl_name:
+            out_dir = self.ui.editOutputDir.text() or "."
+            fname = self._tm.next_available_filename(out_dir, tpl_name)
+            self.ui.editOutputName.setText(fname)
+
+    def _show_save_preset_dialog(self, template_path: str, output_dir: str):
+        """弹出保存模板预设对话框 (公共方法, SystemSettingsDialog 也调用)。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("保存模板预设"))
+        dlg.setMinimumWidth(350)
+        layout = QVBoxLayout(dlg)
+        form = QFormLayout()
+        mfr_combo = QComboBox()
+        mfr_combo.setEditable(True)
+        for m in self._tm.manufacturers:
+            mfr_combo.addItem(m)
+        name_edit = QLineEdit()
+        default_name = Path(template_path).stem
+        for t in self._tm.get_all_templates():
+            if t.path == template_path:
+                default_name = t.name; break
+        name_edit.setText(default_name)
+        form.addRow(self.tr("厂商:"), mfr_combo)
+        form.addRow(self.tr("模板名:"), name_edit)
+        layout.addLayout(form)
+        btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btn_box.accepted.connect(dlg.accept)
+        btn_box.rejected.connect(dlg.reject)
+        layout.addWidget(btn_box)
+        if dlg.exec() != QDialog.Accepted: return
+        mfr = mfr_combo.currentText().strip()
+        tpl_name = name_edit.text().strip()
+        if not mfr or not tpl_name: return
+        self._tm.add_template(mfr, tpl_name, template_path, output_dir)
+        self._log(f"✓ 模板预设已保存: {mfr} → {tpl_name}")
+
+    def _save_template_path(self, path: str):
+        """持久化模板路径到配置文件。"""
+        self._cfg.config.last_template_path = path
+        self._cfg._dirty = True
 
     # ==================================================================
     # LAG 配置
@@ -934,7 +1595,18 @@ class MainWindow(QMainWindow):
             btn.setChecked(angle in self._lag_config.single_angles)
 
     def _update_lag_display(self):
-        """刷新已配置项 — 每项带删除按钮。"""
+        """刷新已配置项 — 每项带删除按钮, 内容过多时自动滚动。"""
+        # 确保 configItemsWidget 在 QScrollArea 中防止溢出重叠
+        parent_layout = self.ui.configItemsWidget.parent().layout()
+        if not hasattr(self, '_lag_scroll'):
+            self._lag_scroll = QScrollArea()
+            self._lag_scroll.setWidgetResizable(True)
+            self._lag_scroll.setMaximumHeight(200)
+            idx = parent_layout.indexOf(self.ui.configItemsWidget)
+            parent_layout.removeWidget(self.ui.configItemsWidget)
+            self._lag_scroll.setWidget(self.ui.configItemsWidget)
+            parent_layout.insertWidget(idx, self._lag_scroll)
+
         widget = self.ui.configItemsWidget
         layout = widget.layout()
         if layout is None:
@@ -952,14 +1624,14 @@ class MainWindow(QMainWindow):
 
         if not singles and not ranges:
             label = QLabel(self.tr("—"))
-            label.setStyleSheet("font-size: 13px; color: #888; padding: 8px;")
+            label.setStyleSheet("color: #888; padding: 8px;")
             layout.addWidget(label)
             return
 
         # ---- 单角度 ----
         if singles:
             header = QLabel(self.tr("单角度："))
-            header.setStyleSheet("font-weight: bold; font-size: 13px; margin-top: 4px;")
+            header.setStyleSheet("font-weight: bold; margin-top: 4px;")
             layout.addWidget(header)
             for a in singles:
                 row = QWidget()
@@ -968,12 +1640,12 @@ class MainWindow(QMainWindow):
                 h.setContentsMargins(8, 4, 0, 4)
                 h.setSpacing(8)
                 lbl = QLabel(f"  {a}°")
-                lbl.setStyleSheet("font-size: 13px;")
+                lbl.setStyleSheet("")
                 lbl.setMinimumHeight(24)
                 btn = QPushButton(" ✕ ")
                 btn.setFixedHeight(24)
                 btn.setToolTip(self.tr("移除此角度"))
-                btn.setStyleSheet("font-size: 11px; padding: 2px 6px;")
+                btn.setStyleSheet("padding: 2px 6px;")
                 btn.clicked.connect(lambda checked, angle=a: self._remove_single(angle))
                 h.addWidget(lbl)
                 h.addWidget(btn)
@@ -983,7 +1655,7 @@ class MainWindow(QMainWindow):
         # ---- 角度范围 ----
         if ranges:
             header = QLabel(self.tr("角度范围："))
-            header.setStyleSheet("font-weight: bold; font-size: 13px; margin-top: 4px;")
+            header.setStyleSheet("font-weight: bold; margin-top: 4px;")
             layout.addWidget(header)
             for lo, hi in ranges:
                 row = QWidget()
@@ -992,12 +1664,12 @@ class MainWindow(QMainWindow):
                 h.setContentsMargins(8, 4, 0, 4)
                 h.setSpacing(8)
                 lbl = QLabel(f"  ({lo}° - {hi}°)")
-                lbl.setStyleSheet("font-size: 13px;")
+                lbl.setStyleSheet("")
                 lbl.setMinimumHeight(24)
                 btn = QPushButton(" ✕ ")
                 btn.setFixedHeight(24)
                 btn.setToolTip(self.tr("移除此范围"))
-                btn.setStyleSheet("font-size: 11px; padding: 2px 6px;")
+                btn.setStyleSheet("padding: 2px 6px;")
                 btn.clicked.connect(lambda checked, lo=lo, hi=hi: self._remove_range(lo, hi))
                 h.addWidget(lbl)
                 h.addWidget(btn)
@@ -1005,6 +1677,7 @@ class MainWindow(QMainWindow):
                 layout.addWidget(row)
 
         layout.addStretch()
+        self._log_current_params()
 
     def _remove_single(self, angle: float):
         self._lag_config.remove_single(angle)
@@ -1021,9 +1694,29 @@ class MainWindow(QMainWindow):
 
     def _on_start(self):
         """启动后台处理。支持单文件或多文件模式。"""
+        # 懒导入：处理链模块较重，仅在首次点击处理时加载
+        from src.chart_config import ChartConfig
+        from src.plot_config import PlotConfig
+        from src.worker import ProcessingWorker
+        # Guard: prevent re-entry if a worker is already running (race condition)
+        # 检查 worker 是否还在运行（防止信号未处理时的竞态）
+        worker_still_running = (
+            self._worker is not None
+            and not getattr(self._worker, '_cancelled', True)
+            and self._thread is not None
+            and self._thread.isRunning()
+        )
+        if worker_still_running:
+            self._log(self.tr("⚠ 处理已在运行中，请等待完成"))
+            return
         if self._running:
             return
+        # 立即设置忙碌状态，防止用户在文件加载期间重复点击
+        self._enter_busy(self.tr("⏳ 处理中..."))
+        self.ui.btnStop.setEnabled(True)
         if not self._data_file_paths:
+            self._restore_start_button()
+            self.ui.btnStop.setEnabled(False)
             QMessageBox.warning(self, self.tr("警告"),
                 self.tr("请先通过「设置→数据源配置」添加数据文件并执行自动匹配。"))
             return
@@ -1032,8 +1725,17 @@ class MainWindow(QMainWindow):
         if self._match_table.rowCount() == 0 and self._data_file_paths:
             try:
                 self._on_auto_match()
-            except Exception:
-                pass
+            except Exception as e:
+                self._log(f"⚠ 自动匹配失败: {e}")
+                QMessageBox.warning(self, self.tr("自动匹配失败"),
+                    self.tr("无法自动匹配工作表与数据文件。\n"
+                            "请通过「设置→数据源配置」手动进行匹配。\n\n"
+                            "错误详情: ") + str(e))
+                self._restore_start_button()
+                return
+
+        # LLM 辅助: 自动匹配后仍有未匹配文件时尝试 LLM 建议
+        self._retry_unmatched_files()
 
         template_path = self.ui.editTemplatePath.text().strip()
         output_dir = self.ui.editOutputDir.text().strip() or str(Path.cwd() / "output")
@@ -1041,17 +1743,25 @@ class MainWindow(QMainWindow):
         output_name = output_name.replace("\\", "").replace("/", "")
 
         if not template_path:
+            self._restore_start_button()
             QMessageBox.warning(self, self.tr("警告"),
                 self.tr("请选择模板 Excel 文件。"))
             return
         if not Path(template_path).exists():
+            self._restore_start_button()
             QMessageBox.warning(self, self.tr("警告"),
                 self.tr("模板文件不存在"))
             return
         template_ext = Path(template_path).suffix.lower()
-        if template_ext not in (".xlsx", ".xls"):
+        if template_ext not in (".xlsx", ".xls", ".csv", ".docx"):
+            self._restore_start_button()
             QMessageBox.warning(self, self.tr("警告"),
-                self.tr("模板文件必须是 Excel 格式 (.xlsx .xls)"))
+                self.tr("不支持的模板文件格式。支持: .xlsx .xls .csv .docx"))
+            return
+        if template_ext in (".csv", ".docx"):
+            self._restore_start_button()
+            QMessageBox.warning(self, self.tr("不支持的模板格式"),
+                self.tr(f"{template_ext} 模板格式当前仅支持存储预设，处理功能尚未实现。\n\n请使用 .xlsx 或 .xls 格式的模板文件。"))
             return
 
         os.makedirs(output_dir, exist_ok=True)
@@ -1068,40 +1778,60 @@ class MainWindow(QMainWindow):
             elev=self.ui.spinElev.value(),
             azim=self.ui.spinAzim.value(),
             dpi=self.ui.spinDpi.value(),
+            step_deg=getattr(self._chart_config_required, 'step_deg', 5.0) if self._chart_config_required else 5.0,
             embed_in_excel=self.ui.checkEmbedExcel.isChecked(),
             save_png_folder=str(Path(output_dir) / "png") if self.ui.checkSavePng.isChecked() else None,
         )
 
-        datasource = None
-        datasource_map = self._build_datasource_map()
+
+        # 显示文件加载进度 (setMaximum 只设一次, processEvents 每 20 个文件一次)
+        # 为什么要节流: 每次 processEvents 会刷新整个 Qt 事件循环,
+        # 在大量文件(>200)时每文件都调用会导致 UI 卡死. 每 20 个文件刷新一次
+        # 在响应性和性能之间取得了平衡.
+        total_files = max(self._match_table.rowCount(), 1)
+        self.ui.progressBar.setMaximum(total_files)
+        self.ui.progressBar.setValue(0)
+        self.ui.lblProgressMsg.setText(self.tr("正在加载数据文件..."))
+        datasource_map = self._build_datasource_map(
+            progress_callback=lambda c, t, m: (
+                self.ui.progressBar.setValue(c),
+                self.ui.lblProgressMsg.setText(m),
+                QApplication.processEvents() if c % 20 == 0 else None
+            )
+        )
         if not datasource_map:
             QMessageBox.warning(self, self.tr("警告"),
                 self.tr("没有有效的工作表↔文件匹配，请先执行自动匹配。"))
+            self._restore_start_button()
             return
         self._log(f"多源模式: {len(datasource_map)} 个工作表")
         for sn, ds in datasource_map.items():
             self._log(f"  {sn} ← {type(ds).__name__}")
+
+        # 构建 sheet → test_mode 映射 (混合批处理)
+        sheet_mode_map: Dict[str, int] = self._build_sheet_mode_map(datasource_map)
 
         self.ui.logOutput.clear()
         self.ui.progressBar.setValue(0)
         self.ui.lblProgressMsg.setText(self.tr("启动中..."))
 
         self._thread = QThread(self)
-        # 合并图表配置（报告需要 + 额外）
-        full_chart_config = None
+        # 合并图表配置: 报告需要的 + 额外 + GUI checkbox 状态
+        # GUI checkbox 优先级最高, 确保用户关闭图表后不会因默认值重新打开
+        full_chart_config = ChartConfig()
         if self._chart_config_required is not None or self._chart_config_extra is not None:
             req = self._chart_config_required or ChartConfig()
             xtr = self._chart_config_extra or ChartConfig()
             full_chart_config = req.merge(xtr)
-            if hasattr(plot_config, 'save_png_folder'):
-                png_dir = plot_config.save_png_folder
-            else:
-                png_dir = str(Path(output_dir) / "png") if self.ui.checkSavePng.isChecked() else None
-            full_chart_config.save_png_folder = png_dir
+        # GUI checkbox 状态覆盖 ChartConfig 默认 (用户意图优先)
+        full_chart_config.chart_eff_freq = self._check_chart_eff.isChecked()
+        full_chart_config.chart_gain_freq = self._check_chart_lag.isChecked()
+        png_dir = plot_config.save_png_folder
+        full_chart_config.save_png_folder = png_dir
 
         self._worker = ProcessingWorker(
-            datasource=datasource,
             datasource_map=datasource_map,
+            sheet_mode_map=sheet_mode_map,
             template_path=template_path,
             output_path=output_path,
             lag_config=self._lag_config,
@@ -1111,12 +1841,12 @@ class MainWindow(QMainWindow):
             freq_source=self._cmb_freq_source.currentData() or "datasource",
             trim_start=self._spin_trim_start.value(),
             trim_end=self._spin_trim_end.value(),
-            chart_eff=self._check_chart_eff.isChecked(),
-            chart_lag=self._check_chart_lag.isChecked(),
             robust_peak=self._check_robust_peak.isChecked(),
             extra_params=self._extra_params if self._extra_params else None,
+            nh_custom_angles=self._nh_custom_angles if self._nh_custom_angles else None,
             chart_config_obj=full_chart_config,
             ar_lag_config=self._ar_lag_config if hasattr(self, '_ar_lag_config') and not self._ar_lag_config.is_empty() else None,
+            ar_output_db=self._ar_output_db,
         )
         self._worker.moveToThread(self._thread)
 
@@ -1127,11 +1857,6 @@ class MainWindow(QMainWindow):
         self._worker.finished.connect(self._on_finished)
         self._worker.error.connect(self._on_error)
         self._thread.finished.connect(self._thread.deleteLater)
-
-        # 设置运行状态
-        self._running = True
-        self.ui.btnStart.setEnabled(False)
-        self.ui.btnStop.setEnabled(True)
 
         self._thread.start()
         self._log(self.tr(f"▶ 开始处理"))
@@ -1145,7 +1870,35 @@ class MainWindow(QMainWindow):
         if self._worker:
             self._worker.cancel()
         self._log("⏹ 用户请求停止...")
+        self._running = False
+        self._data_stale = True  # 中断的计算，数据标记为陈旧
+        self._worker = None
+        # 安全退出线程：quit() 退出事件循环，wait(3000) 等待线程结束
+        if self._thread is not None:
+            self._thread.quit()
+            self._thread.wait(3000)
+        self._thread = None
+        self._restore_start_button()
         self.ui.btnStop.setEnabled(False)
+
+    def _restore_start_button(self):
+        """恢复开始按钮到空闲状态。"""
+        self._running = False
+        self.ui.btnStart.setText(self.tr("▶ 开始处理"))
+        self.ui.btnStart.setEnabled(True)
+        self.ui.btnStop.setEnabled(False)
+
+    def _enter_busy(self, text="⏳ 处理中..."):
+        """进入忙碌状态：锁定开始按钮，防止主计算与工具操作并发。"""
+        self._running = True
+        self.ui.btnStart.setText(self.tr(text))
+        self.ui.btnStart.setEnabled(False)
+
+    def _exit_busy(self):
+        """退出忙碌状态：恢复开始按钮。"""
+        self._running = False
+        self.ui.btnStart.setText(self.tr("▶ 开始处理"))
+        self.ui.btnStart.setEnabled(True)
 
     def _on_progress(self, current: int, total: int, message: str):
         self.ui.progressBar.setMaximum(total)
@@ -1157,7 +1910,14 @@ class MainWindow(QMainWindow):
 
     def _on_finished(self, results, images):
         self._running = False
-        self.ui.btnStart.setEnabled(True)
+        self._worker = None
+        self._data_stale = True  # 计算完成，数据变为陈旧
+        # 安全退出线程：quit() 退出事件循环，wait(3000) 等待线程结束
+        if self._thread is not None:
+            self._thread.quit()
+            self._thread.wait(3000)
+        self._thread = None
+        self._restore_start_button()
         self.ui.btnStop.setEnabled(False)
         self.ui.progressBar.setValue(self.ui.progressBar.maximum())
         self.ui.lblProgressMsg.setText(self.tr("✓ 处理完成"))
@@ -1174,8 +1934,31 @@ class MainWindow(QMainWindow):
         self._populate_results_table(results)
         # 生成图形展示
         self._populate_charts(results)
-        # 自动切到结果Tab (优先级4)
-        self.ui.tabConfig.setCurrentIndex(0)  # 参数结果Tab
+        # 生成图形数据表
+        self._populate_graph_data(results)
+        # 自动切到结果Tab
+        self.ui.tabConfig.setCurrentIndex(0)
+
+    def _make_readable_label(self, key: str) -> str:
+        """将内部 key 转换为短可读标签。
+        ar_single_10 → AR 10°    lag_single_60.0 → LAG 60°
+        ar_range_0_30 → AR 0-30°   lag_range_0_30 → LAG 0-30°
+        """
+        import re
+        # AR/LAG single: xxx_single_<angle>
+        m = re.match(r'(ar|lag)_single_([\d.]+)$', key)
+        if m:
+            prefix = m.group(1).upper()
+            angle = m.group(2).rstrip('0').rstrip('.') if '.' in m.group(2) else m.group(2)
+            return f"{prefix} {angle}°"
+        # AR/LAG range: xxx_range_<lo>_<hi>
+        m = re.match(r'(ar|lag)_range_([\d.]+)_([\d.]+)$', key)
+        if m:
+            prefix = m.group(1).upper()
+            lo = m.group(2).rstrip('0').rstrip('.') if '.' in m.group(2) else m.group(2)
+            hi = m.group(3).rstrip('0').rstrip('.') if '.' in m.group(3) else m.group(3)
+            return f"{prefix} {lo}-{hi}°"
+        return key
 
     def _populate_results_table(self, results):
         """填充参数结果表格。"""
@@ -1203,12 +1986,21 @@ class MainWindow(QMainWindow):
             "boresight_theta":"Boresight θ°","boresight_phi":"Boresight φ°",
         }
 
+        # 生成列标签: 先用映射表，再用动态规则，最后回退到原始 key
+        col_labels = [KEY_LABELS.get(k) or self._make_readable_label(k) for k in keys]
+
         table = QTableWidget()
         table.setColumnCount(len(keys))
-        table.setHorizontalHeaderLabels([KEY_LABELS.get(k, k) for k in keys])
+        table.setHorizontalHeaderLabels(col_labels)
         table.setRowCount(len(first_sheet))
         table.setAlternatingRowColors(True)
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        # 自动换行 + 按内容调整宽度
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeToContents)
+        for ci in range(len(keys)):
+            header.setSectionResizeMode(ci, QHeaderView.ResizeToContents)
+        table.setWordWrap(True)
+        table.setTextElideMode(Qt.ElideNone)
         table.setMinimumHeight(300)
 
         for ri, row in enumerate(first_sheet):
@@ -1224,138 +2016,47 @@ class MainWindow(QMainWindow):
         self._log(self.tr(f"📊 参数表格已更新: {len(keys)} 列 × {len(first_sheet)} 行"))
 
     def _populate_charts(self, results):
-        """在图形展示 Tab 动态渲染图表：B 类曲线 + A/C 类已生成图像。"""
+        """使用 GraphViewer 渲染交互式 3D 球面方向图 + 数据表。"""
         vtab = self.ui.vTabCharts
         while vtab.count():
             item = vtab.takeAt(0)
             if item.widget(): item.widget().deleteLater()
-
-        if not results: return
-
-        import matplotlib
-        matplotlib.use('QtAgg')
-        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-        from matplotlib.figure import Figure
-
-        # 收集所有 results 中的图像
-        all_images = {}  # freq_mhz -> {img_key: BytesIO}
-        for sn, rows in results.items():
-            if not rows: continue
-            for r in rows:
-                freq = r.get("frequency", 0)
-                imgs = r.get("_images", {})
-                if imgs:
-                    all_images[freq] = imgs
-
-        # ── B 类: 频点曲线（Matplotlib 动态绘制） ──
-        for sn, rows in results.items():
-            if not rows: continue
-            if len(rows) < 2: continue
-            freqs = [r.get("frequency", 0) for r in rows]
-
-            # Efficiency vs Freq
-            if "efficiency_pct" in rows[0]:
-                eff_vals = [r.get("efficiency_pct", 0) or 0 for r in rows]
-                self._add_result_chart(vtab, f"{sn}: Efficiency vs Freq",
-                    freqs, eff_vals, "Frequency (MHz)", "Efficiency (%)", 'g')
-
-            # Peak Gain vs Freq
-            if "gain" in rows[0]:
-                gain_vals = [r.get("gain", 0) or 0 for r in rows]
-                self._add_result_chart(vtab, f"{sn}: Peak Gain vs Freq",
-                    freqs, gain_vals, "Frequency (MHz)", "Gain (dBi)", 'b')
-
-            # TRP vs Freq
-            if "trp" in rows[0]:
-                trp_vals = [r.get("trp", -999) or -999 for r in rows]
-                self._add_result_chart(vtab, f"{sn}: TRP vs Freq",
-                    freqs, trp_vals, "Frequency (MHz)", "TRP (dBm)", 'r')
-
-            # Directivity vs Freq
-            if "directivity" in rows[0]:
-                dir_vals = [r.get("directivity", 0) or 0 for r in rows]
-                self._add_result_chart(vtab, f"{sn}: Directivity vs Freq",
-                    freqs, dir_vals, "Frequency (MHz)", "Directivity (dBi)", 'm')
-
-            break  # 只展示第一个 sheet 的 B 类曲线
-
-        # ── A/C 类: 逐频点图像（显示第一个频点的图） ──
-        if all_images:
-            # 频点选择控件
-            freq_list = sorted(all_images.keys())
-            freq_row = QHBoxLayout()
-            freq_row.addWidget(QLabel(self.tr("频点:")))
-            freq_combo = QComboBox()
-            for f in freq_list:
-                freq_combo.addItem(f"{f:.1f} MHz", f)
-            freq_row.addWidget(freq_combo)
-            freq_row.addStretch()
-            vtab.addLayout(freq_row)
-
-            # 图像展示容器
-            img_container = QWidget()
-            img_layout = QVBoxLayout(img_container)
-            vtab.addWidget(img_container, 1)
-
-            def _show_images_for_freq(freq_mhz):
-                # 清除旧图
-                while img_layout.count():
-                    child = img_layout.takeAt(0)
-                    if child.widget(): child.widget().deleteLater()
-
-                imgs = all_images.get(freq_mhz, {})
-                if not imgs:
-                    lbl = QLabel(self.tr("此频点无图形"))
-                    img_layout.addWidget(lbl)
-                    return
-
-                # 每个图用 matplotlib 渲染到 canvas
-                for img_key in sorted(imgs.keys()):
-                    buf = imgs[img_key]
-                    buf.seek(0)
-                    # 将 PNG buffer 显示为 QLabel pixmap
-                    from PySide6.QtGui import QPixmap
-                    from PySide6.QtCore import QByteArray
-                    pixmap = QPixmap()
-                    pixmap.loadFromData(buf.read())
-                    if not pixmap.isNull():
-                        scaled = pixmap.scaled(450, 350,
-                            Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                        lbl = QLabel()
-                        lbl.setPixmap(scaled)
-                        lbl.setAlignment(Qt.AlignCenter)
-                        img_layout.addWidget(lbl)
-                    buf.seek(0)
-
-            freq_combo.currentIndexChanged.connect(
-                lambda idx: _show_images_for_freq(freq_combo.itemData(idx)))
-            if freq_list:
-                _show_images_for_freq(freq_list[0])
+        if not results:
+            return
+        from ui.graph_viewer import GraphViewer
+        viewer = GraphViewer()
+        # 应用图形配置中的视角设置
+        if self._chart_config_required is not None:
+            viewer._elev = self._chart_config_required.elev
+            viewer._azim = self._chart_config_required.azim
+            # 采样精度: 从 ChartConfig 传递到展示窗体
+            step_deg = getattr(self._chart_config_required, 'step_deg', 5.0)
         else:
-            vtab.addWidget(QLabel(self.tr("（未生成图形 — 请在图形配置中启用）")))
+            step_deg = 5.0
+        viewer.load_data(results, step_deg=step_deg)
+        vtab.addWidget(viewer)
+        # 确保图形展示标签页可见
+        tc = self.ui.tabConfig
+        for i in range(tc.count()):
+            if tc.widget(i) is self.ui.tabCharts:
+                tc.setTabVisible(i, True)
+        self._log("图形数据已加载 — 可在「📈 图形展示」标签页查看 3D 方向图")
 
-    def _add_result_chart(self, parent_layout, title, x, y, xlabel, ylabel, color):
-        """添加一个 matplotlib 图表到布局。"""
-        import matplotlib
-        matplotlib.use('QtAgg')
-        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-        from matplotlib.figure import Figure
-
-        fig = Figure(figsize=(8, 4), dpi=100)
-        ax = fig.add_subplot(111)
-        ax.plot(x, y, f'{color}-', linewidth=1.5)
-        ax.set_title(title);
-        ax.set_xlabel(xlabel); ax.set_ylabel(ylabel)
-        ax.grid(True, alpha=0.3)
-        if ylabel == "Gain (dB)": ax.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
-
-        canvas = FigureCanvas(fig)
-        canvas.setMinimumHeight(250)
-        parent_layout.addWidget(canvas)
+    def _populate_graph_data(self, results):
+        """在独立标签页展示 3D 图形原始数据表格。"""
+        from ui.graph_viewer import GraphDataTab
+        GraphDataTab.install_in(self.ui.tabConfig, results)
+        self._log("图形数据已加载 — 可在「📈 图形展示」标签页查看 3D 方向图")
 
     def _on_error(self, message: str):
         self._running = False
-        self.ui.btnStart.setEnabled(True)
+        self._worker = None
+        # 安全退出线程：quit() 退出事件循环，wait(3000) 等待线程结束
+        if self._thread is not None:
+            self._thread.quit()
+            self._thread.wait(3000)
+        self._thread = None
+        self._restore_start_button()
         self.ui.btnStop.setEnabled(False)
         self._log(f"✗ 错误: {message}")
         QMessageBox.critical(self, self.tr("处理错误"), message)
@@ -1372,6 +2073,10 @@ class MainWindow(QMainWindow):
         if theme_id and theme_id != ThemeManager.current_theme():
             ThemeManager.apply(theme_id)
             ThemeManager.save_theme(theme_id)
+            # 更新 QSS：主题应用后必须同步 _theme_qss / _base_qss 并重新应用 ScaleManager
+            self._theme_qss = self.app.styleSheet()
+            self._base_qss = self._theme_qss + self._custom_qss
+            ScaleManager.apply_full_qss(self, self._base_qss)
 
     # ==================================================================
     # 语言切换
@@ -1401,10 +2106,85 @@ class MainWindow(QMainWindow):
     # ==================================================================
 
     def _log(self, message: str):
-        """追加日志行。"""
+        """追加日志行。Emoji 在 GUI 环境中提供视觉提示；若需 CLI 纯文本
+        输出，调用方可预先 strip 掉 emoji 字符。"""
         ts = datetime.now().strftime("%H:%M:%S")
         self.ui.logOutput.appendPlainText(f"[{ts}] {message}")
         # 自动滚动到底部
+        cursor = self.ui.logOutput.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self.ui.logOutput.setTextCursor(cursor)
+
+    def _log_current_params(self):
+        """将当前天线参数摘要打印到日志窗口。"""
+        mode_names = {0: "📡 无源天线", 1: "📶 有源发射 TRP", 2: "📻 有源接收 TIS"}
+        mode_str = mode_names.get(self._test_mode, "未知")
+
+        # 构建参数 key → 人类可读名称的映射
+        from ui.dialogs import CalcParamsDialog
+        param_labels = {}
+        for params_list in [CalcParamsDialog._COMMON_PARAMS,
+                            CalcParamsDialog._TRP_PARAMS,
+                            CalcParamsDialog._TIS_PARAMS]:
+            for _, items in params_list:
+                for key, label in items:
+                    param_labels[key] = label
+
+        lines = [
+            "══════ 当前天线参数 ══════",
+            f"  测试模式: {mode_str}",
+        ]
+
+        # 计算参数
+        all_params = sorted(self._required_params | self._extra_params)
+        param_names = [param_labels.get(k, k) for k in all_params]
+        if param_names:
+            lines.append(f"  计算参数: {', '.join(param_names)}")
+        else:
+            lines.append("  计算参数: (未选择)")
+
+        # Gain/LAG 角度
+        gain_singles = self._lag_config.singles_sorted
+        gain_ranges = self._lag_config.ranges_sorted
+        if gain_singles or gain_ranges:
+            parts = [f"{a}°" for a in gain_singles]
+            if gain_ranges:
+                parts.append("范围: " + ", ".join(f"({lo}°–{hi}°)" for lo, hi in gain_ranges))
+            lines.append(f"  Gain 角度: {', '.join(parts)}")
+        else:
+            lines.append("  Gain 角度: (未设置)")
+
+        # AR 角度
+        if hasattr(self, '_ar_lag_config'):
+            ar_cfg = self._ar_lag_config
+            ar_singles = ar_cfg.singles_sorted
+            ar_ranges = ar_cfg.ranges_sorted
+            if ar_singles or ar_ranges:
+                parts = [f"{a}°" for a in ar_singles]
+                if ar_ranges:
+                    parts.append("范围: " + ", ".join(f"({lo}°–{hi}°)" for lo, hi in ar_ranges))
+                lines.append(f"  AR 角度: {', '.join(parts)}")
+            else:
+                lines.append("  AR 角度: (未设置)")
+
+        # 频点
+        freq_text = self._cmb_freq_source.currentText() if hasattr(self, '_cmb_freq_source') and self._cmb_freq_source else "—"
+        trim = f"去除: 前{self._spin_trim_start.value()} / 后{self._spin_trim_end.value()}"
+        lines.append(f"  频点: {freq_text} | {trim}")
+
+        # 算法
+        algo = []
+        if hasattr(self, '_check_extrapolate') and self._check_extrapolate.isChecked():
+            algo.append("Theta 外推 180°")
+        if hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked():
+            algo.append("Robust peak")
+        lines.append(f"  算法: {', '.join(algo) if algo else '(默认)'}")
+
+        lines.append("════════════════════════════")
+
+        # 一次性打印到日志区（不加时间戳，保持格式整洁）
+        self.ui.logOutput.appendPlainText("\n".join(lines))
+        # 自动滚动
         cursor = self.ui.logOutput.textCursor()
         cursor.movePosition(QTextCursor.End)
         self.ui.logOutput.setTextCursor(cursor)
@@ -1431,10 +2211,20 @@ class MainWindow(QMainWindow):
         paths = [u.toLocalFile() for u in event.mimeData().urls()]
         valid = [p for p in paths if Path(p).suffix.lower() in ('.csv','.xlsx','.xls')]
         if valid:
+            # 自动清除上次计算遗留的陈旧数据
+            if self._data_stale and self._data_file_paths:
+                self._log(f"🗑 自动清除上次计算遗留的 {len(self._data_file_paths)} 个文件")
+                self._data_file_paths.clear()
+                self._file_entries.clear()
+                self._file_list_widget.setRowCount(0)
+                self._match_table.setRowCount(0)
+                self._lbl_match_status.setText("")
             existing = set(self._data_file_paths)
             new = [p for p in valid if p not in existing]
             if new:
                 self._data_file_paths.extend(new)
+                self._data_stale = False
+                self._sync_file_entries()
                 self._refresh_data_file_ui()
                 self._log(f"📂 拖拽添加 {len(new)} 个文件")
                 if self.ui.editTemplatePath.text().strip():
@@ -1446,7 +2236,10 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """窗口关闭时停止线程 + 保存位置。"""
-        self._settings.setValue("window_geometry", self.saveGeometry())
+        import base64
+        geom = self.saveGeometry()
+        self._cfg.config.window_geometry = bytes(geom.toBase64().data()).decode()
+        self._cfg._dirty = True
         if self._thread and self._thread.isRunning():
             if self._worker:
                 self._worker.cancel()

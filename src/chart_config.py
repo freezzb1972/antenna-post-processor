@@ -11,7 +11,6 @@ import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set
 
-import openpyxl
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -112,6 +111,12 @@ class ChartConfig:
     chart_trp_nhprp: bool = False
     chart_ar_freq: bool = False
 
+    # B 类子选择: 具体角度/范围 (为空时自动使用模板默认值)
+    gain_chart_angles: List[float] = field(default_factory=list)   # PK Gain + 指定 θ 单角度
+    gain_chart_ranges: List[tuple] = field(default_factory=list)   # 指定 θ 范围
+    ar_chart_angles: List[float] = field(default_factory=list)     # AR 指定 θ 单角度
+    ar_chart_ranges: List[tuple] = field(default_factory=list)     # AR 指定 θ 范围
+
     # C 类: 2D 切面
     cut_2d_polar: bool = False
     cut_2d_rect: bool = False
@@ -120,6 +125,7 @@ class ChartConfig:
     elev: float = 30.0
     azim: float = -60.0
     dpi: int = 150
+    step_deg: float = 5.0          # 3D 图形采样精度 (°)
 
     # 输出方式
     embed_in_excel: bool = True
@@ -159,8 +165,13 @@ class ChartConfig:
         ]
         merged = ChartConfig(
             elev=self.elev, azim=self.azim, dpi=self.dpi,
+            step_deg=self.step_deg,
             embed_in_excel=self.embed_in_excel,
             save_png_folder=self.save_png_folder,
+            gain_chart_angles=list(set(self.gain_chart_angles + other.gain_chart_angles)),
+            gain_chart_ranges=list(set(self.gain_chart_ranges + other.gain_chart_ranges)),
+            ar_chart_angles=list(set(self.ar_chart_angles + other.ar_chart_angles)),
+            ar_chart_ranges=list(set(self.ar_chart_ranges + other.ar_chart_ranges)),
         )
         for f in fields:
             setattr(merged, f, getattr(self, f) or getattr(other, f))
@@ -177,49 +188,51 @@ class ChartConfig:
           2. 从模板列类型推导 B 类图表
           3. 合并为默认启用的 ChartConfig
         """
+        import openpyxl
         wb = openpyxl.load_workbook(template_path, data_only=True)
         config = ChartConfig()
         col_types: Set[str] = set()
 
-        for ws in wb.worksheets:
-            max_row = ws.max_row or 100
-            max_col = ws.max_column or 20
+        try:
+            for ws in wb.worksheets:
+                max_row = ws.max_row or 100
+                max_col = ws.max_column or 20
 
-            # 扫描元数据行（在 Frequency 列头之前）
-            header_row = None
-            for row_idx in range(1, min(max_row + 1, 200)):
-                row_texts = []
-                for c_idx in range(1, max_col + 1):
-                    v = ws.cell(row_idx, c_idx).value
-                    if v is not None:
-                        row_texts.append(str(v).strip())
-
-                # 检查是否到了 Frequency 列头行
-                for t in row_texts:
-                    if _match_text(t, [r"(?i)freq", r"(?i)频率"]):
-                        header_row = row_idx
-                        break
-
-                if header_row is not None:
-                    # 此行为列头行 —— 解析列类型
+                # 扫描元数据行（在 Frequency 列头之前）
+                header_row = None
+                for row_idx in range(1, min(max_row + 1, 200)):
+                    row_texts = []
                     for c_idx in range(1, max_col + 1):
-                        v = ws.cell(header_row, c_idx).value
+                        v = ws.cell(row_idx, c_idx).value
                         if v is not None:
-                            from .excel_reader import _parse_sheet
-                            # 简化: 直接通过文本判断
-                            col_type = _classify_column_text(str(v).strip())
-                            if col_type:
-                                col_types.add(col_type)
-                    break
+                            row_texts.append(str(v).strip())
 
-                # 元数据行：搜索图表标题
-                for t in row_texts:
-                    for chart_key, patterns in _CHART_PATTERNS.items():
-                        if _match_text(t, patterns):
-                            setattr(config, chart_key, True)
+                    # 检查是否到了 Frequency 列头行
+                    for t in row_texts:
+                        if _match_text(t, [r"(?i)freq", r"(?i)频率"]):
+                            header_row = row_idx
                             break
 
-        wb.close()
+                    if header_row is not None:
+                        # 此行为列头行 —— 解析列类型
+                        for c_idx in range(1, max_col + 1):
+                            v = ws.cell(header_row, c_idx).value
+                            if v is not None:
+                                from .excel_reader import _parse_sheet
+                                # 简化: 直接通过文本判断
+                                col_type = _classify_column_text(str(v).strip())
+                                if col_type:
+                                    col_types.add(col_type)
+                        break
+
+                    # 元数据行：搜索图表标题
+                    for t in row_texts:
+                        for chart_key, patterns in _CHART_PATTERNS.items():
+                            if _match_text(t, patterns):
+                                setattr(config, chart_key, True)
+                                break
+        finally:
+            wb.close()
 
         # 从列类型推导 B 类图表
         for ct in col_types:
@@ -260,13 +273,19 @@ class ChartConfig:
 
     @classmethod
     def all_chart_keys(cls) -> List[str]:
-        """返回所有图形 flag 的 key 列表（不含视角参数）。"""
+        """返回所有图形 flag 的 key 列表（不含视角参数和角度列表）。"""
         return [
             "pattern_3d_gain", "pattern_3d_eirp", "pattern_3d_ar",
             "chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
             "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp",
             "chart_ar_freq", "cut_2d_polar", "cut_2d_rect",
         ]
+
+    @classmethod
+    def all_sub_angle_keys(cls) -> List[str]:
+        """返回所有子角度列表的 key。"""
+        return ["gain_chart_angles", "gain_chart_ranges",
+                "ar_chart_angles", "ar_chart_ranges"]
 
     @classmethod
     def chart_labels(cls) -> Dict[str, str]:

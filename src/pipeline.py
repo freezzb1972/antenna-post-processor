@@ -27,8 +27,12 @@ from .calculator import (
     compute_peak_eirp, compute_partial_prp, compute_power_ratios,
     compute_prp_trp_ratio, compute_total_gain_linear, compute_trp,
     compute_upper_hemisphere_prp,
+    compute_xpi,
+    compute_total_efficiency,
+    compute_phase_center,
 )
 import copy
+import math
 import re
 
 from .datasource import DataSource
@@ -129,6 +133,9 @@ def _process_one_frequency(
     extra_params: set = None,
     chart_config: "ChartConfig" = None,
     ar_lag_config: "LagConfig" = None,
+    nh_custom_angles: Optional[List[float]] = None,
+    ar_output_db: bool = True,
+    log_cb=None,
 ) -> Dict[str, Any]:
     """处理单个频点。按 needed_params（模板列）+ extra_params（用户额外）计算。"""
     theta_lm = raw["theta_logmag"]
@@ -191,8 +198,16 @@ def _process_one_frequency(
     for label, edge in [("nhpis_45", 45.0), ("nhpis_30", 30.0), ("nhpis_225", 22.5)]:
         if label in compute_set or not need: row[label] = round(compute_nhprp_flex(gain_linear, theta_rad, edge), 2)
     # Custom NHPRP/NHPIS angle
-    if "nhprp_custom" in compute_set or not need: row["nhprp_custom"] = round(compute_nhprp_flex(gain_linear, theta_rad, 45.0), 2)
-    if "nhpis_custom" in compute_set or not need: row["nhpis_custom"] = round(compute_nhprp_flex(gain_linear, theta_rad, 45.0), 2)
+    _nh_angles = nh_custom_angles if nh_custom_angles else [45.0]  # default: 45°
+    if "nhprp_custom" in compute_set or not need:
+        for edge in _nh_angles:
+            row[f"nhprp_custom_{int(edge)}"] = round(compute_nhprp_flex(gain_linear, theta_rad, edge), 2)
+        # 向后兼容: 保留第一个角度键
+        row["nhprp_custom"] = round(compute_nhprp_flex(gain_linear, theta_rad, _nh_angles[0]), 2)
+    if "nhpis_custom" in compute_set or not need:
+        for edge in _nh_angles:
+            row[f"nhpis_custom_{int(edge)}"] = round(compute_nhprp_flex(gain_linear, theta_rad, edge), 2)
+        row["nhpis_custom"] = round(compute_nhprp_flex(gain_linear, theta_rad, _nh_angles[0]), 2)
 
     uh_prp = compute_upper_hemisphere_prp(gain_linear, theta_rad)
     lh_prp = compute_lower_hemisphere_prp(gain_linear, theta_rad)
@@ -256,17 +271,62 @@ def _process_one_frequency(
                     ar_singles = ar_cfg.singles_sorted
                     if ar_singles:
                         for angle, val in compute_ar_at_angles(ar, theta_deg, ar_singles).items():
+                            if ar_output_db:
+                                val = 20.0 * math.log10(max(val, 1e-15))
                             row[f"ar_single_{angle}"] = round(val, 6)
                     # AR 范围
                     ar_ranges = ar_cfg.ranges_sorted
                     if ar_ranges:
                         for (lo, hi), val in [(r, compute_ar_range(ar, theta_deg, r[0], r[1])) for r in ar_ranges]:
+                            if ar_output_db:
+                                val = 20.0 * math.log10(max(val, 1e-15))
                             row[f"ar_range_{lo}_{hi}"] = round(val, 6)
                     # 向后兼容的 axial_ratio 字段
                     if "axial_ratio" in compute_set or not need:
-                        row["axial_ratio"] = round(float(np.mean(ar[0, :5])), 6)
+                        legacy_ar = float(np.mean(ar[0, :5]))
+                        if ar_output_db:
+                            legacy_ar = 20.0 * math.log10(max(legacy_ar, 1e-15))
+                        row["axial_ratio"] = round(legacy_ar, 6)
             except Exception as e:
                 row["axial_ratio_error"] = str(e)
+
+    # Cross-Polarization Isolation (XPI)
+    xpi_need = compute_set & {"xpi_boresight", "xpi_mean", "xpi_min"}
+    if xpi_need or not need:
+        xpi_result = compute_xpi(theta_lm, phi_lm)
+        if "xpi_boresight" in compute_set or not need:
+            row["xpi_boresight"] = round(xpi_result["xpi_boresight"], 6)
+        if "xpi_mean" in compute_set or not need:
+            row["xpi_mean"] = round(xpi_result["xpi_mean"], 6)
+        if "xpi_min" in compute_set or not need:
+            row["xpi_min"] = round(xpi_result["xpi_min"], 6)
+
+    # Total Efficiency (含 S11 反射损耗 — S11 当前不可用, 标记为 None)
+    te_need = compute_set & {"total_efficiency_pct", "mismatch_loss_db"}
+    if te_need or not need:
+        if directivity_dbi is None:
+            directivity_dbi = compute_directivity(gain_linear, theta_rad)
+        te_eff_pct, _ = compute_efficiency(peak_dbi, directivity_dbi)
+        te_result = compute_total_efficiency(te_eff_pct)
+        if "total_efficiency_pct" in compute_set or not need:
+            row["total_efficiency_pct"] = round(te_result["total_efficiency_pct"], 6)
+        if "mismatch_loss_db" in compute_set or not need:
+            row["mismatch_loss_db"] = round(te_result["mismatch_loss_db"], 6)
+        # total_efficiency_pct 为 None 说明 S11 数据未提供
+        if te_result["total_efficiency_pct"] is None and log_cb:
+            _log(log_cb,
+                 f"  ℹ {freq} MHz: Total Efficiency 需 S11 (回波损耗) 数据，当前标记为 None")
+
+    # Phase Center (仅当有 Phase 数据)
+    pc_need = compute_set & {"pc_theta_mm", "pc_phi_mm"}
+    if pc_need or not need:
+        tp_r = raw.get("theta_phase"); pp_r = raw.get("phi_phase")
+        if tp_r is not None and pp_r is not None:
+            pc_result = compute_phase_center(tp_r, pp_r, theta_deg, freq)
+            if "pc_theta_mm" in compute_set or not need:
+                row["pc_theta_mm"] = round(pc_result["pc_theta_mm"], 6)
+            if "pc_phi_mm" in compute_set or not need:
+                row["pc_phi_mm"] = round(pc_result["pc_phi_mm"], 6)
 
     # LAG
     singles = lag_config.singles_sorted
@@ -300,8 +360,19 @@ def _process_one_frequency(
             )
             if images:
                 row["_images"] = images
-        except Exception:
-            pass  # 图形生成失败不阻塞数据处理
+        except Exception as e:
+            row["_graph_error"] = str(e)  # 图形生成失败不阻塞数据处理
+
+    # 存储原始数据供图形展示使用
+    # NOTE: 每频点存储 _raw_data 会大幅增加内存开销。
+    # 若有 N 个频点，每个频点的数据为 (n_phi × n_theta) float64 矩阵，
+    # 总内存占用 = N × n_phi × n_theta × 8 字节。
+    # 对高分辨率扫描 (如 361×181) 和大量频点，可能达到数百 MB。
+    # 建议通过 chart_config 限制图形生成频率数，或在 pipeline 层面
+    # 仅存储必要的 raw_data。
+    row["_raw_data"] = {k: v for k, v in raw.items() if v is not None}
+    row["_theta_angles"] = list(theta_deg)
+    row["_phi_angles"] = [float(i) for i in np.linspace(0, 360, phi_lm.shape[0], endpoint=False)]
 
     return row
 
@@ -350,7 +421,7 @@ def _expand_template_sheets(
     Returns:
         扩展后的 SheetInfo 列表。
     """
-    if len(sheets_info) < 2:
+    if len(sheets_info) >= len(datasource_map):
         return list(sheets_info)
 
     ref = sheets_info[0]
@@ -414,6 +485,7 @@ def _collect_tasks(
     freq_source: str = "datasource",
     trim_start: int = 0,
     trim_end: int = 0,
+    sheet_mode_map: Optional[Dict[str, int]] = None,
     log_cb=None,
 ) -> List[Tuple[str, float, int, Any, DataSource]]:
     """收集所有 (sheet_name, freq, csv_idx, lag_cfg, ds) 任务。"""
@@ -437,8 +509,18 @@ def _collect_tasks(
         # 提取模板需要的参数类型
         needed_params = {c.col_type for c in si.columns}
 
+        # 混合批处理: 记录 sheet 对应的测试模式
+        smap = sheet_mode_map or {}
+        sheet_mode = smap.get(si.name, 0)
+        mode_label = {0: "无源", 1: "TRP", 2: "TIS"}.get(sheet_mode, "?")
+
         is_expanded = si.name in expanded_names if use_multi else False
         use_ds_freqs = (is_expanded and freq_source == "datasource")
+
+        # 调试: 记录本 sheet 的频点来源信息
+        ds_freq_count = len(ds.frequencies) if ds else 0
+        tmpl_freq_count = len(si.frequencies) if si.frequencies else 0
+        _log(log_cb, f"  [{si.name}] 数据源={ds_freq_count}频点, 模板={tmpl_freq_count}频点, expanded={is_expanded}")
 
         if not use_ds_freqs:
             dsfreqs = ds.frequencies
@@ -451,6 +533,8 @@ def _collect_tasks(
             if match_count == 0 and dsfreqs:
                 _log(log_cb, f"  ↻ {si.name}: 模板频点无匹配 → 使用数据源全部 {len(dsfreqs)} 个频点")
                 use_ds_freqs = True
+            elif match_count > 0:
+                _log(log_cb, f"  ✓ {si.name}: 模板匹配 {match_count}/{tmpl_freq_count} 个频点")
 
         if use_ds_freqs:
             dsfreqs = ds.frequencies
@@ -489,6 +573,8 @@ def _load_and_compute(
     extra_params: set = None,
     chart_config: "ChartConfig" = None,
     ar_lag_config: "LagConfig" = None,
+    nh_custom_angles: Optional[List[float]] = None,
+    ar_output_db: bool = True,
     cancel_callback=None,
     progress_callback=None,
     log_callback=None,
@@ -510,7 +596,7 @@ def _load_and_compute(
             break
         raw = task_ds.read_sections(csv_idx)
         theta_list = list(task_ds.theta_angles)
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config, ar_lag_config))
+        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config, ar_lag_config, nh_custom_angles, ar_output_db))
         if (i + 1) % 20 == 0 or (i + 1) == total:
             _report(progress_callback, i + 1, progress_max, f"读取中 {i + 1}/{total}")
 
@@ -537,22 +623,22 @@ def _load_and_compute(
                         f"计算中 {completed}/{data_done}")
     else:
         _run_compute_serial(compute_tasks, sheet_results, data_done, progress_max,
-                            cancel_callback, progress_callback)
+                            cancel_callback, progress_callback, log_cb=log_callback)
 
     return sheet_results
 
 
 def _run_compute_serial(
     compute_tasks, sheet_results, data_done, progress_max,
-    cancel_callback, progress_callback,
+    cancel_callback, progress_callback, log_cb=None,
 ):
     """串行逐频点计算（单进程或 parallel=1）。"""
-    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg) in enumerate(compute_tasks):
+    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db) in enumerate(compute_tasks):
         if cancel_callback and cancel_callback():
             break
         try:
             theta_arr = np.array(theta_list)
-            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg)
+            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, log_cb=log_cb)
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
@@ -587,6 +673,7 @@ def run_pipeline(
     output_path: str = "",
     *,
     datasource_map: Optional[Dict[str, DataSource]] = None,
+    sheet_mode_map: Optional[Dict[str, int]] = None,
     lag_config_override: Optional[LagConfig] = None,
     ar_lag_config_override: Optional[LagConfig] = None,
     plot_config: Optional[PlotConfig] = None,
@@ -595,10 +682,11 @@ def run_pipeline(
     freq_source: str = "datasource",
     trim_start: int = 0,
     trim_end: int = 0,
-    chart_config: Optional[Dict[str, bool]] = None,
     chart_config_obj: Optional[ChartConfig] = None,
     robust_peak: bool = False,
     extra_params: Optional[set] = None,
+    nh_custom_angles: Optional[List[float]] = None,
+    ar_output_db: bool = True,
     parallel: int = 1,
     cancel_callback: Optional[Callable[[], bool]] = None,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
@@ -655,11 +743,13 @@ def run_pipeline(
         _log(log_callback, "使用用户指定的 LAG 配置")
 
     # ---- 2. 收集任务 + 加载数据 + 计算 ----
-    tasks = _collect_tasks(sheets_info, datasource, datasource_map, freq_source, trim_start, trim_end, log_callback)
+    tasks = _collect_tasks(sheets_info, datasource, datasource_map, freq_source, trim_start, trim_end, sheet_mode_map, log_callback)
     sheet_results = _load_and_compute(
         tasks, sheets_info, extrapolate_theta, robust_peak, parallel,
         extra_params=extra_params, chart_config=chart_config_obj,
         ar_lag_config=ar_lag_config_override,
+        nh_custom_angles=nh_custom_angles,
+        ar_output_db=ar_output_db,
         cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,
     )
     _close_datasources(use_multi_ds, datasource, datasource_map)
@@ -676,8 +766,7 @@ def run_pipeline(
         sheet_results=sheet_results,
         pattern_images=None,
         sheets_info=sheets_info,
-        chart_config=chart_config or {},
-        chart_config_obj=chart_config_obj,
+        chart_config=chart_config_obj,
         log_callback=log_callback,
     )
     _report(progress_callback, progress_max - 1, progress_max, "Excel 写入完成")
@@ -756,11 +845,11 @@ def _compute_chunk(
     """
     import numpy as np
     results = []
-    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg in compute_tasks:
+    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db in compute_tasks:
         try:
             theta_raw = np.array(theta_list)
             row = _process_one_frequency(raw, freq, theta_raw, lag_cfg,
-                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg)
+                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db)
             results.append((sheet_name, row))
         except Exception as e:
             results.append((sheet_name, {"frequency": freq, "_error": str(e)}))

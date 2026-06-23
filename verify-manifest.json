@@ -1,0 +1,814 @@
+{
+  "version": 1,
+  "project": "antenna-post-processor",
+  "last_verified": "2026-06-22",
+  "ui": {
+    "compiled_widgets": [
+      "btnAddCustomAngle",
+      "btnAddRange",
+      "btnBrowseCsv",
+      "btnBrowseFullReport",
+      "btnBrowseOutput",
+      "btnBrowseTemplate",
+      "btnClearConfig",
+      "btnLangToggle",
+      "btnLoadFromTemplate",
+      "btnLoadPreset",
+      "btnQuick0",
+      "btnQuick30",
+      "btnQuick60",
+      "btnQuick70",
+      "btnQuick80",
+      "btnQuick90",
+      "btnSavePreset",
+      "btnStart",
+      "btnStepGenerate",
+      "btnStop",
+      "centralWidget",
+      "checkEmbedExcel",
+      "checkFullReport",
+      "checkSavePng",
+      "cmbThemeSelector",
+      "configItemsWidget",
+      "editCsvPath",
+      "editFullReportPath",
+      "editOutputDir",
+      "editOutputName",
+      "editTemplatePath",
+      "formInput",
+      "formOutput",
+      "formView",
+      "groupConfigured",
+      "groupGenImg",
+      "groupInput",
+      "groupOutput",
+      "groupQuickSingle",
+      "groupRange",
+      "groupStepGen",
+      "groupView",
+      "hButtons",
+      "hConfigButtons",
+      "hProgress",
+      "hQuickSingle",
+      "hRange",
+      "hStepGen",
+      "hboxLayout",
+      "hboxLayout1",
+      "hboxLayout2",
+      "hboxLayout3",
+      "lblAppTitle",
+      "lblAzim",
+      "lblCsv",
+      "lblCustomAngle",
+      "lblDpi",
+      "lblElev",
+      "lblFullReportPath",
+      "lblOutputDir",
+      "lblOutputName",
+      "lblProgressMsg",
+      "lblREnd",
+      "lblRStart",
+      "lblStepBy",
+      "lblStepEnd",
+      "lblStepStart",
+      "lblTemplate",
+      "lblTheme",
+      "logOutput",
+      "progressBar",
+      "rootVBox",
+      "spBtnLeft",
+      "spConfig",
+      "spFile",
+      "spPlot",
+      "spQuick",
+      "spRange",
+      "spinAzim",
+      "spinCustomAngle",
+      "spinDpi",
+      "spinElev",
+      "spinREnd",
+      "spinRStart",
+      "spinStepBy",
+      "spinStepEnd",
+      "spinStepStart",
+      "statusBar",
+      "tabCalc",
+      "tabCharts",
+      "tabConfig",
+      "tabFile",
+      "tabLag",
+      "tabPlot",
+      "tabResults",
+      "toolbarLayout",
+      "toolbarSpacer",
+      "vConfigured",
+      "vTabCalc",
+      "vTabCharts",
+      "vTabFile",
+      "vTabLag",
+      "vTabPlot",
+      "vTabResults",
+      "vboxLayout"
+    ],
+    "dynamic_widgets": [
+      "_btn_add_files",
+      "_btn_auto_match",
+      "_btn_clear_all",
+      "_btn_clear_selected",
+      "_check_chart_eff",
+      "_check_chart_lag",
+      "_check_extrapolate",
+      "_check_robust_peak",
+      "_cmb_freq_source",
+      "_data_file_widget",
+      "_file_list_widget",
+      "_lag_scroll",
+      "_lbl_match_status",
+      "_match_table",
+      "_thread"
+    ],
+    "methods": [
+      "__init__",
+      "_add_custom_angle",
+      "_apply_minimum_sizes",
+      "_build_datasource_map",
+      "_build_sheet_mode_map",
+      "_connect_signals",
+      "_derive_new_sheet_name",
+      "_enter_busy",
+      "_exit_busy",
+      "_get_template_params",
+      "_hide_settings_tabs",
+      "_init_file_paths",
+      "_init_menu",
+      "_init_multi_file_ui",
+      "_init_param_overview",
+      "_init_params_tab",
+      "_init_quick_angle_buttons",
+      "_init_theme_selector",
+      "_log",
+      "_log_current_params",
+      "_make_readable_label",
+      "_make_tab_scrollable",
+      "_on_about",
+      "_on_add_data_files",
+      "_on_add_range",
+      "_on_auto_match",
+      "_on_browse_full_report",
+      "_on_browse_output",
+      "_on_browse_template",
+      "_on_clear_all_files",
+      "_on_clear_config",
+      "_on_clear_selected_files",
+      "_on_error",
+      "_on_file_mode_changed",
+      "_on_finished",
+      "_on_full_report_toggled",
+      "_on_help",
+      "_on_license",
+      "_on_load_from_template",
+      "_on_load_preset",
+      "_on_match_changed",
+      "_on_progress",
+      "_on_save_preset",
+      "_on_start",
+      "_on_step_generate",
+      "_on_stop",
+      "_on_theme_changed",
+      "_on_toggle_language",
+      "_on_tool_batch_check",
+      "_on_tool_calibrate",
+      "_on_tool_emq_export",
+      "_on_tool_merge",
+      "_on_tool_resample",
+      "_on_worker_log",
+      "_populate_charts",
+      "_populate_graph_data",
+      "_populate_match_table",
+      "_populate_results_table",
+      "_refresh_data_file_ui",
+      "_remove_range",
+      "_remove_single",
+      "_restore_start_button",
+      "_retry_unmatched_files",
+      "_save_template_path",
+      "_show_calc_params_dialog",
+      "_show_data_source_dialog",
+      "_show_llm_settings",
+      "_show_plot_config_dialog",
+      "_show_save_preset_dialog",
+      "_show_system_settings",
+      "_sync_file_entries",
+      "_sync_quick_buttons",
+      "_toggle_quick_angle",
+      "_update_lag_display",
+      "_update_lang_button",
+      "_update_status"
+    ],
+    "dialogs": [
+      "DataSourceDialog",
+      "CalcParamsDialog",
+      "PlotConfigDialog",
+      "SystemSettingsDialog",
+      "RAGSettingsDialog",
+      "HelpDialog"
+    ],
+    "required_visible_tabs": [
+      0
+    ]
+  },
+  "computation": {
+    "modules": [
+      "activation.py",
+      "activation_server.py",
+      "calculator.py",
+      "chart_config.py",
+      "config_manager.py",
+      "datasource.py",
+      "emquest_exporter.py",
+      "excel_reader.py",
+      "exporter.py",
+      "file_entry.py",
+      "finalsummary_reader.py",
+      "graph_data.py",
+      "help_engine.py",
+      "lag_config.py",
+      "license.py",
+      "llm_assist.py",
+      "parser.py",
+      "pipeline.py",
+      "plot_config.py",
+      "plotter.py",
+      "raw_converter.py",
+      "renderer.py",
+      "report_exporter.py",
+      "scale_manager.py",
+      "sheet_file_matcher.py",
+      "step_resampler.py",
+      "template_manager.py",
+      "ui/dialogs.py",
+      "ui/graph_viewer.py",
+      "ui/layout_utils.py",
+      "ui/main_window.py",
+      "ui/splash_screen.py",
+      "ui/theme_manager.py",
+      "worker.py"
+    ]
+  },
+  "tests": {
+    "files": [
+      "__init__.py",
+      "test_calculator.py",
+      "test_e2e_features.py",
+      "test_excel_reader.py",
+      "test_gui.py",
+      "test_gui_e2e.py",
+      "test_lag_config.py"
+    ],
+    "total": 71
+  },
+  "features": [
+    {
+      "id": "file-input-multi",
+      "description": "多文件数据源输入 + 自动工作表匹配",
+      "type": "ui",
+      "widgets": [
+        "_file_list_widget",
+        "_btn_add_files",
+        "_btn_clear_files",
+        "_btn_auto_match",
+        "_match_table",
+        "_lbl_match_status"
+      ],
+      "methods": [
+        "_on_add_data_files",
+        "_on_clear_data_files",
+        "_on_auto_match",
+        "_refresh_data_file_ui",
+        "_build_datasource_map"
+      ],
+      "tests": [
+        "test_e2e_features.py::TestMultiFileInput"
+      ],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "4 E2E tests (add/clear/auto-match/build map)"
+    },
+    {
+      "id": "template-management",
+      "description": "模板预设管理系统 (厂商→模板两级下拉 + 保存预设按钮)",
+      "type": "ui",
+      "widgets": [
+        "_cmb_mfr",
+        "_cmb_template",
+        "_btn_save_preset"
+      ],
+      "methods": [
+        "_on_mfr_changed",
+        "_on_preset_template_changed",
+        "_on_save_preset",
+        "_save_template_path",
+        "_init_file_paths"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "GUI check G7 validates widget visibility + tab not hidden + QFormLayout insertRow fix"
+    },
+    {
+      "id": "splash-screen",
+      "description": "启动闪屏 (进度条 + 状态消息)",
+      "type": "ui",
+      "widgets": [],
+      "methods": [],
+      "src_modules": [
+        "ui/splash_screen.py"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "main.py splash flow: QApplication -> SplashScreen -> ThemeManager -> MainWindow -> show"
+    },
+    {
+      "id": "chart-generation",
+      "description": "Excel 输出中的图表生成 (效率/增益/TRP 曲线)",
+      "type": "ui+computation",
+      "widgets": [
+        "_check_chart_eff",
+        "_check_chart_lag"
+      ],
+      "methods": [
+        "_populate_charts"
+      ],
+      "src_modules": [
+        "exporter.py",
+        "chart_config.py",
+        "plotter.py",
+        "renderer.py"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "Unified ChartConfig system, GUI checkbox state propagated correctly, dict branch removed"
+    },
+    {
+      "id": "gain-directivity-efficiency",
+      "description": "增益/方向性/效率 计算",
+      "type": "computation",
+      "src_modules": [
+        "calculator.py",
+        "pipeline.py"
+      ],
+      "tests": [
+        "test_calculator.py"
+      ],
+      "e2e_verified": true,
+      "status": "verified"
+    },
+    {
+      "id": "trp-nhprp",
+      "description": "TRP/NHPRP/PeakEIRP 计算",
+      "type": "computation",
+      "src_modules": [
+        "calculator.py",
+        "pipeline.py"
+      ],
+      "tests": [
+        "test_calculator.py"
+      ],
+      "e2e_verified": true,
+      "status": "verified"
+    },
+    {
+      "id": "lag",
+      "description": "LAG (线性域平均增益) 计算",
+      "type": "computation",
+      "src_modules": [
+        "calculator.py",
+        "pipeline.py",
+        "lag_config.py"
+      ],
+      "tests": [
+        "test_lag_config.py",
+        "test_calculator.py"
+      ],
+      "e2e_verified": true,
+      "status": "verified"
+    },
+    {
+      "id": "axial-ratio",
+      "description": "轴比 AR 计算 (IEEE 149 CP 分解法)",
+      "type": "computation",
+      "src_modules": [
+        "calculator.py",
+        "pipeline.py"
+      ],
+      "tests": [
+        "test_calculator.py"
+      ],
+      "e2e_verified": true,
+      "status": "verified"
+    },
+    {
+      "id": "excel-export",
+      "description": "Excel 模板填充 + 结果导出",
+      "type": "computation",
+      "src_modules": [
+        "exporter.py",
+        "excel_reader.py",
+        "report_exporter.py"
+      ],
+      "tests": [
+        "test_excel_reader.py"
+      ],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "Chart sub-selection E2E verified: 4-sheet multi-curve with smooth lines, 360 rows processed"
+    },
+    {
+      "id": "data-source-final-summary",
+      "description": "FinalSummary.xlsx 数据源读取",
+      "type": "computation",
+      "src_modules": [
+        "finalsummary_reader.py",
+        "datasource.py"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "Clipping removed per CTIA/EMQuest standards, AR calculation matches Excel AxR 98.9%"
+    },
+    {
+      "id": "font-scaling",
+      "description": "系统设置字体大小调整 (含菜单栏 QSS 覆盖)",
+      "type": "ui",
+      "widgets": [
+        "_spin_font"
+      ],
+      "methods": [
+        "_on_apply_font"
+      ],
+      "dialogs": [
+        "SystemSettingsDialog"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "QSS override for QMenuBar/QMenu/QMenu::item font-size added in _on_apply_font, G9 validates"
+    },
+    {
+      "id": "llm-rag-settings",
+      "description": "LLM API 设置 (RAG 问答配置)",
+      "type": "ui",
+      "dialogs": [
+        "RAGSettingsDialog"
+      ],
+      "src_modules": [
+        "help_engine.py"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "Dialog min size 450x320, API URL/Key minWidth=340, G5c validates"
+    },
+    {
+      "id": "drag-drop",
+      "description": "文件拖拽导入",
+      "type": "ui",
+      "methods": [
+        "dragEnterEvent",
+        "dropEvent"
+      ],
+      "tests": [
+        "test_e2e_features.py::TestDragDrop"
+      ],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "3 E2E tests (accept drops/file filter/drop events)"
+    },
+    {
+      "id": "processing-thread",
+      "description": "QThread 后台处理 + 进度/日志信号",
+      "type": "ui+computation",
+      "widgets": [
+        "btnStart",
+        "btnStop",
+        "progressBar",
+        "logOutput"
+      ],
+      "methods": [
+        "_on_start",
+        "_on_stop",
+        "_on_progress",
+        "_on_worker_log",
+        "_on_finished",
+        "_on_error"
+      ],
+      "src_modules": [
+        "worker.py"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified"
+    },
+    {
+      "id": "theme-i18n",
+      "description": "Material Design 主题切换 + 中英文翻译",
+      "type": "ui",
+      "methods": [
+        "_init_theme_selector",
+        "_on_theme_changed"
+      ],
+      "src_modules": [
+        "theme_manager.py",
+        "i18n_manager.py"
+      ],
+      "tests": [
+        "test_e2e_features.py::TestThemeI18n"
+      ],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "5 E2E tests (theme list/switch/lang toggle/font persist/menu bar)"
+    },
+    {
+      "id": "cross-polarization-isolation",
+      "description": "交叉极化隔离度 — 主极化与交叉极化在同一方向的电平差",
+      "type": "computation",
+      "src_modules": [
+        "calculator.py",
+        "pipeline.py"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "Calculator+pipeline+exporter+dialogs integrated. 46 tests pass."
+    },
+    {
+      "id": "total-efficiency",
+      "description": "总效率 — 辐射效率 × (1-|S11|²), 需要S11回波损耗数据",
+      "type": "computation",
+      "src_modules": [
+        "calculator.py",
+        "pipeline.py"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "Calculator+pipeline+exporter+dialogs integrated. 46 tests pass."
+    },
+    {
+      "id": "phase-center",
+      "description": "相位中心 — 远场辐射的等效发射点, 多天线/卫星定位关键参数",
+      "type": "computation",
+      "src_modules": [
+        "calculator.py",
+        "pipeline.py"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "Calculator+pipeline+exporter+dialogs integrated. 46 tests pass."
+    },
+    {
+      "id": "nf2ff-transformation",
+      "description": "球面近远场变换(NF2FF)模块 — 矢球波函数+矩阵反演+探头校正接口",
+      "type": "computation",
+      "src_modules": [
+        "nf2ff/transform.py",
+        "nf2ff/vector_wave.py",
+        "nf2ff/probe.py",
+        "nf2ff/probe_cal.py",
+        "nf2ff/utils.py"
+      ],
+      "tests": [],
+      "e2e_verified": false,
+      "status": "partial",
+      "_verified_note": "Architecture ready. Probe correction interface complete. Awaiting calibration data for accuracy validation."
+    },
+    {
+      "id": "calc-params-hierarchical",
+      "description": "计算参数配置层级化 — 单列折叠组, Gain/AR内嵌角度弹窗(FlowLayout一行多条 + QSplitter可拖动高度), 旧角度区隐藏",
+      "type": "ui",
+      "widgets": [],
+      "methods": [
+        "_show_angle_popup",
+        "_rebuild_param_columns"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "FlowLayout wraps angle tags, QSplitter allows manual height drag, _update_selected_display also uses FlowLayout, removed redundant QTabWidget, added _update_summary panel, _log_current_params in MainWindow"
+    },
+    {
+      "id": "mixed-batch-processing",
+      "description": "混合批处理 — 每文件独立测试模式(无源/TRP/TIS), FileEntry数据模型, 文件列表模式列, sheet_mode_map管线传递",
+      "type": "ui+computation",
+      "src_modules": [
+        "file_entry.py",
+        "pipeline.py",
+        "worker.py"
+      ],
+      "widgets": [
+        "_file_list_widget"
+      ],
+      "methods": [
+        "_sync_file_entries",
+        "_refresh_data_file_ui",
+        "_on_file_mode_changed",
+        "_on_auto_match"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "Phase 1-5 complete: FileEntry model, mode column in file list, sheet_mode_map through worker→pipeline, auto-infer mode from sheet names. 71 tests pass."
+    },
+    {
+      "id": "config-manager",
+      "description": "统一配置管理 — antenna_config.json 单一真相源, AES-256-GCM API密钥加密, QSettings迁移, 线程安全单例",
+      "type": "computation",
+      "src_modules": [
+        "config_manager.py"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "All 71 tests pass with config_manager. QSettings migration verified. thread-safe singleton pattern."
+    },
+    {
+      "id": "trial-system",
+      "description": "30天试用系统 — HMAC-SHA256签名, 4层冗余存储(EXE内嵌/QSettings/~/.local/share/~/.antpp), 保守最早日期策略",
+      "type": "computation",
+      "src_modules": [
+        "config_manager.py"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "EXE append/read verified with MAGIC marker scan. HMAC anti-tamper cross-check between 4 storage layers."
+    },
+    {
+      "id": "chart-sub-selection",
+      "description": "Gain/AR 频点曲线子选择 — 多曲线支持, 角度选择弹窗, 列-角度自动匹配, 平滑曲线",
+      "type": "ui+computation",
+      "src_modules": [
+        "chart_config.py",
+        "exporter.py"
+      ],
+      "widgets": [],
+      "methods": [
+        "_show_chart_angle_popup"
+      ],
+      "dialogs": [
+        "PlotConfigDialog"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "E2E verified: gain_chart_angles=[60,90] + gain_chart_ranges=[(0,90)] → 4 series per sheet (PK Gain + Gain@60 + Gain@90 + Gain@0~90), smooth=True, correct chart titles"
+    },
+    {
+      "id": "enhanced-graph-viewer",
+      "description": "增强3D图形查看器 — 旋转预设(6视图), 色图选择器(10选项), PNG导出, 实时视角显示",
+      "type": "ui",
+      "src_modules": [
+        "graph_viewer.py"
+      ],
+      "widgets": [],
+      "methods": [
+        "_build_advanced_toolbar",
+        "_set_view_preset",
+        "_on_cmap_changed",
+        "_on_export_view"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "Toolbar with Iso/Top/Front/Side/Back/Bottom presets + 10 colormaps + PNG export button + live angle display"
+    },
+    {
+      "id": "angle-popup-ux",
+      "description": "角度配置弹窗UX修复 — add/delete不关闭对话框, 仅OK提交/Cancel放弃, deep copy + refresh",
+      "type": "ui",
+      "methods": [
+        "_show_angle_popup"
+      ],
+      "dialogs": [
+        "CalcParamsDialog"
+      ],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "Popup stays open during add/delete, OK commits changes, Cancel discards. Deep copy pattern prevents mutation."
+    },
+    {
+      "id": "ar-angle-auto-detect",
+      "description": "AR角度自动检测 — 从模板列头正则匹配AR单角度/范围, from_ar_headers()工厂方法",
+      "type": "computation",
+      "src_modules": [
+        "lag_config.py"
+      ],
+      "tests": [
+        "test_lag_config.py"
+      ],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "RE_AR_SINGLE + RE_AR_RANGE patterns match AR at Theta=XX and AR at Theta=XX~YY"
+    },
+    {
+      "id": "aborted-freq-col-autodetect",
+      "name": "Aborted 格式频点列自动检测",
+      "description": "_parse_section_block 自动检测 Frequency 列位置, 兼容不同 aborted 格式",
+      "status": "verified",
+      "_verified_note": "2026-06-22: 修复频点列硬编码 index=1 导致的解析失败, 改为从标题行自动检测",
+      "widgets": [],
+      "tests": []
+    },
+    {
+      "id": "standard-csv-parser",
+      "name": "标准格式 CSV 解析器",
+      "description": "新增 _parse_standard + _parse_standard_section_block, 支持标准 EMQuest CSV 解析",
+      "status": "verified",
+      "_verified_note": "2026-06-22: 新增模块, 支持解析 Theta/Phi LogMag+Phase 标准格式",
+      "widgets": [],
+      "tests": []
+    },
+    {
+      "id": "mixed-format-merge",
+      "name": "混合格式合并 (标准 + aborted)",
+      "description": "merge_csv_files 自动检测并处理标准格式和 aborted 格式的混合合并",
+      "status": "verified",
+      "_verified_note": "2026-06-22: 支持标准格式 LogMag+Phase → Real+Imag 的内部转换后合并",
+      "widgets": [],
+      "tests": []
+    },
+    {
+      "id": "path-loss-calibration",
+      "name": "路径损耗补偿工具",
+      "description": "加载 EMQuest 导出的 RSP CSV, 应用 Gain=S21-Response 校准",
+      "status": "verified",
+      "_verified_note": "2026-06-22: 新增 parse_rsp_csv + apply_path_loss_calibration + GUI 菜单项",
+      "widgets": [
+        "_on_tool_calibrate"
+      ],
+      "tests": []
+    },
+    {
+      "id": "phi-filter-merge",
+      "name": "合并时 Phi 环绕值过滤",
+      "description": "merge_csv_files 自动过滤 phi>=360 的冗余环绕值 (如 360°, 541°)",
+      "status": "verified",
+      "_verified_note": "2026-06-22: 防止合并结果中出现 541° 等无效 phi 值",
+      "widgets": [],
+      "tests": []
+    },
+    {
+      "id": "batch-check-convert",
+      "name": "格式检查与批量转换",
+      "description": "检测文件格式 (standard/aborted), 批量转换 aborted 文件 + 可选 RSP 校准",
+      "status": "verified",
+      "_verified_note": "2026-06-22: 新工具, 支持单文件/文件夹扫描, 自动识别+批量转换",
+      "widgets": [
+        "_on_tool_batch_check"
+      ],
+      "tests": []
+    },
+    {
+      "id": "emquest-export-tool",
+      "name": "EMQuest 数据导出",
+      "description": "通过 EMQuest CLI 将 .raw 导出为 CSV/Excel/JSON, 后台模式+NI 弹窗看门狗+大文件警告",
+      "status": "verified",
+      "_verified_note": "2026-06-22: 支持 -s silent 模式, 自适应超时, NI 看门狗, >100MB 警告",
+      "widgets": [
+        "_on_tool_emq_export"
+      ],
+      "tests": []
+    },
+    {
+      "id": "readable-results-headers",
+      "name": "结果面板可读列名",
+      "description": "AR_single_10 → AR 10°, 自动换行, 动态转换规则",
+      "status": "verified",
+      "_verified_note": "2026-06-22: _make_readable_label + setWordWrap",
+      "widgets": [],
+      "tests": []
+    },
+    {
+      "id": "merge-rsp-calibration",
+      "name": "合并时 RSP 校准集成",
+      "description": "merge_csv_files 增加 rsp_h/rsp_v 参数, aborted 文件转换后自动校准再合并",
+      "status": "verified",
+      "_verified_note": "2026-06-22: LogMag 域直接合并, 校准 broadcast",
+      "widgets": [],
+      "tests": []
+    },
+    {
+      "id": "merge-aborted-warning",
+      "name": "合并时 aborted 未校准警告",
+      "description": "检测 aborted 文件未加载 RSP 时弹窗警告 ~60-70dB 偏差",
+      "status": "verified",
+      "_verified_note": "2026-06-22: GUI 双重确认对话框",
+      "widgets": [],
+      "tests": []
+    }
+  ]
+}

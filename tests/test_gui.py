@@ -61,43 +61,36 @@ class TestFileInput:
 
 
 class TestFileDisplay:
-    """Bug #2: 文件路径显示在浏览按钮下方，不重叠"""
+    """Bug #2: 文件列表显示在添加按钮下方，正确更新"""
 
-    @pytest.mark.skip(reason="UI feature pending re-implementation")
-    def test_file_label_exists(self, window):
-        assert hasattr(window, '_selected_file_label')
-        assert window._selected_file_label is not None
+    def test_file_list_exists(self, window):
+        """_file_list_widget 存在（替代旧的 _selected_file_label）。"""
+        assert hasattr(window, '_file_list_widget')
+        assert window._file_list_widget is not None
 
-    @pytest.mark.skip(reason="UI feature pending re-implementation")
-    def test_file_label_updates(self, window, qtbot):
-        import tempfile, os
-        tmp = os.path.join(tempfile.gettempdir(), "test_antenna.csv")
-        Path(tmp).touch()  # create file so stat works
-        window.ui.editCsvPath.setText(tmp)
-        window._refresh_selected_file_label()
-        label_text = window._selected_file_label.text()
-        assert "test_antenna.csv" in label_text
-        Path(tmp).unlink()
+    def test_file_list_updates(self, window):
+        """添加文件后列表正确更新。"""
+        window._data_file_paths = ["/tmp/test_antenna.csv"]
+        window._refresh_data_file_ui()
+        assert window._file_list_widget.rowCount() == 1
+        assert "test_antenna.csv" in window._file_list_widget.item(0, 0).text()
 
-    @pytest.mark.skip(reason="UI feature pending re-implementation")
-    def test_file_label_shows_when_empty(self, window):
-        window.ui.editCsvPath.clear()
-        window._refresh_selected_file_label()
-        assert "未选择" in window._selected_file_label.text() or "select" in window._selected_file_label.text().lower()
+    def test_file_list_empty_shows_nothing(self, window):
+        """无文件时列表为空。"""
+        window._data_file_paths.clear()
+        window._refresh_data_file_ui()
+        assert window._file_list_widget.rowCount() == 0
 
 
 class TestTemplateReadOnly:
-    """Bug #3: 模板不存在时不自动填充"""
+    """Bug #3: 模板路径持久化（始终从 config_manager 恢复）。"""
 
-    @pytest.mark.skip(reason="QSettings persists across test sessions; behavior verified manually")
-    def test_template_cleared_if_missing(self, window, qtbot, monkeypatch):
-        from PySide6.QtCore import QSettings
-        # Clear any cached template path
-        window._settings.setValue("template_path", "")
-        window._settings.sync()
-        window.ui.editTemplatePath.setText("/nonexistent/template.xlsx")
+    def test_template_persists_across_restart(self, window):
+        """模板路径持久化到 config_manager 并正确恢复。"""
+        window._cfg.config.last_template_path = "/test/persisted_template.xlsx"
         window._init_file_paths()
-        assert window.ui.editTemplatePath.text() == ""
+        assert window.ui.editTemplatePath.text() == "/test/persisted_template.xlsx"
+        window._cfg.config.last_template_path = ""  # cleanup
 
 
 class TestStartValidation:

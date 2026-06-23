@@ -10,13 +10,15 @@ class PlotConfig:
     elev: float = 30.0
     azim: float = -60.0
     dpi: int = 150
+    step_deg: float = 5.0       # 3D 图形采样精度 (°) — 值越小越精细但越慢
     embed_in_excel: bool = True
     save_png_folder: Optional[str] = None
 
     def __init__(self, *, elev=30.0, azim=-60.0, dpi=150,
-                 embed_in_excel=True, save_png_folder=None):
+                 step_deg=5.0, embed_in_excel=True, save_png_folder=None):
         self.elev = elev
         self.azim = azim
         self.dpi = dpi
+        self.step_deg = step_deg
         self.embed_in_excel = embed_in_excel
         self.save_png_folder = save_png_folder

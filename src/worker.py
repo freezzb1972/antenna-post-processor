@@ -30,6 +30,7 @@ class ProcessingWorker(QObject):
         *,
         datasource: Optional[DataSource] = None,
         datasource_map: Optional[Dict[str, DataSource]] = None,
+        sheet_mode_map: Optional[Dict[str, int]] = None,
         lag_config: Optional[LagConfig] = None,
         plot_config: Optional[PlotConfig] = None,
         full_report_path: Optional[str] = None,
@@ -37,12 +38,12 @@ class ProcessingWorker(QObject):
         freq_source: str = "datasource",
         trim_start: int = 0,
         trim_end: int = 0,
-        chart_eff: bool = True,
-        chart_lag: bool = True,
         robust_peak: bool = False,
         extra_params: Optional[set] = None,
         chart_config_obj: Optional[ChartConfig] = None,
         ar_lag_config: Optional[LagConfig] = None,
+        nh_custom_angles: Optional[List[float]] = None,
+        ar_output_db: bool = True,
     ):
         super().__init__()
         self.csv_path = csv_path
@@ -50,6 +51,7 @@ class ProcessingWorker(QObject):
         self.output_path = output_path
         self.datasource = datasource
         self.datasource_map = datasource_map
+        self.sheet_mode_map = sheet_mode_map or {}
         self.lag_config = lag_config
         self.ar_lag_config = ar_lag_config
         self.plot_config = plot_config or PlotConfig()
@@ -58,11 +60,11 @@ class ProcessingWorker(QObject):
         self.freq_source = freq_source
         self.trim_start = trim_start
         self.trim_end = trim_end
-        self.chart_eff = chart_eff
-        self.chart_lag = chart_lag
         self.robust_peak = robust_peak
         self.extra_params = extra_params
         self.chart_config_obj = chart_config_obj
+        self.nh_custom_angles = nh_custom_angles
+        self.ar_output_db = ar_output_db
         self._cancelled = False
 
     def cancel(self):
@@ -82,16 +84,18 @@ class ProcessingWorker(QObject):
                 output_path=self.output_path,
                 lag_config_override=self.lag_config,
                 ar_lag_config_override=self.ar_lag_config,
+                sheet_mode_map=self.sheet_mode_map,
                 plot_config=self.plot_config,
                 full_report_path=self.full_report_path,
                 extrapolate_theta=self.extrapolate_theta,
                 freq_source=self.freq_source,
                 trim_start=self.trim_start,
                 trim_end=self.trim_end,
-                chart_config={"eff": self.chart_eff, "lag": self.chart_lag},
+                chart_config_obj=self.chart_config_obj,
                 robust_peak=self.robust_peak,
                 extra_params=self.extra_params,
-                chart_config_obj=self.chart_config_obj,
+                nh_custom_angles=self.nh_custom_angles,
+                ar_output_db=self.ar_output_db,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
                 log_callback=self._on_log,

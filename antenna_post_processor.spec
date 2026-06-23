@@ -30,10 +30,15 @@ a = Analysis(
         (str(PROJECT_ROOT / 'i18n' / 'app_en_US.qm'), 'i18n'),
         # 配置文件
         (str(PROJECT_ROOT / 'config' / 'bands.json'), 'config'),
+        (str(PROJECT_ROOT / 'config' / 'templates.json'), 'config'),
         # 模板文件（可选，打包后也可以在运行时选择外部模板）
         (str(PROJECT_ROOT / 'data' / 'template_5G1.xlsx'), 'templates'),
         # 帮助手册
         (str(PROJECT_ROOT / 'USER_GUIDE.html'), '.'),
+        # 内嵌试用许可（30 天，到期后引导在线激活）
+        (str(PROJECT_ROOT / 'license.json'), '.'),
+        # 试用配置（编译时固化: build_date + trial_days，防备份攻击）
+        (str(PROJECT_ROOT / 'trial_config.json'), '.'),
     ],
     hiddenimports=[
         # ---- PySide6 — 仅引用实际使用的模块，避免 collect_submodules 拉入全部 426MB ----
@@ -48,8 +53,14 @@ a = Analysis(
         # ---- numpy ----
         'numpy.lib.format',
 
+        # ---- requests (CloudRenderer) ----
+        'requests',
+
         # ---- openpyxl ----
         'openpyxl.cell._writer',
+
+        # ---- cryptography (ECDSA 许可签名) ----
+        'cryptography.hazmat.primitives',
     ],
     hookspath=[],
     hooksconfig={},

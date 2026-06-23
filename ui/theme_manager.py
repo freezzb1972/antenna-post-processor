@@ -49,31 +49,13 @@ class ThemeManager:
     DEFAULT_THEME = "dark_teal"
     _current_theme: str = DEFAULT_THEME
 
-    # ------------------------------------------------------------------
-    # 查询
-    # ------------------------------------------------------------------
-
-    @classmethod
-    def theme_names(cls) -> list[str]:
-        """返回所有主题 ID 列表。"""
-        return [t[0] for t in cls.ALL_THEMES]
-
-    @classmethod
-    def theme_display_names(cls) -> list[str]:
-        """返回所有主题显示名称列表。"""
-        return [t[1] for t in cls.ALL_THEMES]
-
     @classmethod
     def current_theme(cls) -> str:
         return cls._current_theme
 
-    # ------------------------------------------------------------------
-    # 应用
-    # ------------------------------------------------------------------
-
     @classmethod
     def apply(cls, theme_name: str = DEFAULT_THEME):
-        """应用 qt-material 主题。"""
+        """应用 qt-material 主题 — 剔除所有 font-size 避免与 ScaleManager 冲突。"""
         app = QApplication.instance()
         if app is None:
             return
@@ -81,6 +63,11 @@ class ThemeManager:
         try:
             from qt_material import apply_stylesheet
             apply_stylesheet(app, theme=theme_name + ".xml")
+            # 剔除 qt_material 的所有 font-size — 字号由 ScaleManager 全权控制
+            qss = app.styleSheet()
+            import re
+            qss = re.sub(r'font-size:\s*\d+px;?', '', qss)
+            app.setStyleSheet(qss)
         except (ImportError, FileNotFoundError):
             app.setStyle("Fusion")
 
@@ -88,13 +75,23 @@ class ThemeManager:
 
     @classmethod
     def load_and_apply(cls):
-        """从 QSettings 恢复主题或使用默认值。"""
-        settings = QSettings()
-        theme = settings.value("theme/name", cls.DEFAULT_THEME)
+        """从配置文件恢复主题或使用默认值。"""
+        try:
+            from src.config_manager import get_config
+            cfg = get_config()
+            theme = cfg.theme if hasattr(cfg, 'theme') and cfg.theme else cls.DEFAULT_THEME
+        except Exception:
+            theme = cls.DEFAULT_THEME
         cls.apply(theme)
 
     @classmethod
     def save_theme(cls, theme_name: str):
-        """保存主题到 QSettings。"""
+        """保存主题到配置文件 + QSettings。"""
+        try:
+            from src.config_manager import get_config_manager
+            get_config_manager().config.theme = theme_name
+            get_config_manager().save()
+        except Exception:
+            pass
         settings = QSettings()
         settings.setValue("theme/name", theme_name)

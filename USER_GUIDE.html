@@ -58,7 +58,12 @@
     <li><a href="#extrapolation">Theta 外推选项</a></li>
     <li><a href="#config">配置 & 频段</a></li>
     <li><a href="#terminology">术语对照表</a></li>
-  </ol>
+  
+  <li><a href="#ai-assist">15. AI 智能辅助识别</a></li>
+  <li><a href="#graph-viewer">16. 交互式天线方向图 3D 查看器</a></li>
+  <li><a href="#local-llm">17. 本地 LLM (Ollama) RAG 问答</a></li>
+  <li><a href="#template-preset">18. 模板预设管理系统</a></li>
+</ol>
 </div>
 
 <!-- ================================================================== -->
@@ -574,3 +579,62 @@ antenna-post-processor/
 
 </body>
 </html>
+<!-- ============================================================ -->
+<h2 id="ai-assist">15. AI 智能辅助识别</h2>
+
+<p>本工具内置云端/本地 LLM 智能辅助功能，可作为规则匹配的兜底方案，在以下场景自动辅助识别：</p>
+
+<table>
+  <tr><th width="160">场景</th><th>说明</th></tr>
+  <tr><td><strong>模板识别</strong></td><td>当规则匹配无法确定模板列类型时，使用 LLM 分析 Excel 列头，识别天线参数类型（Gain/Directivity/Efficiency 等）</td></tr>
+  <tr><td><strong>数据源识别</strong></td><td>识别 Merged CSV / FinalSummary / RawData 文件格式和内容结构</td></tr>
+  <tr><td><strong>自动匹配</strong></td><td>当规则匹配失败时，LLM 辅助匹配数据文件与模板工作表</td></tr>
+</table>
+
+<div class="callout info"><strong>配置方式：</strong>文件 → LLM 智能设置。支持云端 API (Anthropic/OpenAI) 和本地 Ollama 模型。默认关闭，需手动启用。</div>
+
+<!-- ============================================================ -->
+<h2 id="graph-viewer">16. 交互式天线方向图 3D 查看器</h2>
+
+<p>处理完成后，在「📈 图形展示」标签页可查看交互式 3D 球面方向图。</p>
+
+<p><strong>功能：</strong></p>
+<ul>
+  <li><strong>多图布局：</strong>支持 1×1、1×2、2×2 网格，同时查看 Gain/AR/Eθ/Eφ</li>
+  <li><strong>图类型：</strong>Spherical 3D (球面)、Polar 2D (极坐标)、Cartesian 3D (直角坐标)</li>
+  <li><strong>联动视角：</strong>勾选后旋转一个子图，其他子图同步旋转</li>
+  <li><strong>球面剖切：</strong>X-Z / Y-Z / X-Y 三个平面切分球面，查看内部结构</li>
+  <li><strong>频点动画：</strong>自动播放所有频点的 3D 方向图变化</li>
+  <li><strong>精度控制：</strong>支持 1° 精细到 10° 快速，可自定义步进</li>
+  <li><strong>频点曲线：</strong>Efficiency/Peak Gain/TRP/Directivity vs Frequency 曲线图</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="local-llm">17. 本地 LLM (Ollama) RAG 问答</h2>
+
+<p>帮助 → 帮助搜索 窗口支持本地 Ollama 大模型进行智能问答。</p>
+
+<p><strong>配置步骤：</strong></p>
+<ol>
+  <li>安装 <a href="https://ollama.com">Ollama</a></li>
+  <li>拉取模型：<code>ollama pull qwen2.5:7b</code></li>
+  <li>在帮助窗口点击 ⚙️ LLM 设置</li>
+  <li>勾选「使用本地 Ollama 模型」</li>
+  <li>默认地址 http://localhost:11434，模型 qwen2.5:7b</li>
+</ol>
+
+<p>本地模式免费、离线、无需 API Key。支持中文问答。</p>
+
+<!-- ============================================================ -->
+<h2 id="template-preset">18. 模板预设管理系统</h2>
+
+<p>文件 → 系统设置 → 模板预设管理 支持两级模板预设：厂商 → 模板。</p>
+
+<p><strong>功能：</strong></p>
+<ul>
+  <li>厂商和模板名支持搜索（输入关键字自动筛选）</li>
+  <li>每个模板可预设默认输出目录</li>
+  <li>模板通过浏览文件选择，支持 .xlsx/.xls/.csv/.docx</li>
+  <li>数据源配置 → 选择预设模板 → 自动填充模板路径和输出目录</li>
+</ul>
+
