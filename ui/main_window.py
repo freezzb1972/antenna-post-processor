@@ -283,11 +283,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._match_table.setHorizontalHeaderLabels([
             self.tr("工作表"), self.tr("数据文件"), self.tr("状态")
         ])
+        self._match_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
         self._match_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self._match_table.setColumnWidth(0, 120)
         self._match_table.verticalHeader().setDefaultSectionSize(28)
         self._match_table.verticalHeader().setVisible(False)
-        self._match_table.setMinimumHeight(100)
-        self._match_table.setMaximumHeight(200)
+        self._match_table.setMinimumHeight(120)
+        self._match_table.setMaximumHeight(280)
         self._match_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self._match_table.setAlternatingRowColors(True)
         layout.addWidget(self._match_table)
@@ -1203,9 +1205,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             combo = QComboBox()
             combo.addItem("—")
             for fp in self._data_file_paths:
-                combo.addItem(fp)
+                # 只显示文件名，完整路径放 tooltip
+                combo.addItem(Path(fp).name, fp)
+                combo.model().item(combo.count() - 1).setToolTip(fp)
             if m.file_path:
-                idx = combo.findText(m.file_path)
+                idx = combo.findData(m.file_path)
                 if idx >= 0:
                     combo.setCurrentIndex(idx)
             combo.currentIndexChanged.connect(lambda idx, row=i: self._on_match_changed(row))
@@ -1221,7 +1225,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
     def _on_match_changed(self, row: int):
         combo = self._match_table.cellWidget(row, 1)
-        fp = combo.currentText().strip() if combo else ""
+        fp = combo.currentData() or "" if combo else ""
         valid = fp and fp != "—" and Path(fp).exists()
         status = self._match_table.item(row, 2)
         if status:
@@ -1246,8 +1250,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         for row in range(self._match_table.rowCount()):
             template_sheet_name = self._match_table.item(row, 0).text()
             combo = self._match_table.cellWidget(row, 1)
-            fp = combo.currentText().strip() if combo else ""
-            if fp and fp != "—" and Path(fp).exists():
+            fp = combo.currentData() or "" if combo else ""
+            if fp and Path(fp).exists():
                 if progress_callback:
                     file_idx += 1
                     progress_callback(file_idx, total_files,
@@ -1315,8 +1319,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         matched_files = set()
         for row in range(self._match_table.rowCount()):
             combo = self._match_table.cellWidget(row, 1)
-            fp = combo.currentText().strip() if combo else ""
-            if fp and fp != "—" and Path(fp).exists():
+            fp = combo.currentData() or "" if combo else ""
+            if fp and Path(fp).exists():
                 matched_files.add(fp)
         unmatched = [f for f in self._data_file_paths if f not in matched_files]
         if not unmatched:
@@ -1353,8 +1357,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             sn = self._match_table.item(row, 0)
             combo = self._match_table.cellWidget(row, 1)
             if sn and combo:
-                fp = combo.currentText().strip()
-                if fp and fp != "—" and fp in file_mode_lookup:
+                fp = combo.currentData() or ""
+                if fp and fp in file_mode_lookup:
                     key = sanitize_sheet_name(extract_key(fp)) if use_file_names else sanitize_sheet_name(sn.text())
                     sheet_mode_map[key] = file_mode_lookup[fp]
         for sn in datasource_map:
