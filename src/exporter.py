@@ -360,7 +360,8 @@ def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
                     _add_multi_line_chart(ws, "Gain vs Frequency", freq_col,
                                          gain_series_cols, gain_series_names,
                                          data_start, data_end,
-                                         n_rows + 5 + chart_offset, gain_series_cols[0] + 2)
+                                         n_rows + 5 + chart_offset, gain_series_cols[0] + 2,
+                                         y_label="Gain (dBi)", y_step=1.0)
                 chart_offset += 18
 
         # Directivity vs Frequency
@@ -391,7 +392,8 @@ def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
                                      [trp_col2, nh45_col, nh30_col],
                                      ["TRP", "NHPRP ±45°", "NHPRP ±30°"],
                                      data_start, data_end,
-                                     n_rows + 5 + chart_offset, trp_col2 + 2)
+                                     n_rows + 5 + chart_offset, trp_col2 + 2,
+                                     y_label="Power (dBm)")
                 chart_offset += 18
 
         # AR vs Frequency — 支持多曲线 (指定角度/范围)
@@ -417,18 +419,26 @@ def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
                 if len(ar_series_cols) == 1:
                     _add_scatter_chart(ws, f"Axial Ratio vs Frequency", freq_col, ar_series_cols[0],
                                       data_start, data_end, n_rows + 5 + chart_offset,
-                                      ar_series_cols[0] + 2, y_label="Axial Ratio (linear)")
+                                      ar_series_cols[0] + 2, y_label="Axial Ratio (dB)")
                 else:
                     _add_multi_line_chart(ws, "Axial Ratio vs Frequency", freq_col,
                                          ar_series_cols, ar_series_names,
                                          data_start, data_end,
-                                         n_rows + 5 + chart_offset, ar_series_cols[0] + 2)
+                                         n_rows + 5 + chart_offset, ar_series_cols[0] + 2,
+                                         y_label="Axial Ratio (dB)")
                 chart_offset += 18
 
 
 def _add_multi_line_chart(ws, title, x_col, y_cols, series_names,
-                         data_start, data_end, anchor_row, anchor_col):
-    """添加多线散点图到工作表。"""
+                         data_start, data_end, anchor_row, anchor_col,
+                         y_label: str = "", y_step: float = None,
+                         x_label: str = "Frequency (MHz)"):
+    """添加多线散点图到工作表。
+
+    X 轴 = 频率列 (所有频点);
+    Y 轴 = 每条曲线一列数据;
+    每条曲线是同一个 X 值范围上的一个 Series。
+    """
     from openpyxl.chart import ScatterChart, Reference, Series
     from openpyxl.chart.legend import Legend
     from openpyxl.utils import get_column_letter
@@ -444,7 +454,6 @@ def _add_multi_line_chart(ws, title, x_col, y_cols, series_names,
     x_values = Reference(ws, min_col=x_col, min_row=data_start,
                          max_row=data_end, max_col=x_col)
 
-    colors = ["0000CC", "CC0000", "00AA00", "CC8800"]
     for i, (y_col, name) in enumerate(zip(y_cols, series_names)):
         if y_col is None:
             continue
@@ -460,12 +469,14 @@ def _add_multi_line_chart(ws, title, x_col, y_cols, series_names,
     chart.legend.position = 'b'
     chart.y_axis.majorGridlines = _chart_axis.ChartLines()
     chart.x_axis.majorGridlines = _chart_axis.ChartLines()
-    chart.x_axis.title = 'Frequency (MHz)'
+    chart.x_axis.title = x_label
     chart.x_axis.numFmt = '0'
     chart.x_axis.tickLblSkip = 1
     chart.x_axis.tickMarkSkip = 1
-    chart.y_axis.title = 'dBm'
+    chart.y_axis.title = y_label
     chart.y_axis.numFmt = '0.00'
+    if y_step is not None:
+        chart.y_axis.majorUnit = y_step
 
     anchor_cell = f"{get_column_letter(anchor_col)}{anchor_row}"
     ws.add_chart(chart, anchor_cell)

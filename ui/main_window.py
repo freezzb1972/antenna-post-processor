@@ -124,6 +124,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._ar_output_db: bool = True     # AR 默认输出 dB
         self._chart_config_required = None   # ChartConfig: 报告需要
         self._chart_config_extra = None      # ChartConfig: 额外(full_report)
+        self._graph_viewer = None            # GraphViewer: 启动时创建，处理完后填充数据
         self._cached_template_path: Optional[str] = None  # 模板路径缓存
         self._cached_template_mtime: float = 0           # 模板文件 mtime 缓存
         self._cached_template_params: set = set()        # 模板参数缓存
@@ -336,6 +337,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # ---- 将整个 Tab 的内容包裹在可滚动区域中，防止内容溢出被压缩 ----
         self._make_tab_scrollable(self.ui.tabFile)
         self._make_tab_scrollable(self.ui.tabLag)
+
+        # ---- 图形展示 Tab: 启动时创建空 GraphViewer (工具栏立即可见) ----
+        from ui.graph_viewer import GraphViewer
+        self._graph_viewer = GraphViewer()
+        self.ui.vTabCharts.addWidget(self._graph_viewer)
 
     def _init_params_tab(self):
         """构建「参数设置」标签页（频点 + 算法选项）。"""
@@ -2063,30 +2069,18 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._log(self.tr(f"📊 参数表格已更新: {len(keys)} 列 × {len(first_sheet)} 行"))
 
     def _populate_charts(self, results):
-        """使用 GraphViewer 渲染交互式 3D 球面方向图 + 数据表。"""
-        vtab = self.ui.vTabCharts
-        while vtab.count():
-            item = vtab.takeAt(0)
-            if item.widget(): item.widget().deleteLater()
-        if not results:
+        """用处理结果填充 GraphViewer（GraphViewer 在启动时已创建，工具栏始终可见）。"""
+        if not results or self._graph_viewer is None:
             return
-        from ui.graph_viewer import GraphViewer
-        viewer = GraphViewer()
+        viewer = self._graph_viewer
         # 应用图形配置中的视角设置
         if self._chart_config_required is not None:
             viewer._elev = self._chart_config_required.elev
             viewer._azim = self._chart_config_required.azim
-            # 采样精度: 从 ChartConfig 传递到展示窗体
             step_deg = getattr(self._chart_config_required, 'step_deg', 5.0)
         else:
             step_deg = 5.0
         viewer.load_data(results, step_deg=step_deg)
-        vtab.addWidget(viewer)
-        # 确保图形展示标签页可见
-        tc = self.ui.tabConfig
-        for i in range(tc.count()):
-            if tc.widget(i) is self.ui.tabCharts:
-                tc.setTabVisible(i, True)
         self._log("图形数据已加载 — 可在「📈 图形展示」标签页查看 3D 方向图")
 
     def _populate_graph_data(self, results):
