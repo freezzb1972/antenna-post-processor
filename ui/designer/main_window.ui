@@ -216,12 +216,6 @@
      </layout>
     </item>
 
-    <!-- ====== 状态栏 ====== -->
-    <item>
-     <widget class="QStatusBar" name="statusBar">
-      <property name="sizeGripEnabled"><bool>false</bool></property>
-     </widget>
-    </item>
    </layout>
   </widget>
  </widget>

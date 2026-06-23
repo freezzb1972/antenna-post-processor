@@ -424,7 +424,6 @@ class CalcParamsDialog(QDialog):
              "freq_source": "datasource", "trim_start": 0, "trim_end": 0,
              "required": set(), "extra": set()},
         ]
-        self._current_mode: int = 0
         self._angle_singles: List[float] = []
         self._angle_ranges: List[tuple] = []
         self._ar_angle_singles: List[float] = []
@@ -657,10 +656,11 @@ class CalcParamsDialog(QDialog):
         self._freq_widget.setVisible(not is_active)
         self._rebuild_param_columns()
         self._update_selected_display()
+        self._sync_angle_buttons()  # 模式切换后同步快捷角度按钮状态
 
     def _save_current_mode_state(self):
         """保存当前模式的状态。"""
-        m = self._current_mode
+        m = self._test_mode
         s = self._mode_states[m]
         s["singles"] = list(self._angle_singles)
         s["ranges"] = list(self._angle_ranges)
@@ -678,7 +678,7 @@ class CalcParamsDialog(QDialog):
 
     def _load_mode_state(self, mode: int):
         """恢复指定模式的状态。"""
-        self._current_mode = mode
+        self._test_mode = mode
         s = self._mode_states[mode]
         self._angle_singles = list(s["singles"])
         self._angle_ranges = list(s["ranges"])
@@ -1275,6 +1275,9 @@ class CalcParamsDialog(QDialog):
 
     def _load_state(self):
         mw = self._mw
+        # 恢复各模式的独立状态（跨对话框生命周期持久化）
+        if hasattr(mw, '_mode_states') and mw._mode_states:
+            self._mode_states = [dict(s) for s in mw._mode_states]
         # 测试模式
         if hasattr(mw, '_test_mode'):
             self._test_mode = mw._test_mode

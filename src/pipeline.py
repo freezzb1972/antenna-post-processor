@@ -409,6 +409,7 @@ def _expand_template_sheets(
     sheets_info: List[SheetInfo],
     datasource_map: Dict[str, DataSource],
     freq_source: str = "datasource",
+    use_raw_name: bool = False,
 ) -> List[SheetInfo]:
     """当模板工作表数少于数据源数时，用第一个 sheet 为模板克隆其余 sheet。
 
@@ -417,6 +418,8 @@ def _expand_template_sheets(
         datasource_map: {sheet_name: DataSource}。
         freq_source:    "datasource" → 新 sheet 用数据源频点；
                         "template" → 新 sheet 用模板最近邻匹配。
+        use_raw_name:   True → 直接用 datasource_map 的键作工作表名;
+                        False → 从键名推导工作表名。
 
     Returns:
         扩展后的 SheetInfo 列表。
@@ -435,11 +438,15 @@ def _expand_template_sheets(
 
     expanded = list(sheets_info)
 
+    from .sheet_file_matcher import sanitize_sheet_name
+
     for ds_name in sorted(unmatched):
-        # 从 datasource 名称提取 key
-        from .sheet_file_matcher import extract_key
-        key = extract_key(ds_name).lstrip("0123456789")
-        new_name = _derive_sheet_name(ref.name, key)
+        if use_raw_name:
+            new_name = sanitize_sheet_name(ds_name)
+        else:
+            from .sheet_file_matcher import extract_key
+            key = extract_key(ds_name)
+            new_name = sanitize_sheet_name(_derive_sheet_name(ref.name, key))
 
         # 深拷贝列头结构
         new_columns = [
@@ -687,6 +694,7 @@ def run_pipeline(
     extra_params: Optional[set] = None,
     nh_custom_angles: Optional[List[float]] = None,
     ar_output_db: bool = True,
+    worksheet_naming_mode: int = 0,  # 0=保留模板工作表名, 1=用数据源名
     parallel: int = 1,
     cancel_callback: Optional[Callable[[], bool]] = None,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
@@ -730,12 +738,23 @@ def run_pipeline(
     for si in sheets_info:
         _log(log_callback, f"  {si.name}: {len(si.frequencies)} 频点")
 
-    # ---- 1.5: 自动扩增工作表 (模板 sheet 数 < 数据源数) ----
-    if use_multi_ds and len(sheets_info) < len(datasource_map):
-        _log(log_callback, f"模板 {len(sheets_info)} 个工作表 → {len(datasource_map)} 个数据源，自动扩增...")
-        sheets_info = _expand_template_sheets(sheets_info, datasource_map, freq_source)
-        for si in sheets_info:
-            _log(log_callback, f"  {si.name}: {len(si.frequencies)} 频点 (来源: {'数据源' if freq_source == 'datasource' else '模板'})")
+    # ---- 1.5: 自动扩增工作表 (模板 sheet 数 < 数据源数, 或文件名模式) ----
+    if use_multi_ds:
+        template_names = {si.name for si in sheets_info}
+        ds_names = set(datasource_map.keys())
+        matched_count = len(template_names & ds_names)
+        if worksheet_naming_mode == 1:
+            # 文件名模式: 用第一个 sheet 做模板, datasource_map 键直接作工作表名
+            _log(log_callback, f"文件名模式: {len(datasource_map)} 个数据源 → 创建 {len(datasource_map)} 个工作表...")
+            ref_sheet = sheets_info[0:1]
+            sheets_info = _expand_template_sheets(ref_sheet, datasource_map, freq_source, use_raw_name=True)
+            for si in sheets_info:
+                _log(log_callback, f"  {si.name}: {len(si.frequencies)} 频点")
+        elif len(sheets_info) < len(datasource_map):
+            _log(log_callback, f"模板 {len(sheets_info)} 个工作表 → {len(datasource_map)} 个数据源，自动扩增...")
+            sheets_info = _expand_template_sheets(sheets_info, datasource_map, freq_source)
+            for si in sheets_info:
+                _log(log_callback, f"  {si.name}: {len(si.frequencies)} 频点 (来源: {'数据源' if freq_source == 'datasource' else '模板'})")
 
     if lag_config_override is not None and not lag_config_override.is_empty():
         for si in sheets_info:
@@ -744,15 +763,17 @@ def run_pipeline(
 
     # ---- 2. 收集任务 + 加载数据 + 计算 ----
     tasks = _collect_tasks(sheets_info, datasource, datasource_map, freq_source, trim_start, trim_end, sheet_mode_map, log_callback)
-    sheet_results = _load_and_compute(
-        tasks, sheets_info, extrapolate_theta, robust_peak, parallel,
-        extra_params=extra_params, chart_config=chart_config_obj,
-        ar_lag_config=ar_lag_config_override,
-        nh_custom_angles=nh_custom_angles,
-        ar_output_db=ar_output_db,
-        cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,
-    )
-    _close_datasources(use_multi_ds, datasource, datasource_map)
+    try:
+        sheet_results = _load_and_compute(
+            tasks, sheets_info, extrapolate_theta, robust_peak, parallel,
+            extra_params=extra_params, chart_config=chart_config_obj,
+            ar_lag_config=ar_lag_config_override,
+            nh_custom_angles=nh_custom_angles,
+            ar_output_db=ar_output_db,
+            cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,
+        )
+    finally:
+        _close_datasources(use_multi_ds, datasource, datasource_map)
 
     # ---- 3. 写入 Excel ----
     total = len(tasks)

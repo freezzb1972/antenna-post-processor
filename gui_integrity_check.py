@@ -276,7 +276,7 @@ def check_g2_formlayout() -> List[str]:
 
     for form_name, rows in forms.items():
         for row, roles in rows.items():
-            if "LabelRole" not in roles:
+            if "LabelRole" not in roles and row not in _SKIP_LABELROLE_ROWS.get(form_name, []):
                 errors.append(f"FormLayout {form_name} row {row}: missing LabelRole")
             if "FieldRole" not in roles and row not in _SKIP_FIELDROLE_ROWS.get(form_name, []):
                 errors.append(f"FormLayout {form_name} row {row}: missing FieldRole")
@@ -284,9 +284,12 @@ def check_g2_formlayout() -> List[str]:
     return errors
 
 
-# formOutput row 2 只有 LabelRole (checkFullReport 复选框) — 合法
+# 跨列 widget (checkbox 等) 不需要同时拥有 LabelRole 和 FieldRole
 _SKIP_FIELDROLE_ROWS = {
-    "self.formOutput": [2],
+    "self.formOutput": [2],  # checkFullReport — FieldRole only
+}
+_SKIP_LABELROLE_ROWS = {
+    "self.formOutput": [2],  # checkFullReport spans both columns
 }
 
 
@@ -618,6 +621,56 @@ def check_g9_font_propagation(window) -> List[str]:
     return errors
 
 
+def check_g8_toolbar_containers(window) -> List[str]:
+    """G8: QToolBar/QMenuBar/QStatusBar 不得作为普通 widget 嵌入 QLayout。
+
+    Qt 框架约定这些控件必须通过 QMainWindow 的专用方法挂载:
+      - QMainWindow.addToolBar(tb)
+      - QMainWindow.setMenuBar(mb)
+      - QMainWindow.setStatusBar(sb)
+
+    直接 embed 到 QLayout (如 layout.addWidget(toolbar)) 在 PyInstaller
+    打包后可能渲染失败 — QToolBar 内部的停靠/浮动逻辑依赖 QMainWindow parent。
+    """
+    from PySide6.QtWidgets import QToolBar, QMenuBar, QStatusBar, QMainWindow
+    errors = []
+    FORBIDDEN = {
+        QToolBar: ("QToolBar", "QMainWindow.addToolBar()"),
+        QMenuBar: ("QMenuBar", "QMainWindow.setMenuBar()"),
+        QStatusBar: ("QStatusBar", "QMainWindow.setStatusBar()"),
+    }
+
+    # 递归扫描整个 widget 树
+    visited = set()
+
+    def scan(w):
+        if w is None or id(w) in visited:
+            return
+        visited.add(id(w))
+        for cls, (name, correct_api) in FORBIDDEN.items():
+            if isinstance(w, cls):
+                p = w.parent()
+                # 正确用法: parent 是 QMainWindow
+                if isinstance(p, QMainWindow):
+                    continue
+                # 孤儿控件 (尚未挂载), 跳过
+                if p is None:
+                    continue
+                # 错误: 被当作普通 widget 嵌入 layout 或其他容器
+                obj_name = w.objectName() or "(unnamed)"
+                ptype = type(p).__name__
+                errors.append(
+                    f"{name} '{obj_name}' 嵌入了 {ptype} — "
+                    f"应使用 {correct_api}，直接 embed 在 PyInstaller 打包后可能不渲染"
+                )
+        # 递归子控件
+        for child in w.children():
+            scan(child)
+
+    scan(window)
+    return errors
+
+
 # ── 主入口 ──────────────────────────────────────────────────────────────
 
 def run_all(quick: bool = False) -> Tuple[bool, dict]:
@@ -646,6 +699,7 @@ def run_all(quick: bool = False) -> Tuple[bool, dict]:
     if not quick:
         phases += [
             ("G4", "ScrollArea", check_g4_scrollarea, [window]),
+            ("G8", "ToolBar容器", check_g8_toolbar_containers, [window]),
             ("G9", "字体传播", check_g9_font_propagation, [window]),
             ("G6", "完整GUI流程(线程)", check_g6_gui_flow, []),
         ]

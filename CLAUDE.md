@@ -54,6 +54,34 @@ main.py → ui/main_window.py (PySide6 GUI)
 6. 多文件模式: 工作表名 ↔ 文件名通过 `sheet_file_matcher.py` 的 `extract_key()` 匹配
 7. 所有计算值 `round(val, 6)` 保留 6 位小数
 
+### 陈旧数据防护（2026-06-23 审计总结）
+
+**陈旧数据 bug 比崩溃更危险** — 第一次运行正确，用户误以为功能正常，但第二次运行会悄悄混入第一次的数据。
+
+#### 五类反模式（代码审查必须检查）
+
+| # | 反模式 | 检测信号 | 修复方式 |
+|---|--------|---------|---------|
+| 1 | **懒初始化一次后不刷新** | `if self._x is None: init` 无对应的重置为 `None` | 在状态变更点（换模板、清文件）重置为 `None` |
+| 2 | **找到已存在对象直接返回** | `find existing → return` 无 update | 若存在则更新数据，或删除后重建 |
+| 3 | **忘记设标志位** | 状态三元组 (True/False/未设置) | 构造函数设初始值，所有分支检查 |
+| 4 | **同名状态变量不同步** | `_mode` / `_test_mode` / `_current_mode` | 单一数据源，其他只读代理 |
+| 5 | **异常路径跳过清理** | 资源获取/释放之间无 `try/finally` | 始终用 `try/finally` 保护 close/disconnect |
+
+#### 必检场景
+
+修改以下方法时，强制问自己 3 个问题：
+- **load / refresh / update**: 新数据会完全覆盖旧状态吗？（检查 `clear()` 是否在所有分支）
+- **browse / select**: 路径变化后，依赖该路径的所有缓存都失效了吗？
+- **error handler**: 异常路径是否设置了 `_data_stale` / 执行了 cleanup？
+
+#### 自动化防线
+
+```bash
+# 双次运行一致性测试 — 最直接的陈旧数据检测
+python3 -m pytest tests/test_e2e_features.py::TestStaleDataProtection -v
+```
+
 ### 开发工作流（自动编排）
 
 使用 `/dev-flow` 编排器自动协调 23 个技能，按照 6 阶段工作流推进：

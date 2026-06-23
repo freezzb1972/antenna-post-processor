@@ -44,6 +44,7 @@ class ProcessingWorker(QObject):
         ar_lag_config: Optional[LagConfig] = None,
         nh_custom_angles: Optional[List[float]] = None,
         ar_output_db: bool = True,
+        worksheet_naming_mode: int = 0,
     ):
         super().__init__()
         self.csv_path = csv_path
@@ -65,6 +66,7 @@ class ProcessingWorker(QObject):
         self.chart_config_obj = chart_config_obj
         self.nh_custom_angles = nh_custom_angles
         self.ar_output_db = ar_output_db
+        self.worksheet_naming_mode = worksheet_naming_mode
         self._cancelled = False
 
     def cancel(self):
@@ -96,6 +98,7 @@ class ProcessingWorker(QObject):
                 extra_params=self.extra_params,
                 nh_custom_angles=self.nh_custom_angles,
                 ar_output_db=self.ar_output_db,
+                worksheet_naming_mode=self.worksheet_naming_mode,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
                 log_callback=self._on_log,

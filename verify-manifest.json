@@ -125,7 +125,8 @@
       "_lag_scroll",
       "_lbl_match_status",
       "_match_table",
-      "_thread"
+      "_thread",
+      "_cmb_naming_mode"
     ],
     "methods": [
       "__init__",
@@ -809,6 +810,19 @@
       "_verified_note": "2026-06-22: GUI 双重确认对话框",
       "widgets": [],
       "tests": []
+    },
+    {
+      "id": "stale-data-protection",
+      "name": "陈旧数据防护 (双次运行一致性)",
+      "description": "TestStaleDataProtection: pipeline 双次运行一致性、DataSource 关闭重开一致性、窗口状态重置",
+      "status": "verified",
+      "_verified_note": "2026-06-23: 11 stale-data bugs 修复 + 双次运行测试 + CLAUDE.md 反模式文档",
+      "widgets": [],
+      "tests": [
+        "tests/test_e2e_features.py::TestStaleDataProtection::test_pipeline_double_run_consistency",
+        "tests/test_e2e_features.py::TestStaleDataProtection::test_datasource_close_reopen_consistency",
+        "tests/test_e2e_features.py::TestStaleDataProtection::test_main_window_state_reset_on_new_files"
+      ]
     }
   ]
 }

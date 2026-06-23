@@ -117,6 +117,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._required_params: set = set()   # 用户确认的报告必需参数
         self._extra_params: set = set()      # 用户额外选择的计算参数
         self._test_mode: int = 0             # 0=passive, 1=TRP, 2=TIS
+        self._worksheet_naming_mode: int = 0  # 0=保留原模板工作表名, 1=用数据源名命名
         self._mode_states = [{}, {}, {}]     # 三种测试模式独立参数状态
         self._ar_lag_config = LagConfig()    # AR 独立角度配置
         self._nh_custom_angles: List[float] = []  # NHPRP/NHPIS 自定义角度列表
@@ -299,6 +300,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         match_row.addWidget(self._btn_auto_match)
         match_row.addWidget(self._lbl_match_status)
         match_row.addStretch()
+        # 工作表命名选项
+        match_row.addWidget(QLabel(self.tr("工作表名:")))
+        self._cmb_naming_mode = QComboBox()
+        self._cmb_naming_mode.addItem(self.tr("保留原模板工作表名"), 0)
+        self._cmb_naming_mode.addItem(self.tr("用数据源名替换"), 1)
+        self._cmb_naming_mode.setToolTip(
+            self.tr("多数据源时，选择工作表命名方式：保留原模板名称 或 用数据源文件名替换"))
+        self._cmb_naming_mode.setFixedWidth(180)
+        self._cmb_naming_mode.currentIndexChanged.connect(self._on_naming_mode_changed)
+        match_row.addWidget(self._cmb_naming_mode)
         layout.addLayout(match_row)
 
         # 图表选择行
@@ -553,24 +564,29 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             return set()
 
     def _show_plot_config_dialog(self):
-        from ui.dialogs import PlotConfigDialog
-        from src.chart_config import ChartConfig
+        try:
+            from ui.dialogs import PlotConfigDialog
+            from src.chart_config import ChartConfig
 
-        # 首次打开时，从模板自动检测图形需求
-        if self._chart_config_required is None:
-            tp = self.ui.editTemplatePath.text().strip()
-            if tp and Path(tp).exists():
-                try:
-                    self._chart_config_required = ChartConfig.from_template(tp)
-                except Exception:
+            # 首次打开时，从模板自动检测图形需求
+            if self._chart_config_required is None:
+                tp = self.ui.editTemplatePath.text().strip()
+                if tp and Path(tp).exists():
+                    try:
+                        self._chart_config_required = ChartConfig.from_template(tp)
+                    except Exception:
+                        self._chart_config_required = ChartConfig()
+                else:
                     self._chart_config_required = ChartConfig()
-            else:
-                self._chart_config_required = ChartConfig()
-        if self._chart_config_extra is None:
-            self._chart_config_extra = ChartConfig()
+            if self._chart_config_extra is None:
+                self._chart_config_extra = ChartConfig()
 
-        dlg = PlotConfigDialog(self)
-        dlg.exec()
+            dlg = PlotConfigDialog(self)
+            dlg.exec()
+        except Exception as e:
+            self._log(f"⚠ 图形配置对话框打开失败: {e}")
+            QMessageBox.warning(self, self.tr("错误"),
+                self.tr(f"图形配置对话框无法打开:\n{e}"))
 
     def _on_help(self):
         from ui.dialogs import HelpDialog
@@ -1115,6 +1131,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if combo and row < len(self._file_entries):
             self._file_entries[row].test_mode = combo.currentData()
 
+    def _on_naming_mode_changed(self, index: int):
+        """工作表命名方式变更回调。"""
+        self._worksheet_naming_mode = self._cmb_naming_mode.currentData() or 0
+        # 命名方式变了，重建匹配表
+        if self._match_table.rowCount() > 0:
+            self._on_auto_match()
+
     def _on_auto_match(self):
         template_path = self.ui.editTemplatePath.text().strip()
         if not template_path:
@@ -1157,10 +1180,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._log(f"自动匹配完成: {matched}/{len(matches)}")
 
     def _populate_match_table(self, matches):
+        from src.sheet_file_matcher import extract_key, sanitize_sheet_name
+        use_file_names = self._worksheet_naming_mode == 1
         self._match_table.setRowCount(len(matches))
         for i, m in enumerate(matches):
             self._match_table.setRowHeight(i, 28)
-            self._match_table.setItem(i, 0, QTableWidgetItem(m.sheet_name))
+            # 工作表名: mode=0 用模板原名, mode=1 用数据源文件名推导
+            display_name = m.sheet_name
+            if use_file_names and m.file_path:
+                display_name = sanitize_sheet_name(extract_key(m.file_path))
+            self._match_table.setItem(i, 0, QTableWidgetItem(display_name))
             combo = QComboBox()
             combo.addItem("—")
             for fp in self._data_file_paths:
@@ -1195,16 +1224,17 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
     def _build_datasource_map(self, progress_callback=None):
         from src.datasource import DataSource
-        from src.sheet_file_matcher import extract_key
+        from src.sheet_file_matcher import extract_key, sanitize_sheet_name
         result = {}
 
-        total_files = max(self._match_table.rowCount(), 1)
+        total_files = max(len(self._data_file_paths), 1)
         file_idx = 0
+        use_file_names = self._worksheet_naming_mode == 1
 
         # 已匹配的行
         matched_files = set()
         for row in range(self._match_table.rowCount()):
-            sheet_name = self._match_table.item(row, 0).text()
+            template_sheet_name = self._match_table.item(row, 0).text()
             combo = self._match_table.cellWidget(row, 1)
             fp = combo.currentText().strip() if combo else ""
             if fp and fp != "—" and Path(fp).exists():
@@ -1213,18 +1243,21 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     progress_callback(file_idx, total_files,
                                      f"Loading {Path(fp).name}...")
                 try:
-                    result[sheet_name] = DataSource.from_path(fp)
+                    if use_file_names:
+                        # 用数据源文件名推导工作表名，并清理为合法 Excel 名
+                        key = sanitize_sheet_name(extract_key(fp))
+                        result[key] = DataSource.from_path(fp)
+                    else:
+                        result[sanitize_sheet_name(template_sheet_name)] = DataSource.from_path(fp)
                     matched_files.add(fp)
                 except Exception as e:
-                    self._log(f"⚠ {sheet_name} 数据源加载失败: {e}")
+                    self._log(f"⚠ {template_sheet_name} 数据源加载失败: {e}")
 
         # 未匹配的剩余数据文件：自动按命名推导工作表名
         unmatched = [f for f in self._data_file_paths if f not in matched_files]
-        if unmatched and self._match_table.rowCount() > 0:
-            ref_name = self._match_table.item(0, 0).text() if self._match_table.item(0, 0) else ""
+        if unmatched:
             for fp in unmatched:
-                key = extract_key(fp).lstrip("0123456789")
-                sheet_name = self._derive_new_sheet_name(ref_name, key)
+                sheet_name = sanitize_sheet_name(extract_key(fp))
                 if progress_callback:
                     file_idx += 1
                     progress_callback(file_idx, total_files,
@@ -1300,16 +1333,20 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         遍历匹配表，查找每个已匹配文件的 test_mode 并关联到工作表名。
         未映射到的 sheet 使用当前 _test_mode 作为默认值。
+        当 _worksheet_naming_mode==1 时，用数据源名（extract_key）做映射键。
         """
+        from src.sheet_file_matcher import extract_key, sanitize_sheet_name
         sheet_mode_map: Dict[str, int] = {}
         file_mode_lookup = {e.path: e.test_mode for e in self._file_entries}
+        use_file_names = self._worksheet_naming_mode == 1
         for row in range(self._match_table.rowCount()):
             sn = self._match_table.item(row, 0)
             combo = self._match_table.cellWidget(row, 1)
             if sn and combo:
                 fp = combo.currentText().strip()
                 if fp and fp != "—" and fp in file_mode_lookup:
-                    sheet_mode_map[sn.text()] = file_mode_lookup[fp]
+                    key = sanitize_sheet_name(extract_key(fp)) if use_file_names else sanitize_sheet_name(sn.text())
+                    sheet_mode_map[key] = file_mode_lookup[fp]
         for sn in datasource_map:
             if sn not in sheet_mode_map:
                 sheet_mode_map[sn] = self._test_mode
@@ -1413,6 +1450,15 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self.ui.editTemplatePath.setText(path)
             self._cfg.config.last_template_path = path
             self._cfg._dirty = True
+            self._chart_config_required = None  # 模板已变，下次使用时重新检测
+            # 模板路径变更后，旧的匹配表基于旧模板的工作表名，无效
+            if self._match_table is not None:
+                self._match_table.setRowCount(0)
+            if hasattr(self, '_lbl_match_status') and self._lbl_match_status is not None:
+                self._lbl_match_status.setText("")
+            # 若已有数据文件，立即重建匹配表
+            if self._data_file_paths:
+                self._on_auto_match()
 
     def _on_browse_output(self):
         start_dir = self.ui.editOutputDir.text() or str(Path.cwd() / "output")
@@ -1844,6 +1890,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             robust_peak=self._check_robust_peak.isChecked(),
             extra_params=self._extra_params if self._extra_params else None,
             nh_custom_angles=self._nh_custom_angles if self._nh_custom_angles else None,
+            worksheet_naming_mode=self._worksheet_naming_mode,
             chart_config_obj=full_chart_config,
             ar_lag_config=self._ar_lag_config if hasattr(self, '_ar_lag_config') and not self._ar_lag_config.is_empty() else None,
             ar_output_db=self._ar_output_db,
@@ -2051,6 +2098,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _on_error(self, message: str):
         self._running = False
         self._worker = None
+        self._data_stale = True  # 错误后数据陈旧，下次处理前自动清除
         # 安全退出线程：quit() 退出事件循环，wait(3000) 等待线程结束
         if self._thread is not None:
             self._thread.quit()
@@ -2193,7 +2241,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """更新状态栏。"""
         singles = len(self._lag_config.singles_sorted)
         ranges = len(self._lag_config.ranges_sorted)
-        self.ui.statusBar.showMessage(
+        self.statusBar().showMessage(
             self.tr(f"LAG: {singles} 单角度 + {ranges} 范围 | 就绪")
         )
 

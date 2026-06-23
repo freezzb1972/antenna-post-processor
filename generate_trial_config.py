@@ -35,7 +35,7 @@ def _load_public_key() -> str:
 
     license_py = PROJECT_ROOT / "src" / "license.py"
     if license_py.exists():
-        content = license_py.read_text()
+        content = license_py.read_text(encoding="utf-8")
         # 查找 PUBLIC_KEY_PEM 或 _PUBLIC_KEY 定义
         import re
 

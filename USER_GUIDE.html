@@ -112,7 +112,8 @@ pyinstaller antenna_post_processor.spec
   <p><span class="step">2</span> <strong>选择模板</strong> — 选择包含多个工作表（如 5G1~5G4）的模板 Excel。</p>
   <p><span class="step">3</span> <strong>自动匹配</strong> — 点击 <code>🔗 自动匹配</code> 按钮，软件自动将工作表名与数据文件名按命名键匹配（如 "5G1" ↔ "G1FinalSummary.xlsx"）。</p>
   <p><span class="step">4</span> <strong>检查匹配</strong> — 匹配表中每行显示 [工作表 | 数据文件（下拉可选） | 状态]。绿色 ✓ 表示已匹配，可手动调整下拉框覆盖自动匹配。</p>
-  <p><span class="step">5</span> <strong>开始处理</strong> — 点击 <code>▶ 开始处理</code>，每个工作表使用自己的数据源独立计算，结果写入同一个输出 Excel。</p>
+  <p><span class="step">5</span> <strong>工作表命名</strong> — 匹配表右侧的 <code>工作表名:</code> 下拉框可选择命名方式：<code>保留原模板工作表名</code>（默认）或 <code>用数据源名替换</code>。选择"用数据源名替换"时，输出 Excel 的工作表名将使用数据源文件的键名（如 "G1FinalSummary"），而非模板中的原始工作表名。</p>
+  <p><span class="step">6</span> <strong>开始处理</strong> — 点击 <code>▶ 开始处理</code>，每个工作表使用自己的数据源独立计算，结果写入同一个输出 Excel。</p>
 </div>
 
 <h3>1.3 功能速查</h3>
@@ -123,6 +124,7 @@ pyinstaller antenna_post_processor.spec
   <tr><td>📐 LAG 配置</td><td>Tab 1</td><td>快捷角度按钮（点击切换）、步进批量生成、角度范围、保存/加载预设</td></tr>
   <tr><td>📊 3D 图形设置</td><td>Tab 2</td><td>视角（仰角/方位角）、分辨率 (DPI)、嵌入 Excel / 独立 PNG</td></tr>
   <tr><td>🔗 自动匹配</td><td>文件 Tab（多文件区）</td><td>工作表↔数据文件自动匹配，支持手动覆盖</td></tr>
+  <tr><td>📝 工作表名</td><td>文件 Tab（匹配表右侧）</td><td>输出工作表命名方式：保留模板原名 / 用数据源名替换</td></tr>
   <tr><td>📏 外推开关</td><td>文件 Tab（底部）</td><td>Theta 0-110° → 0-180° 线性外推，默认关闭</td></tr>
   <tr><td>🌐 语言切换</td><td>顶部工具栏</td><td>EN → 中 / 中 → EN</td></tr>
   <tr><td>🎨 主题切换</td><td>顶部工具栏</td><td>下拉选择 Material Design 主题</td></tr>
@@ -196,6 +198,16 @@ pyinstaller antenna_post_processor.spec
   <li>工作表 5G2 读取 G2FinalSummary.xlsx → 自己的频率列表 → 自己的列结构</li>
   <li>如果一个工作表没有匹配到数据源，会被跳过（日志中显示警告）</li>
 </ul>
+
+<h3>4.4 工作表命名方式</h3>
+
+<p>匹配表右侧的 <code>工作表名:</code> 下拉框提供两种命名方式：</p>
+<table>
+  <tr><th>选项</th><th>行为</th><th>适用场景</th></tr>
+  <tr><td><strong>保留原模板工作表名</strong></td><td>输出 Excel 工作表名 = 模板中的原始工作表名（如 5G1、5G2）</td><td>模板工作表名有固定业务含义</td></tr>
+  <tr><td><strong>用数据源名替换</strong></td><td>输出 Excel 工作表名 = 数据源文件的提取键名（如 G1FinalSummary、G2FinalSummary）</td><td>希望输出工作表名直接反映数据来源</td></tr>
+</table>
+<div class="note"><strong>提示：</strong>切换命名方式会自动重建匹配表显示。未匹配的额外数据源始终使用数据源文件名命名，不受此选项影响。</div>
 
 
 <h2 id="flow">5. 处理流程</h2>

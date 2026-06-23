@@ -16,9 +16,9 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
-    QGroupBox, QHBoxLayout, QLabel, QPushButton,
+    QFrame, QGroupBox, QHBoxLayout, QLabel, QPushButton,
     QSlider, QSpinBox, QSplitter, QTableWidget, QTableWidgetItem,
-    QToolBar, QVBoxLayout, QWidget,
+    QVBoxLayout, QWidget,
 )
 import matplotlib
 matplotlib.use("QtAgg")
@@ -200,14 +200,20 @@ class GraphViewer(QWidget):
         layout.addWidget(self._splitter, stretch=1)
         layout.addWidget(self._build_anim_bar())
 
-    def _build_advanced_toolbar(self) -> QToolBar:
-        """旋转预设 + 色图选择 + 导出按钮。"""
-        tb = QToolBar()
-        tb.setMovable(False)
-        tb.setIconSize(tb.iconSize() * 0.7)
+    def _build_advanced_toolbar(self) -> QWidget:
+        """旋转预设 + 色图选择 + 导出按钮。
+
+        使用 QWidget + QHBoxLayout 而非 QToolBar，
+        确保 PyInstaller 打包后控件正常渲染。
+        """
+        w = QWidget()
+        w.setObjectName("graphCtrlBar")
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(4, 2, 4, 2)
+        lay.setSpacing(6)
 
         # 旋转预设
-        tb.addWidget(QLabel(" 视角: "))
+        lay.addWidget(QLabel("视角:"))
         presets = [
             ("Iso", 30, -60), ("Top", 90, 0), ("Front", 0, 0),
             ("Side", 0, 90), ("Back", 0, 180), ("Bottom", -90, 0),
@@ -217,39 +223,51 @@ class GraphViewer(QWidget):
             btn.setFixedWidth(60)
             btn.setToolTip(f"预设视角: {label} (el={elev}°, az={azim}°)")
             btn.clicked.connect(lambda checked, e=elev, a=azim: self._set_view_preset(e, a))
-            tb.addWidget(btn)
-        tb.addSeparator()
+            lay.addWidget(btn)
+
+        # 分隔线
+        sep1 = QFrame()
+        sep1.setFrameShape(QFrame.VLine)
+        lay.addWidget(sep1)
 
         # 色图选择
-        tb.addWidget(QLabel(" 色图: "))
+        lay.addWidget(QLabel("色图:"))
         self._cmb_cmap = QComboBox()
         self._cmb_cmap.addItems(["jet", "viridis", "plasma", "inferno", "magma", "cividis",
                                   "turbo", "hot", "coolwarm", "rainbow"])
         self._cmb_cmap.setCurrentText("jet")
         self._cmb_cmap.setFixedWidth(100)
         self._cmb_cmap.currentTextChanged.connect(self._on_cmap_changed)
-        tb.addWidget(self._cmb_cmap)
-        tb.addSeparator()
+        lay.addWidget(self._cmb_cmap)
+
+        # 分隔线
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.VLine)
+        lay.addWidget(sep2)
 
         # 导出按钮
         btn_export = QPushButton("💾 导出视图")
         btn_export.setToolTip("保存当前视图为 PNG 图片")
         btn_export.clicked.connect(self._on_export_view)
-        tb.addWidget(btn_export)
+        lay.addWidget(btn_export)
 
-        tb.addSeparator()
+        # 分隔线
+        sep3 = QFrame()
+        sep3.setFrameShape(QFrame.VLine)
+        lay.addWidget(sep3)
 
         # 图形设置按钮
         btn_settings = QPushButton("⚙ 图形设置")
         btn_settings.setToolTip("配置图形显示: 类型、数量、参数")
         btn_settings.clicked.connect(self._show_viewer_settings)
-        tb.addWidget(btn_settings)
+        lay.addWidget(btn_settings)
 
-        # 缩放
-        self._lbl_zoom = QLabel(" 100%")
-        tb.addWidget(self._lbl_zoom)
+        # 弹性空间 + 缩放标签
+        lay.addStretch()
+        self._lbl_zoom = QLabel("100%")
+        lay.addWidget(self._lbl_zoom)
 
-        return tb
+        return w
 
     def _set_view_preset(self, elev: float, azim: float):
         self._elev, self._azim = elev, azim
@@ -693,17 +711,34 @@ class GraphViewer(QWidget):
 
     def load_data(self, results: Dict[str, List[Dict]], step_deg: float = 5.0):
         from src.graph_data import extract_graph_data
+        # 停止动画定时器，防止旧数据残余
+        if self._anim_timer.isActive():
+            self._anim_timer.stop()
+            self._anim_playing = False
+            self._btn_anim_play.setText("▶ 播放")
         self._results = results
         self._step_deg = step_deg
         self._graph_data = extract_graph_data(results, step_deg)
+        # 验证可配置状态在新数据中的有效性（取第一个频点的 keys 即可，所有频点 keys 相同）
+        fd0 = next(iter(self._graph_data.values()), {})
+        available_keys = fd0.keys() - {"theta", "phi"}
+        self._active_pattern_keys = [k for k in self._active_pattern_keys if k in available_keys]
+        if not self._active_pattern_keys:
+            self._active_pattern_keys = list(DEFAULT_PATTERN_KEYS)
+        freq_count = len(self._graph_data)
+        if freq_count > 0:
+            self._active_freq_curve_indices = [i for i in self._active_freq_curve_indices if i < freq_count]
         self._spin_step.blockSignals(True)
         self._spin_step.setValue(int(step_deg))
         self._spin_step.blockSignals(False)
+        # 用 blockSignals 防止 setCurrentIndex 触发 _on_update（此时 _subplots 还是旧的）
+        self._cmb_freq.blockSignals(True)
         self._cmb_freq.clear()
         for f in sorted(self._graph_data.keys()):
             self._cmb_freq.addItem(f"{f:.1f} MHz", f)
         if self._cmb_freq.count() > 0:
             self._cmb_freq.setCurrentIndex(0)
+        self._cmb_freq.blockSignals(False)
         self._rebuild_subplots()
         self._on_update()
 
@@ -939,10 +974,13 @@ class GraphDataTab(QWidget):
     def install_in(cls, tab_widget, results: dict):
         """在 tab_widget 中查找或创建 GraphDataTab，返回 tab index。
 
-        若已存在同名 tab 则直接选中；否则创建新 tab 并选中。
+        若已存在同名 tab 则更新其数据后选中；否则创建新 tab 并选中。
         """
         for i in range(tab_widget.count()):
             if tab_widget.tabText(i) == cls.TAB_NAME:
+                tab = tab_widget.widget(i)
+                if isinstance(tab, cls) and hasattr(tab, 'load_data'):
+                    tab.load_data(results)
                 tab_widget.setCurrentIndex(i)
                 return i
         tab = cls(results)

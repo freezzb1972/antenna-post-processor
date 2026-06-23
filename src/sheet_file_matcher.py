@@ -43,6 +43,19 @@ def extract_key(name: str) -> str:
     return stem.upper()
 
 
+def sanitize_sheet_name(name: str, max_len: int = 31) -> str:
+    """清理字符串使其符合 Excel 工作表名规则。
+
+    Excel 禁止字符: [ ] * / \\ ? : #
+    替换为下划线，并截断到 max_len 字符。
+    """
+    import re
+    cleaned = re.sub(r'[\[\]*/\\?:#]', '_', name)
+    # 去除连续下划线
+    cleaned = re.sub(r'_+', '_', cleaned)
+    return cleaned[:max_len]
+
+
 # ---------------------------------------------------------------------------
 # 匹配结果
 # ---------------------------------------------------------------------------

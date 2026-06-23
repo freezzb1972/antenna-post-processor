@@ -248,3 +248,144 @@ class TestHelpSearch:
             dlg._on_result_clicked(dlg._result_list.item(0))
             content = dlg._rag_answer.toPlainText()
             assert len(content) > 50, f"应显示详细内容, 实际只有 {len(content)} 字符"
+
+
+# ── 5. 陈旧数据防护：双次运行一致性 ─────────────────────────────────
+
+class TestStaleDataProtection:
+    """验证多次运行之间数据完全隔离，不会出现数据残留污染。
+
+    这是最关键的测试类别 —— 陈旧数据 bug 不会导致崩溃，
+    而是在第二次运行时悄悄混入第一次的数据，产生错误结果。
+    """
+
+    def test_pipeline_double_run_consistency(self):
+        """两次独立运行 pipeline，结果应完全一致。"""
+        from src.datasource import DataSource
+        from src.pipeline import run_pipeline
+        from src.lag_config import PRESET_AUTOMOTIVE
+        from pathlib import Path
+
+        data_path = "data/5G1_merged.csv"
+        template_path = "data/template_5G1.xlsx"
+        if not Path(data_path).exists() or not Path(template_path).exists():
+            pytest.skip("测试数据文件不存在")
+
+        # 第一次运行
+        ds1 = DataSource.from_path(data_path)
+        r1 = run_pipeline(datasource=ds1, template_path=template_path,
+                          output_path="/tmp/test_consistency_1.xlsx",
+                          lag_config_override=PRESET_AUTOMOTIVE)
+        count1 = sum(len(v) for v in r1.values())
+
+        # 第二次运行 — 完全独立
+        ds2 = DataSource.from_path(data_path)
+        r2 = run_pipeline(datasource=ds2, template_path=template_path,
+                          output_path="/tmp/test_consistency_2.xlsx",
+                          lag_config_override=PRESET_AUTOMOTIVE)
+        count2 = sum(len(v) for v in r2.values())
+
+        # 两次运行行数应相同
+        assert count1 == count2, f"双次运行行数不一致: {count1} vs {count2}"
+
+        # 逐行逐字段比对（只比数值，跳过路径相关字段）
+        from itertools import zip_longest
+        import numpy as np
+        all_keys = sorted(set().union(*(d.keys() for v in r1.values() for d in v)))
+        skip_keys = {"输出文件", "输出目录", "完整报告", "数据源"}
+
+        def _val_equal(a, b):
+            """安全比较两个值，递归处理 dict/list/numpy 数组/标量/NaN。"""
+            if a is None and b is None:
+                return True
+            if a is None or b is None:
+                return False
+            if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
+                try:
+                    return bool(np.allclose(a, b, equal_nan=True))
+                except (TypeError, ValueError):
+                    return False
+            if isinstance(a, float) and isinstance(b, float):
+                if np.isnan(a) and np.isnan(b):
+                    return True
+                return abs(a - b) < 1e-9
+            if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+                return abs(a - b) < 1e-9
+            if isinstance(a, dict) and isinstance(b, dict):
+                if a.keys() != b.keys():
+                    return False
+                return all(_val_equal(a[k], b[k]) for k in a)
+            if isinstance(a, list) and isinstance(b, list):
+                if len(a) != len(b):
+                    return False
+                return all(_val_equal(x, y) for x, y in zip(a, b))
+            return a == b
+
+        for sheet_name in sorted(set(r1.keys()) | set(r2.keys())):
+            a = r1.get(sheet_name, [])
+            b = r2.get(sheet_name, [])
+            assert len(a) == len(b), f"工作表 {sheet_name} 行数: {len(a)} vs {len(b)}"
+            for i, (ra, rb) in enumerate(zip_longest(a, b, fillvalue={})):
+                for k in sorted(all_keys):
+                    if k in skip_keys:
+                        continue
+                    va, vb = ra.get(k), rb.get(k)
+                    assert _val_equal(va, vb), (
+                        f"{sheet_name}[{i}].{k}: {va!r} vs {vb!r}")
+
+    def test_datasource_close_reopen_consistency(self):
+        """关闭后重新打开同一数据源，频点列表和读取结果应一致。"""
+        from src.datasource import DataSource
+        from pathlib import Path
+
+        data_path = "data/5G1_merged.csv"
+        if not Path(data_path).exists():
+            pytest.skip("测试数据文件不存在")
+
+        ds1 = DataSource.from_path(data_path)
+        freqs1 = list(ds1.frequencies)
+        data1 = ds1.read_all_sections_for_freq(0)  # 按索引读取
+        ds1.close()
+
+        ds2 = DataSource.from_path(data_path)
+        freqs2 = list(ds2.frequencies)
+        data2 = ds2.read_all_sections_for_freq(0)  # 按索引读取
+        ds2.close()
+
+        assert freqs1 == freqs2, f"频点列表不一致: {freqs1} vs {freqs2}"
+        assert data1.keys() == data2.keys(), f"section 不一致"
+        for k in data1:
+            d1, d2 = data1[k], data2[k]
+            assert len(d1) == len(d2), f"{k} 行数不一致"
+            import numpy as np
+            a1 = np.array(d1, dtype=float)
+            a2 = np.array(d2, dtype=float)
+            assert np.allclose(a1, a2, equal_nan=True), f"{k} 数据不一致"
+
+    def test_main_window_state_reset_on_new_files(self, window, qtbot, monkeypatch):
+        """_data_stale 防护: 新文件加载后标志位重置正确。"""
+        import tempfile
+        from pathlib import Path
+
+        tmp = Path(tempfile.mktemp(suffix=".csv"))
+        try:
+            tmp.write_text("Freq,Theta,Phi,Gain_dB\n1000,0,0,1.0\n")
+
+            # 模拟已有陈旧数据的情况
+            window._data_stale = True
+            window._data_file_paths = ["/tmp/old_stale_file.csv"]
+
+            monkeypatch.setattr(
+                QFileDialog, "getOpenFileNames",
+                lambda *a, **kw: ([str(tmp)], ""))
+
+            window._on_add_data_files()
+            qtbot.wait(100)
+
+            # _data_stale 应重置为 False (新数据已加载, 不再陈旧)
+            assert window._data_stale is False
+            # 旧的陈旧文件应被自动清除
+            assert "/tmp/old_stale_file.csv" not in window._data_file_paths
+
+        finally:
+            tmp.unlink(missing_ok=True)

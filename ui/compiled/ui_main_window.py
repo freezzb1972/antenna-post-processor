@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBo
     QFormLayout, QGroupBox, QHBoxLayout, QLabel,
     QLineEdit, QMainWindow, QPlainTextEdit, QProgressBar,
     QPushButton, QSizePolicy, QSpacerItem, QSpinBox,
-    QStatusBar, QTabWidget, QVBoxLayout, QWidget)
+    QTabWidget, QVBoxLayout, QWidget)
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -157,7 +157,7 @@ class Ui_MainWindow(object):
         self.checkFullReport = QCheckBox(self.groupOutput)
         self.checkFullReport.setObjectName(u"checkFullReport")
 
-        self.formOutput.setWidget(2, QFormLayout.ItemRole.LabelRole, self.checkFullReport)
+        self.formOutput.setWidget(2, QFormLayout.ItemRole.FieldRole, self.checkFullReport)
 
         self.lblFullReportPath = QLabel(self.groupOutput)
         self.lblFullReportPath.setObjectName(u"lblFullReportPath")
@@ -540,12 +540,6 @@ class Ui_MainWindow(object):
 
 
         self.rootVBox.addLayout(self.hButtons)
-
-        self.statusBar = QStatusBar(self.centralWidget)
-        self.statusBar.setObjectName(u"statusBar")
-        self.statusBar.setSizeGripEnabled(False)
-
-        self.rootVBox.addWidget(self.statusBar)
 
         MainWindow.setCentralWidget(self.centralWidget)
 
