@@ -13,3 +13,7 @@ build/
 !antenna_post_processor.spec
 output/
 .pytest_cache/
+.license_secret
+license.json
+.claude/checkpoints.log
+CURRENT_STATE.md

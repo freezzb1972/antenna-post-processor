@@ -557,15 +557,21 @@ def compute_ar_at_angles(
     theta_angles_deg: np.ndarray,
     target_angles_deg: List[float],
 ) -> Dict[float, float]:
-    """批量计算多个 θ 角的 AR（取 phi 均值）。
+    """批量计算多个 θ 角的 AR（取 phi 最大值，行业标准的 worst-case）。
+
+    NOTE: 此函数使用 `np.max` 而非 `np.mean`，因为行业规范
+    （如 GNSS 天线测试）要求覆盖空域内 AR 不超过 X dB，
+    取最大值代表最差方向性能。若需要均值，请自行调用 `np.mean`。
+
+    GNSS 天线规范要求"覆盖空域内 AR < X dB"，取最大值代表最差方向性能。
 
     Returns:
-        {theta_deg: ar_linear, ...}
+        {theta_deg: ar_linear_max, ...}
     """
     results: Dict[float, float] = {}
     for target in target_angles_deg:
         idx = int(np.argmin(np.abs(theta_angles_deg - target)))
-        results[target] = float(np.mean(ar_linear[:, idx]))
+        results[target] = float(np.max(ar_linear[:, idx]))
     return results
 
 
@@ -575,7 +581,10 @@ def compute_ar_range(
     theta_start: float,
     theta_end: float,
 ) -> float:
-    """指定 θ 范围内的 AR 均值（线性域平均）。
+    """指定 θ 范围内的 AR 最大值（行业标准的 worst-case 覆盖空域性能）。
+
+    NOTE: 使用 `np.max` 而非 `np.mean`，因为行业规范在评估
+    空域覆盖时以最差点为准。若需要均值，请自行调用 `np.mean`。
 
     Args:
         ar_linear: AR 线性值，形状 (n_phi, n_theta)。
@@ -583,14 +592,14 @@ def compute_ar_range(
         theta_start, theta_end: 范围 (度)。
 
     Returns:
-        范围平均 AR (线性值)。
+        范围内最大 AR (线性值)，代表空域内最差极化纯度。
     """
     mask = (theta_angles_deg >= theta_start) & (theta_angles_deg <= theta_end + 1e-9)
     indices = np.where(mask)[0]
     if len(indices) == 0:
         return 1.0
     subset = ar_linear[:, indices]
-    return float(np.mean(subset))
+    return float(np.max(subset))
 
 
 # ======================================================================
@@ -647,6 +656,166 @@ def compute_beamwidth(
 
     return {"theta_bw_deg": round(theta_bw, 1), "phi_bw_deg": round(phi_bw, 1),
             "front_back_ratio_db": round(fb_ratio, 2)}
+
+
+# ======================================================================
+# Cross-Polarization Isolation — 交叉极化隔离度
+# ======================================================================
+
+def compute_xpi(
+    theta_logmag: np.ndarray,  # (n_phi, n_theta) dB
+    phi_logmag: np.ndarray,    # (n_phi, n_theta) dB
+) -> Dict[str, float]:
+    """计算交叉极化隔离度 (Cross-Polarization Isolation).
+
+    XPI(θ) = 主极化增益 - 交叉极化增益 (dB)
+    对每个方向 (φ,θ)，主极化 = max(|E_θ|,|E_φ|)，交叉极化 = min(|E_θ|,|E_φ|).
+
+    NOTE: 此实现使用 max/min 分量法，适用于线性极化天线，
+    其中主极化与交叉极化方向清晰可辨。对于圆极化 (CP) 天线，
+    需要采用不同的方法（如基于旋向性的圆极化 XPI 定义），
+    此计算方式不适用。
+
+    返回:
+      - xpi_boresight: 天顶方向 (θ=0°) 的 XPI 均值 (XPI 在 phi 上平均)
+      - xpi_mean: 所有方向 XPI 的均值
+      - xpi_min:  最差方向的 XPI (最小值, 即隔离最差)
+    """
+    # 主极化 = max(theta, phi), 交叉极化 = min(theta, phi)
+    main_pol = np.maximum(theta_logmag, phi_logmag)   # (n_phi, n_theta)
+    cross_pol = np.minimum(theta_logmag, phi_logmag)
+    xpi = main_pol - cross_pol  # (n_phi, n_theta) — 正值越大隔离越好
+
+    # boresight (theta=0°) XPI: phi 上平均
+    xpi_bs = float(np.mean(xpi[:, 0]))
+
+    # 全局
+    xpi_mean = float(np.mean(xpi))
+    xpi_min = float(np.min(xpi))
+
+    return {
+        "xpi_boresight": round(xpi_bs, 2),
+        "xpi_mean": round(xpi_mean, 2),
+        "xpi_min": round(xpi_min, 2),
+    }
+
+
+# ======================================================================
+# Total Efficiency — 总效率 (含 S11 反射损耗)
+# ======================================================================
+
+def compute_total_efficiency(
+    efficiency_pct: float,  # 辐射效率 (%)
+    s11_db: Optional[float] = None,  # S11 回波损耗 (dB, 负值=反射少)
+) -> Dict[str, Optional[float]]:
+    """计算总效率 = 辐射效率 × (1 - |S11|²).
+
+    S11 的单位是 dB: S11_linear = 10^(S11_dB/20).
+    |S11|² = 反射功率比, (1 - |S11|²) = 传输功率比.
+
+    Args:
+        efficiency_pct: 辐射效率 (%), 来自 compute_efficiency.
+        s11_db: S11 回波损耗 (dB). 若为 None, 总效率标记为 None.
+
+    Returns:
+        {"total_efficiency_pct": float or None, "mismatch_loss_db": float or None}
+    """
+    if s11_db is None:
+        return {"total_efficiency_pct": None, "mismatch_loss_db": None}
+
+    s11_lin = 10.0 ** (s11_db / 20.0)
+    reflection_pct = s11_lin ** 2 * 100  # |S11|² × 100%
+    transmission_factor = 1.0 - s11_lin ** 2  # (1 - |S11|²)
+    if transmission_factor <= 0:
+        return {"total_efficiency_pct": 0.0, "mismatch_loss_db": None}
+
+    total_eff_pct = efficiency_pct * transmission_factor
+    mismatch_loss_db = float(10.0 * np.log10(max(transmission_factor, 1e-15)))
+
+    return {
+        "total_efficiency_pct": round(total_eff_pct, 6),
+        "mismatch_loss_db": round(mismatch_loss_db, 2),
+    }
+
+
+# ======================================================================
+# Phase Center — 相位中心 (等效辐射点)
+# ======================================================================
+
+def compute_phase_center(
+    theta_phase: np.ndarray,  # (n_phi, n_theta) deg
+    phi_phase: np.ndarray,    # (n_phi, n_theta) deg
+    theta_angles_deg: np.ndarray,  # (n_theta,) deg
+    freq_mhz: float,               # 频率 (MHz)
+    boresight_range_deg: float = 30.0,  # 计算范围 (θ ∈ [0, range])
+) -> Dict[str, Optional[float]]:
+    """计算相位中心偏移 (mm).
+
+    原理: 远场相位随角度变化 → 等效辐射点不在旋转中心。
+    Δφ(θ) = -k · d · sin(θ), 其中 k = 2π/λ, d = 相位中心偏移.
+
+    对主极化 (Theta) 在 boresight 范围内做线性拟合:
+      phase(θ) ≈ -k · d · sin(θ) + const
+    斜率 → d (mm).
+
+    Args:
+        theta_phase: Theta 极化相位 (deg), 形状 (n_phi, n_theta).
+        phi_phase: Phi 极化相位.
+        theta_angles_deg: theta 角度 (deg).
+        freq_mhz: 频率 (MHz).
+        boresight_range_deg: 拟合范围 (deg).
+
+    Returns:
+        {"pc_theta_mm": float, "pc_phi_mm": float} 或 None.
+    """
+    if theta_phase is None:
+        return {"pc_theta_mm": None, "pc_phi_mm": None}
+
+    # 波长 (mm)
+    c_mm_per_s = 299792458000.0
+    freq_hz = freq_mhz * 1e6
+    wavelength_mm = c_mm_per_s / freq_hz
+
+    results = {}
+    for label, phase_data in [("pc_theta_mm", theta_phase), ("pc_phi_mm", phi_phase)]:
+        if phase_data is None:
+            results[label] = None
+            continue
+
+        try:
+            # 取 boresight 范围内的 theta 索引
+            mask = theta_angles_deg <= boresight_range_deg + 1e-9
+            indices = np.where(mask)[0]
+            if len(indices) < 3:
+                results[label] = None
+                continue
+
+            theta_subset = theta_angles_deg[indices]
+            theta_rad = np.deg2rad(theta_subset)
+            sin_theta = np.sin(theta_rad)
+
+            # 对每个 phi 计算相位斜率, 取平均
+            offsets = []
+            for pi in range(phase_data.shape[0]):
+                phase_deg = phase_data[pi, indices]
+                # 解包裹相位
+                phase_rad = np.unwrap(np.deg2rad(phase_deg))
+                # 线性拟合: phase = slope * sin(theta) + const
+                if np.std(sin_theta) > 1e-9:
+                    slope = np.polyfit(sin_theta, phase_rad, 1)[0]
+                    # slope = -2π/λ · d → d = -slope · λ / (2π)
+                    d_mm = -slope * wavelength_mm / (2.0 * np.pi)
+                    offsets.append(d_mm)
+
+            if offsets:
+                # 取中位数 (抗异常方向)
+                results[label] = round(float(np.median(offsets)), 2)
+            else:
+                results[label] = None
+        except Exception:
+            results[label] = None
+
+    return results
 
 
 def _kahan_mean(arr: np.ndarray) -> float:

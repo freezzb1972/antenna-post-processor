@@ -1,0 +1,16 @@
+[2026-06-21 09:49:00] ⚠ 管理员令牌未配置！
+[2026-06-21 09:49:00]   请在 config.json 中设置 admin_token，或设置 ADMIN_TOKEN 环境变量。
+[2026-06-21 09:49:01]   建议随机生成: python3 -c "import secrets; print(secrets.token_urlsafe(24))"
+[2026-06-21 09:49:01] ⚠ SMTP 密码未配置！邮件发送将不可用。请在 config.json 中设置 smtp.password。
+[2026-06-21 09:49:01] 启动许可服务中心: http://0.0.0.0:18999
+[2026-06-21 09:49:01]   申请页面:   http://0.0.0.0:18999/
+[2026-06-21 09:49:01]   管理面板:   http://0.0.0.0:18999/admin?token=<令牌>
+[2026-06-21 09:49:01]   申请数据:   /mnt/d/cc/EMQuest/antenna-post-processor/src/applications.json
+[2026-06-21 09:49:01]   激活码数据: /mnt/d/cc/EMQuest/antenna-post-processor/src/activation_codes.json
+[2026-06-21 09:49:01] 127.0.0.1 — GET /health HTTP/1.1
+[2026-06-21 09:49:01] 127.0.0.1 — GET / HTTP/1.1
+[2026-06-21 09:49:01] 新申请: 张三 <test@example.com>
+[2026-06-21 09:49:01] 127.0.0.1 — POST /apply HTTP/1.1
+[2026-06-21 09:49:01] 127.0.0.1 — GET /admin HTTP/1.1
+[2026-06-21 09:49:01] 127.0.0.1 — GET /admin?token=Qjb2W9VbiealdYz975G-lG6eL_Xwb8bB HTTP/1.1
+[2026-06-21 09:49:02] 127.0.0.1 — POST /admin/approve HTTP/1.1

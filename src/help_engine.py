@@ -245,6 +245,9 @@ class RAGSettings:
     api_base: str = "https://api.anthropic.com/v1/messages"
     api_key: str = ""
     model: str = "claude-sonnet-4-6"
+    use_local: bool = False       # 使用本地 Ollama 模型
+    local_model: str = "qwen2.5:7b"  # Ollama 模型名
+    local_endpoint: str = "http://localhost:11434"  # Ollama 服务地址
 
 
 class HelpEngine:
@@ -336,9 +339,12 @@ class HelpEngine:
 
         Returns: {"answer": "...", "sources": [...], "error": None|str}
         """
-        if not self._rag_settings.enabled or not self._rag_settings.api_key:
+        # 本地模式无需 API Key, 云模式需要
+        if not self._rag_settings.enabled:
+            return {"answer": "", "sources": [], "error": "RAG 未启用"}
+        if not self._rag_settings.use_local and not self._rag_settings.api_key:
             return {"answer": "", "sources": [],
-                    "error": "RAG 未启用或未配置 API Key"}
+                    "error": "云 API 模式需要配置 API Key，或切换到本地 Ollama 模式"}
 
         # 检索相关章节
         search_results = self.search(question, top_k=top_k, use_semantic=True)
@@ -369,7 +375,30 @@ class HelpEngine:
             import json
             import urllib.request
 
-            # 判断 API 类型: Anthropic vs OpenAI-compatible
+            # 本地 Ollama 模式
+            if self._rag_settings.use_local:
+                endpoint = self._rag_settings.local_endpoint.rstrip("/")
+                payload = {
+                    "model": self._rag_settings.local_model,
+                    "system": system_prompt,
+                    "prompt": user_prompt,
+                    "stream": False,
+                }
+                req = urllib.request.Request(
+                    f"{endpoint}/api/generate",
+                    data=json.dumps(payload).encode(),
+                    headers={"Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=120) as resp:
+                    data = json.loads(resp.read().decode())
+                answer = data.get("response", "")
+                return {
+                    "answer": answer.strip(),
+                    "sources": [r["title"] for r in search_results],
+                    "error": None,
+                }
+
+            # 判断云 API 类型: Anthropic vs OpenAI-compatible
             base = self._rag_settings.api_base.rstrip("/")
             headers = {
                 "Content-Type": "application/json",

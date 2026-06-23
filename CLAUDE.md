@@ -4,11 +4,17 @@
 
 从 EMQuest 天线测试数据计算 Gain/Directivity/Efficiency/LAG/Axial Ratio，填入 Excel 模板。
 
-### 当前状态 (2026-06-16)
+### 当前状态 (2026-06-21)
 
-**已完成**: 多数据源+工作表自动匹配、Theta 外推开关、6位小数精度、进度条实时更新、GUI 完整验证（47/47 测试通过）、USER_GUIDE.html 14章完整文档。
+**已完成**: 多数据源+工作表自动匹配、Theta 外推开关、6位小数精度、进度条实时更新、
+GUI 完整验证 (71/71 测试通过, 0 skipped)、USER_GUIDE.html 14章完整文档、
+AR 计算修复 (移除 clipping)、模板预设管理系统、启动闪屏、图表开关统一、字体缩放修复、
+统一配置管理 (antenna_config.json)、30天试用系统 (HMAC + 4层冗余)、
+图表子选择 (Gain/AR 多曲线+角度弹窗)、增强3D查看器 (旋转预设+色图+导出)、
+Excel 图表平滑曲线 + 轴标签修复、角度弹窗 UX 修复 (add/delete 不关闭对话框)。
 
-**已知问题**: 8 个 GUI 测试被暂时跳过（因 git checkout 丢失了部分 `_init_multi_file_ui` 代码）。
+**验证清单**: `verify-manifest.json` — 27 特性, 26 verified (96%), 1 partial (nf2ff 待标定数据)。
+  Manifest 自动维护规则见 verify-py skill (Phase 0), 对所有项目通用。
 
 ### 核心架构
 
@@ -48,6 +54,30 @@ main.py → ui/main_window.py (PySide6 GUI)
 6. 多文件模式: 工作表名 ↔ 文件名通过 `sheet_file_matcher.py` 的 `extract_key()` 匹配
 7. 所有计算值 `round(val, 6)` 保留 6 位小数
 
+### 开发工作流（自动编排）
+
+使用 `/dev-flow` 编排器自动协调 23 个技能，按照 6 阶段工作流推进：
+
+```
+DESIGN → PLAN → DEVELOP → VERIFY → COMMIT → MANAGE
+```
+
+| 命令 | 作用 |
+|------|------|
+| `/dev-flow start` | 开始新功能（→ DESIGN 阶段） |
+| `/dev-flow next` | 推进到下一阶段 |
+| `/dev-flow check` | 运行当前阶段质量检查 |
+| `/dev-flow status` | 查看当前状态 |
+
+**自动钩子**（已配置在 `.claude/settings.json`）：
+- Edit/Write 累计 ≥5 次 → 建议运行 `/dev-flow check`
+- 修改 `ui/*.py` → 提醒运行 `gui-check`
+- 修改 `*.spec` → 提醒运行 `size-gate`
+- pytest 运行后 → 自动更新统计
+- PreCompact → 提醒运行 `/distill-session`
+
+**状态文件**：`.claude/dev-flow.json`（跟踪阶段、文件修改计数、检查点计数）
+
 ### 质量门禁（自动触发）
 
 修改以下文件后，**必须**运行对应的 harness。Harness 已内置在项目中，
@@ -64,13 +94,40 @@ main.py → ui/main_window.py (PySide6 GUI)
 对**任意 Python 项目**使用这些 skill：
 ```bash
 # 初始化（首次）
-python3 ~/.claude/skills/gui-check/gui_integrity_check.py --init    # 生成 .gui-check.json
-python3 ~/.claude/skills/size-gate/build_size_gate.py --init        # 生成 .size-gate.json
+python3 ~/.claude/global-skills/python/gui-check/gui_integrity_check.py --init    # 生成 .gui-check.json
+python3 ~/.claude/global-skills/python/size-gate/build_size_gate.py --init        # 生成 .size-gate.json
 # 编辑 .gui-check.json / .size-gate.json 定制规则
 # 正常运行
-python3 ~/.claude/skills/gui-check/gui_integrity_check.py
-python3 ~/.claude/skills/size-gate/build_size_gate.py --spec-only
+python3 ~/.claude/global-skills/python/gui-check/gui_integrity_check.py
+python3 ~/.claude/global-skills/python/size-gate/build_size_gate.py --spec-only
 ```
+
+### 技能管理体系（三阶架构）
+
+本项目使用 **三阶技能体系**：`~/.claude/global-skills/` 集中管理所有技能，项目 `.claude/skills/` 纯软链按需加载。
+
+```
+全局 ~/.claude/skills/          ← 5 个通用技能（跨项目自动加载）
+  browse, careful, context-save, context-restore, init-project
+
+全局 ~/.claude/global-skills/   ← 90+ 技能集中管理（7 个分类）
+  superpowers/ (26)  everything/ (45)  python/ (3)
+  network/ (5)        homelab/ (5)     security/ (2)
+  misc/ (26)
+
+本项目 .claude/skills/          ← 按需软链 23 个
+  通过 /dev-flow 自动编排调用
+```
+
+| 层 | 位置 | 加载方式 |
+|---|------|---------|
+| **核心** | `~/.claude/skills/` | 全局自动加载（4个通用技能） |
+| **库** | `~/.claude/global-skills/` | 集中管理，项目按需软链 |
+| **项目** | `.claude/skills/` | 纯软链，声明项目依赖 |
+
+钩子路径已统一更新为 `~/.claude/global-skills/...`，插件（claude-api）通过 `enabledPlugins` 控制。
+
+新项目初始化：使用 `/init-project` 引导讨论 → 自动匹配 → 配置技能/插件/MCP。
 
 ### 验证命令
 

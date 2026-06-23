@@ -37,21 +37,21 @@ def normalize_header(text: str) -> str:
 # LAG 列头正则（容错匹配）
 # ---------------------------------------------------------------------------
 
-# 匹配 "Theta=0-90 LAG" / "Theta=60-90 LAG" / "θ=0-90°"
+# 匹配 "Theta=0-90 LAG" / "Theta=60~90 LAG" / "θ=0-90°"
 _RE_LAG_RANGE = re.compile(
-    r"(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)\s*[-–—]\s*(\d+\.?\d*)",
+    r"(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)\s*[-–—~]\s*(\d+\.?\d*)",
     re.IGNORECASE,
 )
 
-# 匹配 "60-90LAG" / "0-90 LAG"（无 Theta= 前缀的 LAG 范围）
+# 匹配 "60-90LAG" / "0~90 LAG"（无 Theta= 前缀的 LAG 范围）
 _RE_LAG_RANGE_NO_PREFIX = re.compile(
-    r"(\d+\.?\d*)\s*[-–—]\s*(\d+\.?\d*)\s*LAG",
+    r"(\d+\.?\d*)\s*[-–—~]\s*(\d+\.?\d*)\s*LAG",
     re.IGNORECASE,
 )
 
 # 匹配 "Theta=60" / "θ=70" / "Theta = 80"（但不能是范围）
 _RE_LAG_SINGLE = re.compile(
-    r"(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)\s*$",
+    r"(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)",
     re.IGNORECASE,
 )
 
@@ -133,6 +133,54 @@ class LagConfig:
             sm = _RE_LAG_SINGLE.search(h)
             if not sm:
                 sm = _RE_LAG_SINGLE_NO_PREFIX.search(h)
+            if sm:
+                val = float(sm.group(1))
+                if val not in singles:
+                    singles.append(val)
+
+        return cls(single_angles=singles, ranges=ranges)
+
+    @classmethod
+    def from_ar_headers(cls, headers: List[str]) -> "LagConfig":
+        """从 Excel 列头自动解析 AR (Axial Ratio) 角度需求。
+
+        识别模式：
+          - ``AR at Theta=30`` / ``Axial Ratio at Theta=60`` → 单角度 30°, 60°
+          - ``AR at Theta=0~70`` / ``Axial Ratio at Theta=20~80`` → 范围 (0, 70), (20, 80)
+
+        注意：列头可能含换行符 ``\\n``、全角括号等，先做规范化。
+        """
+        singles: List[float] = []
+        ranges: List[Tuple[float, float]] = []
+
+        # AR 单角度: "AR at Theta=30" / "Axial Ratio at Theta=60"
+        _RE_AR_SINGLE = re.compile(
+            r"(?:AR|Axial\s*Ratio)\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)",
+            re.IGNORECASE,
+        )
+
+        # AR 范围: "AR at Theta=0~70" / "Axial Ratio at Theta=20~80"
+        _RE_AR_RANGE = re.compile(
+            r"(?:AR|Axial\s*Ratio)\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)\s*[-–—~]\s*(\d+\.?\d*)",
+            re.IGNORECASE,
+        )
+
+        for raw in headers:
+            h = normalize_header(raw)
+            if not h:
+                continue
+
+            # 先检测范围
+            rm = _RE_AR_RANGE.search(h)
+            if rm:
+                lo, hi = float(rm.group(1)), float(rm.group(2))
+                key = (min(lo, hi), max(lo, hi))
+                if key not in ranges:
+                    ranges.append(key)
+                continue
+
+            # 再检测单角度
+            sm = _RE_AR_SINGLE.search(h)
             if sm:
                 val = float(sm.group(1))
                 if val not in singles:

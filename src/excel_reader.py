@@ -181,6 +181,48 @@ def is_avg_power_column(header: str) -> bool:
     return ("average" in h or "avg" in h) and "power" in h
 
 
+def is_xpi_boresight_column(header: str) -> bool:
+    """XPI Boresight 列。"""
+    h = header.lower()
+    return "xpi" in h and "boresight" in h
+
+
+def is_xpi_mean_column(header: str) -> bool:
+    """XPI Mean 列。"""
+    h = header.lower()
+    return "xpi" in h and "mean" in h
+
+
+def is_xpi_min_column(header: str) -> bool:
+    """XPI Min 列。"""
+    h = header.lower()
+    return "xpi" in h and "min" in h and "mean" not in h
+
+
+def is_total_efficiency_column(header: str) -> bool:
+    """Total Efficiency 列。"""
+    h = header.lower()
+    return "total" in h and "efficiency" in h
+
+
+def is_mismatch_loss_column(header: str) -> bool:
+    """Mismatch Loss 列。"""
+    h = header.lower()
+    return "mismatch" in h and "loss" in h
+
+
+def is_pc_theta_column(header: str) -> bool:
+    """Phase Center Theta 列。"""
+    h = header.lower()
+    return ("pc" in h or "phase center" in h) and ("theta" in h or "θ" in h)
+
+
+def is_pc_phi_column(header: str) -> bool:
+    """Phase Center Phi 列。"""
+    h = header.lower()
+    return ("pc" in h or "phase center" in h) and "phi" in h
+
+
 @dataclass
 class ColumnInfo:
     """单列信息。"""
@@ -189,8 +231,11 @@ class ColumnInfo:
     raw_header: str          # 原始列头文本
     normalized_header: str   # 规范化列头
     col_type: str            # "frequency" | "directivity" | "efficiency_pct"
-                             # | "efficiency_db" | "gain" | "lag_single"
-                             # | "lag_range" | "unknown"
+                             # | "efficiency_db" | "total_efficiency_pct"
+                             # | "total_efficiency_db" | "gain" | "lag_single"
+                             # | "lag_range" | "xpi_boresight" | "xpi_mean"
+                             # | "xpi_min" | "mismatch_loss_db"
+                             # | "pc_theta_mm" | "pc_phi_mm" | "unknown"
 
 
 @dataclass
@@ -266,6 +311,14 @@ def _parse_sheet(ws) -> Optional[SheetInfo]:
             ctype = "frequency"
         elif is_directivity_column(raw):
             ctype = "directivity"
+        elif is_total_efficiency_column(raw):
+            # 区分 Total Efficiency(%) 和 Total Efficiency(dB)
+            if "%" in norm or "％" in norm or "pct" in norm.lower():
+                ctype = "total_efficiency_pct"
+            elif "db" in norm.lower():
+                ctype = "total_efficiency_db"
+            else:
+                ctype = "total_efficiency_pct"  # 默认当作 %
         elif is_efficiency_column(raw):
             # 区分 Efficiency(%) 和 Efficiency(dB)
             if "%" in norm or "％" in norm or "pct" in norm.lower():
@@ -311,6 +364,18 @@ def _parse_sheet(ws) -> Optional[SheetInfo]:
                 ctype = "avg_gain"
             elif is_avg_power_column(raw):
                 ctype = "avg_power"
+            elif is_xpi_boresight_column(raw):
+                ctype = "xpi_boresight"
+            elif is_xpi_mean_column(raw):
+                ctype = "xpi_mean"
+            elif is_xpi_min_column(raw):
+                ctype = "xpi_min"
+            elif is_mismatch_loss_column(raw):
+                ctype = "mismatch_loss_db"
+            elif is_pc_theta_column(raw):
+                ctype = "pc_theta_mm"
+            elif is_pc_phi_column(raw):
+                ctype = "pc_phi_mm"
             elif _RE_LAG_RANGE.search(norm) or _RE_LAG_RANGE_NO_PREFIX.search(norm):
                 ctype = "lag_range"
             elif _RE_LAG_SINGLE.search(norm) or _RE_LAG_SINGLE_NO_PREFIX.search(norm):

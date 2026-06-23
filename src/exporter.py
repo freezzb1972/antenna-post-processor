@@ -133,7 +133,7 @@ def export_results(
     *,
     pattern_images: Optional[Dict[str, Dict[float, io.BytesIO]]] = None,
     sheets_info: Optional[List[SheetInfo]] = None,
-    chart_config: Optional[Dict[str, bool]] = None,
+    chart_config: Optional[ChartConfig] = None,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
     log_callback: Optional[Callable[[str], None]] = None,
     **kwargs,
@@ -244,7 +244,10 @@ def export_results(
                         _write_ar_range(ws, excel_row, col_map, lo, hi, value)
                 elif key in ("nhprp_225", "uh_prp", "lh_prp", "prp_120",
                              "max_power", "min_power", "avg_gain", "avg_power",
-                             "boresight_theta", "boresight_phi"):
+                             "boresight_theta", "boresight_phi",
+                             "xpi_boresight", "xpi_mean", "xpi_min",
+                             "total_efficiency_pct", "mismatch_loss_db",
+                             "pc_theta_mm", "pc_phi_mm"):
                     _write_cell(ws, excel_row, col_map, key, value)
                 elif key.endswith("_ratio_db") or key.endswith("_ratio_pct"):
                     _write_cell(ws, excel_row, col_map, key, value)
@@ -262,15 +265,12 @@ def export_results(
             progress_callback(current, total_ops, f"完成 {sheet_name}")
 
     # ---- 嵌入图表 ----
-    if chart_config is None:
-        chart_config = {}
     _add_charts(wb, sheet_results, info_map, chart_config, log_callback)
 
     # ---- 嵌入 A/C 类图形（PNG 图片） ----
     from .chart_config import ChartConfig
-    chart_obj = kwargs.get("chart_config_obj")
-    if chart_obj is not None and chart_obj.has_any_pattern_or_cut:
-        _embed_pattern_images(wb, sheet_results, info_map, chart_obj, log_callback)
+    if isinstance(chart_config, ChartConfig) and chart_config.has_any_pattern_or_cut:
+        _embed_pattern_images(wb, sheet_results, info_map, chart_config, log_callback)
 
     # 保存
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
@@ -281,6 +281,8 @@ def export_results(
 
 def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
     """在对应的 sheet 中嵌入图表。优先使用 ChartConfig 对象，fallback 到旧 dict。"""
+    if chart_config is None:
+        return
     from .chart_config import ChartConfig
 
     for sheet_name, rows in sheet_results.items():
@@ -303,40 +305,62 @@ def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
 
         chart_offset = 0
 
-        # 判断使用 ChartConfig 还是旧 dict
-        if isinstance(chart_config, ChartConfig):
-            cc = chart_config
-            eff_on = cc.chart_eff_freq
-            gain_on = cc.chart_gain_freq
-            dir_on = cc.chart_dir_freq
-            lag_on = cc.chart_lag_freq
-            trp_on = cc.chart_trp_freq
-            trp_nh_on = cc.chart_trp_nhprp
-            ar_on = cc.chart_ar_freq
-        else:
-            cc = None
-            eff_on = chart_config.get("eff", True)
-            gain_on = chart_config.get("gain", False)
-            dir_on = chart_config.get("dir", False)
-            lag_on = chart_config.get("lag", True)
-            trp_on = chart_config.get("trp", False)
-            trp_nh_on = chart_config.get("trp_nhprp", False)
-            ar_on = chart_config.get("ar", False)
+        if not isinstance(chart_config, ChartConfig):
+            return  # 无有效 ChartConfig, 跳过图表生成
+        cc = chart_config
+        eff_on = cc.chart_eff_freq
+        gain_on = cc.chart_gain_freq
+        dir_on = cc.chart_dir_freq
+        lag_on = cc.chart_lag_freq
+        trp_on = cc.chart_trp_freq
+        trp_nh_on = cc.chart_trp_nhprp
+        ar_on = cc.chart_ar_freq
 
         # Efficiency vs Frequency
         if eff_on:
             eff_col = next((c.col_index for c in info.columns if c.col_type == "efficiency_pct"), None)
             if eff_col is not None:
                 _add_scatter_chart(ws, "Efficiency vs Frequency", freq_col, eff_col,
-                                  data_start, data_end, n_rows + 5 + chart_offset, freq_col + 2)
+                                  data_start, data_end, n_rows + 5 + chart_offset, freq_col + 2,
+                                  y_label="Efficiency (%)")
                 chart_offset += 18
 
-        # Peak Gain vs Frequency
-        if gain_on:
-            gain_col = next((c.col_index for c in info.columns if c.col_type == "gain"), None)
-            if gain_col is not None:
-                _add_scatter_chart(ws, "Peak Gain vs Frequency", freq_col, gain_col,
-                                  data_start, data_end, n_rows + 5 + chart_offset, gain_col + 2)
+        # Gain vs Frequency — 支持多曲线 (PK Gain + 指定角度/范围)
+        if gain_on or lag_on:
+            # 收集所有应显示的 Gain 曲线
+            gain_series_names = []
+            gain_series_cols = []
+
+            # PK Gain
+            pk_col = next((c.col_index for c in info.columns if c.col_type == "gain"), None)
+            if pk_col is not None and gain_on:
+                gain_series_names.append("PK Gain")
+                gain_series_cols.append(pk_col)
+
+            # 单角度 Gain (LAG single)
+            for a in sorted(set(cc.gain_chart_angles)):
+                lag_single_col = _find_lag_single_column(info, a)
+                if lag_single_col is not None and lag_single_col not in gain_series_cols:
+                    gain_series_names.append(f"Gain @θ={a:.0f}°")
+                    gain_series_cols.append(lag_single_col)
+
+            # 范围 Gain (LAG range)
+            for lo, hi in sorted(set(cc.gain_chart_ranges), key=lambda x: x[0]):
+                lag_range_col = _find_lag_range_column(info, lo, hi)
+                if lag_range_col is not None and lag_range_col not in gain_series_cols:
+                    gain_series_names.append(f"Gain @θ={lo:.0f}~{hi:.0f}°")
+                    gain_series_cols.append(lag_range_col)
+
+            if gain_series_cols:
+                if len(gain_series_cols) == 1:
+                    _add_scatter_chart(ws, f"Gain vs Frequency", freq_col, gain_series_cols[0],
+                                      data_start, data_end, n_rows + 5 + chart_offset,
+                                      gain_series_cols[0] + 2, y_label="Gain (dBi)", y_step=1.0)
+                else:
+                    _add_multi_line_chart(ws, "Gain vs Frequency", freq_col,
+                                         gain_series_cols, gain_series_names,
+                                         data_start, data_end,
+                                         n_rows + 5 + chart_offset, gain_series_cols[0] + 2)
                 chart_offset += 18
 
         # Directivity vs Frequency
@@ -344,16 +368,8 @@ def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
             dir_col = next((c.col_index for c in info.columns if c.col_type == "directivity"), None)
             if dir_col is not None:
                 _add_scatter_chart(ws, "Directivity vs Frequency", freq_col, dir_col,
-                                  data_start, data_end, n_rows + 5 + chart_offset, dir_col + 2)
-                chart_offset += 18
-
-        # Gain at Theta range vs Frequency
-        if lag_on:
-            lag_col = next((c.col_index for c in info.columns if c.col_type == "lag_range"), None)
-            if lag_col is not None:
-                _add_scatter_chart(ws, "Gain at Theta Range vs Frequency", freq_col, lag_col,
-                                  data_start, data_end, n_rows + 5 + chart_offset, lag_col + 2,
-                                  y_step=1.0)
+                                  data_start, data_end, n_rows + 5 + chart_offset, dir_col + 2,
+                                  y_label="Directivity (dBi)")
                 chart_offset += 18
 
         # TRP vs Frequency
@@ -361,7 +377,8 @@ def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
             trp_col = next((c.col_index for c in info.columns if c.col_type == "trp"), None)
             if trp_col is not None:
                 _add_scatter_chart(ws, "TRP vs Frequency", freq_col, trp_col,
-                                  data_start, data_end, n_rows + 5 + chart_offset, trp_col + 2)
+                                  data_start, data_end, n_rows + 5 + chart_offset, trp_col + 2,
+                                  y_label="TRP (dBm)")
                 chart_offset += 18
 
         # TRP + NHPRP 多线图
@@ -377,12 +394,35 @@ def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
                                      n_rows + 5 + chart_offset, trp_col2 + 2)
                 chart_offset += 18
 
-        # AR vs Frequency
+        # AR vs Frequency — 支持多曲线 (指定角度/范围)
         if ar_on:
-            ar_col = next((c.col_index for c in info.columns if c.col_type == "ar_single"), None)
-            if ar_col is not None:
-                _add_scatter_chart(ws, "Axial Ratio vs Frequency", freq_col, ar_col,
-                                  data_start, data_end, n_rows + 5 + chart_offset, ar_col + 2)
+            ar_series_names = []
+            ar_series_cols = []
+
+            # 单角度 AR
+            for a in sorted(set(cc.ar_chart_angles)):
+                ar_single_col = _find_ar_single_column(info, a)
+                if ar_single_col is not None and ar_single_col not in ar_series_cols:
+                    ar_series_names.append(f"AR @θ={a:.0f}°")
+                    ar_series_cols.append(ar_single_col)
+
+            # 范围 AR
+            for lo, hi in sorted(set(cc.ar_chart_ranges), key=lambda x: x[0]):
+                ar_range_col = _find_ar_range_column(info, lo, hi)
+                if ar_range_col is not None and ar_range_col not in ar_series_cols:
+                    ar_series_names.append(f"AR @θ={lo:.0f}~{hi:.0f}°")
+                    ar_series_cols.append(ar_range_col)
+
+            if ar_series_cols:
+                if len(ar_series_cols) == 1:
+                    _add_scatter_chart(ws, f"Axial Ratio vs Frequency", freq_col, ar_series_cols[0],
+                                      data_start, data_end, n_rows + 5 + chart_offset,
+                                      ar_series_cols[0] + 2, y_label="Axial Ratio (linear)")
+                else:
+                    _add_multi_line_chart(ws, "Axial Ratio vs Frequency", freq_col,
+                                         ar_series_cols, ar_series_names,
+                                         data_start, data_end,
+                                         n_rows + 5 + chart_offset, ar_series_cols[0] + 2)
                 chart_offset += 18
 
 
@@ -390,7 +430,9 @@ def _add_multi_line_chart(ws, title, x_col, y_cols, series_names,
                          data_start, data_end, anchor_row, anchor_col):
     """添加多线散点图到工作表。"""
     from openpyxl.chart import ScatterChart, Reference, Series
+    from openpyxl.chart.legend import Legend
     from openpyxl.utils import get_column_letter
+    import openpyxl.chart.axis as _chart_axis
 
     chart = ScatterChart()
     chart.title = title
@@ -412,11 +454,18 @@ def _add_multi_line_chart(ws, title, x_col, y_cols, series_names,
         series.marker.symbol = ['circle', 'diamond', 'square', 'triangle'][i % 4]
         series.marker.size = 4
         series.graphicalProperties.line.width = 18000
+        series.smooth = True
         chart.series.append(series)
 
+    chart.legend.position = 'b'
+    chart.y_axis.majorGridlines = _chart_axis.ChartLines()
+    chart.x_axis.majorGridlines = _chart_axis.ChartLines()
     chart.x_axis.title = 'Frequency (MHz)'
     chart.x_axis.numFmt = '0'
+    chart.x_axis.tickLblSkip = 1
+    chart.x_axis.tickMarkSkip = 1
     chart.y_axis.title = 'dBm'
+    chart.y_axis.numFmt = '0.00'
 
     anchor_cell = f"{get_column_letter(anchor_col)}{anchor_row}"
     ws.add_chart(chart, anchor_cell)
@@ -458,15 +507,22 @@ def _embed_pattern_images(wb, sheet_results, info_map, chart_config, log_callbac
                 except Exception as e:
                     if log_callback:
                         log_callback(f"  ⚠ 图片嵌入失败 ({img_key}): {e}")
-            break  # 每 sheet 只嵌入第一个频点的图（避免 Excel 过大）
+            # 逐频点嵌入，每次换行留间距（若数据量大会增加 Excel 文件体积）
 
 
 def _add_scatter_chart(ws, title, x_col, y_col, data_start, data_end,
-                       anchor_row, anchor_col, y_step=None, y_min=None):
-    """添加散点折线图到工作表。返回 chart 对象。"""
+                       anchor_row, anchor_col, y_step=None, y_min=None,
+                       y_label: str = ""):
+    """添加散点折线图到工作表。
+
+    使用 openpyxl ScatterChart，以 X-Y 散点方式绘制，
+    频点作为 X 轴值不会在右侧图例中出现。
+    """
     from openpyxl.chart import ScatterChart, Reference, Series
     from openpyxl.chart.axis import NumericAxis
+    from openpyxl.chart.legend import Legend
     from openpyxl.utils import get_column_letter
+    import openpyxl.chart.axis as _chart_axis
 
     chart = ScatterChart()
     chart.title = title
@@ -474,41 +530,110 @@ def _add_scatter_chart(ws, title, x_col, y_col, data_start, data_end,
     chart.width = 18  # cm
     chart.height = 10
 
-    # X 轴
+    # X 轴: 频点
     x_letter = get_column_letter(x_col)
     x_values = Reference(ws, min_col=x_col, min_row=data_start,
                          max_row=data_end, max_col=x_col)
 
-    # Y 轴
+    # Y 轴: 数据值
     y_letter = get_column_letter(y_col)
     y_values = Reference(ws, min_col=y_col, min_row=data_start,
                          max_row=data_end, max_col=y_col)
 
-    series = Series(y_values, x_values, title_from_data=False)
+    # 单系列 — 标题即图例名
+    series = Series(y_values, x_values, title=title)
     series.marker.symbol = 'circle'
     series.marker.size = 4
     series.graphicalProperties.line.width = 20000  # EMU
-
+    # 平滑曲线
+    series.smooth = True
     chart.series.append(series)
+    chart.legend.position = 'b'
 
-    # Y 轴配置
-    if y_step is not None:
-        chart.y_axis.numFmt = '0'
-        chart.y_axis.tickLblSkip = 1
-        chart.y_axis.tickMarkSkip = 1
-        # 设置主刻度单位为 1
-        chart.y_axis.majorUnit = y_step
-        chart.y_axis.scaling.min = y_min
+    # 网格线
+    chart.y_axis.majorGridlines = _chart_axis.ChartLines()
+    chart.x_axis.majorGridlines = _chart_axis.ChartLines()
 
     # X 轴
     chart.x_axis.title = 'Frequency (MHz)'
     chart.x_axis.numFmt = '0'
+    chart.x_axis.tickLblSkip = 1
+    chart.x_axis.tickMarkSkip = 1
+
+    # Y 轴
+    if y_label:
+        chart.y_axis.title = y_label
+    chart.y_axis.numFmt = '0.00'
+    if y_step is not None:
+        chart.y_axis.majorUnit = y_step
+    if y_min is not None:
+        chart.y_axis.scaling.min = y_min
 
     # 放置图表
     anchor_cell = f"{get_column_letter(anchor_col)}{anchor_row}"
     ws.add_chart(chart, anchor_cell)
 
     return chart
+
+
+# ---------------------------------------------------------------------------
+# 列查找辅助 — 按角度匹配
+# ---------------------------------------------------------------------------
+
+def _find_lag_single_column(info, angle: float):
+    """查找匹配指定角度 (°) 的 LAG 单角度列。"""
+    from .lag_config import _RE_LAG_SINGLE, _RE_LAG_SINGLE_NO_PREFIX
+    for c in info.columns:
+        if c.col_type != "lag_single":
+            continue
+        norm = normalize_header(c.raw_header)
+        m = _RE_LAG_SINGLE.search(norm) or _RE_LAG_SINGLE_NO_PREFIX.search(norm)
+        if m and abs(float(m.group(1)) - angle) < 0.01:
+            return c.col_index
+    return None
+
+
+def _find_lag_range_column(info, lo: float, hi: float):
+    """查找匹配指定范围 (°) 的 LAG 范围列。"""
+    from .lag_config import _RE_LAG_RANGE, _RE_LAG_RANGE_NO_PREFIX
+    key = (min(lo, hi), max(lo, hi))
+    for c in info.columns:
+        if c.col_type != "lag_range":
+            continue
+        norm = normalize_header(c.raw_header)
+        m = _RE_LAG_RANGE.search(norm) or _RE_LAG_RANGE_NO_PREFIX.search(norm)
+        if m:
+            ckey = (float(m.group(1)), float(m.group(2)))
+            if abs(ckey[0] - key[0]) < 0.01 and abs(ckey[1] - key[1]) < 0.01:
+                return c.col_index
+    return None
+
+
+def _find_ar_single_column(info, angle: float):
+    """查找匹配指定角度 (°) 的 AR 单角度列。"""
+    for c in info.columns:
+        if c.col_type != "ar_single":
+            continue
+        norm = normalize_header(c.raw_header)
+        m = re.search(r"(\d+\.?\d*)\s*deg", norm) or re.search(r"theta[= ]*(\d+)", norm, re.IGNORECASE)
+        if m and abs(float(m.group(1)) - angle) < 0.01:
+            return c.col_index
+    return None
+
+
+def _find_ar_range_column(info, lo: float, hi: float):
+    """查找匹配指定范围 (°) 的 AR 范围列。"""
+    key = (min(lo, hi), max(lo, hi))
+    for c in info.columns:
+        if c.col_type != "ar_range":
+            continue
+        norm = normalize_header(c.raw_header)
+        m = re.search(r"(\d+)\s*[~\-–—]\s*(\d+)", norm)
+        if m:
+            ckey = (float(m.group(1)), float(m.group(2)))
+            if abs(ckey[0] - key[0]) < 0.01 and abs(ckey[1] - key[1]) < 0.01:
+                return c.col_index
+    return None
 
 
 # ---------------------------------------------------------------------------

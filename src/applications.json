@@ -1,0 +1,12 @@
+[
+  {
+    "name": "张三",
+    "email": "test@example.com",
+    "company": "测试公司",
+    "purpose": "天线测试",
+    "status": "pending",
+    "created": "2026-06-21T01:49:01Z",
+    "reviewed": "",
+    "activation_code": ""
+  }
+]

@@ -297,7 +297,12 @@ class CloudRenderer(BaseRenderer):
         if not self._endpoint:
             return False
         try:
-            import requests
+            try:
+                import requests
+            except ImportError:
+                raise ImportError(
+                    "CloudRenderer requires the 'requests' library. "
+                    "Install it with: pip install requests")
             resp = requests.get(f"{self._endpoint}/api/v1/health",
                               timeout=5.0)
             return resp.status_code == 200
@@ -305,7 +310,12 @@ class CloudRenderer(BaseRenderer):
             return False
 
     def _post_render(self, path: str, payload: dict) -> io.BytesIO:
-        import requests
+        try:
+            import requests
+        except ImportError:
+            raise ImportError(
+                "CloudRenderer requires the 'requests' library. "
+                "Install it with: pip install requests")
         headers = {"Content-Type": "application/json"}
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"

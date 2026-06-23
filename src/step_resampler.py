@@ -41,7 +41,7 @@ def resample_merged_csv(
     section_freqs = sfreqs  # dict: section_name → [freqs]
 
     # 计算索引步长
-    orig_theta_step = theta_angles[1] - theta_angles[0] if len(theta_angles) > 1 else 1.0
+    orig_theta_step = round(theta_angles[1] - theta_angles[0], 6) if len(theta_angles) > 1 else 1.0
     orig_phi_step = phi_angles[1] - phi_angles[0] if len(phi_angles) > 1 else 1.0
 
     theta_stride = max(1, int(round(theta_step_deg / orig_theta_step)))

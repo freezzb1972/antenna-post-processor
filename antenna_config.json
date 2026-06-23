@@ -1,0 +1,43 @@
+{
+  "font_size": 13,
+  "theme": "dark_teal",
+  "language": "zh_CN",
+  "last_template_path": "",
+  "last_output_dir": "",
+  "last_csv_paths": [
+    "/tmp/file1.csv"
+  ],
+  "llm": {
+    "enabled": false,
+    "api_base": "https://api.anthropic.com/v1/messages",
+    "model": "claude-sonnet-4-6",
+    "use_local": false,
+    "local_model": "qwen2.5:7b",
+    "local_endpoint": "http://localhost:11434",
+    "_api_key": ""
+  },
+  "ai": {
+    "enabled": false,
+    "mode": "cloud",
+    "api_base": "https://api.anthropic.com/v1/messages",
+    "model": "claude-sonnet-4-6",
+    "local_endpoint": "http://localhost:11434",
+    "_api_key": ""
+  },
+  "window_geometry": "AdnQywADAAAAAAAAAAAAAAAABBkAAAK7AAAAAAAAAAAAAAQZAAACuwAAAAAAAAAAB4AAAAAAAAAAAAAABBkAAAK7",
+  "license": {
+    "product": "AntennaPostProcessor",
+    "licensee": "",
+    "expiry": "PERMANENT",
+    "features": [
+      "full"
+    ],
+    "issued": "",
+    "machine_id": "",
+    "signature": "",
+    "trial_start": "2026-06-21",
+    "trial_days": 30,
+    "trial_hmac": "97c92ee1498d000cb5bb7401defcc449ea9b353058f6ad13ea2ed0b66a89728c"
+  },
+  "version": 1
+}

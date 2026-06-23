@@ -231,14 +231,10 @@ class FinalSummarySource(DataSource):
             if ntheta2 > 0:
                 ntheta = min(ntheta, ntheta2)
 
-            # 读 Theta Pol 幅度
+            # 读 Theta Pol 幅度（不做 clipping — CTIA/EMQuest 标准无此要求）
             tl = _read_matrix(ws, tsr, nphi, ntheta)
             if dt == "complex":
                 tl = _complex_to_logmag(tl)
-            valid_tl = tl[tl > -900]
-            if valid_tl.size > 0:
-                med = np.median(valid_tl); mad = np.median(np.abs(valid_tl - med))
-                tl = np.clip(tl, med - 4.0 * max(mad, 1.0), med + 3.0 * max(mad, 1.0))
 
             # 读 Theta Pol 相位（如有 Phase 段）
             tp_data = None
@@ -248,15 +244,11 @@ class FinalSummarySource(DataSource):
                 except Exception:
                     tp_data = None
 
-            # 读 Phi Pol 幅度
+            # 读 Phi Pol 幅度（不做 clipping）
             if self._has_phi_pol and self._phi_pol_start > 0:
                 pl = _read_matrix(ws, self._phi_pol_start, nphi, ntheta)
                 if dt == "complex":
                     pl = _complex_to_logmag(pl)
-                valid_pl = pl[pl > -900]
-                if valid_pl.size > 0:
-                    med_p = np.median(valid_pl); mad_p = np.median(np.abs(valid_pl - med_p))
-                    pl = np.clip(pl, med_p - 4.0 * max(mad_p, 1.0), med_p + 3.0 * max(mad_p, 1.0))
             else:
                 pl = np.full_like(tl, -999.0)
 
