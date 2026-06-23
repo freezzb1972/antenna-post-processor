@@ -713,20 +713,30 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._exit_busy()
 
     def _on_tool_calibrate(self):
-        """路径损耗补偿: 加载 RSP 校准文件，对 CSV 应用路径损耗校准。"""
-        # Step 1: 选择输入文件
-        path, _ = QFileDialog.getOpenFileName(self, self.tr("选择待校准的 CSV 文件"), "",
+        """路径损耗补偿: 加载 RSP 校准文件，批量对多个 CSV 应用路径损耗校准。"""
+        # Step 1: 选择输入文件 (多选)
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, self.tr("选择待校准的 CSV 文件 (可多选)"), "",
             self.tr("CSV 文件 (*.csv);;所有文件 (*)"))
-        if not path: return
+        if not paths: return
 
-        # Step 1b: 检测格式 — 标准格式通常已含路径损耗补偿，再次校准会导致双重补偿
+        # Step 1b: 检测格式 — 标准格式通常已含路径损耗补偿
         from src.raw_converter import _detect_format
-        fmt = _detect_format(path)
-        if fmt == 'standard':
+        standard_files = []
+        for p in paths:
+            try:
+                if _detect_format(p) == 'standard':
+                    standard_files.append(Path(p).name)
+            except Exception:
+                pass
+        if standard_files:
+            names = "\n".join(f"  • {n}" for n in standard_files[:5])
+            more = f"\n  ... 等 {len(standard_files)} 个文件" if len(standard_files) > 5 else ""
             reply = QMessageBox.warning(
                 self, self.tr("⚠ 格式提醒"),
-                self.tr("此文件已是标准对数域格式 (LogMag/Phase)，\n"
+                self.tr("以下文件已是标准对数域格式 (LogMag/Phase)，\n"
                         "通常已包含路径损耗补偿。\n\n"
+                        f"{names}{more}\n\n"
                         "再次应用 RSP 校准会导致双重补偿，\n"
                         "使 Gain 值偏高 ~60-70 dB。\n\n"
                         "确定要继续吗？"),
@@ -735,38 +745,76 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 return
 
         # Step 2: 选择 RSP H-pol 文件
-        rsp_h_path, _ = QFileDialog.getOpenFileName(self, self.tr("选择 H-pol RSP 校准文件 (可选)"), "",
-            self.tr("CSV 文件 (*.csv);;所有文件 (*)"))
+        rsp_h_path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("选择 H-pol RSP 校准文件 (可选)"), "",
+            self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
         # 允许跳过
 
         # Step 3: 选择 RSP V-pol 文件
-        rsp_v_path, _ = QFileDialog.getOpenFileName(self, self.tr("选择 V-pol RSP 校准文件 (可选)"), "",
-            self.tr("CSV 文件 (*.csv);;所有文件 (*)"))
+        rsp_v_path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("选择 V-pol RSP 校准文件 (可选)"), "",
+            self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
         # 允许跳过
 
         if not rsp_h_path and not rsp_v_path:
-            QMessageBox.warning(self, self.tr("提示"), self.tr("未选择任何 RSP 校准文件，操作取消。"))
+            QMessageBox.warning(self, self.tr("提示"),
+                self.tr("未选择任何 RSP 校准文件，操作取消。"))
             return
 
-        # Step 4: 选择输出路径
-        out = str(Path(path).parent / f"{Path(path).stem}_calibrated.csv")
-        out_path, _ = QFileDialog.getSaveFileName(self, self.tr("保存校准结果"), out,
-            self.tr("CSV 文件 (*.csv)"))
-        if not out_path: return
+        # Step 4: 加载 RSP 数据，检查频率覆盖所有输入文件
+        from src.raw_converter import (parse_rsp_csv, batch_check_rsp_coverage,
+                                        apply_path_loss_calibration)
 
+        rsp_h = parse_rsp_csv(rsp_h_path) if rsp_h_path else {}
+        rsp_v = parse_rsp_csv(rsp_v_path) if rsp_v_path else {}
+
+        cov = batch_check_rsp_coverage(paths, rsp_h, rsp_v)
+        if not cov.ok:
+            warn_text = (
+                self.tr("RSP 校准文件频率范围:\n"
+                        f"  H-pol: {cov.rsp_h_bounds}\n"
+                        f"  V-pol: {cov.rsp_v_bounds}\n\n"
+                        "以下文件频率超出 RSP 范围:\n") +
+                "\n".join(cov.warnings[:10]) +
+                ("\n..." if len(cov.warnings) > 10 else "") +
+                self.tr("\n\n超出部分将使用 RSP 边界值外推。\n"
+                        "建议确保外推误差在可接受范围内。")
+            )
+            reply = QMessageBox.warning(
+                self, self.tr("⚠ RSP 频率范围不足"),
+                warn_text,
+                QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Cancel)
+            if reply != QMessageBox.Ok:
+                return
+
+        # Step 5: 批量处理 — 每个输入文件生成 _calibrated.csv
         self._enter_busy(self.tr("⏳ 路径损耗校准中..."))
+        success, failed = 0, 0
         try:
-            from src.raw_converter import apply_path_loss_calibration
-            self._log(f"📡 路径损耗补偿: {Path(path).name}")
-            if rsp_h_path:
-                self._log(f"  H-pol RSP: {Path(rsp_h_path).name}")
-            if rsp_v_path:
-                self._log(f"  V-pol RSP: {Path(rsp_v_path).name}")
-            result = apply_path_loss_calibration(
-                path, rsp_h_path or None, rsp_v_path or None, out_path,
-                progress_callback=lambda c, t, m: self._on_progress(c, t, m))
-            self._log(f"✓ 校准完成: {result}")
-            QMessageBox.information(self, self.tr("完成"), self.tr(f"校准完成:\n{result}"))
+            total = len(paths)
+            for i, p in enumerate(paths):
+                pobj = Path(p)
+                out = str(pobj.parent / f"{pobj.stem}_calibrated.csv")
+                self._log(f"📡 路径损耗补偿 [{i+1}/{total}]: {pobj.name}")
+                if rsp_h_path:
+                    self._log(f"     H-pol RSP: {Path(rsp_h_path).name}")
+                if rsp_v_path:
+                    self._log(f"     V-pol RSP: {Path(rsp_v_path).name}")
+                try:
+                    def _progress(c, t, m, _i=i, _total=total):
+                        self._on_progress(_i * 100 + c, _total * 100, f"[{_i+1}/{_total}] {m}")
+                    result = apply_path_loss_calibration(
+                        p, rsp_h_path or None, rsp_v_path or None, out,
+                        progress_callback=_progress)
+                    self._log(f"  ✓ {Path(result).name}")
+                    success += 1
+                except Exception as e:
+                    self._log(f"  ✗ 失败: {e}")
+                    failed += 1
+
+            summary = self.tr(f"校准完成: 成功 {success} 个, 失败 {failed} 个")
+            self._log(f"✓ {summary}")
+            QMessageBox.information(self, self.tr("完成"), summary)
         except Exception as e:
             self._log(f"✗ 校准失败: {e}")
             QMessageBox.critical(self, self.tr("错误"), str(e))
@@ -808,6 +856,29 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
                 if not rsp_h_path and not rsp_v_path:
                     self._log("⚠ 未选择 RSP 文件，跳过路径损耗校准")
+                else:
+                    # RSP 频率覆盖检查: 仅检查 aborted 格式文件
+                    from src.raw_converter import (parse_rsp_csv, batch_check_rsp_coverage)
+                    rsp_h = parse_rsp_csv(rsp_h_path) if rsp_h_path else {}
+                    rsp_v = parse_rsp_csv(rsp_v_path) if rsp_v_path else {}
+                    cov = batch_check_rsp_coverage(paths, rsp_h, rsp_v, only_fmt='aborted')
+                    if not cov.ok:
+                        warn_text = (
+                            self.tr("RSP 校准文件频率范围:\n"
+                                    f"  H-pol: {cov.rsp_h_bounds}\n"
+                                    f"  V-pol: {cov.rsp_v_bounds}\n\n"
+                                    "以下实部/虚部格式文件频率超出 RSP 范围:\n") +
+                            "\n".join(cov.warnings[:10]) +
+                            ("\n..." if len(cov.warnings) > 10 else "") +
+                            self.tr("\n\n超出部分将使用 RSP 边界值外推。\n"
+                                    "建议确保外推误差在可接受范围内。")
+                        )
+                        reply2 = QMessageBox.warning(
+                            self, self.tr("⚠ RSP 频率范围不足"),
+                            warn_text,
+                            QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Cancel)
+                        if reply2 != QMessageBox.Ok:
+                            return
             else:
                 warn = QMessageBox.warning(
                     self, self.tr("⚠ 跳过校准"),

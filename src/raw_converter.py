@@ -22,6 +22,7 @@ import csv
 import math
 import os
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -751,6 +752,149 @@ def _interpolate_rsp(freq_mhz: float, rsp_data: Dict[float, float]) -> float:
     freqs = np.array(sorted(rsp_data.keys()))
     values = np.array([rsp_data[f] for f in freqs])
     return float(np.interp(freq_mhz, freqs, values, left=values[0], right=values[-1]))
+
+
+# ═══════════════════════════════════════════════════════════
+# 频率范围检查 (用于 RSP 覆盖率校验)
+# ═══════════════════════════════════════════════════════════
+
+def extract_freq_range(file_path: str) -> Optional[Tuple[float, float]]:
+    """提取 CSV 文件的频率范围 (min, max MHz)。
+
+    使用现有解析器获取频点列表，不做完整数据解析。
+    适用于标准格式和实部/虚部格式。
+
+    Args:
+        file_path: CSV 文件路径。
+
+    Returns:
+        (min_freq, max_freq) 或 None (无法识别格式)。
+    """
+    try:
+        fmt = _detect_format(file_path)
+        if fmt == 'standard':
+            _, _, freqs, _, _ = _parse_standard(file_path)
+        elif fmt == 'aborted':
+            _, _, freqs, _, _ = _parse_aborted(file_path)
+        else:
+            return None
+        if freqs:
+            return (min(freqs), max(freqs))
+    except Exception:
+        pass
+    return None
+
+
+def check_rsp_coverage(
+    rsp_data: Dict[float, float],
+    file_freqs: List[float],
+    tolerance_mhz: float = 1.0,
+) -> List[str]:
+    """检查 RSP 校准数据是否覆盖文件的频率范围。
+
+    Args:
+        rsp_data: {freq_mhz: response_db} 校准数据。
+        file_freqs: 文件中的频点列表。
+        tolerance_mhz: 容差 (MHz), 边界小幅超出不报警。
+
+    Returns:
+        警告信息列表。空列表表示覆盖完整。
+    """
+    if not rsp_data or not file_freqs:
+        return []
+    rsp_freqs = sorted(rsp_data.keys())
+    rsp_min, rsp_max = rsp_freqs[0], rsp_freqs[-1]
+    file_min, file_max = min(file_freqs), max(file_freqs)
+    warnings = []
+    if file_min < rsp_min - tolerance_mhz:
+        warnings.append(
+            f"最低频率 {file_min:.1f} MHz 低于 RSP 最低 {rsp_min:.1f} MHz"
+        )
+    if file_max > rsp_max + tolerance_mhz:
+        warnings.append(
+            f"最高频率 {file_max:.1f} MHz 高于 RSP 最高 {rsp_max:.1f} MHz"
+        )
+    return warnings
+
+
+def _rsp_freq_bounds(rsp_data: Dict[float, float]) -> Tuple[float, float]:
+    """返回 RSP 数据的频率边界 (min, max)。"""
+    rsp_freqs = sorted(rsp_data.keys())
+    return (rsp_freqs[0], rsp_freqs[-1])
+
+
+@dataclass
+class RspCoverageResult:
+    """RSP 频率覆盖检查结果。"""
+    ok: bool = True                              # True = 全部覆盖
+    rsp_h_bounds: str = ""                        # "400 - 6000 MHz"
+    rsp_v_bounds: str = ""
+    warnings: List[str] = field(default_factory=list)  # 警告信息列表
+
+
+def batch_check_rsp_coverage(
+    file_paths: List[str],
+    rsp_h: Dict[float, float],
+    rsp_v: Dict[float, float],
+    only_fmt: Optional[str] = None,
+) -> RspCoverageResult:
+    """批量检查 RSP 校准数据是否覆盖所有文件的频率范围。
+
+    可由 _on_tool_calibrate 和 _on_tool_merge 共用。
+
+    Args:
+        file_paths: 待检查的 CSV 文件路径列表。
+        rsp_h: H-pol RSP 校准数据。
+        rsp_v: V-pol RSP 校准数据。
+        only_fmt: 仅检查此格式的文件 ('standard'/'aborted')。
+                  None = 检查所有文件。
+
+    Returns:
+        RspCoverageResult: ok=True 表示全部覆盖，warnings 列出具体问题。
+    """
+    result = RspCoverageResult()
+
+    if rsp_h:
+        result.rsp_h_bounds = f"{min(rsp_h.keys()):.0f} - {max(rsp_h.keys()):.0f} MHz"
+    else:
+        result.rsp_h_bounds = "—"
+    if rsp_v:
+        result.rsp_v_bounds = f"{min(rsp_v.keys()):.0f} - {max(rsp_v.keys()):.0f} MHz"
+    else:
+        result.rsp_v_bounds = "—"
+
+    if not rsp_h and not rsp_v:
+        return result  # 无 RSP 数据，无需检查
+
+    for p in file_paths:
+        if not Path(p).exists():
+            continue
+
+        # 格式过滤
+        if only_fmt:
+            try:
+                if _detect_format(p) != only_fmt:
+                    continue
+            except Exception:
+                continue
+
+        freq_range = extract_freq_range(p)
+        if freq_range is None:
+            continue
+        freqs = [freq_range[0], freq_range[1]]
+
+        fname = Path(p).name
+        if rsp_h:
+            w = check_rsp_coverage(rsp_h, freqs)
+            for msg in w:
+                result.warnings.append(f"  • {fname}: H-pol — {msg}")
+        if rsp_v:
+            w = check_rsp_coverage(rsp_v, freqs)
+            for msg in w:
+                result.warnings.append(f"  • {fname}: V-pol — {msg}")
+
+    result.ok = len(result.warnings) == 0
+    return result
 
 
 def apply_path_loss_calibration(
