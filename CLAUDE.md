@@ -102,7 +102,7 @@ DESIGN → PLAN → DEVELOP → VERIFY → COMMIT → MANAGE
 - 修改 `ui/*.py` → 提醒运行 `gui-check`
 - 修改 `*.spec` → 提醒运行 `size-gate`
 - pytest 运行后 → 自动更新统计
-- PreCompact → 提醒运行 `/distill-session`
+- PreCompact → 自动检测 CURRENT_STATE.md 新鲜度; 过期则阻塞, Claude 自动 distill 后放行
 
 **状态文件**：`.claude/dev-flow.json`（跟踪阶段、文件修改计数、检查点计数）
 
@@ -164,8 +164,10 @@ DESIGN → PLAN → DEVELOP → VERIFY → COMMIT → MANAGE
 | **累计 Edit/Write ≥ 10 次** | 自动写 `CURRENT_STATE.md` |
 | **解决问题消耗 > 5 轮尝试** | 自动 distill，防止噪声积累 |
 | **用户说 "好了/可以了/完成"** | 检查 `git status`，确保没有遗漏文件 |
+| **PreCompact hook 被阻止 (exit 2)** | 自动运行 `/distill-session` → 下次压缩自动放行 |
 
 > **注意**: Agent 无法直接读取上下文使用率。用 commit 次数和 Edit 次数代替。
+> **PreCompact 自动 distill 流程**: hook 检测 CURRENT_STATE.md > 10 分钟未更新 → exit 2 阻止压缩 → Claude 看到阻塞消息 → 自动 distill → CURRENT_STATE.md 刷新 → 下次压缩 hook 放行。
 
 对**任意 Python 项目**使用这些 skill：
 ```bash

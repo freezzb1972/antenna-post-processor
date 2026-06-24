@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# PreCompact hook: 压缩前自动保存会话状态
-# 策略: 绝不覆盖手动 distill 的 CURRENT_STATE.md
-#   - 若 CURRENT_STATE.md 在 10 分钟内被修改过 → 跳过 (保留手动 distill)
-#   - 否则 → 写 .claude/auto-save-before-compact.md (不影响手动 distill)
+# PreCompact hook: 智能阻塞 — 无近期 distill 则阻止压缩，触发 Claude 自动 distill
 #
-# 两层防护:
-#   1. 主输出文件: .claude/auto-save-before-compact.md (hook 专属, 始终覆盖)
-#   2. CURRENT_STATE.md: 仅在不存在 或 超过 10 分钟未更新时写入 (保护手动 distill)
+# 流程:
+#   1. 始终写 .claude/auto-save-before-compact.md (最低保障)
+#   2. 检查 CURRENT_STATE.md 是否在 10 分钟内更新过
+#      - 是 → exit 0 (有近期 distill, 安全压缩)
+#      - 否 → exit 2 (阻止压缩, Claude 应自动运行 /distill-session)
+#
+# Claude 行为 (CLAUDE.md 规则):
+#   当看到 "被 PreCompact hook 阻止" 消息时, 自动运行 /distill-session,
+#   下次压缩触发时 CURRENT_STATE.md 已刷新, 自动放行。
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -19,63 +22,51 @@ LAST_COMMIT=$(git log -1 --format="%h %s" 2>/dev/null || echo "unknown")
 BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 FILES_CHANGED=$(git diff --name-only HEAD~5..HEAD 2>/dev/null | sort -u | head -20 || echo "")
 
-# ── 判断 CURRENT_STATE.md 是否由手动 distill 生成 ──
-SKIP_MANUAL_DISTILL=false
+# ── 始终写兜底备份 ──
+cat > "$AUTO_BACKUP" << EOF
+# SESSION BACKUP — $(date '+%Y-%m-%d %H:%M') (PreCompact hook safety net)
+
+**Branch:** $BRANCH
+**Last commit:** $LAST_COMMIT
+
+## Recent commits
+
+$NEW_COMMITS
+
+## Recently changed files
+
+$FILES_CHANGED
+
+> 此文件由 PreCompact hook 自动生成。详细 distill 见 CURRENT_STATE.md。
+EOF
+
+# ── 判断是否需要阻止压缩 ──
+NEED_DISTILL=false
 if [[ -f "$MANUAL_DISTILL" ]]; then
     M_TIME=$(stat -c %Y "$MANUAL_DISTILL" 2>/dev/null || echo 0)
     AGE_SEC=$(( NOW_EPOCH - M_TIME ))
-    # 10分钟内有更新 → 很可能是手动 distill, 跳过覆盖
-    if [[ $AGE_SEC -lt 600 ]]; then
-        SKIP_MANUAL_DISTILL=true
+    if [[ $AGE_SEC -ge 600 ]]; then
+        NEED_DISTILL=true
     fi
-fi
-
-# ── 始终写入专属备份文件 ──
-cat > "$AUTO_BACKUP" << EOF
-# SESSION BACKUP — $(date '+%Y-%m-%d %H:%M') (PreCompact hook)
-
-**Branch:** $BRANCH
-**Last commit:** $LAST_COMMIT
-
-## Recent commits
-
-$NEW_COMMITS
-
-## Recently changed files
-
-$FILES_CHANGED
-
-> 此文件由 PreCompact hook 自动生成，作为会话恢复的最低保障。
-> 详细 distill 见 CURRENT_STATE.md（如有手动 distill）。
-EOF
-
-echo "✅ $AUTO_BACKUP written (PreCompact safety net)"
-
-# ── 只在安全时更新 CURRENT_STATE.md ──
-if $SKIP_MANUAL_DISTILL; then
-    echo "⏭️  CURRENT_STATE.md 跳过 (最近已更新, 保留手动 distill)"
 else
-    if [[ -f "$MANUAL_DISTILL" ]]; then
-        echo "📝 CURRENT_STATE.md 超过 10 分钟未更新, 更新为基础备份"
-    else
-        echo "📝 CURRENT_STATE.md 不存在, 创建基础备份"
-    fi
-    cat > "$MANUAL_DISTILL" << EOF
-# CURRENT STATE — $(date '+%Y-%m-%d %H:%M') (auto-saved by PreCompact hook)
-
-**Branch:** $BRANCH
-**Last commit:** $LAST_COMMIT
-
-## Recent commits
-
-$NEW_COMMITS
-
-## Recently changed files
-
-$FILES_CHANGED
-
-> ⚠️ 此文件由 PreCompact hook 自动生成。如有需要，下个会话应手动 distill。
-EOF
+    NEED_DISTILL=true  # 文件不存在, 需要首次 distill
 fi
 
+if $NEED_DISTILL; then
+    cat << EOF
+╔══════════════════════════════════════════════════════════════╗
+║ ⛔ 压缩被 PreCompact hook 阻止                              ║
+╠══════════════════════════════════════════════════════════════╣
+║ CURRENT_STATE.md 超过 10 分钟未更新, 需要先 distill。       ║
+║                                                            ║
+║ Claude 将自动运行 /distill-session 保存会话状态,           ║
+║ 下次压缩触发时会自动放行。                                  ║
+║                                                            ║
+║ 兜底备份已保存至: $AUTO_BACKUP
+╚══════════════════════════════════════════════════════════════╝
+EOF
+    exit 2
+fi
+
+echo "✅ CURRENT_STATE.md 近期已更新, 压缩放行"
 exit 0
