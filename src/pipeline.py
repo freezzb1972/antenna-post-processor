@@ -745,6 +745,7 @@ def run_pipeline(
         _log(log_callback, f"  {si.name}: {len(si.frequencies)} 频点")
 
     # ---- 1.5: 自动扩增工作表 (模板 sheet 数 < 数据源数, 或文件名模式) ----
+    template_sheet_names_to_remove: Optional[List[str]] = None
     if use_multi_ds:
         template_names = {si.name for si in sheets_info}
         ds_names = set(datasource_map.keys())
@@ -752,6 +753,7 @@ def run_pipeline(
         if worksheet_naming_mode == 1:
             # 文件名模式: 用第一个 sheet 做模板, datasource_map 键直接作工作表名
             _log(log_callback, f"文件名模式: {len(datasource_map)} 个数据源 → 创建 {len(datasource_map)} 个工作表...")
+            template_sheet_names_to_remove = [si.name for si in sheets_info]
             ref_sheet = sheets_info[0:1]
             sheets_info = _expand_template_sheets(ref_sheet, datasource_map, freq_source, use_raw_name=True)
             for si in sheets_info:
@@ -795,6 +797,7 @@ def run_pipeline(
         sheets_info=sheets_info,
         chart_config=chart_config_obj,
         log_callback=log_callback,
+        remove_template_sheets=template_sheet_names_to_remove,
     )
     _report(progress_callback, progress_max - 1, progress_max, "Excel 写入完成")
 

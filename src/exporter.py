@@ -136,6 +136,7 @@ def export_results(
     chart_config: Optional[ChartConfig] = None,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
     log_callback: Optional[Callable[[str], None]] = None,
+    remove_template_sheets: Optional[List[str]] = None,
     **kwargs,
 ) -> str:
     """基于模板填充数据 + 嵌入图片。
@@ -147,6 +148,7 @@ def export_results(
                         row_dict key = column type ("directivity", "lag_single_60.0", ...)。
         pattern_images: {sheet_name: {freq_mhz: PNG_buffer}}（可选）。
         sheets_info:    预解析的 Sheet 信息（可选，避免重复读模板）。
+        remove_template_sheets: 要删除的模板原始工作表名列表（None=不删除）。
         progress_callback: (current, total, message)。
         log_callback:   (message)。
 
@@ -263,6 +265,16 @@ def export_results(
         current += 1
         if progress_callback:
             progress_callback(current, total_ops, f"完成 {sheet_name}")
+
+    # ---- 删除模板原始工作表 (数据源文件名模式) ----
+    if remove_template_sheets:
+        desired = set(sheet_results.keys())
+        sheets_to_remove = [s for s in remove_template_sheets if s in wb.sheetnames and s not in desired]
+        if sheets_to_remove:
+            if log_callback:
+                log_callback(f"  ✕ 删除模板原始工作表: {', '.join(sheets_to_remove)}")
+            for name in sheets_to_remove:
+                del wb[name]
 
     # ---- 嵌入图表 ----
     _add_charts(wb, sheet_results, info_map, chart_config, log_callback)
