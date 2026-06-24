@@ -97,15 +97,13 @@ def convert_aborted_to_normal(
     return output_path
 
 
-def _parse_aborted(path: str):
-    """解析实部/虚部格式 (线性域) CSV (EMQuest aborted 数据)。
+def _parse_streaming(path: str, section_names: Tuple[str, ...],
+                     block_parser: Callable):
+    """流式逐 section 解析 CSV，避免全量 Python 字符串加载。
 
-    流式策略: csv.reader 作为生成器，逐 section 收集后立即处理释放。
-    避免 list(csv.reader(f)) 一次性将整个文件加载为 Python 字符串列表，
-    消除 3-5x 内存膨胀（100MB 文件从 350-500MB → ~80MB per section）。
+    一次只持有一个 section 的 Python 行在内存中，
+    处理完毕立即释放，消除 list(csv.reader(f)) 的 3-5x 内存膨胀。
     """
-    section_names = ('Theta Real', 'Theta Imaginary', 'Phi Real', 'Phi Imaginary')
-
     with open(path, 'r', encoding='utf-8-sig') as f:
         reader = csv.reader(f)
         try:
@@ -113,101 +111,55 @@ def _parse_aborted(path: str):
         except StopIteration:
             return {}, "", [], [], []
 
-        sections = {}
-        all_freqs = set()
-        theta_angles = []
-        phi_angles = []
+    sections = {}
+    all_freqs = set()
+    theta_angles = []
+    phi_angles = []
+    current_section = None
+    section_rows: List[List[str]] = []
 
-        current_section = None
-        section_rows: List[List[str]] = []
+    for row in reader:
+        r0 = row[0].strip() if row else ''
+        if r0 in section_names:
+            if current_section and section_rows:
+                sec_data, fas, tas, pas = block_parser(section_rows)
+                sections[current_section] = sec_data
+                all_freqs.update(fas)
+                if tas: theta_angles = tas
+                if pas: phi_angles = pas
+                section_rows = []  # 立即释放当前 section 的 Python 字符串
+            current_section = r0
+            section_rows.append(row)
+            continue
+        if current_section:
+            section_rows.append(row)
 
-        for row in reader:
-            r0 = row[0].strip() if row else ''
+    if current_section and section_rows:
+        sec_data, fas, tas, pas = block_parser(section_rows)
+        sections[current_section] = sec_data
+        all_freqs.update(fas)
+        if tas: theta_angles = tas
+        if pas: phi_angles = pas
 
-            if r0 in section_names:
-                # 处理上一个 section
-                if current_section and section_rows:
-                    sec_data, fas, tas, pas = _parse_section_block(section_rows)
-                    sections[current_section] = sec_data
-                    all_freqs.update(fas)
-                    if tas: theta_angles = tas
-                    if pas: phi_angles = pas
-                    section_rows = []  # 立即释放
+    return sections, metadata, sorted(all_freqs), theta_angles, phi_angles
 
-                current_section = r0
-                section_rows.append(row)
-                continue
 
-            if current_section:
-                section_rows.append(row)
-
-        # 处理最后一个 section
-        if current_section and section_rows:
-            sec_data, fas, tas, pas = _parse_section_block(section_rows)
-            sections[current_section] = sec_data
-            all_freqs.update(fas)
-            if tas: theta_angles = tas
-            if pas: phi_angles = pas
-
-    freqs = sorted(all_freqs)
-    return sections, metadata, freqs, theta_angles, phi_angles
+def _parse_aborted(path: str):
+    """解析实部/虚部格式 (线性域) CSV (EMQuest aborted 数据)。"""
+    return _parse_streaming(path,
+        ('Theta Real', 'Theta Imaginary', 'Phi Real', 'Phi Imaginary'),
+        _parse_section_block)
 
 
 def _parse_standard(path: str):
     """解析标准 EMQuest CSV 格式 (Theta/Phi LogMag + Phase)。
 
-    标准格式中 section 按频点分组，每个频点内按 phi 行展开。
-    与实部/虚部格式相反：实部/虚部是 phi 外层 / freq 内层，
-    标准格式是 freq 外层 / phi 内层。
-
-    流式策略: 同 _parse_aborted，逐 section 收集处理后释放。
+    标准格式中 section 按频点分组，每个频点内按 phi 行展开
+    (与 aborted 格式的 phi 外层 / freq 内层相反)。
     """
-    section_names = ('Theta Log Magnitude', 'Theta Phase',
-                     'Phi Log Magnitude', 'Phi Phase')
-
-    with open(path, 'r', encoding='utf-8-sig') as f:
-        reader = csv.reader(f)
-        try:
-            metadata = next(reader)[0] if reader else ""
-        except StopIteration:
-            return {}, "", [], [], []
-
-        sections = {}
-        all_freqs = set()
-        theta_angles = []
-        phi_angles = []
-
-        current_section = None
-        section_rows: List[List[str]] = []
-
-        for row in reader:
-            r0 = row[0].strip() if row else ''
-
-            if r0 in section_names:
-                if current_section and section_rows:
-                    sec_data, fas, tas, pas = _parse_standard_section_block(section_rows)
-                    sections[current_section] = sec_data
-                    all_freqs.update(fas)
-                    if tas: theta_angles = tas
-                    if pas: phi_angles = pas
-                    section_rows = []
-
-                current_section = r0
-                section_rows.append(row)
-                continue
-
-            if current_section:
-                section_rows.append(row)
-
-        if current_section and section_rows:
-            sec_data, fas, tas, pas = _parse_standard_section_block(section_rows)
-            sections[current_section] = sec_data
-            all_freqs.update(fas)
-            if tas: theta_angles = tas
-            if pas: phi_angles = pas
-
-    freqs = sorted(all_freqs)
-    return sections, metadata, freqs, theta_angles, phi_angles
+    return _parse_streaming(path,
+        ('Theta Log Magnitude', 'Theta Phase', 'Phi Log Magnitude', 'Phi Phase'),
+        _parse_standard_section_block)
 
 
 def _parse_standard_section_block(block):
@@ -467,23 +419,29 @@ def _apply_rsp_to_logmag(data, freqs, rsp_data):
     """对 LogMag 数据应用 RSP 路径损耗校准: data[dB] -= Response(freq)."""
     if data is None or not rsp_data:
         return data
-    rsp_vals = np.array([_interpolate_rsp(f, rsp_data) for f in freqs])
-    if not np.any(rsp_vals != 0.0):
+    rsp_freqs = np.array(sorted(rsp_data.keys()))
+    rsp_values = np.array([rsp_data[f] for f in rsp_freqs])
+    rsp_interp = np.interp(freqs, rsp_freqs, rsp_values,
+                           left=rsp_values[0], right=rsp_values[-1])
+    if not np.any(rsp_interp != 0.0):
         return data
-    return np.asarray(data, dtype=np.float32) - rsp_vals[:, np.newaxis, np.newaxis].astype(np.float32)
+    return np.asarray(data, dtype=np.float32) - rsp_interp[:, np.newaxis, np.newaxis].astype(np.float32)
 
 
 def _apply_rsp_phase(data, freqs, rsp_phase_data):
     """对 Phase 数据应用 RSP 相位校准: Phase(°) -= RSP_Phase(freq)."""
     if data is None or not rsp_phase_data:
         return data
-    rsp_vals = np.array([_interpolate_rsp(f, rsp_phase_data) for f in freqs])
-    if not np.any(rsp_vals != 0.0):
+    rsp_freqs = np.array(sorted(rsp_phase_data.keys()))
+    rsp_values = np.array([rsp_phase_data[f] for f in rsp_freqs])
+    rsp_interp = np.interp(freqs, rsp_freqs, rsp_values,
+                           left=rsp_values[0], right=rsp_values[-1])
+    if not np.any(rsp_interp != 0.0):
         return data
     # 相位修正用复数旋转避免 wrap 问题
     corrected = np.degrees(np.angle(
         np.exp(1j * np.radians(np.asarray(data, dtype=np.float32)))
-        * np.exp(-1j * np.radians(rsp_vals[:, np.newaxis, np.newaxis].astype(np.float32)))
+        * np.exp(-1j * np.radians(rsp_interp[:, np.newaxis, np.newaxis].astype(np.float32)))
     ))
     return corrected.astype(np.float32)
 
@@ -576,30 +534,51 @@ def _detect_format(path: str) -> str:
     return 'unknown'
 
 
-def _scan_file_meta(path: str, fmt: str) -> Tuple[List[float], List[float], List[float], str]:
-    """快速扫描文件元数据 (phi/freq/theta/meta)，不解析数据值。
+def _scan_file_meta(path: str) -> Tuple[str, List[float], List[float], List[float], str]:
+    """快速扫描文件元数据 (fmt/phi/freq/theta/meta)，不解析数据值。
 
-    用于 merge 排序：先收集所有文件的 phi 列表以确定处理顺序，
-    避免在排序前解析完整数据。
+    同时自动检测文件格式 (aborted/standard)，无需单独调用 _detect_format。
+    一次文件打开完成格式检测 + 元数据扫描。
     """
     phis: List[float] = []
     freqs: List[float] = []
     theta: List[float] = []
     metadata = ""
+    fmt = 'unknown'
 
     with open(path, 'r', encoding='utf-8-sig') as f:
         reader = csv.reader(f)
         try:
             metadata = next(reader)[0] if reader else ""
         except StopIteration:
-            return phis, freqs, theta, metadata
+            return fmt, phis, freqs, theta, metadata
+
+        # 收集前导行直到第一个 section header，同时检测格式
+        preamble = []
+        for row in reader:
+            r0 = row[0].strip() if row else ''
+            if r0 in ('Theta Real', 'Theta Imaginary', 'Phi Real', 'Phi Imaginary'):
+                fmt = 'aborted'; preamble.append(row); break
+            if r0 in ('Theta Log Magnitude', 'Theta Phase', 'Phi Log Magnitude', 'Phi Phase'):
+                fmt = 'standard'; preamble.append(row); break
+            preamble.append(row)
+
+        if fmt == 'unknown':
+            return fmt, phis, freqs, theta, metadata
+
+        # 回放前导行给格式专属扫描器 (扫描器期望从第一个 section header 开始)
+        def _replay():
+            for r in preamble:
+                yield r
+            for r in reader:
+                yield r
 
         if fmt == 'aborted':
-            _scan_aborted_meta(reader, phis, freqs, theta)
+            _scan_aborted_meta(_replay(), phis, freqs, theta)
         elif fmt == 'standard':
-            _scan_standard_meta(reader, phis, freqs, theta)
+            _scan_standard_meta(_replay(), phis, freqs, theta)
 
-    return phis, freqs, theta, metadata
+    return fmt, phis, freqs, theta, metadata
 
 
 def _scan_aborted_meta(reader, phis, freqs, theta):
@@ -610,8 +589,7 @@ def _scan_aborted_meta(reader, phis, freqs, theta):
     section_names = ('Theta Real', 'Theta Imaginary', 'Phi Real', 'Phi Imaginary')
     in_first_section = False
     freq_col = 1
-    state = 'seek_phi'       # seek_phi → saw_phi → seek_freq_header → collect_freqs
-    first_phi_done = False   # 第一个 phi 块处理完毕
+    state = 'seek_phi'  # seek_phi → saw_phi → collect_freqs → phi_done
 
     for row in reader:
         r0 = row[0].strip() if row else ''
@@ -636,9 +614,8 @@ def _scan_aborted_meta(reader, phis, freqs, theta):
                 phis.append(0.0)
 
             if state == 'collect_freqs':
-                first_phi_done = True  # 进入第二个 phi 块，停止收集频点
-
-            if not first_phi_done:
+                state = 'phi_done'  # 进入第二个 phi 块，停止收集频点
+            elif state != 'phi_done':
                 state = 'saw_phi'
                 if not theta:
                     for v in row[2:]:
@@ -651,7 +628,7 @@ def _scan_aborted_meta(reader, phis, freqs, theta):
             continue
 
         # 频点标题行
-        if state == 'saw_phi' and not first_phi_done:
+        if state == 'saw_phi':
             for ci, cell in enumerate(row):
                 if 'Frequency' in (cell or ''):
                     freq_col = ci
@@ -660,7 +637,7 @@ def _scan_aborted_meta(reader, phis, freqs, theta):
             continue
 
         # 频点数据行
-        if state == 'collect_freqs' and not first_phi_done:
+        if state == 'collect_freqs':
             if len(row) > freq_col:
                 try:
                     fv = float(row[freq_col].strip())
@@ -780,8 +757,7 @@ def merge_csv_files(
     base_metadata = ""
 
     for fp in file_paths:
-        fmt = _detect_format(fp)
-        phis, freqs, theta, meta = _scan_file_meta(fp, fmt)
+        fmt, phis, freqs, theta, meta = _scan_file_meta(fp)
         file_meta.append((fp, fmt, phis, freqs, theta, meta))
         all_phis.update(phis)
         if not base_freqs and freqs:
@@ -905,98 +881,17 @@ def merge_csv_files(
 # 路径损耗补偿 (Path Loss Calibration)
 # ═══════════════════════════════════════════════════════════
 
-def parse_rsp_csv(path: str) -> Dict[float, float]:
-    """解析 EMQuest 导出的 .rsp 文件 (CSV 或 Excel 格式)。
+def _parse_rsp_file(path: str, col_idx: int) -> Dict[float, float]:
+    """从 RSP 文件读取指定列 (CSV 或 Excel 格式)。
 
-    CSV 格式 (EMQuest 导出):
-      Format,Log Magnitude,Phase,
-      Frequency  (MHz),Response  (dB),Response Phase  (?,
-      400,-12.2014,-18.1525,
-      ...
-
-    Excel 格式 (.xlsx/.xls): 第一列 Frequency, 第二列 Response
+    Args:
+        path: RSP 文件路径。
+        col_idx: 0-based 列索引 (1 = Response dB, 2 = Response Phase deg)。
 
     Returns:
-        {frequency_mhz: response_db}  响应值通常为负数
+        {frequency_mhz: value} 读取到的频率-值映射。
     """
-    freq_loss: Dict[float, float] = {}
-    ext = path.rsplit('.', 1)[-1].lower() if '.' in path else ''
-
-    if ext in ('xlsx', 'xls'):
-        # Excel 格式: 读取前两列
-        try:
-            import openpyxl
-            wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-            ws = wb.active
-            in_data = False
-            for row in ws.iter_rows(min_col=1, max_col=2, values_only=True):
-                r0 = str(row[0]).strip() if row[0] is not None else ''
-                r1 = row[1]
-                if 'Frequency' in r0 and 'MHz' in r0:
-                    in_data = True
-                    continue
-                if in_data:
-                    try:
-                        freq = float(r0)
-                        resp = float(r1) if r1 is not None else 0.0
-                        if 300 < freq < 10000:
-                            freq_loss[freq] = resp
-                    except (ValueError, TypeError):
-                        if freq_loss:
-                            in_data = False
-            wb.close()
-        except Exception:
-            pass
-    else:
-        # CSV 格式
-        try:
-            with open(path, 'r', encoding='utf-8-sig') as f:
-                reader = csv.reader(f)
-                in_data = False
-                for row in reader:
-                    if not row:
-                        continue
-                    r0 = row[0].strip() if row[0] else ''
-                    if 'Frequency' in r0 and 'MHz' in r0:
-                        in_data = True
-                        continue
-                    if in_data:
-                        try:
-                            freq = float(r0)
-                            resp = float(row[1].strip()) if len(row) > 1 else 0.0
-                            if 300 < freq < 10000:
-                                freq_loss[freq] = resp
-                        except (ValueError, IndexError):
-                            if freq_loss:
-                                in_data = False
-        except Exception:
-            pass
-
-    return freq_loss
-
-
-_PHI_MAX = 360.0  # Phi 值的有效上界 (不含)
-
-
-def _interpolate_rsp(freq_mhz: float, rsp_data: Dict[float, float]) -> float:
-    """线性插值: 根据频率获取对应的响应值 (dB 或 度)。"""
-    if not rsp_data:
-        return 0.0
-    freqs = np.array(sorted(rsp_data.keys()))
-    values = np.array([rsp_data[f] for f in freqs])
-    return float(np.interp(freq_mhz, freqs, values, left=values[0], right=values[-1]))
-
-
-def parse_rsp_phase(path: str) -> Dict[float, float]:
-    """解析 RSP 文件的 Phase 列 (Response Phase, 第3列)。
-
-    与 parse_rsp_csv 使用相同的解析逻辑，但读取第3列 (Phase)
-    而非第2列 (Response dB)。
-
-    Returns:
-        {frequency_mhz: phase_deg}
-    """
-    freq_phase: Dict[float, float] = {}
+    result: Dict[float, float] = {}
     ext = path.rsplit('.', 1)[-1].lower() if '.' in path else ''
 
     if ext in ('xlsx', 'xls'):
@@ -1005,18 +900,18 @@ def parse_rsp_phase(path: str) -> Dict[float, float]:
             wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
             ws = wb.active
             in_data = False
-            for row in ws.iter_rows(min_col=1, max_col=3, values_only=True):
+            for row in ws.iter_rows(min_col=1, max_col=col_idx + 1, values_only=True):
                 r0 = str(row[0]).strip() if row[0] is not None else ''
                 if 'Frequency' in r0 and 'MHz' in r0:
                     in_data = True; continue
                 if in_data:
                     try:
                         freq = float(r0)
-                        ph = float(row[2]) if row[2] is not None else 0.0
+                        val = float(row[col_idx]) if row[col_idx] is not None else 0.0
                         if 300 < freq < 10000:
-                            freq_phase[freq] = ph
+                            result[freq] = val
                     except (ValueError, TypeError):
-                        if freq_phase: in_data = False
+                        if result: in_data = False
             wb.close()
         except Exception: pass
     else:
@@ -1032,14 +927,35 @@ def parse_rsp_phase(path: str) -> Dict[float, float]:
                     if in_data:
                         try:
                             freq = float(r0)
-                            ph = float(row[2].strip()) if len(row) > 2 else 0.0
+                            val = float(row[col_idx].strip()) if len(row) > col_idx else 0.0
                             if 300 < freq < 10000:
-                                freq_phase[freq] = ph
+                                result[freq] = val
                         except (ValueError, IndexError):
-                            if freq_phase: in_data = False
+                            if result: in_data = False
         except Exception: pass
 
-    return freq_phase
+    return result
+
+
+def parse_rsp_csv(path: str) -> Dict[float, float]:
+    """解析 EMQuest 导出的 .rsp 文件第2列 (Response dB)。
+
+    公式: Gain(dBi) = S21(dB) - Response(dB)
+    响应值通常为负数。
+    """
+    return _parse_rsp_file(path, col_idx=1)
+
+
+_PHI_MAX = 360.0  # Phi 值的有效上界 (不含)
+
+
+def parse_rsp_phase(path: str) -> Dict[float, float]:
+    """解析 RSP 文件的 Phase 列 (Response Phase, 第3列)。
+
+    Returns:
+        {frequency_mhz: phase_deg}
+    """
+    return _parse_rsp_file(path, col_idx=2)
 
 
 # ═══════════════════════════════════════════════════════════

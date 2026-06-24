@@ -254,8 +254,6 @@ class FinalSummarySource(DataSource):
 
             # 读 Theta Pol 幅度（不做 clipping — CTIA/EMQuest 标准无此要求）
             tl = _read_matrix(ws, tsr, nphi, ntheta)
-            if dt == "complex":
-                tl = _complex_to_logmag(tl)
 
             # 读 Theta Pol 相位（如有 Phase 段）
             tp_data = None
@@ -268,8 +266,6 @@ class FinalSummarySource(DataSource):
             # 读 Phi Pol 幅度（不做 clipping）
             if self._has_phi_pol and self._phi_pol_start > 0:
                 pl = _read_matrix(ws, self._phi_pol_start, nphi, ntheta)
-                if dt == "complex":
-                    pl = _complex_to_logmag(pl)
             else:
                 pl = np.full_like(tl, -999.0)
 
@@ -338,6 +334,3 @@ def _read_matrix(ws, start_row: int, n_rows: int, n_cols: int) -> np.ndarray:
     return data
 
 
-def _complex_to_logmag(data: np.ndarray) -> np.ndarray:
-    """复数矩阵 → LogMag (dB)。已废弃— _read_matrix 现在直接处理复数。"""
-    return data  # _read_matrix 已经处理了复数转换
