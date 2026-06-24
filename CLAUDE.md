@@ -119,6 +119,43 @@ DESIGN → PLAN → DEVELOP → VERIFY → COMMIT → MANAGE
 | PyInstaller 构建后 | `/size-gate` | `python3 build_size_gate.py` |
 | 任何 `.py` 变更 | E2E | `python3 _e2e_verify.py` |
 
+### Agent 自动行为规则（本会话生效，跨会话 CLAUDE.md 加载后生效）
+
+以下规则告诉 Claude Code agent **在每次 Edit/Write 操作后自动执行**，
+无需用户明确指令。用户只提需求，agent 自动完成全流程。
+
+#### A. 自动质量门禁
+
+| 触发条件 | 自动执行 |
+|---------|---------|
+| 修改了 `ui/*.py` 或 `ui/dialogs.py` | `python3 gui_integrity_check.py` |
+| 修改了任何 `.py` 文件 | `python3 -m pytest tests/ -q -x` (后台运行) |
+| 修改了 `src/pipeline.py` | `python3 -m pytest tests/ -q -x -k "e2e or pipeline"` |
+| 新增/修改 UI 控件 | `/gui-audit` — 检查控件是否可见/被裁剪/布局正确 |
+
+#### B. 自动开发流程
+
+| 用户行为 | Agent 自动响应 |
+|---------|---------------|
+| 提出新功能需求 | → 自动 `EnterPlanMode`, 设计后请求批准 |
+| 需求模糊/有多种方案 | → 自动 `AskUserQuestion` 澄清 |
+| 写完代码 | → 自动运行质量门禁 → 通过后 `git commit` |
+| 对话结束前 | → 自动 `git status` 检查遗漏文件 |
+
+#### C. 代码审查自动检查（每次写代码前自查）
+
+| 检查项 | 方法 |
+|--------|------|
+| 陈旧数据: 新修改的方法是否正确清理旧状态? | 对照 Claude.md 五类反模式 |
+| 双 UI 同步: 是否新增了只在一边存在的控件? | grep 关键属性名两边对比 |
+| 隐藏元素: 是否新增了 `setVisible(False)` 或 `hide()`? | 必须写理由 |
+
+#### D. 禁止行为
+
+- ❌ 不自动 `pyinstaller` 打包 (需等用户确认)
+- ❌ 不跳过质量门禁直接提交
+- ❌ 修改超过 3 个文件不先写计划
+
 对**任意 Python 项目**使用这些 skill：
 ```bash
 # 初始化（首次）
