@@ -474,8 +474,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
     def _hide_settings_tabs(self):
         tc = self.ui.tabConfig
-        # 文件设置/处理参数/3D图形/参数设置 均通过菜单访问 (设置→数据源配置, 文件→系统设置等)
-        for tab, idx in [(self.ui.tabFile, 0), (self.ui.tabLag, 1), (self.ui.tabPlot, 2), (self.ui.tabCalc, 3)]:
+        # LAG/图形/计算设置通过菜单访问; 文件设置保留在选项卡中
+        for tab, idx in [(self.ui.tabLag, 1), (self.ui.tabPlot, 2), (self.ui.tabCalc, 3)]:
             if idx < tc.count(): tc.setTabVisible(idx, False)
 
     def _show_system_settings(self):
