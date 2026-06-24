@@ -160,10 +160,12 @@ DESIGN → PLAN → DEVELOP → VERIFY → COMMIT → MANAGE
 
 | 触发条件 | 自动执行 |
 |---------|---------|
-| 累计 Edit/Write ≥ 10 次 | 自动写 `CURRENT_STATE.md` (distill) |
-| 解决问题消耗 > 5 轮尝试 | 自动 distill，防止噪声积累 |
-| 上下文使用率 > 80% | 自动 distill 后允许 compaction 继续进行 |
-| 用户说 "好了/可以了/完成" | 检查 `git status`，确保没有遗漏文件 |
+| **每次 `git commit` 后** | 检查是否需要更新 `CURRENT_STATE.md`（新增 ≥3 个 commits 则更新） |
+| **累计 Edit/Write ≥ 10 次** | 自动写 `CURRENT_STATE.md` |
+| **解决问题消耗 > 5 轮尝试** | 自动 distill，防止噪声积累 |
+| **用户说 "好了/可以了/完成"** | 检查 `git status`，确保没有遗漏文件 |
+
+> **注意**: Agent 无法直接读取上下文使用率。用 commit 次数和 Edit 次数代替。
 
 对**任意 Python 项目**使用这些 skill：
 ```bash
