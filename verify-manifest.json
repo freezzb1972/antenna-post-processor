@@ -234,6 +234,7 @@
       "finalsummary_reader.py",
       "graph_data.py",
       "help_engine.py",
+      "json_reader.py",
       "lag_config.py",
       "license.py",
       "llm_assist.py",

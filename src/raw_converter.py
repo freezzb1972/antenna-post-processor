@@ -98,33 +98,56 @@ def convert_aborted_to_normal(
 
 
 def _parse_aborted(path: str):
-    """解析实部/虚部格式 (线性域) CSV (EMQuest aborted 数据)。"""
-    with open(path, 'r', encoding='utf-8-sig') as f:
-        rows = list(csv.reader(f))
+    """解析实部/虚部格式 (线性域) CSV (EMQuest aborted 数据)。
 
-    metadata = rows[0][0] if rows else ""
-
+    流式策略: csv.reader 作为生成器，逐 section 收集后立即处理释放。
+    避免 list(csv.reader(f)) 一次性将整个文件加载为 Python 字符串列表，
+    消除 3-5x 内存膨胀（100MB 文件从 350-500MB → ~80MB per section）。
+    """
     section_names = ('Theta Real', 'Theta Imaginary', 'Phi Real', 'Phi Imaginary')
-    sec_start = {}
-    for i, row in enumerate(rows):
-        if row and row[0].strip() in section_names:
-            sec_start[row[0].strip()] = i
 
-    sections = {}
-    all_freqs = set()
-    theta_angles = []
-    phi_angles = []
+    with open(path, 'r', encoding='utf-8-sig') as f:
+        reader = csv.reader(f)
+        try:
+            metadata = next(reader)[0] if reader else ""
+        except StopIteration:
+            return {}, "", [], [], []
 
-    for sn, start in sec_start.items():
-        # Find next section boundary
-        next_starts = [s for n, s in sec_start.items() if s > start]
-        end = min(next_starts) if next_starts else len(rows)
+        sections = {}
+        all_freqs = set()
+        theta_angles = []
+        phi_angles = []
 
-        sec_data, fas, tas, pas = _parse_section_block(rows[start:end])
-        sections[sn] = sec_data
-        all_freqs.update(fas)
-        if tas: theta_angles = tas
-        if pas: phi_angles = pas
+        current_section = None
+        section_rows: List[List[str]] = []
+
+        for row in reader:
+            r0 = row[0].strip() if row else ''
+
+            if r0 in section_names:
+                # 处理上一个 section
+                if current_section and section_rows:
+                    sec_data, fas, tas, pas = _parse_section_block(section_rows)
+                    sections[current_section] = sec_data
+                    all_freqs.update(fas)
+                    if tas: theta_angles = tas
+                    if pas: phi_angles = pas
+                    section_rows = []  # 立即释放
+
+                current_section = r0
+                section_rows.append(row)
+                continue
+
+            if current_section:
+                section_rows.append(row)
+
+        # 处理最后一个 section
+        if current_section and section_rows:
+            sec_data, fas, tas, pas = _parse_section_block(section_rows)
+            sections[current_section] = sec_data
+            all_freqs.update(fas)
+            if tas: theta_angles = tas
+            if pas: phi_angles = pas
 
     freqs = sorted(all_freqs)
     return sections, metadata, freqs, theta_angles, phi_angles
@@ -136,33 +159,52 @@ def _parse_standard(path: str):
     标准格式中 section 按频点分组，每个频点内按 phi 行展开。
     与实部/虚部格式相反：实部/虚部是 phi 外层 / freq 内层，
     标准格式是 freq 外层 / phi 内层。
+
+    流式策略: 同 _parse_aborted，逐 section 收集处理后释放。
     """
-    with open(path, 'r', encoding='utf-8-sig') as f:
-        rows = list(csv.reader(f))
-
-    metadata = rows[0][0] if rows else ""
-
     section_names = ('Theta Log Magnitude', 'Theta Phase',
                      'Phi Log Magnitude', 'Phi Phase')
-    sec_start = {}
-    for i, row in enumerate(rows):
-        if row and row[0].strip() in section_names:
-            sec_start[row[0].strip()] = i
 
-    sections = {}
-    all_freqs = set()
-    theta_angles = []
-    phi_angles = []
+    with open(path, 'r', encoding='utf-8-sig') as f:
+        reader = csv.reader(f)
+        try:
+            metadata = next(reader)[0] if reader else ""
+        except StopIteration:
+            return {}, "", [], [], []
 
-    for sn, start in sec_start.items():
-        next_starts = [s for n, s in sec_start.items() if s > start]
-        end = min(next_starts) if next_starts else len(rows)
+        sections = {}
+        all_freqs = set()
+        theta_angles = []
+        phi_angles = []
 
-        sec_data, fas, tas, pas = _parse_standard_section_block(rows[start:end])
-        sections[sn] = sec_data
-        all_freqs.update(fas)
-        if tas: theta_angles = tas
-        if pas: phi_angles = pas
+        current_section = None
+        section_rows: List[List[str]] = []
+
+        for row in reader:
+            r0 = row[0].strip() if row else ''
+
+            if r0 in section_names:
+                if current_section and section_rows:
+                    sec_data, fas, tas, pas = _parse_standard_section_block(section_rows)
+                    sections[current_section] = sec_data
+                    all_freqs.update(fas)
+                    if tas: theta_angles = tas
+                    if pas: phi_angles = pas
+                    section_rows = []
+
+                current_section = r0
+                section_rows.append(row)
+                continue
+
+            if current_section:
+                section_rows.append(row)
+
+        if current_section and section_rows:
+            sec_data, fas, tas, pas = _parse_standard_section_block(section_rows)
+            sections[current_section] = sec_data
+            all_freqs.update(fas)
+            if tas: theta_angles = tas
+            if pas: phi_angles = pas
 
     freqs = sorted(all_freqs)
     return sections, metadata, freqs, theta_angles, phi_angles
@@ -276,7 +318,7 @@ def _parse_standard_section_block(block):
     phi_angles = sorted(phi_order)
 
     # 构建 3D 数组
-    data = np.full((n_freqs, n_phi, n_theta), np.nan)
+    data = np.full((n_freqs, n_phi, n_theta), np.nan, dtype=np.float32)
     freq_to_data_idx = {f: i for i, f in enumerate(frequencies)}
     sorted_phi_to_idx = {p: i for i, p in enumerate(phi_angles)}
 
@@ -371,7 +413,7 @@ def _parse_section_block(block):
     if n_freqs == 0:
         return None, [], [], []
 
-    data = np.zeros((n_freqs, n_phi, n_theta))
+    data = np.zeros((n_freqs, n_phi, n_theta), dtype=np.float32)
     freq_to_idx = {f: i for i, f in enumerate(frequencies)}
 
     for bi, tr in enumerate(theta_rows):
@@ -428,7 +470,49 @@ def _apply_rsp_to_logmag(data, freqs, rsp_data):
     rsp_vals = np.array([_interpolate_rsp(f, rsp_data) for f in freqs])
     if not np.any(rsp_vals != 0.0):
         return data
-    return np.asarray(data, dtype=np.float64) - rsp_vals[:, np.newaxis, np.newaxis]
+    return np.asarray(data, dtype=np.float32) - rsp_vals[:, np.newaxis, np.newaxis].astype(np.float32)
+
+
+def _apply_rsp_phase(data, freqs, rsp_phase_data):
+    """对 Phase 数据应用 RSP 相位校准: Phase(°) -= RSP_Phase(freq)."""
+    if data is None or not rsp_phase_data:
+        return data
+    rsp_vals = np.array([_interpolate_rsp(f, rsp_phase_data) for f in freqs])
+    if not np.any(rsp_vals != 0.0):
+        return data
+    # 相位修正用复数旋转避免 wrap 问题
+    corrected = np.degrees(np.angle(
+        np.exp(1j * np.radians(np.asarray(data, dtype=np.float32)))
+        * np.exp(-1j * np.radians(rsp_vals[:, np.newaxis, np.newaxis].astype(np.float32)))
+    ))
+    return corrected.astype(np.float32)
+
+
+def _apply_rsp_calibration(
+    tl: np.ndarray, tp: np.ndarray,
+    pl: np.ndarray, pp: np.ndarray,
+    freqs: List[float],
+    rsp_h: Dict[float, float], rsp_v: Dict[float, float],
+    rsp_h_phase: Dict[float, float], rsp_v_phase: Dict[float, float],
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """RSP 路径损耗校准 (幅度 + 相位)，统一入口。
+
+    公式:
+      LogMag_cal = LogMag_raw - Response(freq)     [dB]
+      Phase_cal  = Phase_raw  - RSP_Phase(freq)   [deg]
+
+    极化对应: V-pol → Theta, H-pol → Phi
+
+    Returns:
+        (tl, tp, pl, pp) 校准后的 4 个 3D 数组。
+    """
+    tl = _apply_rsp_to_logmag(tl, freqs, rsp_v)
+    pl = _apply_rsp_to_logmag(pl, freqs, rsp_h)
+    if rsp_v_phase:
+        tp = _apply_rsp_phase(tp, freqs, rsp_v_phase)
+    if rsp_h_phase:
+        pp = _apply_rsp_phase(pp, freqs, rsp_h_phase)
+    return tl, tp, pl, pp
 
 
 def _write_normal_csv(path, metadata, freqs, theta, phi,
@@ -492,6 +576,151 @@ def _detect_format(path: str) -> str:
     return 'unknown'
 
 
+def _scan_file_meta(path: str, fmt: str) -> Tuple[List[float], List[float], List[float], str]:
+    """快速扫描文件元数据 (phi/freq/theta/meta)，不解析数据值。
+
+    用于 merge 排序：先收集所有文件的 phi 列表以确定处理顺序，
+    避免在排序前解析完整数据。
+    """
+    phis: List[float] = []
+    freqs: List[float] = []
+    theta: List[float] = []
+    metadata = ""
+
+    with open(path, 'r', encoding='utf-8-sig') as f:
+        reader = csv.reader(f)
+        try:
+            metadata = next(reader)[0] if reader else ""
+        except StopIteration:
+            return phis, freqs, theta, metadata
+
+        if fmt == 'aborted':
+            _scan_aborted_meta(reader, phis, freqs, theta)
+        elif fmt == 'standard':
+            _scan_standard_meta(reader, phis, freqs, theta)
+
+    return phis, freqs, theta, metadata
+
+
+def _scan_aborted_meta(reader, phis, freqs, theta):
+    """快速扫描 aborted 格式的元数据（仅第一个 section: Theta Real）。
+
+    收集: 所有 phi 值 + 第一个 phi 块的频点/角度。
+    """
+    section_names = ('Theta Real', 'Theta Imaginary', 'Phi Real', 'Phi Imaginary')
+    in_first_section = False
+    freq_col = 1
+    state = 'seek_phi'       # seek_phi → saw_phi → seek_freq_header → collect_freqs
+    first_phi_done = False   # 第一个 phi 块处理完毕
+
+    for row in reader:
+        r0 = row[0].strip() if row else ''
+
+        if r0 in section_names:
+            if r0 == 'Theta Real':
+                in_first_section = True
+                continue
+            elif in_first_section:
+                break  # 离开第一个 section
+            continue
+
+        if not in_first_section:
+            continue
+
+        # 检测 Theta Angle 行 (phi 块边界)
+        is_theta_row = any('Theta Angle' in (c or '') for c in row)
+        if is_theta_row:
+            try:
+                phis.append(float(row[1].strip()))
+            except (ValueError, IndexError):
+                phis.append(0.0)
+
+            if state == 'collect_freqs':
+                first_phi_done = True  # 进入第二个 phi 块，停止收集频点
+
+            if not first_phi_done:
+                state = 'saw_phi'
+                if not theta:
+                    for v in row[2:]:
+                        sv = v.strip()
+                        if sv:
+                            try:
+                                theta.append(float(sv))
+                            except ValueError:
+                                pass
+            continue
+
+        # 频点标题行
+        if state == 'saw_phi' and not first_phi_done:
+            for ci, cell in enumerate(row):
+                if 'Frequency' in (cell or ''):
+                    freq_col = ci
+                    state = 'collect_freqs'
+                    break
+            continue
+
+        # 频点数据行
+        if state == 'collect_freqs' and not first_phi_done:
+            if len(row) > freq_col:
+                try:
+                    fv = float(row[freq_col].strip())
+                    if 300 < fv < 10000:
+                        freqs.append(fv)
+                except (ValueError, IndexError):
+                    pass
+
+
+def _scan_standard_meta(reader, phis, freqs, theta):
+    """快速扫描 standard 格式的元数据。"""
+    in_first_section = False
+    got_theta = False
+    got_freqs = False
+
+    for row in reader:
+        r0 = row[0].strip() if row else ''
+
+        if r0 in ('Theta Log Magnitude', 'Theta Phase', 'Phi Log Magnitude', 'Phi Phase'):
+            if r0 == 'Theta Log Magnitude':
+                in_first_section = True
+            elif in_first_section:
+                break
+            continue
+
+        if not in_first_section:
+            continue
+
+        # 检测 Theta Angle 行 → freq + theta
+        for ci, cell in enumerate(row):
+            if 'Theta Angle' in cell:
+                if not theta:
+                    for v in row[2:]:
+                        sv = v.strip()
+                        if sv:
+                            try:
+                                theta.append(float(sv))
+                            except ValueError:
+                                pass
+                    got_theta = True
+                # 频点在 col[1]
+                try:
+                    fv = float(row[1].strip())
+                    if 300 < fv < 10000 and fv not in freqs:
+                        freqs.append(fv)
+                        got_freqs = True
+                except (ValueError, IndexError):
+                    pass
+                break
+
+        # 检测 phi 数据行 (col[2] 是 phi 值)
+        if got_theta and len(row) > 2:
+            try:
+                pv = float(row[2].strip())
+                if pv not in phis:
+                    phis.append(pv)
+            except (ValueError, IndexError):
+                pass
+
+
 def merge_csv_files(
     file_paths: List[str],
     output_path: Optional[str] = None,
@@ -502,11 +731,10 @@ def merge_csv_files(
     """合并多个分段测量 CSV 为完整 360° 覆盖文件。
 
     流程:
-      1. 检测每个文件格式 (对数域/实部虚部)
-      2. 实部/虚部格式 → 转换为对数域 LogMag/Phase
-      3. 如有 RSP → 对实部/虚部转换结果应用路径损耗校准 (对数域文件不受影响)
-      4. 在 LogMag/Phase 域合并所有文件
-      5. 输出对数域标准格式
+      1. 快速扫描所有文件元数据 (phi/freq/theta) → 确定合并顺序
+      2. 按最小 φ 升序排列 (主段先处理，补全段覆盖重叠区)
+      3. 逐文件解析→转换→校准→合并 (每文件处理完即释放内存)
+      4. 向量化计算 Total Power → 写出
 
     Args:
         file_paths: 待合并的 CSV 文件路径列表。
@@ -525,51 +753,84 @@ def merge_csv_files(
     # 加载 RSP 校准数据 (如有)
     rsp_h: Dict[float, float] = {}
     rsp_v: Dict[float, float] = {}
+    rsp_h_phase: Dict[float, float] = {}
+    rsp_v_phase: Dict[float, float] = {}
     has_rsp = False
     if rsp_h_path and Path(rsp_h_path).exists():
         rsp_h = parse_rsp_csv(rsp_h_path)
+        rsp_h_phase = parse_rsp_phase(rsp_h_path)
         if rsp_h:
             has_rsp = True
     if rsp_v_path and Path(rsp_v_path).exists():
         rsp_v = parse_rsp_csv(rsp_v_path)
+        rsp_v_phase = parse_rsp_phase(rsp_v_path)
         if rsp_v:
             has_rsp = True
 
-    has_aborted = any(_detect_format(fp) == 'aborted' for fp in file_paths)
-    total = len(file_paths) + 2 + (1 if has_aborted and has_rsp else 0)
-    step = 0
-
-    # 统一内部使用 LogMag/Phase 域合并
     logmag_sections = ('Theta Log Magnitude', 'Theta Phase',
                        'Phi Log Magnitude', 'Phi Phase')
 
-    # 读所有文件 → 统一为 LogMag/Phase 3D 数组
-    all_logmag = []       # [{section_name: 2D/3D_array}]
-    all_file_phis = []    # 每个文件的 phi 列表
-    all_phis = set()
+    # ═══════════════════════════════════════════════════════════════
+    # Phase 1: 快速扫描所有文件 → 收集元数据 + 确定处理顺序
+    # ═══════════════════════════════════════════════════════════════
+    file_meta: list = []  # [(path, fmt, phis, freqs, theta, metadata)]
+    all_phis: set = set()
+    base_freqs: List[float] = []
+    base_theta: List[float] = []
     base_metadata = ""
-    base_freqs = []
-    base_theta = []
 
     for fp in file_paths:
+        fmt = _detect_format(fp)
+        phis, freqs, theta, meta = _scan_file_meta(fp, fmt)
+        file_meta.append((fp, fmt, phis, freqs, theta, meta))
+        all_phis.update(phis)
+        if not base_freqs and freqs:
+            base_freqs = sorted(freqs)
+        if not base_theta and theta:
+            base_theta = theta
+        if not base_metadata and meta:
+            base_metadata = meta
+
+    if not base_freqs or not base_theta:
+        raise ValueError("未能从任何文件中解析到有效数据，请检查文件格式。")
+
+    # 按最小 φ 升序排列 (主段先，补全段后)
+    file_meta.sort(key=lambda x: min(x[2]) if x[2] else 0)
+
+    # 构建合并后的 phi 索引
+    valid_phis = [p for p in all_phis if 0.0 <= p < _PHI_MAX]
+    merged_phis = sorted(valid_phis)
+    n_phi = len(merged_phis)
+    n_theta = len(base_theta)
+    n_freqs = len(base_freqs)
+    phi_to_idx = {p: i for i, p in enumerate(merged_phis)}
+
+    has_aborted = any(fmt == 'aborted' for _, fmt, _, _, _, _ in file_meta)
+    total = len(file_paths) + 2 + (1 if has_aborted and has_rsp else 0)
+    step = 0
+
+    # ═══════════════════════════════════════════════════════════════
+    # Phase 2: 预分配合并数组 (float32, ~58MB total for 4 sections)
+    # ═══════════════════════════════════════════════════════════════
+    merged_sections = {}
+    for sn in logmag_sections:
+        merged_sections[sn] = np.full((n_freqs, n_phi, n_theta),
+                                      np.nan, dtype=np.float32)
+
+    # ═══════════════════════════════════════════════════════════════
+    # Phase 3: 逐文件处理 (解析→转换→校准→合并→释放)
+    # ═══════════════════════════════════════════════════════════════
+    for fp, fmt, phis, _, _, _ in file_meta:
         if progress_callback:
             progress_callback(step, total, f"读取: {Path(fp).name}")
         step += 1
 
-        fmt = _detect_format(fp)
-
+        # 解析文件 (流式 section-by-section)
         if fmt == 'standard':
-            # 标准格式: 直接读取 LogMag/Phase
-            sections, meta, freqs, theta, phis = _parse_standard(fp)
-            lm_sections = {}
-            for sn in logmag_sections:
-                lm_sections[sn] = sections.get(sn)
-            all_logmag.append(lm_sections)
-
+            sections, _, _, _, _ = _parse_standard(fp)
+            lm_sections = {sn: sections.get(sn) for sn in logmag_sections}
         elif fmt == 'aborted':
-            # 实部/虚部: Real/Imag → LogMag/Phase
-            sections, meta, freqs, theta, phis = _parse_aborted(fp)
-
+            sections, _, freqs, _, _ = _parse_aborted(fp)
             tr = sections.get('Theta Real')
             ti = sections.get('Theta Imaginary')
             pr = sections.get('Phi Real')
@@ -580,13 +841,11 @@ def merge_csv_files(
             pl = _to_logmag(pr, pi)
             pp = _to_phase(pr, pi)
 
-            # 应用 RSP 路径损耗校准 (如有)
+            del tr, ti, pr, pi, sections  # 立即释放 Re/Im 数组
+
             if has_rsp:
-                tl = _apply_rsp_to_logmag(tl, freqs, rsp_v)
-                pl = _apply_rsp_to_logmag(pl, freqs, rsp_h)
-                if progress_callback:
-                    progress_callback(step, total,
-                        f"校准 {Path(fp).name}: RSP")
+                tl, tp, pl, pp = _apply_rsp_calibration(
+                    tl, tp, pl, pp, freqs, rsp_h, rsp_v, rsp_h_phase, rsp_v_phase)
 
             lm_sections = {
                 'Theta Log Magnitude': tl,
@@ -594,57 +853,31 @@ def merge_csv_files(
                 'Phi Log Magnitude': pl,
                 'Phi Phase': pp,
             }
-            all_logmag.append(lm_sections)
-
         else:
-            raise ValueError(
-                f"无法识别文件格式: {Path(fp).name}\n"
-                f"支持格式: Theta/Phi LogMag+Phase (标准) 或 "
-                f"Theta/Phi Real+Imaginary (实部/虚部格式)"
-            )
+            raise ValueError(f"无法识别文件格式: {Path(fp).name}")
 
-        all_file_phis.append(phis)
-        all_phis.update(phis)
-        if not base_freqs:
-            base_freqs = freqs
-        if not base_theta:
-            base_theta = theta
-        base_metadata = meta
+        # 合并当前文件的 phi 切片到总数组中
+        if progress_callback:
+            progress_callback(step, total, f"合并: {Path(fp).name}")
 
-    if not base_freqs or not base_theta:
-        raise ValueError("未能从任何文件中解析到有效数据，请检查文件格式。")
-
-    # 过滤 phi: 保留 [0, 360) 范围
-    valid_phis = [p for p in all_phis if 0.0 <= p < _PHI_MAX]
-    merged_phis = sorted(valid_phis)
-    n_phi = len(merged_phis)
-    n_theta = len(base_theta)
-    n_freqs = len(base_freqs)
-    phi_to_idx = {p: i for i, p in enumerate(merged_phis)}
-
-    if progress_callback:
-        progress_callback(step, total, "合并数据...")
-    step += 1
-
-    # 合并各 section (LogMag/Phase 域)
-    merged_sections = {}
-
-    for sn in logmag_sections:
-        merged = np.full((n_freqs, n_phi, n_theta), np.nan)
-        for si, lm_sections in enumerate(all_logmag):
+        for sn in logmag_sections:
             sdata = lm_sections.get(sn)
             if sdata is None:
                 continue
-            phis = all_file_phis[si]
             for pi_local, phi_val in enumerate(phis):
                 if phi_val in phi_to_idx:
                     pi_merged = phi_to_idx[phi_val]
                     if pi_local < sdata.shape[1]:
                         nf = min(n_freqs, sdata.shape[0])
                         nt = min(n_theta, sdata.shape[2])
-                        merged[:nf, pi_merged, :nt] = sdata[:nf, pi_local, :nt]
-        merged_sections[sn] = merged
+                        merged_sections[sn][:nf, pi_merged, :nt] = \
+                            sdata[:nf, pi_local, :nt]
 
+        del lm_sections  # 释放当前文件的内存
+
+    # ═══════════════════════════════════════════════════════════════
+    # Phase 4: 向量化计算 Total Power + 写出
+    # ═══════════════════════════════════════════════════════════════
     if progress_callback:
         progress_callback(step, total, "写入输出文件...")
     step += 1
@@ -746,12 +979,67 @@ _PHI_MAX = 360.0  # Phi 值的有效上界 (不含)
 
 
 def _interpolate_rsp(freq_mhz: float, rsp_data: Dict[float, float]) -> float:
-    """线性插值: 根据频率获取对应的响应值 (dB)。"""
+    """线性插值: 根据频率获取对应的响应值 (dB 或 度)。"""
     if not rsp_data:
         return 0.0
     freqs = np.array(sorted(rsp_data.keys()))
     values = np.array([rsp_data[f] for f in freqs])
     return float(np.interp(freq_mhz, freqs, values, left=values[0], right=values[-1]))
+
+
+def parse_rsp_phase(path: str) -> Dict[float, float]:
+    """解析 RSP 文件的 Phase 列 (Response Phase, 第3列)。
+
+    与 parse_rsp_csv 使用相同的解析逻辑，但读取第3列 (Phase)
+    而非第2列 (Response dB)。
+
+    Returns:
+        {frequency_mhz: phase_deg}
+    """
+    freq_phase: Dict[float, float] = {}
+    ext = path.rsplit('.', 1)[-1].lower() if '.' in path else ''
+
+    if ext in ('xlsx', 'xls'):
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+            ws = wb.active
+            in_data = False
+            for row in ws.iter_rows(min_col=1, max_col=3, values_only=True):
+                r0 = str(row[0]).strip() if row[0] is not None else ''
+                if 'Frequency' in r0 and 'MHz' in r0:
+                    in_data = True; continue
+                if in_data:
+                    try:
+                        freq = float(r0)
+                        ph = float(row[2]) if row[2] is not None else 0.0
+                        if 300 < freq < 10000:
+                            freq_phase[freq] = ph
+                    except (ValueError, TypeError):
+                        if freq_phase: in_data = False
+            wb.close()
+        except Exception: pass
+    else:
+        try:
+            with open(path, 'r', encoding='utf-8-sig') as f:
+                reader = csv.reader(f)
+                in_data = False
+                for row in reader:
+                    if not row: continue
+                    r0 = row[0].strip() if row[0] else ''
+                    if 'Frequency' in r0 and 'MHz' in r0:
+                        in_data = True; continue
+                    if in_data:
+                        try:
+                            freq = float(r0)
+                            ph = float(row[2].strip()) if len(row) > 2 else 0.0
+                            if 300 < freq < 10000:
+                                freq_phase[freq] = ph
+                        except (ValueError, IndexError):
+                            if freq_phase: in_data = False
+        except Exception: pass
+
+    return freq_phase
 
 
 # ═══════════════════════════════════════════════════════════
@@ -936,10 +1224,14 @@ def apply_path_loss_calibration(
 
     rsp_h: Dict[float, float] = {}
     rsp_v: Dict[float, float] = {}
+    rsp_h_phase: Dict[float, float] = {}
+    rsp_v_phase: Dict[float, float] = {}
     if rsp_h_path and Path(rsp_h_path).exists():
         rsp_h = parse_rsp_csv(rsp_h_path)
+        rsp_h_phase = parse_rsp_phase(rsp_h_path)
     if rsp_v_path and Path(rsp_v_path).exists():
         rsp_v = parse_rsp_csv(rsp_v_path)
+        rsp_v_phase = parse_rsp_phase(rsp_v_path)
 
     has_cal = bool(rsp_h or rsp_v)
     if not has_cal:
@@ -991,13 +1283,13 @@ def apply_path_loss_calibration(
             return None
         return data_3d[:, out_indices, :]
 
-    # Step 4: 应用 RSP 校准 (numpy 广播，单次遍历频点)
+    # Step 4: 应用 RSP 校准 (幅度 + 相位)
     if progress_callback:
         progress_callback(step, total, "应用路径损耗补偿...")
     step += 1
 
-    tl = _apply_rsp_to_logmag(tl, freqs, rsp_v)  # V-pol → Theta
-    pl = _apply_rsp_to_logmag(pl, freqs, rsp_h)  # H-pol → Phi
+    tl, tp, pl, pp = _apply_rsp_calibration(
+        tl, tp, pl, pp, freqs, rsp_h, rsp_v, rsp_h_phase, rsp_v_phase)
 
     # Step 5: 过滤 phi + 写入输出
     if progress_callback:

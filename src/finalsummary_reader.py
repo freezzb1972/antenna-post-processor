@@ -13,12 +13,33 @@ FinalSummary.xlsx 直接读取器 (v3)
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from typing import Dict, List, Optional, Union
 
 import numpy as np
 import openpyxl
 
 from .datasource import DataSource
+
+
+class _LRUDict(OrderedDict):
+    """定长 LRU 缓存: 超过 maxsize 时自动淘汰最久未使用的条目。
+    每次访问自动将条目标记为最近使用 (move_to_end)。
+    """
+
+    def __init__(self, maxsize: int = 128):
+        super().__init__()
+        self._maxsize = maxsize
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        if len(self) > self._maxsize:
+            self.popitem(last=False)
+
+    def __getitem__(self, key):
+        value = super().__getitem__(key)
+        self.move_to_end(key)
+        return value
 
 
 def _is_numeric(v) -> bool:
@@ -123,8 +144,8 @@ class FinalSummarySource(DataSource):
             self._phi_pol_start = self._theta_start_row + d_phi_amp
             self._phi_phase_start = self._theta_start_row + d_phi_phase
 
-        # ---- 缓存 ----
-        self._cache: Dict[float, tuple] = {}
+        # ---- 缓存 (LRU: 最多缓存 128 个频点，防止大文件无限增长) ----
+        self._cache: _LRUDict = _LRUDict(maxsize=128)
 
     @staticmethod
     def _probe_structure(ws) -> tuple:
