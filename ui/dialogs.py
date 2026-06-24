@@ -620,7 +620,7 @@ class CalcParamsDialog(QDialog):
         self._cmb_ar_output.addItem("AR 输出 dB", True)
         self._cmb_ar_output.addItem("AR 输出 线性", False)
         self._cmb_ar_output.setCurrentIndex(0)  # 默认 dB
-        self._cmb_ar_output.setToolTip("AR 输出单位: dB (10·log₁₀) 或线性比值")
+        self._cmb_ar_output.setToolTip("AR 输出单位: dB (20·log₁₀) 或线性比值")
         self._cmb_ar_output.currentIndexChanged.connect(lambda: self._update_summary())
         check_row.addWidget(self._cmb_ar_output)
         check_row.addStretch()
