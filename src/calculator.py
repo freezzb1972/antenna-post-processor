@@ -495,23 +495,25 @@ def compute_axial_ratio(
     phi_logmag: np.ndarray,    # (n_phi, n_theta)  dB
     phi_phase: np.ndarray,     # (n_phi, n_theta)  deg
 ) -> Optional[np.ndarray]:
-    """计算轴比 AR (dB)，基于极化椭圆。
+    """计算轴比 AR（线性值），基于极化椭圆。
 
-    AR = 20·log₁₀( |E_major| / |E_minor| )
+    AR = |E_major| / |E_minor|  (线性, ≥ 1)
 
     步骤：
       1. 幅度 dB → 线性, 相位 deg → rad
       2. 复电场: E_θ = mag_θ · exp(j·phase_θ)
                 E_φ = mag_φ · exp(j·phase_φ)
-      3. 对每个方向 (φ,θ):
-         - 构建极化矢量 [E_θ, E_φ]
-         - 计算极化椭圆主轴/短轴
-         - AR = |E_major| / |E_minor|
+      3. 圆极化分量: E_RHCP = (E_θ - j·E_φ) / √2
+                     E_LHCP = (E_θ + j·E_φ) / √2
+      4. AR = (|E_RHCP| + |E_LHCP|) / ||E_RHCP| - |E_LHCP||
+
+    调用方可通过 20·log₁₀(AR) 转为 dB。
+    注意: 20·log₁₀ 而非 10·log₁₀，因为 AR 是场量比（非功率比）。
 
     参考：IEEE Std 149-2021, C.2 Polarization Ellipse
 
     Returns:
-        AR 数组 (n_phi, n_theta)，单位 dB；或 None（数据不完整时）。
+        AR 数组 (n_phi, n_theta)，线性值 (≥1)；或 None（数据不完整时）。
     """
     if theta_phase is None or phi_phase is None:
         return None
