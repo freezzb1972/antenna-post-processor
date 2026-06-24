@@ -59,11 +59,15 @@ class DataSource(ABC):
 
         - .xlsx / .xls → FinalSummarySource
         - .csv           → MergedCSVParser
+        - .json          → JsonDataSource (EMQuest 导出)
         """
         ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
         if ext in ("xlsx", "xls"):
             from .finalsummary_reader import FinalSummarySource
             return FinalSummarySource(path)
+        elif ext == "json":
+            from .json_reader import JsonDataSource
+            return JsonDataSource(path)
         else:
             from .parser import MergedCSVParser
             return MergedCSVParser(path)
