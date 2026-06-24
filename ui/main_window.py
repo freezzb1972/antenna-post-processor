@@ -1575,6 +1575,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._cfg.config.last_template_path = path
             self._cfg._dirty = True
             self._chart_config_required = None  # 模板已变，下次使用时重新检测
+            self._cached_template_params = set()  # 强制刷新模板参数缓存
+            # 自动应用模板检测到的计算参数
+            self._auto_apply_template_params()
             # 模板路径变更后，旧的匹配表基于旧模板的工作表名，无效
             if self._match_table is not None:
                 self._match_table.setRowCount(0)
@@ -1620,6 +1623,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             out_dir = self.ui.editOutputDir.text() or "."
             fname = self._tm.next_available_filename(out_dir, tpl_name)
             self.ui.editOutputName.setText(fname)
+        # 模板变更后自动识别并应用计算参数
+        self._cached_template_params = set()
+        self._auto_apply_template_params()
 
     def _show_save_preset_dialog(self, template_path: str, output_dir: str):
         """弹出保存模板预设对话框 (公共方法, SystemSettingsDialog 也调用)。"""
@@ -1744,6 +1750,24 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     f"从模板自动更新 AR 角度: "
                     f"单角度={ar_cfg.singles_sorted}, 范围={ar_cfg.ranges_sorted}"
                 )
+
+    def _auto_apply_template_params(self):
+        """从模板自动识别并应用计算参数到主窗口。
+
+        选择模板后自动调用，无需用户打开计算参数对话框。
+        仅当检测到参数时才更新，避免覆盖用户手动设置。
+        """
+        tp = self._get_template_params()
+        if not tp:
+            return
+
+        # 检查是否有变化
+        if tp == self._required_params:
+            return  # 没变化，不重复日志
+
+        self._required_params = tp
+        self._extra_params = set()
+        self._log_current_params()
 
     def _on_load_from_template(self):
         template_path = self.ui.editTemplatePath.text()

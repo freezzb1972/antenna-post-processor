@@ -289,6 +289,10 @@ class DataSourceDialog(QDialog):
         # 持久化模板和输出路径到配置文件
         if hasattr(mw, '_save_template_path'):
             mw._save_template_path(self._edit_template.text())
+        # 模板变更后自动识别并应用计算参数
+        if hasattr(mw, '_auto_apply_template_params'):
+            mw._cached_template_params = set()
+            mw._auto_apply_template_params()
         mw._cfg.config.last_output_dir = self._edit_dir.text()
         mw._cfg._dirty = True
         if hasattr(mw, '_check_chart_eff'):
