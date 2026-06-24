@@ -135,11 +135,22 @@ class DataSourceDialog(QDialog):
         self._check_chart_lag = QCheckBox("增益曲线"); self._check_chart_lag.setChecked(True)
         ch_row.addWidget(self._check_chart_eff); ch_row.addWidget(self._check_chart_lag); ch_row.addStretch()
 
+        # 工作表命名
+        grp_name = QGroupBox("工作表命名")
+        name_row = QHBoxLayout(grp_name)
+        name_row.addWidget(QLabel("多数据源时工作表命名方式:"))
+        self._cmb_naming_mode = QComboBox()
+        self._cmb_naming_mode.addItem("保留原模板工作表名", 0)
+        self._cmb_naming_mode.addItem("用数据源文件名替换", 1)
+        self._cmb_naming_mode.setToolTip("保留模板原名 或 用数据源文件名命名工作表")
+        name_row.addWidget(self._cmb_naming_mode)
+        name_row.addStretch()
+
         # 按钮
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(self._on_accept); btns.rejected.connect(self.reject)
 
-        wrap_in_scroll(self, [grp_tpl, grp_data, grp_out, grp_chart], btns)
+        wrap_in_scroll(self, [grp_tpl, grp_data, grp_name, grp_out, grp_chart], btns)
 
     def _load_state(self):
         mw = self._mw
@@ -152,6 +163,11 @@ class DataSourceDialog(QDialog):
             self._check_chart_eff.setChecked(mw._check_chart_eff.isChecked())
         if hasattr(mw, '_check_chart_lag'):
             self._check_chart_lag.setChecked(mw._check_chart_lag.isChecked())
+        # 工作表命名模式
+        if hasattr(mw, '_worksheet_naming_mode') and hasattr(self, '_cmb_naming_mode'):
+            idx = self._cmb_naming_mode.findData(mw._worksheet_naming_mode)
+            if idx >= 0:
+                self._cmb_naming_mode.setCurrentIndex(idx)
         # 多文件列表
         if hasattr(mw, '_data_file_paths') and mw._data_file_paths:
             self._file_list.clear()
@@ -279,15 +295,32 @@ class DataSourceDialog(QDialog):
             mw._check_chart_eff.setChecked(self._check_chart_eff.isChecked())
         if hasattr(mw, '_check_chart_lag'):
             mw._check_chart_lag.setChecked(self._check_chart_lag.isChecked())
-        # 更新数据文件列表 (存完整路径)
+        # 工作表命名模式
+        if hasattr(self, '_cmb_naming_mode'):
+            mw._worksheet_naming_mode = self._cmb_naming_mode.currentData() or 0
+            if hasattr(mw, '_cmb_naming_mode'):
+                idx = mw._cmb_naming_mode.findData(mw._worksheet_naming_mode)
+                if idx >= 0:
+                    mw._cmb_naming_mode.setCurrentIndex(idx)
+        # 更新数据文件列表 (存完整路径) — 陈旧数据保护
         data_files = [self._file_list.item(i).text() for i in range(self._file_list.count())]
         if hasattr(mw, '_data_file_paths'):
+            old_count = len(mw._data_file_paths)
             mw._data_file_paths = data_files
-            mw._data_stale = False  # 用户通过对话框确认了新文件列表，清除陈旧标记
+            # 如果通过对话框清空/替换了文件，标记非陈旧
+            mw._data_stale = False
             if hasattr(mw, '_sync_file_entries'):
                 mw._sync_file_entries()
-        if data_files and hasattr(mw, '_file_list_widget'):
-            mw._refresh_data_file_ui()
+            # 对话框替换了文件列表 → 完整重建 UI 和匹配
+            if hasattr(mw, '_file_list_widget'):
+                mw._refresh_data_file_ui()
+            if mw._match_table is not None:
+                mw._match_table.setRowCount(0)
+            if hasattr(mw, '_lbl_match_status') and mw._lbl_match_status is not None:
+                mw._lbl_match_status.setText("")
+            # 重建匹配表
+            if data_files and hasattr(mw, '_on_auto_match'):
+                mw._on_auto_match()
         self.accept()
 
 

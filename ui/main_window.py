@@ -1140,9 +1140,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         )
         if not paths:
             return
-        # 自动清除上次计算遗留的陈旧数据
-        if self._data_stale and self._data_file_paths:
-            self._log(f"🗑 自动清除上次计算遗留的 {len(self._data_file_paths)} 个文件")
+        # 自动清除上次计算遗留的陈旧数据 (即使 _data_file_paths 为空仍须清 UI)
+        if self._data_stale:
+            n_stale = len(self._data_file_paths)
+            if n_stale > 0:
+                self._log(f"🗑 自动清除上次计算遗留的 {n_stale} 个文件")
             self._data_file_paths.clear()
             self._file_entries.clear()
             self._file_list_widget.setRowCount(0)
@@ -1339,6 +1341,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         total_files = max(len(self._data_file_paths), 1)
         file_idx = 0
         use_file_names = self._worksheet_naming_mode == 1
+
+        # 防御: 清除不在 _data_file_paths 中的匹配表行 (陈旧数据保护)
+        valid_paths = set(self._data_file_paths)
+        for row in range(self._match_table.rowCount()):
+            combo = self._match_table.cellWidget(row, 1)
+            if combo:
+                fp = combo.currentData() or ""
+                if fp and fp != "—" and fp not in valid_paths:
+                    # 此匹配表行引用了不存在于 _data_file_paths 的旧文件 → 重置
+                    combo.setCurrentIndex(0)
 
         # 已匹配的行
         matched_files = set()
