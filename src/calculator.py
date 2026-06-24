@@ -507,8 +507,7 @@ def compute_axial_ratio(
                      E_LHCP = (E_θ + j·E_φ) / √2
       4. AR = (|E_RHCP| + |E_LHCP|) / ||E_RHCP| - |E_LHCP||
 
-    调用方可通过 20·log₁₀(AR) 转为 dB。
-    注意: 20·log₁₀ 而非 10·log₁₀，因为 AR 是场量比（非功率比）。
+    调用方可通过 10·log₁₀(AR) 转为 dB。
 
     参考：IEEE Std 149-2021, C.2 Polarization Ellipse
 

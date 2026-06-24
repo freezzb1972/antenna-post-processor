@@ -272,20 +272,20 @@ def _process_one_frequency(
                     if ar_singles:
                         for angle, val in compute_ar_at_angles(ar, theta_deg, ar_singles).items():
                             if ar_output_db:
-                                val = 20.0 * math.log10(max(val, 1e-15))
+                                val = 10.0 * math.log10(max(val, 1e-15))
                             row[f"ar_single_{angle}"] = round(val, 6)
                     # AR 范围
                     ar_ranges = ar_cfg.ranges_sorted
                     if ar_ranges:
                         for (lo, hi), val in [(r, compute_ar_range(ar, theta_deg, r[0], r[1])) for r in ar_ranges]:
                             if ar_output_db:
-                                val = 20.0 * math.log10(max(val, 1e-15))
+                                val = 10.0 * math.log10(max(val, 1e-15))
                             row[f"ar_range_{lo}_{hi}"] = round(val, 6)
                     # 向后兼容的 axial_ratio 字段
                     if "axial_ratio" in compute_set or not need:
                         legacy_ar = float(np.mean(ar[0, :5]))
                         if ar_output_db:
-                            legacy_ar = 20.0 * math.log10(max(legacy_ar, 1e-15))
+                            legacy_ar = 10.0 * math.log10(max(legacy_ar, 1e-15))
                         row["axial_ratio"] = round(legacy_ar, 6)
             except Exception as e:
                 row["axial_ratio_error"] = str(e)
@@ -732,7 +732,7 @@ def run_pipeline(
     t0 = time.time()
 
     # ---- 0. 参数校验 ----
-    _log(log_callback, f"AR 输出: {'dB (20·log₁₀)' if ar_output_db else '线性比值'}")
+    _log(log_callback, f"AR 输出: {'dB (10·log₁₀)' if ar_output_db else '线性比值'}")
     if datasource_map is not None and datasource is not None:
         raise ValueError("datasource 和 datasource_map 互斥，只能提供一个")
     if datasource_map is None and datasource is None:
