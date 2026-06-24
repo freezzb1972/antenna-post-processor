@@ -64,10 +64,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '⚠️  上下文即将自动压缩。CURRENT_STATE.md 应已在压缩前更新。'"
+            "command": "bash .claude/hooks/pre-compact-distill.sh"
           }
         ],
-        "description": "压缩前提醒：确认 CURRENT_STATE.md 已更新"
+        "description": "压缩前自动 distill: 保存 git log + 文件变更到 CURRENT_STATE.md"
       }
     ]
   }
