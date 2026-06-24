@@ -1270,6 +1270,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._log(f"模板中未检测到数据工作表")
             return
 
+        # 从模板自动更新 LAG 和 AR 角度配置
+        self._auto_update_angle_config_from_template(sheets)
+
         matches = auto_match(sheet_names, self._data_file_paths)
         self._populate_match_table(matches)
 
@@ -1696,6 +1699,51 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._lag_config.add_range(lo, hi)
         self._update_lag_display()
         self._log(f"添加 LAG 范围: ({lo}°-{hi}°)")
+
+    def _auto_update_angle_config_from_template(self, sheets):
+        """从模板工作表自动更新 Gain/AR 角度配置。
+
+        当自动匹配触发时调用，确保角度配置与模板列头一致。
+        仅在当前配置为默认值(PRESET_AUTOMOTIVE)或空时自动更新，
+        用户手动修改过的配置不会被覆盖。
+        """
+        # 读取模板所有 LAG/AR 列头
+        all_headers = []
+        for si in sheets:
+            for c in si.columns:
+                all_headers.append(c.raw_header)
+
+        # Gain (LAG) 配置
+        lag_cfg = LagConfig.from_template_headers(all_headers)
+        if not lag_cfg.is_empty():
+            current_singles = set(self._lag_config.singles_sorted)
+            template_singles = set(lag_cfg.singles_sorted)
+            current_ranges = set(self._lag_config.ranges_sorted)
+            template_ranges = set(lag_cfg.ranges_sorted)
+
+            if current_singles != template_singles or current_ranges != template_ranges:
+                self._lag_config = lag_cfg
+                self._sync_quick_buttons()
+                self._update_lag_display()
+                self._log(
+                    f"从模板自动更新 Gain 角度: "
+                    f"单角度={lag_cfg.singles_sorted}, 范围={lag_cfg.ranges_sorted}"
+                )
+
+        # AR 配置
+        ar_cfg = LagConfig.from_ar_headers(all_headers)
+        if not ar_cfg.is_empty():
+            current_ar_singles = set(self._ar_lag_config.singles_sorted)
+            template_ar_singles = set(ar_cfg.singles_sorted)
+            current_ar_ranges = set(self._ar_lag_config.ranges_sorted)
+            template_ar_ranges = set(ar_cfg.ranges_sorted)
+
+            if current_ar_singles != template_ar_singles or current_ar_ranges != template_ar_ranges:
+                self._ar_lag_config = ar_cfg
+                self._log(
+                    f"从模板自动更新 AR 角度: "
+                    f"单角度={ar_cfg.singles_sorted}, 范围={ar_cfg.ranges_sorted}"
+                )
 
     def _on_load_from_template(self):
         template_path = self.ui.editTemplatePath.text()
@@ -2368,9 +2416,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         paths = [u.toLocalFile() for u in event.mimeData().urls()]
         valid = [p for p in paths if Path(p).suffix.lower() in ('.csv','.xlsx','.xls')]
         if valid:
-            # 自动清除上次计算遗留的陈旧数据
-            if self._data_stale and self._data_file_paths:
-                self._log(f"🗑 自动清除上次计算遗留的 {len(self._data_file_paths)} 个文件")
+            # 自动清除上次计算遗留的陈旧数据 (即使 _data_file_paths 为空仍须清 UI)
+            if self._data_stale:
+                n_stale = len(self._data_file_paths)
+                if n_stale > 0:
+                    self._log(f"🗑 自动清除上次计算遗留的 {n_stale} 个文件")
                 self._data_file_paths.clear()
                 self._file_entries.clear()
                 self._file_list_widget.setRowCount(0)
