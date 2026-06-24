@@ -1,0 +1,74 @@
+{
+  "enabledPlugins": {
+    "claude-api@anthropic-agent-skills": true,
+    "document-skills@anthropic-agent-skills": false
+  },
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-memory"]
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "tool == \"Edit\" || tool == \"Write\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/global-skills/everything/strategic-compact/suggest-compact.js"
+          }
+        ],
+        "description": "战略压缩建议：Edit/Write 超过阈值时提醒 compact"
+      },
+      {
+        "matcher": "tool == \"Write\" && path.match(/\\.py$/)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"import json; p='.claude/dev-flow.json'; d=json.load(open(p)); d['stats']['filesModified']=d['stats'].get('filesModified',0)+1; json.dump(d,open(p,'w'),indent=2); c=d['stats']['filesModified']; print(f'📊 文件修改 {c} 次' + (' — 建议运行 /dev-flow check' if c>=5 else ''))\""
+          }
+        ],
+        "description": "文件修改计数：.py 文件修改 ≥5 次时建议验证"
+      },
+      {
+        "matcher": "tool == \"Write\" && path.match(/ui\\//)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '🔔 UI 文件已修改 — 建议运行 python3 gui_integrity_check.py'"
+          }
+        ],
+        "description": "UI 文件修改提醒：ui/ 目录修改时建议 GUI 检查"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "tool == \"Bash\" && command.match(/pytest/)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"import json,subprocess; p='.claude/dev-flow.json'; d=json.load(open(p)); d['stats']['testsRun']=d['stats'].get('testsRun',0)+1; json.dump(d,open(p,'w'),indent=2)\""
+          }
+        ],
+        "description": "测试运行计数：pytest 运行后更新统计"
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '⚠️  上下文即将自动压缩。CURRENT_STATE.md 应已在压缩前更新。'"
+          }
+        ],
+        "description": "压缩前提醒：确认 CURRENT_STATE.md 已更新"
+      }
+    ]
+  }
+}

@@ -156,6 +156,15 @@ DESIGN → PLAN → DEVELOP → VERIFY → COMMIT → MANAGE
 - ❌ 不跳过质量门禁直接提交
 - ❌ 修改超过 3 个文件不先写计划
 
+#### E. 会话管理
+
+| 触发条件 | 自动执行 |
+|---------|---------|
+| 累计 Edit/Write ≥ 10 次 | 自动写 `CURRENT_STATE.md` (distill) |
+| 解决问题消耗 > 5 轮尝试 | 自动 distill，防止噪声积累 |
+| 上下文使用率 > 80% | 自动 distill 后允许 compaction 继续进行 |
+| 用户说 "好了/可以了/完成" | 检查 `git status`，确保没有遗漏文件 |
+
 对**任意 Python 项目**使用这些 skill：
 ```bash
 # 初始化（首次）
