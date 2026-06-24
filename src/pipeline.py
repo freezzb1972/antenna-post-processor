@@ -732,6 +732,7 @@ def run_pipeline(
     t0 = time.time()
 
     # ---- 0. 参数校验 ----
+    _log(log_callback, f"AR 输出: {'dB (20·log₁₀)' if ar_output_db else '线性比值'}")
     if datasource_map is not None and datasource is not None:
         raise ValueError("datasource 和 datasource_map 互斥，只能提供一个")
     if datasource_map is None and datasource is None:
