@@ -444,8 +444,6 @@ def _expand_template_sheets(
     if not unmatched:
         return list(sheets_info)
 
-    expanded = list(sheets_info)
-
     from .sheet_file_matcher import sanitize_sheet_name
 
     for ds_name in sorted(unmatched):
