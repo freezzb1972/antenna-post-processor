@@ -7,6 +7,7 @@
   "last_csv_paths": [
     "/tmp/file1.csv"
   ],
+  "last_rsp_preset_name": "",
   "llm": {
     "enabled": false,
     "api_base": "https://api.anthropic.com/v1/messages",

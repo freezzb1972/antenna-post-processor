@@ -666,12 +666,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     "(选择「否」将仅转换格式，不应用路径损耗补偿)"),
             QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
         if rsp_reply == QMessageBox.Yes:
-            rsp_h_path, _ = QFileDialog.getOpenFileName(
-                self, self.tr("选择 H-pol RSP 校准文件 (Phi 分量)"), "",
-                self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
-            rsp_v_path, _ = QFileDialog.getOpenFileName(
-                self, self.tr("选择 V-pol RSP 校准文件 (Theta 分量)"), "",
-                self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
+            from ui.rsp_picker_dialog import RspPickerDialog
+            rsp_h_path, rsp_v_path = RspPickerDialog.pick(
+                self, test_mode=-1, auto_skip_if_no_presets=False)
 
         if (rsp_h_path or rsp_v_path) and realimag_files:
             # RSP 频率覆盖检查: 仅对需转换的 aborted 文件
@@ -768,17 +765,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             if reply != QMessageBox.Yes:
                 return
 
-        # Step 2: 选择 RSP H-pol 文件
-        rsp_h_path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("选择 H-pol RSP 校准文件 (可选)"), "",
-            self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
-        # 允许跳过
-
-        # Step 3: 选择 RSP V-pol 文件
-        rsp_v_path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("选择 V-pol RSP 校准文件 (可选)"), "",
-            self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
-        # 允许跳过
+        # Step 2: 选择 RSP 文件 (使用预设选择器)
+        from ui.rsp_picker_dialog import RspPickerDialog
+        rsp_h_path, rsp_v_path = RspPickerDialog.pick(
+            self, test_mode=-1, auto_skip_if_no_presets=False)
 
         if not rsp_h_path and not rsp_v_path:
             QMessageBox.warning(self, self.tr("提示"),
@@ -872,12 +862,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                         "是否加载 RSP 路径损耗校准文件？"),
                 QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
             if reply == QMessageBox.Yes:
-                rsp_h_path, _ = QFileDialog.getOpenFileName(
-                    self, self.tr("选择 H-pol RSP 校准文件 (Phi 分量)"), "",
-                    self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
-                rsp_v_path, _ = QFileDialog.getOpenFileName(
-                    self, self.tr("选择 V-pol RSP 校准文件 (Theta 分量)"), "",
-                    self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
+                from ui.rsp_picker_dialog import RspPickerDialog
+                rsp_h_path, rsp_v_path = RspPickerDialog.pick(
+                    self, test_mode=-1, auto_skip_if_no_presets=False)
                 if not rsp_h_path and not rsp_v_path:
                     self._log("⚠ 未选择 RSP 文件，跳过路径损耗校准")
                 else:

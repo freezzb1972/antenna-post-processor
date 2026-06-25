@@ -294,6 +294,7 @@ class AppConfig:
     last_template_path: str = ""
     last_output_dir: str = ""
     last_csv_paths: List[str] = field(default_factory=list)
+    last_rsp_preset_name: str = ""  # 最后使用的 RSP 预设名称
     # LLM
     llm: LLMConfig = field(default_factory=LLMConfig)
     # AI 辅助
@@ -736,6 +737,7 @@ class ConfigManager:
             last_template_path=raw.get('last_template_path', ''),
             last_output_dir=raw.get('last_output_dir', ''),
             last_csv_paths=raw.get('last_csv_paths', []),
+            last_rsp_preset_name=raw.get('last_rsp_preset_name', ''),
             window_geometry=str(raw.get('window_geometry', '')),
         )
         # LLM
@@ -789,6 +791,7 @@ class ConfigManager:
             language=s.value("language", "zh_CN") or "zh_CN",
             last_template_path=s.value("template_path", "") or "",
             last_output_dir=s.value("output_dir", "") or "",
+            last_rsp_preset_name=s.value("rsp_preset_name", "") or "",
             window_geometry=str(s.value("window_geometry", "") or ""),
         )
         # CSV paths

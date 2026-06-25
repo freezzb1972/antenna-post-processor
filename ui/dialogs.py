@@ -2237,6 +2237,81 @@ class SystemSettingsDialog(QDialog):
 
         layout.addWidget(tpl_grp)
 
+        # ── RSP 校准预设管理 ──
+        rsp_grp = QGroupBox("RSP 校准预设管理")
+        rsp_layout = QFormLayout(rsp_grp)
+        rsp_layout.setSpacing(6)
+
+        self._cmb_rsp_name = QComboBox()
+        self._cmb_rsp_name.setEditable(True)
+        self._cmb_rsp_name.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_rsp_name.lineEdit().setPlaceholderText("输入新预设名称或选择已有...")
+        self._cmb_rsp_name.currentIndexChanged.connect(self._on_rsp_preset_selected)
+        rsp_layout.addRow("预设名称:", self._cmb_rsp_name)
+
+        self._cmb_rsp_mode = QComboBox()
+        self._cmb_rsp_mode.addItem("通用 (任意模式)", -1)
+        self._cmb_rsp_mode.addItem("无源天线", 0)
+        self._cmb_rsp_mode.addItem("有源发射 TRP", 1)
+        self._cmb_rsp_mode.addItem("有源接收 TIS", 2)
+        rsp_layout.addRow("关联测试模式:", self._cmb_rsp_mode)
+
+        self._edit_rsp_h = QLineEdit()
+        self._edit_rsp_h.setPlaceholderText("选择 H-pol RSP 校准文件 (Phi 分量)")
+        btn_browse_rsp_h = QPushButton("浏览...")
+        btn_browse_rsp_h.clicked.connect(self._on_browse_rsp_h)
+        h_row = QHBoxLayout()
+        h_row.addWidget(self._edit_rsp_h)
+        h_row.addWidget(btn_browse_rsp_h)
+        rsp_layout.addRow("H-pol RSP:", h_row)
+
+        self._edit_rsp_v = QLineEdit()
+        self._edit_rsp_v.setPlaceholderText("选择 V-pol RSP 校准文件 (Theta 分量)")
+        btn_browse_rsp_v = QPushButton("浏览...")
+        btn_browse_rsp_v.clicked.connect(self._on_browse_rsp_v)
+        v_row = QHBoxLayout()
+        v_row.addWidget(self._edit_rsp_v)
+        v_row.addWidget(btn_browse_rsp_v)
+        rsp_layout.addRow("V-pol RSP:", v_row)
+
+        self._edit_rsp_desc = QLineEdit()
+        self._edit_rsp_desc.setPlaceholderText("可选注释")
+        rsp_layout.addRow("描述:", self._edit_rsp_desc)
+
+        btn_rsp_row = QHBoxLayout()
+        self._btn_save_rsp = QPushButton("💾 保存 RSP 预设")
+        self._btn_save_rsp.clicked.connect(self._on_rsp_save)
+        btn_rsp_row.addWidget(self._btn_save_rsp)
+        self._btn_delete_rsp = QPushButton("🗑 删除预设")
+        self._btn_delete_rsp.clicked.connect(self._on_rsp_delete)
+        btn_rsp_row.addWidget(self._btn_delete_rsp)
+        btn_rsp_row.addStretch()
+        rsp_layout.addRow("", btn_rsp_row)
+
+        # ── 当前默认值 ──
+        defaults_grp = QGroupBox("当前默认值 (工具自动匹配)")
+        defaults_layout = QFormLayout(defaults_grp)
+        defaults_layout.setSpacing(4)
+
+        self._cmb_default_passive = QComboBox()
+        self._cmb_default_passive.addItem("(未设置)", "")
+        defaults_layout.addRow("无源天线:", self._cmb_default_passive)
+
+        self._cmb_default_trp = QComboBox()
+        self._cmb_default_trp.addItem("(未设置)", "")
+        defaults_layout.addRow("有源 TRP:", self._cmb_default_trp)
+
+        self._cmb_default_tis = QComboBox()
+        self._cmb_default_tis.addItem("(未设置)", "")
+        defaults_layout.addRow("有源 TIS:", self._cmb_default_tis)
+
+        btn_set_defaults = QPushButton("应用默认值")
+        btn_set_defaults.clicked.connect(self._on_rsp_set_defaults)
+        defaults_layout.addRow("", btn_set_defaults)
+
+        rsp_layout.addRow(defaults_grp)
+        layout.addWidget(rsp_grp)
+
         # ── LLM API ──
         llm_grp = QGroupBox("LLM API (RAG 问答)")
         llm_layout = QFormLayout(llm_grp)
@@ -2319,7 +2394,7 @@ class SystemSettingsDialog(QDialog):
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(self._on_accept)
         btns.rejected.connect(self.reject)
-        wrap_in_scroll(self, [font_grp, theme_grp, lang_grp, tpl_grp, llm_grp, self._ai_grp], btns)
+        wrap_in_scroll(self, [font_grp, theme_grp, lang_grp, tpl_grp, rsp_grp, llm_grp, self._ai_grp], btns)
 
         # 限制高度不超过屏幕 90%, 允许手动调整
         screen = QApplication.primaryScreen().availableGeometry()
@@ -2381,6 +2456,9 @@ class SystemSettingsDialog(QDialog):
         self._edit_ai_local_endpoint.setText(cfg.ai.local_endpoint)
         self._on_ai_mode_changed(0)
 
+        # RSP 预设
+        self._refresh_rsp_presets()
+
     # ── 模板预设管理 ──
 
     def _on_browse_template_file(self):
@@ -2439,6 +2517,119 @@ class SystemSettingsDialog(QDialog):
         if idx >= 0: self._cmb_mfr.setCurrentIndex(idx)
         self._cmb_mfr.blockSignals(False)
         self._on_tpl_mfr_changed(0)
+
+    # ── RSP 预设管理 ──
+
+    def _on_browse_rsp_h(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "选择 H-pol RSP 校准文件", "",
+            "CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)")
+        if path:
+            self._edit_rsp_h.setText(path)
+
+    def _on_browse_rsp_v(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "选择 V-pol RSP 校准文件", "",
+            "CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)")
+        if path:
+            self._edit_rsp_v.setText(path)
+
+    def _on_rsp_preset_selected(self, _index: int):
+        from src.rsp_preset_manager import RspPresetManager
+        name = self._cmb_rsp_name.currentText().strip()
+        if not name:
+            return
+        mgr = RspPresetManager()
+        preset = mgr.get_by_name(name)
+        if preset:
+            self._cmb_rsp_name.blockSignals(True)
+            mode_idx = self._cmb_rsp_mode.findData(preset.test_mode)
+            if mode_idx >= 0:
+                self._cmb_rsp_mode.setCurrentIndex(mode_idx)
+            self._edit_rsp_h.setText(preset.rsp_h_path)
+            self._edit_rsp_v.setText(preset.rsp_v_path)
+            self._edit_rsp_desc.setText(preset.description)
+            self._cmb_rsp_name.blockSignals(False)
+
+    def _on_rsp_save(self):
+        from src.rsp_preset_manager import RspPresetManager, RspPreset
+        name = self._cmb_rsp_name.currentText().strip()
+        if not name:
+            QMessageBox.warning(self, "保存预设", "请输入预设名称。")
+            return
+        test_mode = self._cmb_rsp_mode.currentData()
+        rsp_h = self._edit_rsp_h.text().strip()
+        rsp_v = self._edit_rsp_v.text().strip()
+        desc = self._edit_rsp_desc.text().strip()
+        if not rsp_h and not rsp_v:
+            QMessageBox.warning(self, "保存预设", "请至少选择一个 RSP 校准文件。")
+            return
+        mgr = RspPresetManager()
+        preset = RspPreset(
+            name=name, test_mode=test_mode,
+            rsp_h_path=rsp_h, rsp_v_path=rsp_v, description=desc,
+        )
+        mgr.add_or_update(preset)
+        self._refresh_rsp_presets()
+        self._log_msg(f"RSP 预设已保存: {name}")
+
+    def _on_rsp_delete(self):
+        from src.rsp_preset_manager import RspPresetManager
+        name = self._cmb_rsp_name.currentText().strip()
+        if not name:
+            return
+        reply = QMessageBox.question(
+            self, "删除预设",
+            f"确定删除 RSP 预设「{name}」？\n（关联的默认值将同时清除）",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+        mgr = RspPresetManager()
+        mgr.delete(name)
+        self._refresh_rsp_presets()
+        self._log_msg(f"RSP 预设已删除: {name}")
+
+    def _on_rsp_set_defaults(self):
+        from src.rsp_preset_manager import RspPresetManager
+        mgr = RspPresetManager()
+        for mode, combo in [(0, self._cmb_default_passive),
+                            (1, self._cmb_default_trp),
+                            (2, self._cmb_default_tis)]:
+            name = combo.currentData()
+            mgr.set_default(mode, name if name else None)
+        self._refresh_rsp_presets()
+        self._log_msg("RSP 默认值已更新")
+
+    def _refresh_rsp_presets(self):
+        from src.rsp_preset_manager import RspPresetManager
+        mgr = RspPresetManager()
+        cur_name = self._cmb_rsp_name.currentText()
+        self._cmb_rsp_name.blockSignals(True)
+        self._cmb_rsp_name.clear()
+        self._cmb_rsp_name.addItem("")  # 空选项
+        for preset in mgr.presets:
+            self._cmb_rsp_name.addItem(preset.name)
+        idx = self._cmb_rsp_name.findText(cur_name)
+        if idx >= 0:
+            self._cmb_rsp_name.setCurrentIndex(idx)
+        self._cmb_rsp_name.blockSignals(False)
+
+        # 刷新默认值下拉框
+        for mode, combo in [(0, self._cmb_default_passive),
+                            (1, self._cmb_default_trp),
+                            (2, self._cmb_default_tis)]:
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem("(未设置)", "")
+            for preset in mgr.presets:
+                if preset.test_mode in (mode, -1):
+                    combo.addItem(preset.name, preset.name)
+            default_name = mgr.get_default(mode)
+            if default_name:
+                idx2 = combo.findData(default_name)
+                if idx2 >= 0:
+                    combo.setCurrentIndex(idx2)
+            combo.blockSignals(False)
 
     def _on_apply_font(self):
         size = self._spin_font.value()

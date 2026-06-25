@@ -245,6 +245,8 @@
       "raw_converter.py",
       "renderer.py",
       "report_exporter.py",
+      "rsp_calibration.py",
+      "rsp_preset_manager.py",
       "scale_manager.py",
       "sheet_file_matcher.py",
       "step_resampler.py",
@@ -253,6 +255,7 @@
       "ui/graph_viewer.py",
       "ui/layout_utils.py",
       "ui/main_window.py",
+      "ui/rsp_picker_dialog.py",
       "ui/splash_screen.py",
       "ui/theme_manager.py",
       "worker.py"
