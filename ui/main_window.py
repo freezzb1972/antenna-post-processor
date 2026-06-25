@@ -466,6 +466,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         tm.addAction(self.tr("数据合并 (多段拼接)..."), self._on_tool_merge)
         tm.addAction(self.tr("步进重采样..."), self._on_tool_resample)
         tm.addSeparator()
+        tm.addAction(self.tr("数据修复 (插值)"), self._on_tool_quality_repair)
+        tm.addSeparator()
         tm.addAction(self.tr("EMQuest 数据导出..."), self._on_tool_emq_export)
         hm = menubar.addMenu(self.tr("&帮助"))
         hm.addAction(self.tr("使用说明"), self._on_help, QKeySequence("F1"))
@@ -920,6 +922,83 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             QMessageBox.information(self, self.tr("完成"), self.tr(f"合并完成:\n{result}"))
         except Exception as e:
             self._log(f"✗ 合并失败: {e}")
+            QMessageBox.critical(self, self.tr("错误"), str(e))
+        finally:
+            self._exit_busy()
+
+    def _on_tool_quality_repair(self):
+        """数据修复: 检测并修复 CSV 文件中的 phi 损坏数据。"""
+        from src.data_quality import auto_detect_and_repair
+        from PySide6.QtWidgets import QInputDialog, QDialog, QVBoxLayout, QLabel, \
+            QRadioButton, QButtonGroup, QDialogButtonBox
+
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, self.tr("选择要修复的 CSV 文件"), "",
+            self.tr("CSV 文件 (*.csv);;所有文件 (*)"))
+        if not paths:
+            return
+
+        # 修复模式选择
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("数据修复选项"))
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(QLabel(self.tr(f"已选 {len(paths)} 个文件\n选择修复模式:")))
+        group = QButtonGroup(dlg)
+        rb_auto = QRadioButton(self.tr("自动检测损坏 (推荐)"))
+        rb_manual = QRadioButton(self.tr("手动指定 phi (修复奇数点位)"))
+        rb_auto.setChecked(True)
+        group.addButton(rb_auto)
+        group.addButton(rb_manual)
+        layout.addWidget(rb_auto)
+        layout.addWidget(rb_manual)
+        btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btn_box.accepted.connect(dlg.accept)
+        btn_box.rejected.connect(dlg.reject)
+        layout.addWidget(btn_box)
+
+        if not dlg.exec():
+            return
+
+        manual = rb_manual.isChecked()
+
+        ok, fail = 0, 0
+        self._enter_busy(self.tr("⏳ 数据修复中..."))
+        try:
+            for i, p in enumerate(paths):
+                pobj = Path(p)
+                out = str(pobj.parent / f"{pobj.stem}_repaired.csv")
+
+                if manual:
+                    from src.raw_converter import _detect_format, _parse_aborted, _parse_standard
+                    fmt = _detect_format(p)
+                    if fmt == 'aborted':
+                        sections, _, freqs, theta, phis = _parse_aborted(p)
+                    else:
+                        sections, _, freqs, theta, phis = _parse_standard(p)
+                    n_phi = len(phis)
+                    # 修复所有奇数 phi
+                    force_phis = list(range(1, n_phi, 2))
+                    r = auto_detect_and_repair(
+                        p, out, force_phis=force_phis,
+                        progress_callback=lambda c, t, m, _i=i: self._on_progress(
+                            _i * 100 + c, 100 * len(paths), f"[{_i+1}/{len(paths)}] {m}"))
+                else:
+                    r = auto_detect_and_repair(
+                        p, out,
+                        progress_callback=lambda c, t, m, _i=i: self._on_progress(
+                            _i * 100 + c, 100 * len(paths), f"[{_i+1}/{len(paths)}] {m}"))
+
+                if r.get('repaired_count', 0) > 0:
+                    self._log(f"✓ {pobj.name}: 修复 {r['repaired_count']} 个 phi → {Path(out).name}")
+                    ok += 1
+                else:
+                    self._log(f"  {pobj.name}: 无需修复" if not r['bad_phis'] else f"⚠ {pobj.name}: 检测到 {len(r['bad_phis'])} 坏点但未修复")
+                    ok += 1
+
+            summary = self.tr(f"完成: {ok} 成功, {fail} 失败")
+            QMessageBox.information(self, self.tr("数据修复"), summary)
+        except Exception as e:
+            self._log(f"✗ 修复失败: {e}")
             QMessageBox.critical(self, self.tr("错误"), str(e))
         finally:
             self._exit_busy()
