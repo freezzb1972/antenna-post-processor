@@ -16,4 +16,7 @@ output/
 .license_secret
 license.json
 .claude/checkpoints.log
+.claude/.distill-done
+.claude/.compact_counter
+.claude/auto-save-before-compact.md
 CURRENT_STATE.md

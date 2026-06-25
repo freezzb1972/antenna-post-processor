@@ -117,35 +117,35 @@ def _parse_streaming(path: str, section_names: Tuple[str, ...],
         except StopIteration:
             return {}, "", [], [], []
 
-    sections = {}
-    all_freqs = set()
-    theta_angles = []
-    phi_angles = []
-    current_section = None
-    section_rows: List[List[str]] = []
+        sections = {}
+        all_freqs = set()
+        theta_angles = []
+        phi_angles = []
+        current_section = None
+        section_rows: List[List[str]] = []
 
-    for row in reader:
-        r0 = row[0].strip() if row else ''
-        if r0 in section_names:
-            if current_section and section_rows:
-                sec_data, fas, tas, pas = block_parser(section_rows)
-                sections[current_section] = sec_data
-                all_freqs.update(fas)
-                if tas: theta_angles = tas
-                if pas: phi_angles = pas
-                section_rows = []  # 立即释放当前 section 的 Python 字符串
-            current_section = r0
-            section_rows.append(row)
-            continue
-        if current_section:
-            section_rows.append(row)
+        for row in reader:
+            r0 = row[0].strip() if row else ''
+            if r0 in section_names:
+                if current_section and section_rows:
+                    sec_data, fas, tas, pas = block_parser(section_rows)
+                    sections[current_section] = sec_data
+                    all_freqs.update(fas)
+                    if tas: theta_angles = tas
+                    if pas: phi_angles = pas
+                    section_rows = []  # 立即释放当前 section 的 Python 字符串
+                current_section = r0
+                section_rows.append(row)
+                continue
+            if current_section:
+                section_rows.append(row)
 
-    if current_section and section_rows:
-        sec_data, fas, tas, pas = block_parser(section_rows)
-        sections[current_section] = sec_data
-        all_freqs.update(fas)
-        if tas: theta_angles = tas
-        if pas: phi_angles = pas
+        if current_section and section_rows:
+            sec_data, fas, tas, pas = block_parser(section_rows)
+            sections[current_section] = sec_data
+            all_freqs.update(fas)
+            if tas: theta_angles = tas
+            if pas: phi_angles = pas
 
     return sections, metadata, sorted(all_freqs), theta_angles, phi_angles
 
