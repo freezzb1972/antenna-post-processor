@@ -445,19 +445,25 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _init_menu(self):
         from PySide6.QtGui import QAction, QKeySequence
         menubar = self.menuBar()
+
+        # ── 文件 ──
         fm = menubar.addMenu(self.tr("&文件"))
+        fm.addAction(self.tr("新建窗口"), self._on_new_window, QKeySequence("Ctrl+N"))
+        fm.addSeparator()
         fm.addAction(self.tr("系统设置..."), self._show_system_settings)
         fm.addAction(self.tr("LLM 智能设置..."), self._show_llm_settings)
         fm.addSeparator()
         fm.addAction(self.tr("保存结果..."), self._on_browse_output, QKeySequence("Ctrl+S"))
-        fm.addSeparator(); fm.addAction(self.tr("退出"), self.close, QKeySequence("Ctrl+Q"))
-        sm = menubar.addMenu(self.tr("&设置"))
-        sm.addAction(self.tr("数据源配置..."), self._show_data_source_dialog)
-        sm.addAction(self.tr("计算参数配置..."), self._show_calc_params_dialog)
-        sm.addAction(self.tr("图形配置..."), self._show_plot_config_dialog)
-        pm = menubar.addMenu(self.tr("&处理"))
-        pm.addAction(self.tr("▶ 开始处理"), self._on_start, QKeySequence("F5"))
-        pm.addAction(self.tr("⏹ 停止"), self._on_stop, QKeySequence("Esc"))
+        fm.addSeparator()
+        fm.addAction(self.tr("关闭窗口"), self.close, QKeySequence("Ctrl+W"))
+
+        # ── 窗口 ──
+        self._menu_window = menubar.addMenu(self.tr("&窗口"))
+        self._menu_window.addAction(self.tr("新建窗口"), self._on_new_window)
+        self._menu_window.addSeparator()
+        # 窗口列表由 WindowManager 动态填充
+
+        # ── 工具 ──
         tm = menubar.addMenu(self.tr("&工具"))
         tm.addAction(self.tr("数据检查与转换..."), self._on_tool_batch_check)
         tm.addAction(self.tr("路径损耗补偿..."), self._on_tool_calibrate)
@@ -468,10 +474,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         tm.addSeparator()
         tm.addAction(self.tr("模板识别..."), self._on_tool_template_recognizer)
         tm.addAction(self.tr("EMQuest 数据导出..."), self._on_tool_emq_export)
+
+        # ── 帮助 ──
         hm = menubar.addMenu(self.tr("&帮助"))
         hm.addAction(self.tr("使用说明"), self._on_help, QKeySequence("F1"))
         hm.addAction(self.tr("许可管理..."), self._on_license)
         hm.addAction(self.tr("关于..."), self._on_about)
+
+        # 注册到 WindowManager
+        from ui.window_manager import WindowManager
+        WindowManager.instance().register(self)
 
     def _hide_settings_tabs(self):
         tc = self.ui.tabConfig
@@ -600,6 +612,19 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._log(f"⚠ 图形配置对话框打开失败: {e}")
             QMessageBox.warning(self, self.tr("错误"),
                 self.tr(f"图形配置对话框无法打开:\n{e}"))
+
+    def window_title(self) -> str:
+        """返回窗口标题，用于窗口菜单列表。"""
+        if self._data_file_paths:
+            import os
+            names = [os.path.splitext(os.path.basename(p))[0] for p in self._data_file_paths]
+            return ", ".join(names[:2]) + ("..." if len(names) > 2 else "")
+        return self.tr("未命名窗口")
+
+    def _on_new_window(self):
+        """创建新的工作窗口。"""
+        from ui.window_manager import WindowManager
+        WindowManager.instance().create_window(self.app)
 
     def _on_help(self):
         from ui.dialogs import HelpDialog

@@ -141,6 +141,9 @@ def main():
     splash.advance("正在创建主窗口...", 80)
 
     # 主窗口
+    app.setQuitOnLastWindowClosed(False)
+    from ui.window_manager import WindowManager
+    wm = WindowManager.instance()
     window = MainWindow(app)
     splash.advance("启动完成", 100)
 
