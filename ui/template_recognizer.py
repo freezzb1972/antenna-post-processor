@@ -113,7 +113,7 @@ class TemplateRecognizerDialog(QDialog):
         grp_tpl = QGroupBox(self.tr("模板文件"))
         tpl_layout = QHBoxLayout(grp_tpl)
         self._edit_tpl_path = QLineEdit()
-        self._edit_tpl_path.setPlaceholderText(self.tr("选择模板 Excel 文件 (.xlsx)...")))
+        self._edit_tpl_path.setPlaceholderText(self.tr("选择模板 Excel 文件 (.xlsx)..."))
         self._edit_tpl_path.textChanged.connect(self._on_path_changed)
         tpl_layout.addWidget(self._edit_tpl_path, 1)
         btn_browse = QPushButton(self.tr("浏览..."))
@@ -202,13 +202,15 @@ class TemplateRecognizerDialog(QDialog):
     def _on_detect(self):
         path = self._edit_tpl_path.text().strip()
         if not path or not os.path.isfile(path):
-            QMessageBox.warning(self, self.tr("文件不存在"), fself.tr("请选择有效的模板文件。\n{path}"))
+            QMessageBox.warning(self, self.tr("文件不存在"),
+                                self.tr("请选择有效的模板文件。\n{path}").format(path=path))
             return
 
         try:
             self._scan_template(path)
         except Exception as e:
-            QMessageBox.critical(self, self.tr("检测失败"), fself.tr("无法解析模板文件:\n{e}"))
+            QMessageBox.critical(self, self.tr("检测失败"),
+                                 self.tr("无法解析模板文件:\n{e}").format(e=e))
             return
 
         self._populate_sheet_combo()
@@ -530,5 +532,6 @@ class TemplateRecognizerDialog(QDialog):
 
         QMessageBox.information(
             self, self.tr("保存成功"),
-            fself.tr("已保存 {len(new_patterns)} 类列头模式到:\n{json_path}\n\n")
-            fself.tr("下次模板解析时将优先使用这些模式。"))
+            self.tr("已保存 {0} 类列头模式到:\n{1}\n\n"
+                    "下次模板解析时将优先使用这些模式。").format(
+                len(new_patterns), json_path))

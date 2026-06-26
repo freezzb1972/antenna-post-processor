@@ -53,6 +53,38 @@ main.py → ui/main_window.py (PySide6 GUI)
 5. LAG = 线性域平均再转 dB，**非** dB 域直接平均
 6. 多文件模式: 工作表名 ↔ 文件名通过 `sheet_file_matcher.py` 的 `extract_key()` 匹配
 7. 所有计算值 `round(val, 6)` 保留 6 位小数
+8. **所有 UI 文本必须用 `self.tr()` 包裹**，禁止硬编码中文 — 详细准则见下方「国际化规范」
+
+### 国际化规范（所有 UI 类强制执行）
+
+> 翻译工具链: `pyside6-lupdate` 扫描 `.py` → 更新 `.ts` → `pyside6-lrelease` 编译 `.qm`
+
+**必须遵守**:
+
+| 规则 | 正确 ✅ | 错误 ❌ |
+|------|---------|---------|
+| QWidget 文本 | `QLabel(self.tr("工作表:"))` | `QLabel("工作表:")` |
+| 窗口标题 | `self.setWindowTitle(self.tr("模板识别"))` | `self.setWindowTitle("模板识别")` |
+| 按钮文本 | `QPushButton(self.tr("浏览..."))` | `QPushButton("浏览...")` |
+| QMessageBox | `QMessageBox.warning(self, self.tr("标题"), self.tr("内容"))` | `QMessageBox.warning(self, "标题", "内容")` |
+| 带变量的文本 | `self.tr("已保存 {0} 个文件到:\n{1}").format(n, path)` | `f"已保存 {n} 个文件到:\n{path}"` |
+
+**新建 UI 类后必须执行**:
+```bash
+# 1. 扫描新字符串
+pyside6-lupdate ui/新文件.py ui/dialogs.py ... -ts i18n/app_zh_CN.ts i18n/app_en_US.ts
+
+# 2. 在 en_US.ts 中添加英文翻译 (zh_CN.ts 自动身份翻译)
+# 3. 编译
+pyside6-lrelease i18n/app_zh_CN.ts -qm i18n/app_zh_CN.qm
+pyside6-lrelease i18n/app_en_US.ts -qm i18n/app_en_US.qm
+```
+
+**翻译文件结构**:
+- `i18n/app_zh_CN.ts` — 中文源 → 中文翻译（身份）
+- `i18n/app_en_US.ts` — 中文源 → 英文翻译
+- `i18n/*.qm` — 编译后的二进制翻译文件
+- Context = 类名（`TemplateRecognizerDialog`），`self.tr()` 自动匹配
 
 ### 陈旧数据防护（2026-06-23 审计总结）
 
