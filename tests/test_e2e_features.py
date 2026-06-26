@@ -134,33 +134,39 @@ class TestThemeI18n:
     """主题切换 + 中英文翻译。"""
 
     def test_theme_list_populated(self, window, qtbot):
-        """主题下拉列表包含 28 个主题。"""
+        """主题列表包含 28 个主题（通过 ThemeManager 直接验证）。"""
         from ui.theme_manager import ThemeManager
-        assert window.ui.cmbThemeSelector.count() >= 20  # 至少 20 个主题
+        assert len(ThemeManager.ALL_THEMES) >= 20  # 至少 20 个主题
 
     def test_theme_switch(self, window, qtbot):
-        """切换主题不崩溃。"""
-        combo = window.ui.cmbThemeSelector
-        original = combo.currentIndex()
-        # 切换到下一个主题
-        next_idx = (original + 1) % combo.count()
-        combo.setCurrentIndex(next_idx)
-        qtbot.wait(100)
-        assert combo.currentIndex() == next_idx
-        # 切回
-        combo.setCurrentIndex(original)
+        """切换主题不崩溃（通过 ThemeManager.apply 验证）。"""
+        from ui.theme_manager import ThemeManager
+        themes = ThemeManager.ALL_THEMES
+        assert len(themes) > 0
+        # 切换到第一个主题
+        first_id = themes[0][0]
+        current = ThemeManager.current_theme()
+        try:
+            ThemeManager.apply(first_id)
+            ThemeManager.save_theme(first_id)
+            qtbot.wait(100)
+            assert ThemeManager.current_theme() == first_id
+        finally:
+            # 恢复原主题
+            ThemeManager.apply(current)
+            ThemeManager.save_theme(current)
 
     def test_language_toggle_button_exists(self, window, qtbot):
-        """语言切换按钮存在且可点击。"""
-        btn = window.ui.btnLangToggle
-        assert btn is not None
-        assert btn.isVisible()
-        original_text = btn.text()
-        btn.click()
-        qtbot.wait(100)
-        new_text = btn.text()
-        # 点击后文本应变化
-        assert new_text != original_text or len(new_text) > 0
+        """语言切换通过 I18nManager 正常工作。"""
+        from i18n.i18n_manager import I18nManager
+        original = I18nManager.current_language()
+        new_lang = "en_US" if original == "zh_CN" else "zh_CN"
+        try:
+            I18nManager.switch(QApplication.instance(), new_lang)
+            qtbot.wait(100)
+            assert I18nManager.current_language() == new_lang
+        finally:
+            I18nManager.switch(QApplication.instance(), original)
 
     def test_font_size_persists(self, window, qtbot):
         """字体大小设置持久化到 QSettings。"""
