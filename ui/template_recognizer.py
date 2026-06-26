@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -506,10 +507,13 @@ class TemplateRecognizerDialog(QDialog):
             QMessageBox.information(self, self.tr("无数据"), self.tr("没有识别到任何列类型，请先检测模板。"))
             return
 
-        # 写回 JSON
-        json_path = os.path.join(
-            os.path.dirname(__file__), "..", "config", "column_patterns.json")
-        json_path = os.path.normpath(json_path)
+        # 写回 JSON — 打包模式存到 EXE 同目录 config/，开发模式存到项目根目录
+        if getattr(sys, 'frozen', False):
+            config_dir = Path(sys.executable).parent / "config"
+        else:
+            config_dir = Path(__file__).resolve().parent.parent / "config"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        json_path = config_dir / "column_patterns.json"
 
         try:
             with open(json_path, "r", encoding="utf-8") as f:

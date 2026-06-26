@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
@@ -44,11 +45,14 @@ def _load_column_patterns() -> List[dict]:
     if _COLUMN_PATTERNS is not None:
         return _COLUMN_PATTERNS
 
-    # 项目根目录查找
-    candidates = [
-        os.path.join(os.path.dirname(__file__), "..", "config", "column_patterns.json"),
-        os.path.join(os.getcwd(), "config", "column_patterns.json"),
-    ]
+    candidates = []
+    # 打包模式: EXE 同目录 config/ 优先（用户外部编辑，可写入）
+    if getattr(sys, 'frozen', False):
+        candidates.append(os.path.join(os.path.dirname(sys.executable), "config", "column_patterns.json"))
+    # 内嵌默认值 (MEIPASS) 或开发模式项目根目录
+    candidates.append(os.path.join(os.path.dirname(__file__), "..", "config", "column_patterns.json"))
+    # 当前工作目录 fallback
+    candidates.append(os.path.join(os.getcwd(), "config", "column_patterns.json"))
     for candidate in candidates:
         path = os.path.normpath(candidate)
         if os.path.isfile(path):

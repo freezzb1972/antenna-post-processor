@@ -31,6 +31,8 @@ a = Analysis(
         # 配置文件
         (str(PROJECT_ROOT / 'config' / 'bands.json'), 'config'),
         (str(PROJECT_ROOT / 'config' / 'templates.json'), 'config'),
+        (str(PROJECT_ROOT / 'config' / 'column_patterns.json'), 'config'),
+        (str(PROJECT_ROOT / 'config' / 'full_report_columns.json'), 'config'),
         # 模板文件（可选，打包后也可以在运行时选择外部模板）
         (str(PROJECT_ROOT / 'data' / 'template_5G1.xlsx'), 'templates'),
         # 帮助手册
@@ -60,6 +62,9 @@ a = Analysis(
 
         # ---- openpyxl ----
         'openpyxl.cell._writer',
+
+        # ---- 延迟导入模块（方法内部 import，静态分析可能遗漏） ----
+        'ui.template_recognizer',
 
         # ---- cryptography (ECDSA 许可签名) ----
         'cryptography.hazmat.primitives',

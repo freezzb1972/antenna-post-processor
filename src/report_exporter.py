@@ -14,6 +14,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import openpyxl
@@ -59,10 +60,14 @@ def _load_report_columns() -> List[dict]:
     if _REPORT_COLUMNS is not None:
         return _REPORT_COLUMNS
 
-    candidates = [
-        os.path.join(os.path.dirname(__file__), "..", "config", "full_report_columns.json"),
-        os.path.join(os.getcwd(), "config", "full_report_columns.json"),
-    ]
+    candidates = []
+    # 打包模式: EXE 同目录 config/ 优先（用户外部编辑）
+    if getattr(sys, 'frozen', False):
+        candidates.append(os.path.join(os.path.dirname(sys.executable), "config", "full_report_columns.json"))
+    # 内嵌默认值 (MEIPASS) 或开发模式项目根目录
+    candidates.append(os.path.join(os.path.dirname(__file__), "..", "config", "full_report_columns.json"))
+    # 当前工作目录 fallback
+    candidates.append(os.path.join(os.getcwd(), "config", "full_report_columns.json"))
     for candidate in candidates:
         path = os.path.normpath(candidate)
         if os.path.isfile(path):
