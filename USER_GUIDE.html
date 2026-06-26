@@ -63,6 +63,11 @@
   <li><a href="#graph-viewer">16. 交互式天线方向图 3D 查看器</a></li>
   <li><a href="#local-llm">17. 本地 LLM (Ollama) RAG 问答</a></li>
   <li><a href="#template-preset">18. 模板预设管理系统</a></li>
+  <li><a href="#chart-config">19. 图表配置</a></li>
+  <li><a href="#template-recognizer">20. 模板识别工具</a></li>
+  <li><a href="#graph-viewer-v2">21. 图形查看器 (v2)</a></li>
+  <li><a href="#i18n">22. 国际化支持 (中/英)</a></li>
+  <li><a href="#report-config">23. 报告列配置</a></li>
 </ol>
 </div>
 
@@ -126,8 +131,8 @@ pyinstaller antenna_post_processor.spec
   <tr><td>🔗 自动匹配</td><td>文件 Tab（多文件区）</td><td>工作表↔数据文件自动匹配，支持手动覆盖</td></tr>
   <tr><td>📝 工作表名</td><td>文件 Tab（匹配表右侧）</td><td>输出工作表命名方式：保留模板原名 / 用数据源名替换</td></tr>
   <tr><td>📏 外推开关</td><td>文件 Tab（底部）</td><td>Theta 0-110° → 0-180° 线性外推，默认关闭</td></tr>
-  <tr><td>🌐 语言切换</td><td>顶部工具栏</td><td>EN → 中 / 中 → EN</td></tr>
-  <tr><td>🎨 主题切换</td><td>顶部工具栏</td><td>下拉选择 Material Design 主题</td></tr>
+  <tr><td>🌐 语言切换</td><td>文件 → 系统设置</td><td>中文 / English 切换</td></tr>
+  <tr><td>🎨 主题切换</td><td>文件 → 系统设置</td><td>下拉选择 Material Design 主题</td></tr>
   <tr><td>📄 完整报告</td><td>输出区域复选框</td><td>生成独立 Excel 含全部指标 + 图表</td></tr>
 </table>
 
@@ -650,3 +655,102 @@ antenna-post-processor/
   <li>数据源配置 → 选择预设模板 → 自动填充模板路径和输出目录</li>
 </ul>
 
+
+<!-- ============================================================ -->
+<h2 id="chart-config">19. 图表配置</h2>
+
+<p>图形配置对话框通过 <strong>设置 → 图形配置...</strong> 打开。默认所有 B 类频点曲线图表不选中（效率/增益/LAG vs 频率），用户按需手动勾选。</p>
+
+<p><strong>全选/取消全选：</strong></p>
+<ul>
+  <li>每个图表分类顶部有「全选」和「取消全选」按钮</li>
+  <li>控制当前分类左右两列（报告需要 + 额外 full_report）所有 checkbox</li>
+  <li>左列「报告需要」= 嵌入主输出 Excel</li>
+  <li>右列「额外 (full_report)」= 仅完整报告使用</li>
+</ul>
+
+<p><strong>图表子选择：</strong></p>
+<ul>
+  <li>Gain/AR/LAG 曲线支持 ⚙ 角度... 弹窗选择具体 θ 角度或范围</li>
+  <li>视角参数：仰角/方位角/DPI/采样精度</li>
+  <li>输出方式：嵌入 Excel + 可选 PNG 文件夹</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="template-recognizer">20. 模板识别工具</h2>
+
+<p>通过 <strong>工具 → 模板识别...</strong> 打开。用于检测和自定义模板 Excel 的列头识别规则。</p>
+
+<p><strong>使用流程：</strong></p>
+<ol>
+  <li>浏览选择模板 Excel 文件，点击「检测」</li>
+  <li>自动扫描所有工作表的列头，显示检测类型</li>
+  <li>可通过下拉框手动修改类型（43 种可选）</li>
+  <li>点击「重检」对单列重新自动分类</li>
+  <li>点击「💾 保存到配置文件」写入 config/column_patterns.json</li>
+</ol>
+
+<p><strong>关键功能：</strong></p>
+<ul>
+  <li>工作表下拉框切换不同 Sheet</li>
+  <li>标题行微调框调整列头行号</li>
+  <li>检测结果摘要：共 N 列，识别 M 列</li>
+  <li>保存的 JSON 模式优先级高于内置正则</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="graph-viewer-v2">21. 图形查看器 (v2)</h2>
+
+<p>图形查看器已升级为单行主工具栏 + ⚙ 设置对话框模式。</p>
+
+<p><strong>主工具栏（始终可见）：</strong></p>
+<ul>
+  <li>视角预设：Iso / Top / Front / Side / Back / Bottom</li>
+  <li>视图模式：3D Pattern 或 Freq Curves</li>
+  <li>频点选择器 + ⚙ 设置按钮</li>
+</ul>
+
+<p><strong>⚙ 设置对话框包含：</strong></p>
+<ul>
+  <li><strong>数据：</strong>数据类型多选 + 子图布局 + 采样精度 + 频率曲线选择</li>
+  <li><strong>显示：</strong>色图（10 种）、联动视角、💾 导出视图</li>
+  <li><strong>子图：</strong>每子图类型（Spherical 3D/Polar 2D/Cartesian 3D）+ X-Z/Y-Z/X-Y 剖切</li>
+  <li><strong>动画：</strong>频点动画播放/暂停 + 速度调节</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="i18n">22. 国际化支持 (中/英)</h2>
+
+<p>通过 <strong>文件 → 系统设置 → 语言 / Language</strong> 切换界面语言。</p>
+
+<p><strong>覆盖范围：</strong></p>
+<ul>
+  <li>所有 UI 文本均支持中英文切换（266 条 zh_CN + 256 条 en_US）</li>
+  <li>主窗口菜单、按钮、对话框、模板识别工具</li>
+  <li>翻译文件：<code>i18n/app_zh_CN.qm</code> / <code>i18n/app_en_US.qm</code></li>
+</ul>
+
+<p><strong>开发者注意事项：</strong></p>
+<ul>
+  <li>所有 UI 文本必须用 <code>self.tr("中文")</code> 包裹，禁止硬编码</li>
+  <li>新增 UI 后需运行 <code>pyside6-lupdate</code> → 翻译 → <code>pyside6-lrelease</code></li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="report-config">23. 报告列配置</h2>
+
+<p>完整报告（独立文件）的列顺序和表头可通过 <code>config/full_report_columns.json</code> 自定义。</p>
+
+<p><strong>配置内容：</strong></p>
+<ul>
+  <li>22 种列类型定义（key / 中英文表头 / 数值格式 / 是否必需）</li>
+  <li>LAG/AR 角度的动态列模板（支持 {angle}/{start}/{end} 占位符）</li>
+  <li>16 条数据验证规则（最小值/最大值/类型检查）</li>
+</ul>
+
+<p><strong>数据验证：</strong></p>
+<ul>
+  <li><code>export_full_report_with_validation()</code> 同时导出和验证</li>
+  <li>验证包括：必需列检查、值范围检查、类型检查</li>
+  <li>验证警告不阻止报告生成，仅在日志中提示</li>
+</ul>
