@@ -91,7 +91,7 @@ class TemplateRecognizerDialog(QDialog):
     def __init__(self, parent: "MainWindow"):
         super().__init__(parent)
         self._mw = parent
-        self.setWindowTitle("模板识别")
+        self.setWindowTitle(self.tr("模板识别"))
         self.resize(900, 650)
         self.setMinimumSize(720, 500)
 
@@ -110,28 +110,28 @@ class TemplateRecognizerDialog(QDialog):
         layout.setSpacing(10)
 
         # ── 模板选择 ──
-        grp_tpl = QGroupBox("模板文件")
+        grp_tpl = QGroupBox(self.tr("模板文件"))
         tpl_layout = QHBoxLayout(grp_tpl)
         self._edit_tpl_path = QLineEdit()
-        self._edit_tpl_path.setPlaceholderText("选择模板 Excel 文件 (.xlsx)...")
+        self._edit_tpl_path.setPlaceholderText(self.tr("选择模板 Excel 文件 (.xlsx)...")))
         self._edit_tpl_path.textChanged.connect(self._on_path_changed)
         tpl_layout.addWidget(self._edit_tpl_path, 1)
-        btn_browse = QPushButton("浏览...")
+        btn_browse = QPushButton(self.tr("浏览..."))
         btn_browse.clicked.connect(self._on_browse)
         tpl_layout.addWidget(btn_browse)
-        btn_load = QPushButton("检测")
+        btn_load = QPushButton(self.tr("检测"))
         btn_load.clicked.connect(self._on_detect)
         tpl_layout.addWidget(btn_load)
         layout.addWidget(grp_tpl)
 
         # ── 工作表选择 + 标题行 ──
-        grp_sheet = QGroupBox("工作表 & 标题行")
+        grp_sheet = QGroupBox(self.tr("工作表 & 标题行"))
         sheet_layout = QHBoxLayout(grp_sheet)
-        sheet_layout.addWidget(QLabel("工作表:"))
+        sheet_layout.addWidget(QLabel(self.tr("工作表:")))
         self._cmb_sheet = QComboBox()
         self._cmb_sheet.currentIndexChanged.connect(self._on_sheet_changed)
         sheet_layout.addWidget(self._cmb_sheet, 1)
-        sheet_layout.addWidget(QLabel("标题行:"))
+        sheet_layout.addWidget(QLabel(self.tr("标题行:")))
         self._spin_header = QSpinBox()
         self._spin_header.setRange(1, 20)
         self._spin_header.setValue(1)
@@ -141,12 +141,12 @@ class TemplateRecognizerDialog(QDialog):
         layout.addWidget(grp_sheet)
 
         # ── 列检测结果表 ──
-        grp_cols = QGroupBox("列头检测结果 (双击类型可修改)")
+        grp_cols = QGroupBox(self.tr("列头检测结果 (双击类型可修改)"))
         cols_layout = QVBoxLayout(grp_cols)
         self._table = QTableWidget()
         self._table.setColumnCount(4)
         self._table.setHorizontalHeaderLabels(
-            ["列号", "原始列头", "检测类型", "操作"])
+            [self.tr("列号"), self.tr("原始列头"), self.tr("检测类型"), self.tr("操作")])
         self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
         self._table.setColumnWidth(0, 60)
         self._table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
@@ -166,7 +166,7 @@ class TemplateRecognizerDialog(QDialog):
         # ── 按钮 ──
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        self._btn_save = QPushButton("💾 保存到配置文件")
+        self._btn_save = QPushButton(self.tr("💾 保存到配置文件"))
         self._btn_save.setEnabled(False)
         self._btn_save.clicked.connect(self._on_save)
         btn_layout.addWidget(self._btn_save)
@@ -192,8 +192,8 @@ class TemplateRecognizerDialog(QDialog):
 
     def _on_browse(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择模板文件", "",
-            "Excel 文件 (*.xlsx *.xls);;所有文件 (*)")
+            self, self.tr("选择模板文件"), "",
+            self.tr("Excel 文件 (*.xlsx *.xls);;所有文件 (*)"))
         if path:
             self._edit_tpl_path.setText(path)
 
@@ -202,13 +202,13 @@ class TemplateRecognizerDialog(QDialog):
     def _on_detect(self):
         path = self._edit_tpl_path.text().strip()
         if not path or not os.path.isfile(path):
-            QMessageBox.warning(self, "文件不存在", f"请选择有效的模板文件。\n{path}")
+            QMessageBox.warning(self, self.tr("文件不存在"), fself.tr("请选择有效的模板文件。\n{path}"))
             return
 
         try:
             self._scan_template(path)
         except Exception as e:
-            QMessageBox.critical(self, "检测失败", f"无法解析模板文件:\n{e}")
+            QMessageBox.critical(self, self.tr("检测失败"), fself.tr("无法解析模板文件:\n{e}"))
             return
 
         self._populate_sheet_combo()
@@ -377,7 +377,7 @@ class TemplateRecognizerDialog(QDialog):
                 wb.close()
                 self._refresh_table()
             except Exception as e:
-                QMessageBox.warning(self, "重新检测失败", str(e))
+                QMessageBox.warning(self, self.tr("重新检测失败"), str(e))
 
     def _refresh_table(self):
         sheet = self._cmb_sheet.currentText()
@@ -413,7 +413,7 @@ class TemplateRecognizerDialog(QDialog):
             btn_layout = QHBoxLayout(btn_widget)
             btn_layout.setContentsMargins(2, 2, 2, 2)
             btn_layout.setSpacing(4)
-            btn_redo = QPushButton("重检")
+            btn_redo = QPushButton(self.tr("重检"))
             btn_redo.setFixedWidth(50)
             btn_redo.clicked.connect(lambda checked, r=row: self._on_recheck_row(r))
             btn_layout.addWidget(btn_redo)
@@ -424,7 +424,7 @@ class TemplateRecognizerDialog(QDialog):
         detected = sum(1 for _, _, t in cols if t != "unknown")
         total = len(cols)
         self._lbl_summary.setText(
-            f"共 {total} 列，识别 {detected} 列，{total - detected} 列未识别")
+            self.tr("共 %1 列，识别 %2 列，%3 列未识别").arg(total).arg(detected).arg(total - detected))
 
         self._table.setRowHeight
         self._table.resizeRowsToContents()
@@ -501,7 +501,7 @@ class TemplateRecognizerDialog(QDialog):
             })
 
         if not new_patterns:
-            QMessageBox.information(self, "无数据", "没有识别到任何列类型，请先检测模板。")
+            QMessageBox.information(self, self.tr("无数据"), self.tr("没有识别到任何列类型，请先检测模板。"))
             return
 
         # 写回 JSON
@@ -529,6 +529,6 @@ class TemplateRecognizerDialog(QDialog):
         reload_column_patterns()
 
         QMessageBox.information(
-            self, "保存成功",
-            f"已保存 {len(new_patterns)} 类列头模式到:\n{json_path}\n\n"
-            f"下次模板解析时将优先使用这些模式。")
+            self, self.tr("保存成功"),
+            fself.tr("已保存 {len(new_patterns)} 类列头模式到:\n{json_path}\n\n")
+            fself.tr("下次模板解析时将优先使用这些模式。"))

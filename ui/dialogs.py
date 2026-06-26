@@ -1488,9 +1488,9 @@ class PlotConfigDialog(QDialog):
             # 全选 / 取消全选 按钮行
             btn_row = QHBoxLayout()
             btn_row.setSpacing(6)
-            btn_select_all = QPushButton("全选")
+            btn_select_all = QPushButton(self.tr("全选"))
             btn_select_all.setFixedWidth(60)
-            btn_deselect_all = QPushButton("取消全选")
+            btn_deselect_all = QPushButton(self.tr("取消全选"))
             btn_deselect_all.setFixedWidth(72)
             # 连接信号：控制本分类左右两列的所有 checkbox
             btn_select_all.clicked.connect(
