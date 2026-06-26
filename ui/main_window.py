@@ -631,6 +631,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             return ", ".join(names[:2]) + ("..." if len(names) > 2 else "")
         return self.tr("未命名窗口")
 
+    def _update_window_title(self):
+        """更新窗口标题和窗口菜单。"""
+        title = self.window_title()
+        self.setWindowTitle(title)
+        # 同步窗口菜单
+        from ui.window_manager import WindowManager
+        WindowManager.instance()._update_all_window_menus()
+
     def _on_new_window(self):
         """创建新的工作窗口。"""
         from ui.window_manager import WindowManager
@@ -1338,6 +1346,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 lambda idx, row=i: self._on_file_mode_changed(row))
             t.setCellWidget(i, 1, mode_combo)
             t.setRowHeight(i, 28)
+
+        self._update_window_title()
 
     def _on_file_mode_changed(self, row: int):
         """文件行测试模式变更回调。"""
