@@ -586,6 +586,7 @@ def _load_and_compute(
     extra_params: set = None,
     chart_config: "ChartConfig" = None,
     ar_lag_config: "LagConfig" = None,
+    sheet_ar_configs: Dict[str, "LagConfig"] = None,
     nh_custom_angles: Optional[List[float]] = None,
     ar_output_db: bool = True,
     cancel_callback=None,
@@ -598,6 +599,9 @@ def _load_and_compute(
     if total == 0:
         return sheet_results
 
+    if sheet_ar_configs is None:
+        sheet_ar_configs = {}
+
     progress_max = total * 2 + 5
 
     # 阶段 A: 加载数据
@@ -609,7 +613,9 @@ def _load_and_compute(
             break
         raw = task_ds.read_sections(csv_idx)
         theta_list = list(task_ds.theta_angles)
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config, ar_lag_config, nh_custom_angles, ar_output_db))
+        # 每 sheet 的 AR 配置: 优先用全局 override, 否则用模板自动检测的
+        ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
+        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db))
         if (i + 1) % 20 == 0 or (i + 1) == total:
             _report(progress_callback, i + 1, progress_max, f"读取中 {i + 1}/{total}")
 
@@ -770,6 +776,22 @@ def run_pipeline(
             si.lag_config = lag_config_override
         _log(log_callback, "使用用户指定的 LAG 配置")
 
+    # ---- 构建 sheet→AR 配置映射 (自动检测或使用覆盖) ----
+    sheet_ar_configs: Dict[str, LagConfig] = {}
+    if ar_lag_config_override is not None and not ar_lag_config_override.is_empty():
+        # 用户覆盖: 所有 sheet 用同一个 AR 配置
+        for si in sheets_info:
+            sheet_ar_configs[si.name] = ar_lag_config_override
+        _log(log_callback, "使用用户指定的 AR 配置")
+    else:
+        # 自动检测: 从模板列头解析 AR 角度
+        for si in sheets_info:
+            if si.ar_config is not None and not si.ar_config.is_empty():
+                sheet_ar_configs[si.name] = si.ar_config
+        if sheet_ar_configs:
+            total_angles = sum(len(c.singles_sorted) + len(c.ranges_sorted) for c in sheet_ar_configs.values())
+            _log(log_callback, f"自动检测到 {total_angles} 个 AR 角度 (来自 {len(sheet_ar_configs)} 个 sheet)")
+
     # ---- 2. 收集任务 + 加载数据 + 计算 ----
     tasks = _collect_tasks(sheets_info, datasource, datasource_map, freq_source, trim_start, trim_end, sheet_mode_map, log_callback)
     try:
@@ -777,6 +799,7 @@ def run_pipeline(
             tasks, sheets_info, extrapolate_theta, robust_peak, parallel,
             extra_params=extra_params, chart_config=chart_config_obj,
             ar_lag_config=ar_lag_config_override,
+            sheet_ar_configs=sheet_ar_configs,
             nh_custom_angles=nh_custom_angles,
             ar_output_db=ar_output_db,
             cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,

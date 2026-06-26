@@ -355,4 +355,31 @@ class MergedCSVParser(DataSource):
             values.append(0.0)
         return values
 
-    _ENCODING = "utf-8-sig"  # EMQuest files are UTF-8-BOM
+    _ENCODING_CANDIDATES = [
+        "utf-8-sig",   # EMQuest 标准格式 (UTF-8-BOM)
+        "gbk",          # 中文 Windows 系统 GBK 编码
+        "gb18030",      # GB18030 国标编码
+        "gb2312",       # GB2312 简体中文
+        "latin-1",      # 兜底: 单字节编码, 永不出错
+    ]
+
+    def _detect_encoding(self) -> str:
+        """检测文件编码，按优先级尝试。
+
+        返回第一个成功解码的编码名。latin-1 作为兜底永不出错。
+        """
+        for enc in self._ENCODING_CANDIDATES:
+            try:
+                with open(self.path, "r", encoding=enc) as f:
+                    f.read(4096)  # 读开头4KB验证
+                return enc
+            except (UnicodeDecodeError, UnicodeError):
+                continue
+        return "latin-1"  # 终极兜底
+
+    @property
+    def _ENCODING(self) -> str:
+        """懒检测文件编码。"""
+        if not hasattr(self, "_detected_encoding"):
+            self._detected_encoding = self._detect_encoding()
+        return self._detected_encoding
