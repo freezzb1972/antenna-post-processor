@@ -1,0 +1,52 @@
+{
+  "_comment": "完整报告列配置。定义数据列的顺序、显示名称、格式和验证规则。",
+  "version": "1.0",
+
+  "columns": [
+    {"key": "frequency",        "header_cn": "Frequency (MHz)",  "header_en": "Frequency (MHz)",         "format": "0.00",        "required": true},
+    {"key": "directivity",      "header_cn": "Directivity (dBi)","header_en": "Directivity (dBi)",       "format": "0.000000",    "required": false},
+    {"key": "efficiency_pct",   "header_cn": "Efficiency (%)",   "header_en": "Efficiency (%)",          "format": "0.00",        "required": false},
+    {"key": "efficiency_db",    "header_cn": "Efficiency (dB)",  "header_en": "Efficiency (dB)",         "format": "0.000000",    "required": false},
+    {"key": "gain",             "header_cn": "Gain (dBi)",       "header_en": "Gain (dBi)",              "format": "0.000000",    "required": true},
+    {"key": "axial_ratio",      "header_cn": "Axial Ratio (dB)", "header_en": "Axial Ratio (dB)",        "format": "0.000000",    "required": false},
+    {"key": "lag_single_*",     "header_cn": "LAG θ={angle}° (dB)",  "header_en": "LAG θ={angle}° (dB)", "format": "0.000000", "required": false, "_dynamic": true},
+    {"key": "lag_range_*",      "header_cn": "LAG ({start}°-{end}°) (dB)", "header_en": "LAG ({start}°-{end}°) (dB)", "format": "0.000000", "required": false, "_dynamic": true},
+    {"key": "ar_single_*",      "header_cn": "AR θ={angle}° (dB)", "header_en": "AR θ={angle}° (dB)",    "format": "0.000000",    "required": false, "_dynamic": true},
+    {"key": "trp",              "header_cn": "TRP (dBm)",         "header_en": "TRP (dBm)",              "format": "0.000000",    "required": false},
+    {"key": "peak_eirp",        "header_cn": "Peak EIRP (dBm)",   "header_en": "Peak EIRP (dBm)",        "format": "0.000000",    "required": false},
+    {"key": "boresight_theta",  "header_cn": "Boresight Theta (°)", "header_en": "Boresight Theta (°)",   "format": "0.00",        "required": false},
+    {"key": "boresight_phi",    "header_cn": "Boresight Phi (°)",  "header_en": "Boresight Phi (°)",      "format": "0.00",        "required": false},
+    {"key": "max_power",        "header_cn": "Max Power (dBm)",    "header_en": "Max Power (dBm)",        "format": "0.000000",    "required": false},
+    {"key": "min_power",        "header_cn": "Min Power (dBm)",    "header_en": "Min Power (dBm)",        "format": "0.000000",    "required": false},
+    {"key": "avg_gain",         "header_cn": "Avg Gain (dBi)",     "header_en": "Avg Gain (dBi)",         "format": "0.000000",    "required": false},
+    {"key": "avg_power",        "header_cn": "Avg Power (dBm)",    "header_en": "Avg Power (dBm)",        "format": "0.000000",    "required": false},
+    {"key": "xpi_boresight",    "header_cn": "XPI Boresight (dB)", "header_en": "XPI Boresight (dB)",     "format": "0.000000",    "required": false},
+    {"key": "xpi_mean",         "header_cn": "XPI Mean (dB)",      "header_en": "XPI Mean (dB)",          "format": "0.000000",    "required": false},
+    {"key": "xpi_min",          "header_cn": "XPI Min (dB)",       "header_en": "XPI Min (dB)",           "format": "0.000000",    "required": false},
+    {"key": "mismatch_loss_db", "header_cn": "Mismatch Loss (dB)", "header_en": "Mismatch Loss (dB)",     "format": "0.000000",    "required": false},
+    {"key": "pc_theta_mm",      "header_cn": "PC Theta (mm)",      "header_en": "PC Theta (mm)",          "format": "0.00",        "required": false},
+    {"key": "pc_phi_mm",        "header_cn": "PC Phi (mm)",        "header_en": "PC Phi (mm)",            "format": "0.00",        "required": false}
+  ],
+
+  "validation": {
+    "enabled": true,
+    "rules": [
+      {"key": "frequency", "min": 0.0,       "max": 100000.0, "type": "float"},
+      {"key": "directivity","min": -50.0,     "max": 60.0,     "type": "float"},
+      {"key": "efficiency_pct","min": 0.0,    "max": 110.0,    "type": "float"},
+      {"key": "efficiency_db","min": -40.0,   "max": 10.0,     "type": "float"},
+      {"key": "gain",       "min": -50.0,     "max": 60.0,     "type": "float"},
+      {"key": "axial_ratio","min": 0.0,       "max": 60.0,     "type": "float"},
+      {"key": "trp",        "min": -100.0,    "max": 60.0,     "type": "float"},
+      {"key": "peak_eirp",  "min": -100.0,    "max": 60.0,     "type": "float"},
+      {"key": "xpi_boresight","min": -80.0,   "max": 80.0,     "type": "float"},
+      {"key": "xpi_mean",   "min": -80.0,     "max": 80.0,     "type": "float"},
+      {"key": "xpi_min",    "min": -80.0,     "max": 80.0,     "type": "float"},
+      {"key": "mismatch_loss_db","min": -80.0,"max": 40.0,     "type": "float"},
+      {"key": "boresight_theta","min": 0.0,   "max": 180.0,    "type": "float"},
+      {"key": "boresight_phi","min": 0.0,     "max": 360.0,    "type": "float"},
+      {"key": "pc_theta_mm","min": -1000.0,   "max": 1000.0,   "type": "float"},
+      {"key": "pc_phi_mm",  "min": -1000.0,   "max": 1000.0,   "type": "float"}
+    ]
+  }
+}

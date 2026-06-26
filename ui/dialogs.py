@@ -1482,6 +1482,28 @@ class PlotConfigDialog(QDialog):
         # ── 图形分类 + 双列 ──
         for cat_name, keys in categories.items():
             grp = QGroupBox(cat_name)
+            outer_layout = QVBoxLayout(grp)
+            outer_layout.setSpacing(4)
+
+            # 全选 / 取消全选 按钮行
+            btn_row = QHBoxLayout()
+            btn_row.setSpacing(6)
+            btn_select_all = QPushButton("全选")
+            btn_select_all.setFixedWidth(60)
+            btn_deselect_all = QPushButton("取消全选")
+            btn_deselect_all.setFixedWidth(72)
+            # 连接信号：控制本分类左右两列的所有 checkbox
+            btn_select_all.clicked.connect(
+                lambda checked, ks=keys: [self._chart_required[k].setChecked(True) for k in ks if k in self._chart_required] or
+                                         [self._chart_extra[k].setChecked(True) for k in ks if k in self._chart_extra])
+            btn_deselect_all.clicked.connect(
+                lambda checked, ks=keys: [self._chart_required[k].setChecked(False) for k in ks if k in self._chart_required] or
+                                         [self._chart_extra[k].setChecked(False) for k in ks if k in self._chart_extra])
+            btn_row.addWidget(btn_select_all)
+            btn_row.addWidget(btn_deselect_all)
+            btn_row.addStretch()
+            outer_layout.addLayout(btn_row)
+
             row_layout = QHBoxLayout(grp)
             row_layout.setSpacing(8)
 
@@ -1535,6 +1557,7 @@ class PlotConfigDialog(QDialog):
             right_layout.addStretch()
             row_layout.addWidget(right_box, 1)
 
+            outer_layout.addLayout(row_layout)
             grp_list.append(grp)
 
         # ── 视角参数 ──

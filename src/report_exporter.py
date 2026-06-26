@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -46,6 +47,93 @@ PLOT_DESC_FONT = Font(name="Calibri", size=9, italic=True, color="808080")
 # 图像尺寸
 IMG_3D_SIZE = (300, 225)    # 3D 球面图
 IMG_2D_SIZE = (280, 210)    # 2D 切面图
+
+# ── JSON 列配置缓存 ──
+_REPORT_COLUMNS: Optional[List[dict]] = None
+_REPORT_VALIDATION: Optional[dict] = None
+
+
+def _load_report_columns() -> List[dict]:
+    """加载 config/full_report_columns.json 中的列定义。"""
+    global _REPORT_COLUMNS, _REPORT_VALIDATION
+    if _REPORT_COLUMNS is not None:
+        return _REPORT_COLUMNS
+
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "..", "config", "full_report_columns.json"),
+        os.path.join(os.getcwd(), "config", "full_report_columns.json"),
+    ]
+    for candidate in candidates:
+        path = os.path.normpath(candidate)
+        if os.path.isfile(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                _REPORT_COLUMNS = data.get("columns", [])
+                _REPORT_VALIDATION = data.get("validation", {})
+                return _REPORT_COLUMNS
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    _REPORT_COLUMNS = []
+    _REPORT_VALIDATION = {}
+    return _REPORT_COLUMNS
+
+
+def _get_column_order(all_keys: List[str]) -> List[str]:
+    """根据 JSON 配置对列排序，未知列追加到末尾。"""
+    config = _load_report_columns()
+    # JSON 中声明的 key（非动态）
+    ordered = []
+    for col in config:
+        if col.get("_dynamic"):
+            # 动态列 — 匹配 all_keys 中匹配的前缀
+            base = col["key"].rstrip("*")
+            matched = sorted(k for k in all_keys if k.startswith(base))
+            ordered.extend(matched)
+        elif col["key"] in all_keys:
+            ordered.append(col["key"])
+    # 追加 JSON 中未声明的列
+    declared = {c["key"].rstrip("*") for c in config}
+    remaining = sorted(k for k in all_keys if k not in ordered
+                       and not any(k.startswith(d) for d in declared if d.endswith("_*")))
+    ordered += [k for k in remaining if not k.startswith("_")]
+    return ordered
+
+
+def _get_column_header(key: str, lang: str = "cn") -> str:
+    """从 JSON 配置获取列头显示文本。"""
+    config = _load_report_columns()
+    header_field = "header_cn" if lang == "cn" else "header_en"
+
+    for col in config:
+        if col.get("_dynamic"):
+            base = col["key"].rstrip("*")
+            if key.startswith(base):
+                tmpl = col.get(header_field, key)
+                # 解析模板变量
+                if "lag_single_" in base or "ar_single_" in base:
+                    angle = key.replace(base, "")
+                    return tmpl.replace("{angle}", angle)
+                elif "lag_range_" in base:
+                    parts = key.replace(base, "").split("_")
+                    if len(parts) >= 2:
+                        return tmpl.replace("{start}", parts[0]).replace("{end}", parts[1])
+                return tmpl
+        elif col["key"] == key:
+            return col.get(header_field, key)
+
+    # Fallback: 用旧逻辑
+    if key.startswith("lag_single_"):
+        angle = key.replace("lag_single_", "")
+        return f"LAG θ={angle}° (dB)"
+    if key.startswith("lag_range_"):
+        parts = key.replace("lag_range_", "").split("_")
+        return f"LAG ({parts[0]}°-{parts[1]}°) (dB)"
+    if key.startswith("ar_single_"):
+        angle = key.replace("ar_single_", "")
+        return f"AR θ={angle}° (dB)"
+    return key
 
 
 # ---------------------------------------------------------------------------
@@ -158,39 +246,14 @@ def _write_data_table(ws, rows: List[Dict[str, Any]], start_row: int):
                 seen.add(k)
                 all_keys.append(k)
 
-    # 排序：固定列在前，LAG 列在后
-    fixed_order = ["frequency", "directivity", "efficiency_pct", "efficiency_db",
-                   "gain", "axial_ratio"]
-    ordered = [k for k in fixed_order if k in all_keys]
-    # 追加剩余的 LAG 列（按字母排序）
-    remaining = sorted(k for k in all_keys if k not in fixed_order)
-    ordered += [k for k in remaining if not k.startswith("_")]
-
-    # 中文列头映射
-    CN_HEADERS = {
-        "frequency": "Frequency (MHz)",
-        "directivity": "Directivity (dBi)",
-        "efficiency_pct": "Efficiency (%)",
-        "efficiency_db": "Efficiency (dB)",
-        "gain": "Gain (dBi)",
-        "axial_ratio": "Axial Ratio (dB)",
-    }
+    # 排序：JSON 配置优先，剩余 LAG 列追加
+    ordered = _get_column_order(all_keys)
 
     # 写表头
     header_row = start_row
     for ci, key in enumerate(ordered, 1):
         cell = ws.cell(row=header_row, column=ci)
-        # LAG 列保持原始 key 名作为表头
-        if key in CN_HEADERS:
-            cell.value = CN_HEADERS[key]
-        elif key.startswith("lag_single_"):
-            angle = key.replace("lag_single_", "")
-            cell.value = f"LAG θ={angle}° (dB)"
-        elif key.startswith("lag_range_"):
-            parts = key.replace("lag_range_", "").split("_")
-            cell.value = f"LAG ({parts[0]}°-{parts[1]}°) (dB)"
-        else:
-            cell.value = key
+        cell.value = _get_column_header(key)
         cell.font = HEADER_FONT
         cell.fill = HEADER_FILL
         cell.alignment = HEADER_ALIGN
@@ -370,3 +433,101 @@ def _write_summary_sheet(
 
     _auto_width(ws)
     ws.freeze_panes = ws.cell(row=start_row + 1, column=1)
+
+
+# ---------------------------------------------------------------------------
+# 数据验证
+# ---------------------------------------------------------------------------
+
+def validate_report_data(
+    rows: List[Dict[str, Any]],
+    sheet_name: str = "",
+) -> Dict[str, Any]:
+    """验证报告数据是否符合 JSON 中定义的规则。
+
+    Returns:
+        {"valid": bool, "errors": [str], "warnings": [str], "stats": {...}}
+    """
+    _load_report_columns()
+    validation = _REPORT_VALIDATION or {}
+    rules = validation.get("rules", []) if validation.get("enabled", True) else []
+
+    errors = []
+    warnings = []
+    stats = {"total_rows": len(rows)}
+
+    # 检查 required 列
+    required_cols = [c["key"] for c in _REPORT_COLUMNS if c.get("required")
+                     and not c.get("_dynamic")]
+    for req_key in required_cols:
+        missing = sum(1 for r in rows if req_key not in r or r.get(req_key) is None)
+        if missing > 0:
+            errors.append(f"[{sheet_name}] 缺少必需列 '{req_key}': {missing}/{len(rows)} 行无数据")
+
+    for col_def in rules:
+        key = col_def.get("key", "")
+        vmin = col_def.get("min")
+        vmax = col_def.get("max")
+        col_type = col_def.get("type", "float")
+
+        # 检查值范围
+        for ri, row in enumerate(rows):
+            val = row.get(key)
+            if val is None or val == "":
+                continue
+            try:
+                val = float(val)
+                if vmin is not None and val < vmin:
+                    warnings.append(
+                        f"[{sheet_name}] 行{ri+1}: {key}={val} < min({vmin})")
+                if vmax is not None and val > vmax:
+                    warnings.append(
+                        f"[{sheet_name}] 行{ri+1}: {key}={val} > max({vmax})")
+            except (ValueError, TypeError):
+                if col_type == "float":
+                    warnings.append(
+                        f"[{sheet_name}] 行{ri+1}: {key}={val} 不是数字")
+
+        # 统计
+        values = []
+        for r in rows:
+            v = r.get(key)
+            if v is not None and v != "":
+                try:
+                    values.append(float(v))
+                except (ValueError, TypeError):
+                    pass
+        if values:
+            stats[key] = {"min": min(values), "max": max(values),
+                          "avg": sum(values) / len(values), "count": len(values)}
+
+    valid = len(errors) == 0
+    return {"valid": valid, "errors": errors, "warnings": warnings, "stats": stats}
+
+
+def export_full_report_with_validation(
+    output_path: str,
+    sheet_results: Dict[str, List[Dict[str, Any]]],
+    **kwargs,
+) -> Tuple[bool, Dict[str, Any]]:
+    """生成报告 + 数据验证，返回 (success, validation_result)。"""
+    # 先验证
+    all_errors = []
+    all_warnings = []
+    all_stats = {}
+    for sheet_name, rows in sheet_results.items():
+        result = validate_report_data(rows, sheet_name)
+        all_errors.extend(result["errors"])
+        all_warnings.extend(result["warnings"])
+        all_stats[sheet_name] = result["stats"]
+
+    # 始终导出（验证警告不阻止）
+    export_full_report(output_path, sheet_results, **kwargs)
+
+    validation_result = {
+        "valid": len(all_errors) == 0,
+        "errors": all_errors,
+        "warnings": all_warnings,
+        "stats": all_stats,
+    }
+    return len(all_errors) == 0, validation_result

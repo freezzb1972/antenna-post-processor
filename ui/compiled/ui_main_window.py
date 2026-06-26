@@ -33,36 +33,6 @@ class Ui_MainWindow(object):
         self.rootVBox.setSpacing(6)
         self.rootVBox.setObjectName(u"rootVBox")
         self.rootVBox.setContentsMargins(12, 8, 12, 8)
-        self.toolbarLayout = QHBoxLayout()
-        self.toolbarLayout.setObjectName(u"toolbarLayout")
-        self.lblAppTitle = QLabel(self.centralWidget)
-        self.lblAppTitle.setObjectName(u"lblAppTitle")
-
-        self.toolbarLayout.addWidget(self.lblAppTitle)
-
-        self.toolbarSpacer = QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-
-        self.toolbarLayout.addItem(self.toolbarSpacer)
-
-        self.lblTheme = QLabel(self.centralWidget)
-        self.lblTheme.setObjectName(u"lblTheme")
-
-        self.toolbarLayout.addWidget(self.lblTheme)
-
-        self.cmbThemeSelector = QComboBox(self.centralWidget)
-        self.cmbThemeSelector.setObjectName(u"cmbThemeSelector")
-        self.cmbThemeSelector.setMinimumSize(QSize(150, 28))
-
-        self.toolbarLayout.addWidget(self.cmbThemeSelector)
-
-        self.btnLangToggle = QPushButton(self.centralWidget)
-        self.btnLangToggle.setObjectName(u"btnLangToggle")
-        self.btnLangToggle.setMinimumSize(QSize(48, 30))
-
-        self.toolbarLayout.addWidget(self.btnLangToggle)
-
-
-        self.rootVBox.addLayout(self.toolbarLayout)
 
         self.tabConfig = QTabWidget(self.centralWidget)
         self.tabConfig.setObjectName(u"tabConfig")
@@ -185,6 +155,53 @@ class Ui_MainWindow(object):
         self.spFile = QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
         self.vTabFile.addItem(self.spFile)
+
+        # ── 执行面板 ──
+        self.hProgress = QHBoxLayout()
+        self.hProgress.setObjectName(u"hProgress")
+        self.progressBar = QProgressBar(self.tabFile)
+        self.progressBar.setObjectName(u"progressBar")
+        self.progressBar.setValue(0)
+        self.progressBar.setMaximum(100)
+
+        self.hProgress.addWidget(self.progressBar)
+
+        self.lblProgressMsg = QLabel(self.tabFile)
+        self.lblProgressMsg.setObjectName(u"lblProgressMsg")
+        self.lblProgressMsg.setMinimumSize(QSize(320, 0))
+
+        self.hProgress.addWidget(self.lblProgressMsg)
+
+        self.vTabFile.addLayout(self.hProgress)
+
+        self.logOutput = QPlainTextEdit(self.tabFile)
+        self.logOutput.setObjectName(u"logOutput")
+        self.logOutput.setReadOnly(True)
+        self.logOutput.setMaximumBlockCount(5000)
+
+        self.vTabFile.addWidget(self.logOutput)
+
+        self.hButtons = QHBoxLayout()
+        self.hButtons.setObjectName(u"hButtons")
+        self.spBtnLeft = QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+
+        self.hButtons.addItem(self.spBtnLeft)
+
+        self.btnStart = QPushButton(self.tabFile)
+        self.btnStart.setObjectName(u"btnStart")
+        self.btnStart.setMinimumSize(QSize(140, 36))
+
+        self.hButtons.addWidget(self.btnStart)
+
+        self.btnStop = QPushButton(self.tabFile)
+        self.btnStop.setObjectName(u"btnStop")
+        self.btnStop.setMinimumSize(QSize(100, 36))
+        self.btnStop.setEnabled(False)
+
+        self.hButtons.addWidget(self.btnStop)
+
+
+        self.vTabFile.addLayout(self.hButtons)
 
         self.tabConfig.addTab(self.tabFile, "")
         self.tabLag = QWidget()
@@ -494,53 +511,6 @@ class Ui_MainWindow(object):
 
         self.rootVBox.addWidget(self.tabConfig)
 
-        self.hProgress = QHBoxLayout()
-        self.hProgress.setObjectName(u"hProgress")
-        self.progressBar = QProgressBar(self.centralWidget)
-        self.progressBar.setObjectName(u"progressBar")
-        self.progressBar.setValue(0)
-        self.progressBar.setMaximum(100)
-
-        self.hProgress.addWidget(self.progressBar)
-
-        self.lblProgressMsg = QLabel(self.centralWidget)
-        self.lblProgressMsg.setObjectName(u"lblProgressMsg")
-        self.lblProgressMsg.setMinimumSize(QSize(320, 0))
-
-        self.hProgress.addWidget(self.lblProgressMsg)
-
-
-        self.rootVBox.addLayout(self.hProgress)
-
-        self.logOutput = QPlainTextEdit(self.centralWidget)
-        self.logOutput.setObjectName(u"logOutput")
-        self.logOutput.setReadOnly(True)
-        self.logOutput.setMaximumBlockCount(5000)
-
-        self.rootVBox.addWidget(self.logOutput)
-
-        self.hButtons = QHBoxLayout()
-        self.hButtons.setObjectName(u"hButtons")
-        self.spBtnLeft = QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-
-        self.hButtons.addItem(self.spBtnLeft)
-
-        self.btnStart = QPushButton(self.centralWidget)
-        self.btnStart.setObjectName(u"btnStart")
-        self.btnStart.setMinimumSize(QSize(140, 36))
-
-        self.hButtons.addWidget(self.btnStart)
-
-        self.btnStop = QPushButton(self.centralWidget)
-        self.btnStop.setObjectName(u"btnStop")
-        self.btnStop.setMinimumSize(QSize(100, 36))
-        self.btnStop.setEnabled(False)
-
-        self.hButtons.addWidget(self.btnStop)
-
-
-        self.rootVBox.addLayout(self.hButtons)
-
         MainWindow.setCentralWidget(self.centralWidget)
 
         self.retranslateUi(MainWindow)
@@ -553,16 +523,6 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"\u5929\u7ebf\u53c2\u6570\u540e\u5904\u7406\u5de5\u5177 \u2014 Antenna Post-Processor", None))
-        self.lblAppTitle.setText(QCoreApplication.translate("MainWindow", u"\U0001f4e1 \U00005929\U00007ebf\U000053c2\U00006570\U0000540e\U00005904\U00007406\U00005de5\U00005177", None))
-        self.lblAppTitle.setStyleSheet(QCoreApplication.translate("MainWindow", u"font-size: 18px; font-weight: bold;", None))
-        self.lblTheme.setText(QCoreApplication.translate("MainWindow", u"\U0001f3a8 \U00004e3b\U00009898\U0000ff1a", None))
-#if QT_CONFIG(tooltip)
-        self.cmbThemeSelector.setToolTip(QCoreApplication.translate("MainWindow", u"\u5207\u6362 Material Design \u4e3b\u9898", None))
-#endif // QT_CONFIG(tooltip)
-        self.btnLangToggle.setText(QCoreApplication.translate("MainWindow", u"EN", None))
-#if QT_CONFIG(tooltip)
-        self.btnLangToggle.setToolTip(QCoreApplication.translate("MainWindow", u"Switch Language / \u5207\u6362\u8bed\u8a00", None))
-#endif // QT_CONFIG(tooltip)
         self.groupInput.setTitle(QCoreApplication.translate("MainWindow", u"\u8f93\u5165", None))
         self.lblCsv.setText(QCoreApplication.translate("MainWindow", u"\u8f93\u5165\u6587\u4ef6\uff1a", None))
         self.editCsvPath.setPlaceholderText(QCoreApplication.translate("MainWindow", u"\u652f\u6301 .csv .xlsx .xls ...", None))

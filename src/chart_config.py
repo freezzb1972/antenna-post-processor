@@ -103,10 +103,10 @@ class ChartConfig:
     pattern_3d_ar: bool = False
 
     # B 类: 频点曲线
-    chart_eff_freq: bool = True
-    chart_gain_freq: bool = True
+    chart_eff_freq: bool = False
+    chart_gain_freq: bool = False
     chart_dir_freq: bool = False
-    chart_lag_freq: bool = True
+    chart_lag_freq: bool = False
     chart_trp_freq: bool = False
     chart_trp_nhprp: bool = False
     chart_ar_freq: bool = False
@@ -336,10 +336,10 @@ def _match_text(text: str, patterns: List[str]) -> bool:
 
 
 def _classify_column_text(text: str) -> Optional[str]:
-    """从列头文本推导 col_type（简化版，复用 excel_reader 逻辑）。"""
+    """从列头文本推导 col_type（简化版，JSON 模式优先，fallback 到内置正则）。"""
     from .excel_reader import (
-        is_frequency_column, is_directivity_column, is_efficiency_column,
-        is_gain_column, is_trp_column, is_nhprp_45_column,
+        _classify_by_json_patterns, is_frequency_column, is_directivity_column,
+        is_efficiency_column, is_gain_column, is_trp_column, is_nhprp_45_column,
         is_nhprp_30_column, is_peak_eirp_column, is_ar_single_column,
         is_ar_range_column, is_nhprp_225_column, is_uh_prp_column,
         is_lh_prp_column, detect_ratio_column_type,
@@ -347,6 +347,10 @@ def _classify_column_text(text: str) -> Optional[str]:
         is_max_power_column, is_min_power_column,
         is_avg_gain_column, is_avg_power_column,
     )
+    # JSON 用户模式优先
+    json_type = _classify_by_json_patterns(text)
+    if json_type is not None:
+        return json_type
     if is_frequency_column(text): return "frequency"
     if is_directivity_column(text): return "directivity"
     if is_efficiency_column(text):

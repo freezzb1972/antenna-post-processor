@@ -46,12 +46,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from i18n.i18n_manager import I18nManager
 from src.file_entry import FileEntry, mode_name, infer_mode_from_sheet
 from src.lag_config import LagConfig, PRESET_AUTOMOTIVE
 from src.scale_manager import ScaleManager, AdaptiveWidgetMixin
 from ui.compiled.ui_main_window import Ui_MainWindow
-from ui.theme_manager import ThemeManager
 
 if TYPE_CHECKING:
     from src.worker import ProcessingWorker
@@ -132,7 +130,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._cached_template_params: set = set()        # 模板参数缓存
 
         # ---- 初始化 ----
-        self._init_theme_selector()
+        # 主题/语言已移至系统设置对话框
         self._custom_qss = self._make_custom_qss()
         self._init_file_paths()
         self._init_multi_file_ui()
@@ -468,6 +466,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         tm.addSeparator()
         tm.addAction(self.tr("数据修复 (插值)"), self._on_tool_quality_repair)
         tm.addSeparator()
+        tm.addAction(self.tr("模板识别..."), self._on_tool_template_recognizer)
         tm.addAction(self.tr("EMQuest 数据导出..."), self._on_tool_emq_export)
         hm = menubar.addMenu(self.tr("&帮助"))
         hm.addAction(self.tr("使用说明"), self._on_help, QKeySequence("F1"))
@@ -1007,6 +1006,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         from ui.dialogs import ResampleDialog
         ResampleDialog(self).exec()
 
+    def _on_tool_template_recognizer(self):
+        """模板识别: 加载模板 Excel，显示列头检测，支持手动修正并保存。"""
+        from ui.template_recognizer import TemplateRecognizerDialog
+        TemplateRecognizerDialog(self).exec()
+
     def _on_tool_emq_export(self):
         """EMQuest 数据导出: 将 .raw 文件通过 EMQuest CLI 导出为 CSV/Excel/JSON。"""
         # Step 1: 选择文件或文件夹
@@ -1542,16 +1546,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 sheet_mode_map[sn] = self._test_mode
         return sheet_mode_map
 
-    def _init_theme_selector(self):
-        """填充主题下拉框并选中当前主题。"""
-        cmb = self.ui.cmbThemeSelector
-        for theme_id, display_name in ThemeManager.ALL_THEMES:
-            cmb.addItem(display_name, theme_id)
-        current = ThemeManager.current_theme()
-        for i in range(cmb.count()):
-            if cmb.itemData(i) == current:
-                cmb.setCurrentIndex(i)
-                break
+
 
     @staticmethod
     def _make_custom_qss() -> str:
@@ -1580,7 +1575,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _connect_signals(self):
         """连接所有信号/槽。"""
         # 主题切换
-        self.ui.cmbThemeSelector.currentIndexChanged.connect(self._on_theme_changed)
 
         # 文件浏览
         self.ui.btnBrowseTemplate.clicked.connect(self._on_browse_template)
@@ -1608,8 +1602,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.btnStop.clicked.connect(self._on_stop)
 
         # 语言切换
-        self.ui.btnLangToggle.clicked.connect(self._on_toggle_language)
-        self._update_lang_button()
 
     # ==================================================================
     # 文件浏览
@@ -2360,33 +2352,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     # 主题切换
     # ==================================================================
 
-    def _on_theme_changed(self, index: int):
-        """切换 Material Design 主题。"""
-        if index < 0:
-            return
-        theme_id = self.ui.cmbThemeSelector.itemData(index)
-        if theme_id and theme_id != ThemeManager.current_theme():
-            ThemeManager.apply(theme_id)
-            ThemeManager.save_theme(theme_id)
-            # 更新 QSS：主题应用后必须同步 _theme_qss / _base_qss 并重新应用 ScaleManager
-            self._theme_qss = self.app.styleSheet()
-            self._base_qss = self._theme_qss + self._custom_qss
-            ScaleManager.apply_full_qss(self, self._base_qss)
 
     # ==================================================================
     # 语言切换
     # ==================================================================
 
-    def _on_toggle_language(self):
-        new_lang = "en_US" if I18nManager.current_language() == "zh_CN" else "zh_CN"
-        I18nManager.switch(self.app, new_lang)
-        self._update_lang_button()
-
-    def _update_lang_button(self):
-        if I18nManager.current_language() == "zh_CN":
-            self.ui.btnLangToggle.setText("EN")
-        else:
-            self.ui.btnLangToggle.setText("中")
 
     def changeEvent(self, event: QEvent):
         """语言切换事件 → 刷新所有 UI 文字。"""

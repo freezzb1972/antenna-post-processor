@@ -9,6 +9,8 @@ Excel 模板读取器
 
 from __future__ import annotations
 
+import json
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
@@ -27,6 +29,93 @@ from .lag_config import (LagConfig, normalize_header,
 def _normalize_key(name: str) -> str:
     """将列头转成小写无空格键，用于固定列匹配。"""
     return re.sub(r"[^a-z%％()db]+", "", name.lower())
+
+
+# ═══════════════════════════════════════════════════════════════
+# JSON 列头模式加载器 — 用户可编辑的外部配置
+# ═══════════════════════════════════════════════════════════════
+
+_COLUMN_PATTERNS: Optional[List[dict]] = None
+
+
+def _load_column_patterns() -> List[dict]:
+    """加载 config/column_patterns.json，若文件不存在则返回空列表。"""
+    global _COLUMN_PATTERNS
+    if _COLUMN_PATTERNS is not None:
+        return _COLUMN_PATTERNS
+
+    # 项目根目录查找
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "..", "config", "column_patterns.json"),
+        os.path.join(os.getcwd(), "config", "column_patterns.json"),
+    ]
+    for candidate in candidates:
+        path = os.path.normpath(candidate)
+        if os.path.isfile(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                _COLUMN_PATTERNS = data.get("patterns", [])
+                return _COLUMN_PATTERNS
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    _COLUMN_PATTERNS = []
+    return _COLUMN_PATTERNS
+
+
+def _classify_by_json_patterns(raw_header: str) -> Optional[str]:
+    """用 config/column_patterns.json 中的规则匹配列头。
+
+    返回匹配的 col_type，无匹配返回 None。
+    匹配逻辑（与 Python 函数一致）：
+      - "keywords" 中所有词都必须出现在规范化列头中（AND）
+      - "negate" 中的词都不能出现（如果有）
+      - 匹配在 normalize_header() 小写后进行
+    """
+    patterns = _load_column_patterns()
+    if not patterns:
+        return None
+
+    # 用小写规范化列头，保留可读文本
+    norm = normalize_header(raw_header).lower()
+    # 同时也检查 _normalize_key 版本（去除非字母/数字）
+    compact = _normalize_key(raw_header)
+
+    for entry in patterns:
+        keywords = entry.get("keywords", [])
+        negate = entry.get("negate", [])
+
+        # 检查所有关键词 —— 在 norm 或 compact 中出现即可
+        all_matched = True
+        for kw in keywords:
+            kw_lower = kw.lower()
+            if kw_lower not in norm and kw_lower not in compact:
+                all_matched = False
+                break
+        if not all_matched:
+            continue
+
+        # 检查排除词
+        blocked = False
+        for nkw in negate:
+            nkw_lower = nkw.lower()
+            if nkw_lower in norm or nkw_lower in compact:
+                blocked = True
+                break
+        if blocked:
+            continue
+
+        return entry["col_type"]
+
+    return None
+
+
+def reload_column_patterns():
+    """强制重新加载 JSON 模式（对话框保存后调用）。"""
+    global _COLUMN_PATTERNS
+    _COLUMN_PATTERNS = None
+    _load_column_patterns()
 
 
 def is_frequency_column(header: str) -> bool:
@@ -308,8 +397,11 @@ def _parse_sheet(ws) -> Optional[SheetInfo]:
         norm = normalize_header(raw)
         col_letter = openpyxl.utils.get_column_letter(c)
 
-        # 分类
-        if is_frequency_column(raw):
+        # 分类 — JSON 用户模式优先，fallback 到内置正则
+        json_type = _classify_by_json_patterns(raw)
+        if json_type is not None:
+            ctype = json_type
+        elif is_frequency_column(raw):
             ctype = "frequency"
         elif is_directivity_column(raw):
             ctype = "directivity"
