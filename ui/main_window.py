@@ -348,8 +348,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.vTabCharts.addWidget(self._graph_viewer)
 
     def _init_params_tab(self):
-        """构建「参数设置」标签页（频点 + 算法选项）。"""
-        vtab = self.ui.vTabCalc
+        """构建「天线参数」子节 — 频点 + 算法选项，加入 tabFile。"""
+        vtab = self.ui.vTabFile  # 放入文件设置区域
 
         group_freq = QGroupBox(self.tr("频点设置"))
         freq_form = QFormLayout(group_freq)
@@ -394,8 +394,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._make_tab_scrollable(self.ui.tabCalc)
 
     def _init_param_overview(self):
-        """在处理参数配置 Tab 顶部插入参数分类概览面板。"""
-        vtab = self.ui.vTabLag
+        """在 tabFile 中插入参数分类概览面板（天线参数子节）。"""
+        vtab = self.ui.vTabFile
 
         overview = QGroupBox(self.tr("计算参数分类"))
         ov_layout = QVBoxLayout(overview)
@@ -486,10 +486,20 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         WindowManager.instance().register(self)
 
     def _hide_settings_tabs(self):
+        """重组标签页：将天线参数和图形设置放入可见区域。
+
+        Tab 最终顺序：
+          0 - 参数设置 (包含文件设置 + 天线参数 + LAG配置 + 图形设置)
+          1 - 参数结果
+          2 - 图形展示
+        tabCalc 的内容已通过 _init_params_tab/_init_param_overview 移入 tabFile，
+        本方法移除空壳标签页并保持 tabLag/tabPlot 可见。
+        """
         tc = self.ui.tabConfig
-        # LAG/图形/计算设置通过菜单访问; 文件设置保留在选项卡中
-        for tab, idx in [(self.ui.tabLag, 1), (self.ui.tabPlot, 2), (self.ui.tabCalc, 3)]:
-            if idx < tc.count(): tc.setTabVisible(idx, False)
+        # 移除 tabCalc（内容已移入 tabFile）
+        idx_calc = tc.indexOf(self.ui.tabCalc)
+        if idx_calc >= 0:
+            tc.removeTab(idx_calc)
 
     def _show_system_settings(self):
         from ui.dialogs import SystemSettingsDialog
