@@ -1,0 +1,406 @@
+"""
+可复用 GUI 组件
+==============
+包含 AnglePickerWidget, TemplateSourceRow, OutputSettingsGroup 等。
+"""
+from __future__ import annotations
+
+import os
+from typing import Callable, Dict, List, Optional, Tuple
+
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (
+    QCheckBox, QComboBox, QFileDialog, QFormLayout, QFrame,
+    QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+    QSpinBox, QVBoxLayout, QWidget,
+)
+
+from src.lag_config import LagConfig
+
+
+# ═══════════════════════════════════════════════════════════════
+# AnglePickerWidget — 角度选择组件（Gain/LAG/AR 共用）
+# ═══════════════════════════════════════════════════════════════
+
+class AnglePickerWidget(QWidget):
+    """角度选择组件：快捷角度 + 步进生成 + 范围添加 + 已配置项显示。
+
+    信号:
+        angle_changed(LagConfig) — 任何角度变更时发出
+    """
+
+    angle_changed = Signal(LagConfig)
+
+    COMMON_ANGLES = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90]
+    DEFAULT_SINGLES = [60, 70, 80, 90]
+    DEFAULT_RANGES = [(0, 90), (60, 90)]
+
+    def __init__(self, label: str = "", parent=None):
+        super().__init__(parent)
+        self._config = LagConfig(
+            single_angles=list(self.DEFAULT_SINGLES),
+            ranges=list(self.DEFAULT_RANGES),
+        )
+        self._label = label
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        title = QLabel(self._label)
+        title.setStyleSheet("font-weight: bold;")
+        layout.addWidget(title)
+
+        # ── 快捷单角度 ──
+        quick_label = QLabel(self.tr("快捷单角度（点击切换）"))
+        quick_label.setStyleSheet("font-size: 0.9em; color: #888;")
+        layout.addWidget(quick_label)
+
+        self._quick_btns: Dict[float, QPushButton] = {}
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(4)
+        for angle in self.COMMON_ANGLES:
+            btn = QPushButton(f"{angle}°")
+            btn.setFixedWidth(42)
+            btn.setCheckable(True)
+            btn.setChecked(angle in self._config.single_angles)
+            btn.clicked.connect(lambda checked, a=angle: self._toggle_single(a, checked))
+            self._quick_btns[angle] = btn
+            btn_row.addWidget(btn)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        # ── 步进批量生成 ──
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        layout.addWidget(sep)
+
+        step_label = QLabel(self.tr("步进批量生成"))
+        step_label.setStyleSheet("font-size: 0.9em; color: #888;")
+        layout.addWidget(step_label)
+
+        step_row = QHBoxLayout()
+        step_row.setSpacing(6)
+        step_row.addWidget(QLabel(self.tr("起始:")))
+        self._spin_gen_start = QSpinBox()
+        self._spin_gen_start.setRange(0, 180)
+        self._spin_gen_start.setValue(0)
+        step_row.addWidget(self._spin_gen_start)
+        step_row.addWidget(QLabel(self.tr("结束:")))
+        self._spin_gen_end = QSpinBox()
+        self._spin_gen_end.setRange(0, 180)
+        self._spin_gen_end.setValue(90)
+        step_row.addWidget(self._spin_gen_end)
+        step_row.addWidget(QLabel(self.tr("步进:")))
+        self._spin_gen_step = QSpinBox()
+        self._spin_gen_step.setRange(1, 45)
+        self._spin_gen_step.setValue(10)
+        step_row.addWidget(self._spin_gen_step)
+        btn_gen = QPushButton(self.tr("生成 >>"))
+        btn_gen.clicked.connect(self._on_generate)
+        step_row.addWidget(btn_gen)
+        step_row.addStretch()
+        layout.addLayout(step_row)
+
+        # ── 范围添加 ──
+        range_label = QLabel(self.tr("添加角度范围"))
+        range_label.setStyleSheet("font-size: 0.9em; color: #888;")
+        layout.addWidget(range_label)
+
+        range_row = QHBoxLayout()
+        range_row.setSpacing(6)
+        range_row.addWidget(QLabel(self.tr("起始:")))
+        self._spin_range_start = QSpinBox()
+        self._spin_range_start.setRange(0, 180)
+        self._spin_range_start.setValue(0)
+        range_row.addWidget(self._spin_range_start)
+        range_row.addWidget(QLabel(self.tr("结束:")))
+        self._spin_range_end = QSpinBox()
+        self._spin_range_end.setRange(0, 180)
+        self._spin_range_end.setValue(90)
+        range_row.addWidget(self._spin_range_end)
+        btn_add = QPushButton(self.tr("添加范围"))
+        btn_add.clicked.connect(self._on_add_range)
+        range_row.addWidget(btn_add)
+        range_row.addStretch()
+        layout.addLayout(range_row)
+
+        # ── 已配置项显示 ──
+        self._lbl_configured = QLabel("")
+        self._lbl_configured.setStyleSheet("color: #666; font-size: 0.9em;")
+        self._update_configured_label()
+        layout.addWidget(self._lbl_configured)
+
+    def _toggle_single(self, angle: float, checked: bool):
+        """切换单角度。"""
+        angles = list(self._config.single_angles)
+        if checked and angle not in angles:
+            angles.append(angle)
+            angles.sort()
+        elif not checked and angle in angles:
+            angles.remove(angle)
+        self._config.single_angles = angles
+        self._sync_quick_buttons()
+        self._update_configured_label()
+        self.angle_changed.emit(self._config)
+
+    def _sync_quick_buttons(self):
+        """同步快捷按钮的勾选状态。"""
+        for angle, btn in self._quick_btns.items():
+            btn.blockSignals(True)
+            btn.setChecked(angle in self._config.single_angles)
+            btn.blockSignals(False)
+
+    def _on_generate(self):
+        """步进批量生成。"""
+        start = self._spin_gen_start.value()
+        end = self._spin_gen_end.value()
+        step = self._spin_gen_step.value()
+        gen = LagConfig.generate_singles(start, end, step)
+        self._config.add_singles(gen)
+        self._sync_quick_buttons()
+        self._update_configured_label()
+        self.angle_changed.emit(self._config)
+
+    def _on_add_range(self):
+        """添加角度范围。"""
+        lo = self._spin_range_start.value()
+        hi = self._spin_range_end.value()
+        if lo < hi:
+            self._config.add_range(lo, hi)
+            self._update_configured_label()
+            self.angle_changed.emit(self._config)
+
+    def _update_configured_label(self):
+        """更新已配置项标签。"""
+        singles = self._config.singles_sorted
+        ranges = self._config.ranges_sorted
+        parts = []
+        if singles:
+            parts.append(f"{self.tr('单角度')}: {', '.join(f'{a}°' for a in singles[:10])}"
+                         f"{'...' if len(singles) > 10 else ''}")
+        if ranges:
+            parts.append(f"{self.tr('范围')}: {', '.join(f'({lo}°-{hi}°)' for lo, hi in ranges)}")
+        self._lbl_configured.setText(" | ".join(parts) if parts else self.tr("(未配置)"))
+
+    # ── 外部接口 ──
+
+    def get_config(self) -> LagConfig:
+        return self._config
+
+    def set_config(self, config: LagConfig):
+        """外部设置角度配置（不触发 signal）。"""
+        self._config = LagConfig(
+            single_angles=list(config.single_angles),
+            ranges=list(config.ranges),
+        )
+        self._sync_quick_buttons()
+        self._update_configured_label()
+
+    def reset_to_defaults(self):
+        """重置为默认角度。"""
+        self._config = LagConfig(
+            single_angles=list(self.DEFAULT_SINGLES),
+            ranges=list(self.DEFAULT_RANGES),
+        )
+        self._sync_quick_buttons()
+        self._update_configured_label()
+        self.angle_changed.emit(self._config)
+
+
+# ═══════════════════════════════════════════════════════════════
+# TemplateSourceRow — 模板来源选择
+# ═══════════════════════════════════════════════════════════════
+
+class TemplateSourceRow(QWidget):
+    """模板来源选择行：内置模板 ▾ | 从电脑选择... | 📋 预览报告。
+
+    信号:
+        template_changed(str) — 模板路径变化时发出
+    """
+
+    template_changed = Signal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        layout.addWidget(QLabel(self.tr("模板:")))
+
+        # 内置模板下拉
+        self._cmb_preset = QComboBox()
+        self._cmb_preset.setEditable(True)
+        self._cmb_preset.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_preset.lineEdit().setPlaceholderText(self.tr("搜索预设模板..."))
+        self._cmb_preset.setMinimumWidth(180)
+        self._cmb_preset.currentIndexChanged.connect(self._on_preset_selected)
+        layout.addWidget(self._cmb_preset)
+
+        # 从电脑选择
+        btn_browse = QPushButton(self.tr("从电脑选择..."))
+        btn_browse.clicked.connect(self._on_browse)
+        layout.addWidget(btn_browse)
+
+        # 预览报告
+        btn_preview = QPushButton(self.tr("📋 预览报告"))
+        btn_preview.clicked.connect(self._on_preview)
+        layout.addWidget(btn_preview)
+
+        # 路径显示
+        self._lbl_path = QLineEdit()
+        self._lbl_path.setReadOnly(True)
+        self._lbl_path.setPlaceholderText(self.tr("(未选择模板)"))
+        self._lbl_path.setStyleSheet("color: #888;")
+        layout.addWidget(self._lbl_path, 1)
+
+    def populate_presets(self, presets: List[dict]):
+        """填充内置模板下拉列表。"""
+        self._cmb_preset.blockSignals(True)
+        self._cmb_preset.clear()
+        self._cmb_preset.addItem("", "")
+        for p in presets:
+            label = f"{p.get('manufacturer', '')} - {p.get('name', '')}"
+            self._cmb_preset.addItem(label.strip(" - "), p.get("path", ""))
+        self._cmb_preset.blockSignals(False)
+
+    def set_path(self, path: str):
+        """外部设置模板路径（不触发 signal）。"""
+        self._lbl_path.setText(path)
+
+    def get_path(self) -> str:
+        return self._lbl_path.text()
+
+    def _on_preset_selected(self, index: int):
+        path = self._cmb_preset.currentData()
+        if path:
+            self._lbl_path.setText(path)
+            self.template_changed.emit(path)
+
+    def _on_browse(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("选择模板文件"), "",
+            self.tr("所有支持格式 (*.xlsx *.xls *.docx *.doc);;Excel (*.xlsx *.xls);;Word (*.docx *.doc);;所有文件 (*)"))
+        if path:
+            self._lbl_path.setText(path)
+            self.template_changed.emit(path)
+
+    def _on_preview(self):
+        """打开报告预览。"""
+        path = self._lbl_path.text()
+        if not path or not os.path.exists(path):
+            return
+        from src.column_mapping import detect_columns_from_template, ALL_COL_TYPE_LABELS
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QComboBox, QHeaderView, QPushButton, QMessageBox
+
+        mappings = detect_columns_from_template(path)
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("报告预览 — 列头检测结果"))
+        dlg.setMinimumSize(600, 400)
+        dl = QVBoxLayout(dlg)
+
+        table = QTableWidget()
+        table.setColumnCount(3)
+        table.setHorizontalHeaderLabels([self.tr("列"), self.tr("列头"), self.tr("类型")])
+        table.horizontalHeader().setStretchLastSection(True)
+        table.setRowCount(len(mappings))
+        for ri, m in enumerate(mappings):
+            table.setItem(ri, 0, QTableWidgetItem(m.col_letter))
+            table.setItem(ri, 1, QTableWidgetItem(m.raw_header))
+            cmb = QComboBox()
+            for ct, label in ALL_COL_TYPE_LABELS:
+                cmb.addItem(label, ct)
+            idx = cmb.findData(m.detected_type)
+            if idx >= 0:
+                cmb.setCurrentIndex(idx)
+            table.setCellWidget(ri, 2, cmb)
+        dl.addWidget(table)
+        btn_close = QPushButton(self.tr("关闭"))
+        btn_close.clicked.connect(dlg.accept)
+        dl.addWidget(btn_close)
+        dlg.exec()
+
+
+# ═══════════════════════════════════════════════════════════════
+# OutputSettingsGroup — 输出设置组
+# ═══════════════════════════════════════════════════════════════
+
+class OutputSettingsGroup(QGroupBox):
+    """输出目录 + 文件名 + 完整报告路径。"""
+
+    output_changed = Signal(str, str)  # (output_dir, output_name)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setTitle(self.tr("输出设置"))
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QFormLayout(self)
+        layout.setSpacing(6)
+
+        # 输出目录
+        dir_row = QHBoxLayout()
+        self._edit_dir = QLineEdit()
+        self._edit_dir.setPlaceholderText(self.tr("默认: ./output"))
+        dir_row.addWidget(self._edit_dir, 1)
+        btn_dir = QPushButton(self.tr("浏览..."))
+        btn_dir.clicked.connect(self._on_browse_dir)
+        dir_row.addWidget(btn_dir)
+        layout.addRow(self.tr("输出目录:"), dir_row)
+
+        # 文件名
+        self._edit_name = QLineEdit("antenna_report.xlsx")
+        layout.addRow(self.tr("文件名:"), self._edit_name)
+
+        # 完整报告
+        report_row = QHBoxLayout()
+        self._chk_full_report = QCheckBox(self.tr("生成完整报告（独立文件，含全部指标 + 2D/3D 图）"))
+        report_row.addWidget(self._chk_full_report)
+        layout.addRow(report_row)
+
+        self._edit_report_path = QLineEdit()
+        self._edit_report_path.setPlaceholderText(self.tr("默认: ./output/full_report.xlsx"))
+        self._chk_full_report.toggled.connect(self._edit_report_path.setVisible)
+        self._edit_report_path.setVisible(False)
+        layout.addRow(self.tr("报告路径:"), self._edit_report_path)
+
+        # 信号连接
+        self._edit_dir.textChanged.connect(self._emit_changed)
+        self._edit_name.textChanged.connect(self._emit_changed)
+
+    def get_directory(self) -> str:
+        return self._edit_dir.text().strip()
+
+    def get_filename(self) -> str:
+        return self._edit_name.text().strip()
+
+    def get_report_path(self) -> str:
+        return self._edit_report_path.text().strip()
+
+    def set_directory(self, path: str):
+        self._edit_dir.blockSignals(True)
+        self._edit_dir.setText(path)
+        self._edit_dir.blockSignals(False)
+
+    def set_filename(self, name: str):
+        self._edit_name.blockSignals(True)
+        self._edit_name.setText(name)
+        self._edit_name.blockSignals(False)
+
+    def is_full_report_enabled(self) -> bool:
+        return self._chk_full_report.isChecked()
+
+    def _on_browse_dir(self):
+        d = QFileDialog.getExistingDirectory(self, self.tr("选择输出目录"))
+        if d:
+            self._edit_dir.setText(d)
+
+    def _emit_changed(self):
+        self.output_changed.emit(self.get_directory(), self.get_filename())

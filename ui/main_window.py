@@ -2249,6 +2249,17 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         cursor.movePosition(QTextCursor.End)
         self.ui.logOutput.setTextCursor(cursor)
 
+    def _update_param_summary(self) -> str:
+        """生成当前天线参数摘要（供底部状态栏显示）。"""
+        from src.ui_utils import build_param_summary_text
+        return build_param_summary_text(
+            test_mode=self._test_mode,
+            required_params=self._required_params,
+            extra_params=self._extra_params,
+            lag_config=self._lag_config,
+            ar_lag_config=self._ar_lag_config if hasattr(self, '_ar_lag_config') else None,
+        )
+
     def _log_current_params(self):
         """将当前天线参数摘要打印到日志窗口。"""
         mode_names = {0: "📡 无源天线", 1: "📶 有源发射 TRP", 2: "📻 有源接收 TIS"}
