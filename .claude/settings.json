@@ -3,11 +3,8 @@
     "claude-api@anthropic-agent-skills": true,
     "document-skills@anthropic-agent-skills": false
   },
+  "disabledMcpjsonServers": ["context7"],
   "mcpServers": {
-    "playwright": {
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"]
-    },
     "memory": {
       "command": "npx",
       "args": ["@modelcontextprotocol/server-memory"]
