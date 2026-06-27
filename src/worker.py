@@ -135,9 +135,15 @@ class ProcessingWorker(QObject):
             self.error.emit(f"{e}\n{traceback.format_exc()}")
 
     def _run_multi_step(self, base_ds: DataSource, **kwargs) -> Dict[str, list]:
-        """多步进同时计算：源文件一次读取，各步进零拷贝重采样。"""
+        """多步进并行计算：源文件一次读取，各步进在独立线程中同时计算。
+
+        自动适配硬件：
+          - 最大线程数 = min(步进数, CPU核心数-1, 6)
+          - 4核以下: 串行或2线程; 8核+: 最多6线程并行
+        """
         import os
         import openpyxl
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         from tempfile import NamedTemporaryFile
 
         # 原始步进
@@ -148,53 +154,95 @@ class ProcessingWorker(QObject):
             base_ds.phi_angles[1] - base_ds.phi_angles[0], 6
         ) if len(base_ds.phi_angles) > 1 else 1.0
 
-        # 确定要计算哪些步进
-        steps_to_run = []
+        # 构建任务列表: (suffix, display_label, DataSource)
+        tasks = []
         if not self.skip_original:
-            steps_to_run.append(("", base_ds))  # 原始步进，无后缀
+            tasks.append(("", "原始步进", base_ds))
 
         for step in sorted(self.step_values):
             theta_stride = max(1, int(round(step / orig_theta_step)))
             phi_stride = max(1, int(round(step / orig_phi_step)))
             suffix = f"_step{int(step)}"
-            # 去重：不同 stride 的步进都计算
             resampled = ResampledDataSource(base_ds, theta_stride, phi_stride)
-            steps_to_run.append((suffix, resampled))
-
-        all_results = {}
-        total_steps = len(steps_to_run)
+            tasks.append((suffix, f"步进 {step}°", resampled))
 
         output_path = kwargs.pop("output_path", self.output_path)
         temp_dir = os.path.dirname(output_path) or "."
         os.makedirs(temp_dir, exist_ok=True)
 
-        # 合并工作簿
-        wb = openpyxl.Workbook()
-        wb.remove(wb.active)
+        # ── 自动适配并行度 ──
+        cpu_count = os.cpu_count() or 2
+        max_workers = max(1, min(len(tasks), cpu_count - 1, 6))
+        self.log.emit(
+            f"📏 多步进并行计算: {len(tasks)} 个步进, "
+            f"{cpu_count} 核 CPU, 使用 {max_workers} 个并行线程")
 
-        for si, (suffix, ds) in enumerate(steps_to_run):
+        # ── 并行计算 ──
+        def _compute_one(suffix, label, ds):
+            """单个步进的计算任务（在线程池中运行）。"""
             if self._cancelled:
-                break
+                return None
+            self.log.emit(f"  ⏳ 计算: {label}...")
 
-            label = suffix[1:] if suffix else "原始步进"
-            self.log.emit(f"📏 计算步进: {label}...")
-
-            # 用临时文件跑单个步进
             with NamedTemporaryFile(suffix=".xlsx", dir=temp_dir, delete=False) as tf:
                 tmp_out = tf.name
 
             try:
                 kw = dict(kwargs)
                 kw["output_path"] = tmp_out
-                kw["progress_callback"] = lambda c, t, m, s=si, ts=total_steps: \
-                    self._on_progress(s * 100 + c, ts * 100, m)
+                kw["progress_callback"] = lambda c, t, m: None  # 不跨线程发信号
+                kw["log_callback"] = lambda m: None
 
-                results = run_pipeline(datasource=ds, **kw)
+                run_pipeline(datasource=ds, **kw)
+                if self._cancelled:
+                    return None
+                self.log.emit(f"  ✓ 完成: {label}")
+                return (suffix, tmp_out)
+            except Exception as e:
+                self.log.emit(f"  ✗ 失败: {label} — {e}")
+                try:
+                    os.unlink(tmp_out)
+                except OSError:
+                    pass
+                return None
 
-                # 把临时文件的 sheet 拷贝到合并工作簿
+        results = []
+        if max_workers == 1:
+            # 串行模式（单核或只有1个任务）
+            for suffix, label, ds in tasks:
+                if self._cancelled:
+                    break
+                r = _compute_one(suffix, label, ds)
+                if r:
+                    results.append(r)
+        else:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(_compute_one, suffix, label, ds): (suffix, label)
+                    for suffix, label, ds in tasks
+                }
+                for future in as_completed(futures):
+                    if self._cancelled:
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        break
+                    r = future.result()
+                    if r:
+                        results.append(r)
+
+        if self._cancelled:
+            return {}
+
+        # ── 合并工作簿（串行，按步进排序） ──
+        results.sort(key=lambda x: (x[0] == "", float(x[0].replace("_step", "") or "0")))
+
+        wb = openpyxl.Workbook()
+        wb.remove(wb.active)
+
+        for suffix, tmp_out in results:
+            try:
                 twb = openpyxl.load_workbook(tmp_out, data_only=True)
                 for ws in twb.worksheets:
-                    new_name = (ws.title + suffix)[:31]  # Excel max 31 chars
+                    new_name = (ws.title + suffix)[:31]
                     nws = wb.create_sheet(title=new_name)
                     for row in ws.iter_rows():
                         for cell in row:
@@ -206,10 +254,8 @@ class ProcessingWorker(QObject):
                                 ncell.alignment = cell.alignment
                                 ncell.border = cell.border
                                 ncell.number_format = cell.number_format
-                    # 拷贝列宽
                     for col_letter, dim in ws.column_dimensions.items():
                         nws.column_dimensions[col_letter].width = dim.width
-                    # 拷贝冻结窗格
                     if ws.freeze_panes:
                         nws.freeze_panes = ws.freeze_panes
                 twb.close()
@@ -219,11 +265,10 @@ class ProcessingWorker(QObject):
                 except OSError:
                     pass
 
-        # 保存合并工作簿
         wb.save(output_path)
         wb.close()
 
-        return all_results
+        return {}
 
     def _on_progress(self, current, total, message):
         if not self._cancelled:
