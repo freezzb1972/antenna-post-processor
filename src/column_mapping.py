@@ -145,21 +145,6 @@ def _detect_excel_columns(path: str, header_row: int = None) -> List[ColumnMappi
 
         col_letter = openpyxl.utils.get_column_letter(c)
         ctype = classify_header(raw)
-                               is_efficiency_column, is_total_efficiency_column,
-                               is_gain_column, is_trp_column, is_nhprp_45_column,
-                               is_nhprp_30_column, is_peak_eirp_column,
-                               is_ar_single_column, is_ar_range_column,
-                               is_nhprp_225_column, is_uh_prp_column, is_lh_prp_column,
-                               detect_ratio_column_type, is_boresight_phi_column,
-                               is_boresight_theta_column, is_max_power_column,
-                               is_min_power_column, is_avg_gain_column,
-                               is_avg_power_column, is_xpi_boresight_column,
-                               is_xpi_mean_column, is_xpi_min_column,
-                               is_mismatch_loss_column, is_pc_theta_column,
-                               is_pc_phi_column, normalize_header, _normalize_key,
-                               _RE_LAG_RANGE, _RE_LAG_RANGE_NO_PREFIX,
-                               _RE_LAG_SINGLE, _RE_LAG_SINGLE_NO_PREFIX)
-
         mappings.append(ColumnMapping(
             col_letter=col_letter,
             col_index=c,
