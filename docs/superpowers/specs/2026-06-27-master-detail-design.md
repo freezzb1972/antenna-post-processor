@@ -1,0 +1,314 @@
+# UI 重构设计：Master-Detail 参数设置
+
+**日期:** 2026-06-27
+**基于 ARM 设计意图:** `docs/superpowers/specs/2026-06-27-full-design.md`
+
+---
+
+## 一、背景与问题
+
+ARM 合并后，`tabConfig` 有 5 个可见标签页：
+- 文件设置（塞满参数概览、频点、算法、多步进、报告预览）
+- LAG 参数配置（与 CalcParamsDialog 功能重复）
+- 3D 图形（与 PlotConfigDialog 功能重复）
+- 参数结果
+- 图形展示
+
+加上空壳 tabCalc（已移除），共 6 个模块。ARM 设计文档的意图是把所有设置归入一个"参数设置"主标签页，但实现未完成。
+
+**核心问题：** 同样的角度配置在 tabLag 和 CalcParamsDialog 各实现了一遍，图形配置在 tabPlot 和 PlotConfigDialog 各实现了一遍，用户需要在多处操作同一份数据，状态不同步。
+
+---
+
+## 二、目标
+
+```
+5 标签页 → 3 标签页 (处理设置 / 计算结果 / 图表查看)
+Master-Detail 布局: 左侧导航 (固定) + 右侧 QStackedWidget (3页切换) + 底部执行栏 (共享)
+只保留一套角度配置、一套图形配置
+所有 UI 文本 self.tr() 包裹，中英文完整切换
+```
+
+---
+
+## 三、最终布局
+
+```
+┌─ QTabWidget: 3 标签页 ───────────────────────────────────────────┐
+│ 📐 处理设置  │  📊 计算结果  │  📈 图表查看                        │
+├───────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌─ 左侧导航 (固定 ~140px) ─┬─ 右侧内容 (QStackedWidget) ────────┐│
+│  │                          │                                     ││
+│  │ ▸ 📂 输入输出            │ page[0]: FileSettingsPage          ││
+│  │                          │ ┌ 模板文件 ─────────────────────┐  ││
+│  │   📡 天线参数            │ │ 模板: [path] [浏览] [📋 预览] │  ││
+│  │                          │ │ 来源: [内置模板▾] [从电脑选择] │  ││
+│  │   📊 图表配置            │ └────────────────────────────────┘  ││
+│  │                          │ ┌ 数据文件 ─────────────────────┐  ││
+│  │                          │ │ [添加文件][清除选中][全部清除] │  ││
+│  │                          │ │ [文件列表 table]              │  ││
+│  │                          │ │ [匹配表 table]                │  ││
+│  │                          │ │ [自动匹配] 命名:[▾]          │  ││
+│  │                          │ │ ☑ 效率曲线 ☑ 增益曲线        │  ││
+│  │                          │ └────────────────────────────────┘  ││
+│  │                          │ ┌ 输出设置 ─────────────────────┐  ││
+│  │                          │ │ 目录: [path] [浏览]          │  ││
+│  │                          │ │ 文件名: [name]               │  ││
+│  │                          │ │ ☐ 完整报告: [path] [浏览]    │  ││
+│  │                          │ └────────────────────────────────┘  ││
+│  │                          │                                     ││
+│  │                          │ page[1]: AntennaParamsPage          ││
+│  │                          │ (原 CalcParamsDialog → QWidget)     ││
+│  │                          │ - 测试模式选择 (无源/TRP/TIS)       ││
+│  │                          │ - 参数组勾选 (报告 + full_report)   ││
+│  │                          │ - Gain 角度 (AnglePickerWidget)     ││
+│  │                          │ - AR 角度 (AnglePickerWidget)       ││
+│  │                          │ - 频点设置 + 算法选项                ││
+│  │                          │ - 多步进选择                         ││
+│  │                          │                                     ││
+│  │                          │ page[2]: ChartSettingsPage           ││
+│  │                          │ (原 PlotConfigDialog → QWidget)     ││
+│  │                          │ - 图表类别选择 (3类可折叠)           ││
+│  │                          │ - 视角参数 (仰角/方位角/DPI)         ││
+│  │                          │ - 输出方式 (嵌入Excel/保存PNG)       ││
+│  └──────────────────────────┴─────────────────────────────────────┘│
+│                                                                   │
+│  ┌─ 底部执行栏 (固定，所有页面共享) ──────────────────────────────┐│
+│  │ [==================进度条==================] 处理中...          ││
+│  │ [日志输出区                                        ]          ││
+│  │                                   [▶ 开始处理] [⏹ 停止]       ││
+│  └───────────────────────────────────────────────────────────────┘│
+└───────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 四、命名规范
+
+| 原名称 | 新名称 | 说明 |
+|--------|--------|------|
+| tabConfig 第0个: 文件设置 | 📐 处理设置 | Process Settings |
+| tabConfig 第1个: 参数结果 | 📊 计算结果 | Calculation Results |
+| tabConfig 第2个: 图形展示 | 📈 图表查看 | Chart Viewer |
+| 左侧导航项1 | 📂 输入输出 | Input/Output |
+| 左侧导航项2 | 📡 天线参数 | Antenna Parameters |
+| 左侧导航项3 | 📊 图表配置 | Chart Configuration |
+| CalcParamsDialog | AntennaParamsPage (QWidget) | 嵌入右侧面板 |
+| PlotConfigDialog | ChartSettingsPage (QWidget) | 嵌入右侧面板 |
+
+**i18n:** 所有标题用 `self.tr()` 包裹，emoji 仅在中文模式下显示（通过 i18n 翻译控制）。
+
+---
+
+## 五、组件树
+
+```
+MainWindow (QMainWindow)
+└─ tabConfig (QTabWidget, 3 tabs)
+   ├─ tab[0]: "处理设置" ← Master-Detail 新布局
+   │   ├─ QHBoxLayout (左右分栏)
+   │   │   ├─ navList (QListWidget, fixed width ~140px)
+   │   │   │   ├─ "输入输出"
+   │   │   │   ├─ "天线参数"
+   │   │   │   └─ "图表配置"
+   │   │   └─ pageStack (QStackedWidget, stretch=1)
+   │   │       ├─ FileSettingsPage   (QWidget, 索引 0)
+   │   │       ├─ AntennaParamsPage  (QWidget, 索引 1)
+   │   │       └─ ChartSettingsPage  (QWidget, 索引 2)
+   │   └─ executionBar (QWidget, fixed bottom)
+   │       ├─ progressBar + lblProgressMsg
+   │       ├─ logOutput (QPlainTextEdit)
+   │       └─ btnStart + btnStop
+   ├─ tab[1]: "计算结果" ← 保持现有 tabResults
+   └─ tab[2]: "图表查看" ← 保持现有 tabCharts
+```
+
+**删除:** tabLag, tabPlot, tabCalc（及其内所有 widget）
+
+---
+
+## 六、数据流
+
+```
+                    MainWindow (数据 Owner)
+                    ┌────────────────────────────────┐
+                    │ _required_params (set)          │ ← 报告必需参数
+                    │ _extra_params (set)             │ ← full_report 额外
+                    │ _lag_config (LagConfig)         │ ← LAG 角度
+                    │ _ar_lag_config (LagConfig)      │ ← AR 角度
+                    │ _test_mode (int: 0/1/2)         │ ← 测试模式
+                    │ _freq_source (str)              │ ← 频点来源
+                    │ _trim_start/end (int)           │ ← 去除频点
+                    │ _extrapolate (bool)             │ ← Theta外推
+                    │ _robust_peak (bool)             │ ← 鲁棒峰值
+                    │ _ar_output_db (bool)            │ ← AR输出格式
+                    │ _step_values (List[float])      │ ← 多步进
+                    │ _skip_original (bool)           │ ← 跳过原始
+                    │ _chart_config_required/extra    │ ← 图表配置
+                    │ _plot_elev/_azim/_dpi (float)   │ ← 视角参数
+                    │ _embed_in_excel (bool)          │ ← 嵌入Excel
+                    │ _save_png (bool)                │ ← 保存PNG
+                    │ _template_path (str)            │ ← 模板路径
+                    │ _data_file_paths (list)         │ ← 数据文件
+                    │ _output_dir/_output_name (str)  │ ← 输出
+                    │ _mode_states (list[dict])       │ ← 三模式独立状态
+                    └───────┬────────────────────────┘
+                            │ 实时读写 + Qt Signals
+               ┌────────────┼────────────────────┐
+               ▼            ▼                    ▼
+         FileSettings  AntennaParams       ChartSettings
+            Page          Page                Page
+         (输入输出)    (天线参数)          (图表配置)
+
+双向同步: 预览处 ≡ AntennaParamsPage (通过 MainWindow 属性中转)
+          _required_params 同步
+          _extra_params 仅在 AntennaParamsPage 配置
+
+底部状态: _update_param_summary() 聚合所有属性 → 冻结摘要显示
+执行:    _on_start() 读取所有属性 → run_pipeline()
+```
+
+**同步规则:**
+1. 每个 Page 直接读写 `self.window()._xxx` 属性
+2. 写属性后 emit 信号 → 其他 Page 感知变化自动刷新
+3. 报告预览处改 `_required_params` → emit → AntennaParamsPage 自动更新
+4. full_report (`_extra_params`) 仅在 AntennaParamsPage 配置
+
+---
+
+## 七、公共模块提取
+
+### `src/ui_utils.py` (新建 — 零 Qt 依赖)
+
+```
+build_param_summary_text(mode, required, extra, lag_cfg, ar_cfg) → str
+  构建天线参数摘要字符串
+  调用者: MainWindow._update_param_summary, 三个Page的状态栏
+
+merge_params_from_columns(column_types: set) → set
+  从模板列类型推断需要的计算参数
+  调用者: 预览处, AntennaParamsPage
+```
+
+### `ui/widgets.py` (新建 — 可含 Qt)
+
+```
+AnglePickerWidget(QWidget)
+  可复用角度选择组件:
+  - 快捷单角度按钮 (0~90°, 可选中)
+  - 步进批量生成 (起/止/步)
+  - 范围添加 (起/止)
+  - 已配置项 FlowLayout 标签
+  - signal: angle_changed(LagConfig)
+  使用: AntennaParamsPage 实例化 2 个 (Gain角度 + AR角度)
+
+TemplateSourceRow(QWidget)
+  模板来源选择行: [内置模板 ▾] [从电脑选择...] [📋 预览报告]
+  使用: FileSettingsPage, ReportPreviewDialog
+
+OutputSettingsGroup(QGroupBox)
+  输出目录 + 文件名 + 完整报告路径
+  使用: FileSettingsPage
+```
+
+---
+
+## 八、参数体系
+
+| 参数类型 | 配置入口 | 数据属性 | 用途 |
+|---------|---------|---------|------|
+| 报告必需参数 | 预览处 **AND** AntennaParamsPage | `_required_params` | 填入测试报告模板 |
+| full_report 额外参数 | **仅** AntennaParamsPage | `_extra_params` | 实验室人员独立完整报告 |
+
+**同步:** 预览处改参数 → 写 `_required_params` → emit signal → AntennaParamsPage 实时刷新
+**隔离:** full_report 只在 AntennaParamsPage 显示和配置，预览处不可见
+
+---
+
+## 九、集成策略 (5 步渐进)
+
+### Step 1 — 建地基（不破坏现有功能）
+- 新建 `src/ui_utils.py` + `ui/widgets.py`
+- 新增 MainWindow 数据属性
+- 新增 `_update_param_summary()`
+- 验证: 现有功能不受影响 → `python3 gui_integrity_check.py`
+
+### Step 2 — 抽页面
+- 创建 `FileSettingsPage` ← 从 groupInput + `_init_multi_file_ui` + groupOutput 抽
+- 创建 `AntennaParamsPage` ← 从 CalcParamsDialog 改 (QDialog → QWidget)
+- 创建 `ChartSettingsPage` ← 从 PlotConfigDialog 改 (QDialog → QWidget)
+- 验证: 每个 Page 独立可显示
+
+### Step 3 — 搭框架
+- `_build_parameter_tab()` 构建 Master-Detail 布局
+- `_hide_settings_tabs()` 删除 tabLag/tabPlot/tabCalc
+- 只用 3 个标签页
+- 验证: GUI 结构正确，导航切换正常 → `python3 gui_integrity_check.py`
+
+### Step 4 — 接数据
+- Page 读写 MainWindow 属性 → 实时同步 (无 OK/Cancel)
+- 预览处 ↔ AntennaParamsPage 双向同步
+- `_on_start()` 从属性读取
+- 验证: 设置参数 → 运行 → 结果正确
+
+### Step 5 — 清扫
+- 删除废弃方法 (~15个)
+- 清理 `_connect_signals` 中的 LAG/Plot 信号
+- 更新 `_log_current_params` / `_update_status`
+- 验证: `python3 -m pytest tests/ -q -x` + `python3 gui_integrity_check.py`
+
+---
+
+## 十、国际化 (i18n)
+
+**所有** 标签标题、GUI 标题、菜单标题、状态文本 必须 `self.tr()` 包裹，英文模式零中文。
+
+新增文本来源:
+- 标签页标题 (3个)
+- 左侧导航项 (3个)
+- FileSettingsPage 内部标签 (~20个)
+- AntennaParamsPage 内部标签 (~50个)
+- ChartSettingsPage 内部标签 (~15个)
+- 底部状态栏文本 (~5个)
+- 菜单项标题 (4个文件菜单)
+
+**新增字符串后执行:**
+```bash
+pyside6-lupdate ui/main_window.py ui/widgets.py ui/dialogs.py -ts i18n/app_zh_CN.ts i18n/app_en_US.ts
+# 在 en_US.ts 中补充英文翻译
+pyside6-lrelease i18n/app_zh_CN.ts -qm i18n/app_zh_CN.qm
+pyside6-lrelease i18n/app_en_US.ts -qm i18n/app_en_US.qm
+```
+
+---
+
+## 十一、需修改的文件
+
+| 文件 | 改动 | 说明 |
+|------|------|------|
+| `ui/main_window.py` | **重度重构** | 布局重建、方法增删、信号重连 |
+| `ui/dialogs.py` | 重度改动 | CalcParamsDialog→AntennaParamsPage, PlotConfigDialog→ChartSettingsPage, 新增 ReportPreviewDialog |
+| `src/ui_utils.py` | **新建** | 公共纯函数 |
+| `ui/widgets.py` | **新建** | 可复用 Qt 组件 |
+| `ui/compiled/ui_main_window.py` | **不改** | 编译 UI 不变 |
+
+---
+
+## 十二、验证清单
+
+| # | 验证项 | 方法 |
+|---|-------|------|
+| 1 | 启动后只有 3 标签页 | 目视 |
+| 2 | 左侧导航切换，右侧内容跟随 | 点击三项 |
+| 3 | 天线参数页改参数 → _on_start 读到正确值 | 改角度 → 运行 → 检查结果 |
+| 4 | 图表配置页改视角 → 图表按新参数生成 | 改 DPI → 运行 → 检查图表 |
+| 5 | 预览处改参数 → 天线参数页面自动刷新 | 开预览改 → 切到天线参数页 |
+| 6 | full_report 仅在面板可配置 | 预览处看不到 full_report |
+| 7 | 底部执行栏始终可见 | 添加多文件 → 底部固定 |
+| 8 | 拖拽文件到窗口仍有效 | 拖 CSV 文件到窗口 |
+| 9 | 内置模板下拉 + 从电脑选择正常 | 两者各试一次 |
+| 10 | 多窗口 (Ctrl+N) 仍正常 | Ctrl+N → 两窗口独立 |
+| 11 | 切换英文后无中文 | 切换语言 → 遍历所有页面 |
+| 12 | GUI 完整性检查通过 | `python3 gui_integrity_check.py` |
+| 13 | E2E 测试通过 | `python3 -m pytest tests/ -q -x` |
