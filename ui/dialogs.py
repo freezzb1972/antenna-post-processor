@@ -1524,6 +1524,7 @@ class PlotConfigDialog(QDialog):
         # ── 状态 ──
         self._chart_required: Dict[str, QCheckBox] = {}   # 左列: 报告需要
         self._chart_extra: Dict[str, QCheckBox] = {}      # 右列: 额外(full_report)
+        self._collapse_map: Dict[str, dict] = {}          # 折叠状态
 
         self._setup_ui()
         self._load_state()
@@ -1549,8 +1550,25 @@ class PlotConfigDialog(QDialog):
         # ── 图形分类 + 双列 ──
         for cat_name, keys in categories.items():
             grp = QGroupBox(cat_name)
+            grp.setCheckable(True)
+            grp.setChecked(True)
+            grp.setStyleSheet("""
+                QGroupBox { font-weight: bold; padding-top: 16px; }
+                QGroupBox::indicator { width: 14px; height: 14px; margin-right: 4px; }
+                QGroupBox::indicator:unchecked { image: none; }
+                QGroupBox::indicator:unchecked:hover { image: none; }
+            """)
+            grp.setCursor(Qt.PointingHandCursor)
             outer_layout = QVBoxLayout(grp)
             outer_layout.setSpacing(4)
+
+            # 折叠内容容器 — 方便显示/隐藏
+            self._collapse_map[cat_name] = {"grp": grp, "hidden": False}
+            content_widget = QWidget()
+            content_layout = QVBoxLayout(content_widget)
+            content_layout.setContentsMargins(0, 0, 0, 0)
+            content_layout.setSpacing(4)
+            outer_layout.addWidget(content_widget)
 
             # 全选 / 取消全选 按钮行
             btn_row = QHBoxLayout()
@@ -1569,9 +1587,9 @@ class PlotConfigDialog(QDialog):
             btn_row.addWidget(btn_select_all)
             btn_row.addWidget(btn_deselect_all)
             btn_row.addStretch()
-            outer_layout.addLayout(btn_row)
+            content_layout.addLayout(btn_row)
 
-            row_layout = QHBoxLayout(grp)
+            row_layout = QHBoxLayout()
             row_layout.setSpacing(8)
 
             # 左列: 报告需要
@@ -1624,8 +1642,16 @@ class PlotConfigDialog(QDialog):
             right_layout.addStretch()
             row_layout.addWidget(right_box, 1)
 
-            outer_layout.addLayout(row_layout)
+            content_layout.addLayout(row_layout)
             grp_list.append(grp)
+
+            # 折叠/展开切换
+            def make_toggle(g=grp, cw=content_widget, name=cat_name):
+                def toggle(checked):
+                    cw.setVisible(checked)
+                    self._collapse_map[name]["hidden"] = not checked
+                return toggle
+            grp.toggled.connect(make_toggle(grp, content_widget, cat_name))
 
         # ── 视角参数 ──
         view_grp = QGroupBox("视角参数")
