@@ -24,21 +24,8 @@ from PySide6.QtWidgets import (
 if TYPE_CHECKING:
     from ui.main_window import MainWindow
 
-from src.excel_reader import (
-    _classify_by_json_patterns, _normalize_key, normalize_header,
-    is_frequency_column, is_directivity_column, is_efficiency_column,
-    is_total_efficiency_column, is_gain_column, is_trp_column,
-    is_nhprp_45_column, is_nhprp_30_column, is_peak_eirp_column,
-    is_ar_single_column, is_ar_range_column, is_nhprp_225_column,
-    is_uh_prp_column, is_lh_prp_column, detect_ratio_column_type,
-    is_boresight_phi_column, is_boresight_theta_column,
-    is_max_power_column, is_min_power_column,
-    is_avg_gain_column, is_avg_power_column,
-    is_xpi_boresight_column, is_xpi_mean_column, is_xpi_min_column,
-    is_mismatch_loss_column, is_pc_theta_column, is_pc_phi_column,
-)
-from src.lag_config import _RE_LAG_RANGE, _RE_LAG_RANGE_NO_PREFIX, \
-    _RE_LAG_SINGLE, _RE_LAG_SINGLE_NO_PREFIX
+from src.excel_reader import normalize_header
+from src.column_mapping import classify_header
 
 # ── 所有可选的列类型 ──
 ALL_COL_TYPES = [
@@ -269,82 +256,8 @@ class TemplateRecognizerDialog(QDialog):
             wb.close()
 
     def _classify(self, raw_header: str) -> str:
-        """完整分类（JSON 优先 + 内置 fallback），复用 excel_reader 逻辑。"""
-        # JSON 模式优先
-        json_type = _classify_by_json_patterns(raw_header)
-        if json_type is not None:
-            return json_type
-        # 内置函数 fallback
-        norm = normalize_header(raw_header)
-        if is_frequency_column(raw_header):
-            return "frequency"
-        if is_directivity_column(raw_header):
-            return "directivity"
-        if is_total_efficiency_column(raw_header):
-            if "%" in norm or "％" in norm or "pct" in norm.lower():
-                return "total_efficiency_pct"
-            elif "db" in norm.lower():
-                return "total_efficiency_db"
-            return "total_efficiency_pct"
-        if is_efficiency_column(raw_header):
-            if "%" in norm or "％" in norm or "pct" in norm.lower():
-                return "efficiency_pct"
-            elif "db" in norm.lower():
-                return "efficiency_db"
-            return "efficiency_pct"
-        if is_gain_column(raw_header):
-            return "gain"
-        if is_trp_column(raw_header):
-            return "trp"
-        if is_nhprp_45_column(raw_header):
-            return "nhprp_45"
-        if is_nhprp_30_column(raw_header):
-            return "nhprp_30"
-        if is_peak_eirp_column(raw_header):
-            return "peak_eirp"
-        if is_ar_single_column(raw_header):
-            return "ar_single"
-        if is_ar_range_column(raw_header):
-            return "ar_range"
-        if is_nhprp_225_column(raw_header):
-            return "nhprp_225"
-        if is_uh_prp_column(raw_header):
-            return "uh_prp"
-        if is_lh_prp_column(raw_header):
-            return "lh_prp"
-        ratio_type = detect_ratio_column_type(raw_header)
-        if ratio_type:
-            return ratio_type
-        if is_boresight_phi_column(raw_header):
-            return "boresight_phi"
-        if is_boresight_theta_column(raw_header):
-            return "boresight_theta"
-        if is_max_power_column(raw_header):
-            return "max_power"
-        if is_min_power_column(raw_header):
-            return "min_power"
-        if is_avg_gain_column(raw_header):
-            return "avg_gain"
-        if is_avg_power_column(raw_header):
-            return "avg_power"
-        if is_xpi_boresight_column(raw_header):
-            return "xpi_boresight"
-        if is_xpi_mean_column(raw_header):
-            return "xpi_mean"
-        if is_xpi_min_column(raw_header):
-            return "xpi_min"
-        if is_mismatch_loss_column(raw_header):
-            return "mismatch_loss_db"
-        if is_pc_theta_column(raw_header):
-            return "pc_theta_mm"
-        if is_pc_phi_column(raw_header):
-            return "pc_phi_mm"
-        _norm = _normalize_key(raw_header)
-        if _RE_LAG_RANGE.search(_norm) or _RE_LAG_RANGE_NO_PREFIX.search(_norm):
-            return "lag_range"
-        if _RE_LAG_SINGLE.search(_norm) or _RE_LAG_SINGLE_NO_PREFIX.search(_norm):
-            return "lag_single"
-        return "unknown"
+        """完整分类入口，委托给 column_mapping.classify_header。"""
+        return classify_header(raw_header)
 
     # ── 表格显示 ─────────────────────────────────────────────────────
 

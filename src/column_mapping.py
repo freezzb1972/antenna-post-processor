@@ -113,18 +113,7 @@ def detect_columns_from_template(template_path: str,
 def _detect_excel_columns(path: str, header_row: int = None) -> List[ColumnMapping]:
     """Excel 模板列检测。"""
     import openpyxl
-    from src.excel_reader import _classify_by_json_patterns, is_frequency_column, \
-        is_directivity_column, is_efficiency_column, is_total_efficiency_column, \
-        is_gain_column, is_trp_column, is_nhprp_45_column, is_nhprp_30_column, \
-        is_peak_eirp_column, is_ar_single_column, is_ar_range_column, \
-        is_nhprp_225_column, is_uh_prp_column, is_lh_prp_column, \
-        detect_ratio_column_type, is_boresight_phi_column, is_boresight_theta_column, \
-        is_max_power_column, is_min_power_column, is_avg_gain_column, \
-        is_avg_power_column, is_xpi_boresight_column, is_xpi_mean_column, \
-        is_xpi_min_column, is_mismatch_loss_column, is_pc_theta_column, \
-        is_pc_phi_column, normalize_header, _normalize_key
-    from src.lag_config import _RE_LAG_RANGE, _RE_LAG_RANGE_NO_PREFIX, \
-        _RE_LAG_SINGLE, _RE_LAG_SINGLE_NO_PREFIX
+    from src.excel_reader import is_frequency_column
 
     wb = openpyxl.load_workbook(path, data_only=True)
 
@@ -155,8 +144,7 @@ def _detect_excel_columns(path: str, header_row: int = None) -> List[ColumnMappi
             continue
 
         col_letter = openpyxl.utils.get_column_letter(c)
-        ctype = _classify_full(raw, _classify_by_json_patterns,
-                               is_frequency_column, is_directivity_column,
+        ctype = classify_header(raw)
                                is_efficiency_column, is_total_efficiency_column,
                                is_gain_column, is_trp_column, is_nhprp_45_column,
                                is_nhprp_30_column, is_peak_eirp_column,
@@ -245,77 +233,86 @@ def _detect_word_columns_docx(path: str, header_row: int = None) -> List[ColumnM
 # 分类函数
 # ═══════════════════════════════════════════════════════════════
 
+def classify_header(raw_header: str) -> str:
+    """统一列头分类入口。JSON 模式优先 → 内置函数 fallback → regex fallback。
+
+    单一入口，供 excel_reader, template_recognizer, chart_config 共用。
+    """
+    from src.excel_reader import (
+        _classify_by_json_patterns, is_frequency_column, is_directivity_column,
+        is_efficiency_column, is_total_efficiency_column, is_gain_column,
+        is_trp_column, is_nhprp_45_column, is_nhprp_30_column,
+        is_peak_eirp_column, is_ar_single_column, is_ar_range_column,
+        is_nhprp_225_column, is_uh_prp_column, is_lh_prp_column,
+        detect_ratio_column_type, is_boresight_phi_column,
+        is_boresight_theta_column, is_max_power_column, is_min_power_column,
+        is_avg_gain_column, is_avg_power_column, is_xpi_boresight_column,
+        is_xpi_mean_column, is_xpi_min_column, is_mismatch_loss_column,
+        is_pc_theta_column, is_pc_phi_column, normalize_header, _normalize_key,
+    )
+    from src.lag_config import (
+        _RE_LAG_RANGE, _RE_LAG_RANGE_NO_PREFIX,
+        _RE_LAG_SINGLE, _RE_LAG_SINGLE_NO_PREFIX,
+    )
+
+    # JSON 模式优先
+    json_type = _classify_by_json_patterns(raw_header)
+    if json_type is not None:
+        return json_type
+
+    # 内置函数 fallback
+    if is_frequency_column(raw_header):          return "frequency"
+    if is_directivity_column(raw_header):        return "directivity"
+
+    if is_total_efficiency_column(raw_header):
+        return "total_efficiency_db" if "db" in normalize_header(raw_header).lower() else "total_efficiency_pct"
+    if is_efficiency_column(raw_header):
+        return "efficiency_db" if "db" in normalize_header(raw_header).lower() else "efficiency_pct"
+
+    if is_gain_column(raw_header):               return "gain"
+    if is_trp_column(raw_header):                return "trp"
+    if is_nhprp_45_column(raw_header):           return "nhprp_45"
+    if is_nhprp_30_column(raw_header):           return "nhprp_30"
+    if is_peak_eirp_column(raw_header):          return "peak_eirp"
+    if is_ar_single_column(raw_header):          return "ar_single"
+    if is_ar_range_column(raw_header):           return "ar_range"
+    if is_nhprp_225_column(raw_header):          return "nhprp_225"
+    if is_uh_prp_column(raw_header):             return "uh_prp"
+    if is_lh_prp_column(raw_header):             return "lh_prp"
+
+    ratio_type = detect_ratio_column_type(raw_header)
+    if ratio_type:                               return ratio_type
+
+    if is_boresight_phi_column(raw_header):      return "boresight_phi"
+    if is_boresight_theta_column(raw_header):    return "boresight_theta"
+    if is_max_power_column(raw_header):          return "max_power"
+    if is_min_power_column(raw_header):          return "min_power"
+    if is_avg_gain_column(raw_header):           return "avg_gain"
+    if is_avg_power_column(raw_header):          return "avg_power"
+    if is_xpi_boresight_column(raw_header):      return "xpi_boresight"
+    if is_xpi_mean_column(raw_header):           return "xpi_mean"
+    if is_xpi_min_column(raw_header):            return "xpi_min"
+    if is_mismatch_loss_column(raw_header):      return "mismatch_loss_db"
+    if is_pc_theta_column(raw_header):           return "pc_theta_mm"
+    if is_pc_phi_column(raw_header):             return "pc_phi_mm"
+
+    # Regex fallback (LAG)
+    _norm = _normalize_key(raw_header)
+    if _RE_LAG_RANGE.search(_norm) or _RE_LAG_RANGE_NO_PREFIX.search(_norm):
+        return "lag_range"
+    if _RE_LAG_SINGLE.search(_norm) or _RE_LAG_SINGLE_NO_PREFIX.search(_norm):
+        return "lag_single"
+    return "unknown"
+
+
 def _classify_full(raw_header, classify_json, *classifiers) -> str:
-    """完整分类链: JSON优先 → 内置函数 → regex fallback。"""
-    # 由于 _classify_full_static 无法接受动态导入的函数，这里内联实现
-    return _classify_full_static(raw_header)
+    """(已弃用) 保留兼容接口，直接调用 classify_header。"""
+    return classify_header(raw_header)
 
 
 def _classify_full_static(raw_header: str) -> str:
-    """静态版本 — 不依赖外部导入的完整分类。"""
-    import re
-    # JSON 模式优先
-    from src.excel_reader import _classify_by_json_patterns
-    json_type = _classify_by_json_patterns(raw_header)
-    if json_type:
-        return json_type
-
-    h = re.sub(r"[^a-z%％()db一-鿿]+", "", raw_header.lower())
-
-    # 内置规则（精简版 — 覆盖主要类型）
-    if "frequency" in h or "freq" in h:
-        return "frequency"
-    if "directivity" in h:
-        return "directivity"
-    if "total" in h and "efficiency" in h:
-        return "total_efficiency_db" if "db" in h else "total_efficiency_pct"
-    if "efficiency" in h:
-        return "efficiency_db" if "db" in h else "efficiency_pct"
-    if "gain" in h and "average" not in h and "avg" not in h and "theta" not in h:
-        return "gain"
-    if "trp" in h and "nhprp" not in h:
-        return "trp"
-    if "nhprp" in h and "45" in h:
-        return "nhprp_45"
-    if "nhprp" in h and "30" in h:
-        return "nhprp_30"
-    if "nhprp" in h and "22.5" in h:
-        return "nhprp_225"
-    if "peak" in h and "eirp" in h:
-        return "peak_eirp"
-    if "ar" in h and "theta" in h:
-        return "ar_range" if "~" in raw_header else "ar_single"
-    if "boresight" in h and "phi" in h:
-        return "boresight_phi"
-    if "boresight" in h and "theta" in h:
-        return "boresight_theta"
-    if "xpi" in h and "boresight" in h:
-        return "xpi_boresight"
-    if "xpi" in h and "mean" in h:
-        return "xpi_mean"
-    if "xpi" in h and "min" in h:
-        return "xpi_min"
-    if "mismatch" in h and "loss" in h:
-        return "mismatch_loss_db"
-    if "pc" in h and "theta" in h:
-        return "pc_theta_mm"
-    if "pc" in h and "phi" in h:
-        return "pc_phi_mm"
-    if "average" in h and "gain" in h:
-        return "avg_gain"
-    if "average" in h and "power" in h:
-        return "avg_power"
-    if "max" in h and "power" in h:
-        return "max_power"
-    if "min" in h and "power" in h:
-        return "min_power"
-    if "upper" in h and "prp" in h:
-        return "uh_prp"
-    if "lower" in h and "prp" in h:
-        return "lh_prp"
-    if "ratio" in h and "nhprp" in h:
-        return "nhprp45_ratio_db"
-    return "unknown"
+    """(已弃用) 保留兼容接口，直接调用 classify_header。"""
+    return classify_header(raw_header)
 
 
 # ═══════════════════════════════════════════════════════════════
