@@ -24,7 +24,7 @@ ARM 合并后，`tabConfig` 有 5 个可见标签页：
 
 ```
 5 标签页 → 3 标签页 (处理设置 / 计算结果 / 图表查看)
-Master-Detail 布局: 左侧导航 (固定) + 右侧 QStackedWidget (3页切换) + 底部执行栏 (共享)
+Master-Detail 布局: 左侧导航 (固定) + 右侧 QStackedWidget (3页切换) + 底部执行栏 (跨标签页共享，在 tabConfig 外部)
 只保留一套角度配置、一套图形配置
 所有 UI 文本 self.tr() 包裹，中英文完整切换
 ```
@@ -76,7 +76,7 @@ Master-Detail 布局: 左侧导航 (固定) + 右侧 QStackedWidget (3页切换)
 │  │                          │ - 输出方式 (嵌入Excel/保存PNG)       ││
 │  └──────────────────────────┴─────────────────────────────────────┘│
 │                                                                   │
-│  ┌─ 底部执行栏 (固定，所有页面共享) ──────────────────────────────┐│
+│  ┌─ 底部执行栏 (固定，跨 3 主标签页共享，在 tabConfig 外部) ──────────────────────────────┐│
 │  │ [==================进度条==================] 处理中...          ││
 │  │ [日志输出区                                        ]          ││
 │  │                                   [▶ 开始处理] [⏹ 停止]       ││
@@ -166,12 +166,16 @@ MainWindow (QMainWindow)
    │   │       ├─ FileSettingsPage   (QWidget, 索引 0)
    │   │       ├─ AntennaParamsPage  (QWidget, 索引 1)
    │   │       └─ ChartSettingsPage  (QWidget, 索引 2)
-   │   └─ executionBar (QWidget, fixed bottom)
-   │       ├─ progressBar + lblProgressMsg
-   │       ├─ logOutput (QPlainTextEdit)
-   │       └─ btnStart + btnStop
+   │   └─ (无执行栏 — 在 tabConfig 外部共享)
    ├─ tab[1]: "计算结果" ← 保持现有 tabResults
    └─ tab[2]: "图表查看" ← 保持现有 tabCharts
+
+├─ executionBar (QWidget, 在 tabConfig **外部**, 跨 3 主标签页共享)
+│   ├─ progressBar + lblProgressMsg
+│   ├─ logOutput (QPlainTextEdit)
+│   └─ btnStart + btnStop
+
+└─ ReportPreviewDialog (QDialog, 从模板文件旁的「📋 预览报告」按钮打开)
 ```
 
 **删除:** tabLag, tabPlot, tabCalc（及其内所有 widget）
@@ -211,9 +215,11 @@ MainWindow (QMainWindow)
             Page          Page                Page
          (输入输出)    (天线参数)          (图表配置)
 
-双向同步: 预览处 ≡ AntennaParamsPage (通过 MainWindow 属性中转)
-          _required_params 同步
+双向同步: ReportPreviewDialog ≡ AntennaParamsPage (通过 MainWindow 属性中转)
+          _required_params 同步 (直接写属性 → emit 信号)
           _extra_params 仅在 AntennaParamsPage 配置
+
+**同步循环防护:** 每次写属性前 `self.blockSignals(True)`, 写完后恢复, 避免级联触发
 
 底部状态: _update_param_summary() 聚合所有属性 → 冻结摘要显示
 执行:    _on_start() 读取所有属性 → run_pipeline()
@@ -222,7 +228,7 @@ MainWindow (QMainWindow)
 **同步规则:**
 1. 每个 Page 直接读写 `self.window()._xxx` 属性
 2. 写属性后 emit 信号 → 其他 Page 感知变化自动刷新
-3. 报告预览处改 `_required_params` → emit → AntennaParamsPage 自动更新
+3. ReportPreviewDialog 改 `_required_params` → emit → AntennaParamsPage 自动更新
 4. full_report (`_extra_params`) 仅在 AntennaParamsPage 配置
 
 ---
@@ -238,7 +244,7 @@ build_param_summary_text(mode, required, extra, lag_cfg, ar_cfg) → str
 
 merge_params_from_columns(column_types: set) → set
   从模板列类型推断需要的计算参数
-  调用者: 预览处, AntennaParamsPage
+  调用者: ReportPreviewDialog, AntennaParamsPage
 ```
 
 ### `ui/widgets.py` (新建 — 可含 Qt)
@@ -268,11 +274,11 @@ OutputSettingsGroup(QGroupBox)
 
 | 参数类型 | 配置入口 | 数据属性 | 用途 |
 |---------|---------|---------|------|
-| 报告必需参数 | 预览处 **AND** AntennaParamsPage | `_required_params` | 填入测试报告模板 |
+| 报告必需参数 | ReportPreviewDialog **AND** AntennaParamsPage | `_required_params` | 填入测试报告模板 |
 | full_report 额外参数 | **仅** AntennaParamsPage | `_extra_params` | 实验室人员独立完整报告 |
 
-**同步:** 预览处改参数 → 写 `_required_params` → emit signal → AntennaParamsPage 实时刷新
-**隔离:** full_report 只在 AntennaParamsPage 显示和配置，预览处不可见
+**同步:** ReportPreviewDialog 改参数 → 写 `_required_params` → emit signal → AntennaParamsPage 实时刷新
+**隔离:** full_report 只在 AntennaParamsPage 显示和配置，ReportPreviewDialog 不可见
 
 ---
 
@@ -298,7 +304,7 @@ OutputSettingsGroup(QGroupBox)
 
 ### Step 4 — 接数据
 - Page 读写 MainWindow 属性 → 实时同步 (无 OK/Cancel)
-- 预览处 ↔ AntennaParamsPage 双向同步
+- ReportPreviewDialog ↔ AntennaParamsPage 双向同步
 - `_on_start()` 从属性读取
 - 验证: 设置参数 → 运行 → 结果正确
 
@@ -569,8 +575,8 @@ pyside6-lrelease i18n/app_en_US.ts -qm i18n/app_en_US.qm
 | 2 | 左侧导航切换，右侧内容跟随 | 点击三项 |
 | 3 | 天线参数页改参数 → _on_start 读到正确值 | 改角度 → 运行 → 检查结果 |
 | 4 | 图表配置页改视角 → 图表按新参数生成 | 改 DPI → 运行 → 检查图表 |
-| 5 | 预览处改参数 → 天线参数页面自动刷新 | 开预览改 → 切到天线参数页 |
-| 6 | full_report 仅在面板可配置 | 预览处看不到 full_report |
+| 5 | ReportPreviewDialog 改参数 → 天线参数页面自动刷新 | 开预览改 → 切到天线参数页 |
+| 6 | full_report 仅在面板可配置 | ReportPreviewDialog 看不到 full_report |
 | 7 | 底部执行栏始终可见 | 添加多文件 → 底部固定 |
 | 8 | 拖拽文件到窗口仍有效 | 拖 CSV 文件到窗口 |
 | 9 | 内置模板下拉 + 从电脑选择正常 | 两者各试一次 |
