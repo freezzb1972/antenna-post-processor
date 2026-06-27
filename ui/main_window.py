@@ -137,6 +137,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._init_quick_angle_buttons()
         self._init_params_tab()
         self._init_param_overview()
+        self._init_step_selector()
         self._connect_signals()
         self._update_lag_display()
         self._init_menu()
@@ -392,6 +393,69 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         vtab.addStretch()
 
         self._make_tab_scrollable(self.ui.tabCalc)
+
+    def _init_step_selector(self):
+        """在文件设置区添加多步进计算选择面板。"""
+        from PySide6.QtWidgets import QLineEdit
+        vtab = self.ui.vTabFile
+
+        self._grp_step = QGroupBox(self.tr("📏 多步进计算"))
+        self._grp_step.setCheckable(True)
+        self._grp_step.setChecked(False)
+        self._grp_step.setToolTip(self.tr("勾选后可以选择多个步进值同时计算，结果输出到同一个Excel的不同Sheet"))
+        sl = QVBoxLayout(self._grp_step)
+        sl.setSpacing(6)
+
+        # 说明标签
+        sl.addWidget(QLabel(self.tr("选择要计算的步进值（可多选）。未选中则使用源文件原始步进。")))
+
+        # Checkbox 行
+        self._step_checks: Dict[float, QCheckBox] = {}
+        cb_row = QHBoxLayout()
+        cb_row.setSpacing(8)
+        COMMON_STEPS = [2, 5, 10, 15, 20, 30, 45]
+        for s in COMMON_STEPS:
+            cb = QCheckBox(f"{s}°")
+            cb.setChecked(s in [5, 10])  # 默认选中常用
+            self._step_checks[s] = cb
+            cb_row.addWidget(cb)
+        cb_row.addStretch()
+        sl.addLayout(cb_row)
+
+        # 自定义输入
+        cust_row = QHBoxLayout()
+        cust_row.addWidget(QLabel(self.tr("自定义:")))
+        self._edit_step_custom = QLineEdit()
+        self._edit_step_custom.setPlaceholderText(self.tr("如: 3, 8, 25 (逗号分隔)"))
+        self._edit_step_custom.setMaximumWidth(250)
+        cust_row.addWidget(self._edit_step_custom)
+        cust_row.addStretch()
+        sl.addLayout(cust_row)
+
+        # 跳过原始步进
+        self._chk_skip_original = QCheckBox(
+            self.tr("☐ 跳过原始步进（仅计算上述选中的步进值）"))
+        sl.addWidget(self._chk_skip_original)
+
+        vtab.addWidget(self._grp_step)
+
+    def _get_selected_steps(self) -> List[float]:
+        """获取用户选中的步进值列表。未启用多步进则返回空。"""
+        if not self._grp_step.isChecked():
+            return []
+        steps = [s for s, cb in self._step_checks.items() if cb.isChecked()]
+        custom = self._edit_step_custom.text().strip()
+        if custom:
+            for part in custom.split(","):
+                part = part.strip()
+                if part:
+                    try:
+                        v = float(part)
+                        if v > 0 and v not in steps:
+                            steps.append(v)
+                    except ValueError:
+                        pass
+        return sorted(steps)
 
     def _init_param_overview(self):
         """在 tabFile 中插入参数分类概览面板（天线参数子节）。"""
@@ -1810,6 +1874,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             chart_config_obj=full_chart_config,
             ar_lag_config=self._ar_lag_config if hasattr(self, '_ar_lag_config') and not self._ar_lag_config.is_empty() else None,
             ar_output_db=self._ar_output_db,
+            # 多步进参数
+            step_values=self._get_selected_steps() if hasattr(self, '_get_selected_steps') else [],
+            skip_original=self._chk_skip_original.isChecked() if hasattr(self, '_chk_skip_original') else False,
         )
         self._worker.moveToThread(self._thread)
 

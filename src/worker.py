@@ -2,16 +2,17 @@
 后台处理 Worker
 ================
 QThread 封装的异步处理任务，通过 Signal 与 GUI 通信。
+支持多步进同时计算模式。
 """
 
 from __future__ import annotations
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from PySide6.QtCore import QObject, Signal
 from .lag_config import LagConfig
 from .plot_config import PlotConfig
 from .chart_config import ChartConfig
 from .pipeline import run_pipeline, run_batch_pipeline
-from .datasource import DataSource
+from .datasource import DataSource, ResampledDataSource
 
 
 class ProcessingWorker(QObject):
@@ -45,6 +46,9 @@ class ProcessingWorker(QObject):
         nh_custom_angles: Optional[List[float]] = None,
         ar_output_db: bool = True,
         worksheet_naming_mode: int = 0,
+        # 多步进参数
+        step_values: Optional[List[float]] = None,
+        skip_original: bool = False,
     ):
         super().__init__()
         self.csv_path = csv_path
@@ -67,6 +71,8 @@ class ProcessingWorker(QObject):
         self.nh_custom_angles = nh_custom_angles
         self.ar_output_db = ar_output_db
         self.worksheet_naming_mode = worksheet_naming_mode
+        self.step_values = step_values or []
+        self.skip_original = skip_original
         self._cancelled = False
 
     def cancel(self):
@@ -104,7 +110,17 @@ class ProcessingWorker(QObject):
                 log_callback=self._on_log,
             )
 
-            if self.datasource_map:
+            # ── 多步进模式 ──
+            if self.step_values:
+                # 获取基础 DataSource（单文件或 map 首项）
+                base = self.datasource
+                if base is None and self.datasource_map:
+                    base = next(iter(self.datasource_map.values()))
+                if base is not None:
+                    results = self._run_multi_step(base, **kwargs)
+                else:
+                    results = run_batch_pipeline(csv_path=self.csv_path, **kwargs)
+            elif self.datasource_map:
                 results = run_pipeline(datasource_map=self.datasource_map, **kwargs)
             elif self.datasource:
                 results = run_pipeline(datasource=self.datasource, **kwargs)
@@ -117,6 +133,97 @@ class ProcessingWorker(QObject):
         except Exception as e:
             import traceback
             self.error.emit(f"{e}\n{traceback.format_exc()}")
+
+    def _run_multi_step(self, base_ds: DataSource, **kwargs) -> Dict[str, list]:
+        """多步进同时计算：源文件一次读取，各步进零拷贝重采样。"""
+        import os
+        import openpyxl
+        from tempfile import NamedTemporaryFile
+
+        # 原始步进
+        orig_theta_step = round(
+            base_ds.theta_angles[1] - base_ds.theta_angles[0], 6
+        ) if len(base_ds.theta_angles) > 1 else 1.0
+        orig_phi_step = round(
+            base_ds.phi_angles[1] - base_ds.phi_angles[0], 6
+        ) if len(base_ds.phi_angles) > 1 else 1.0
+
+        # 确定要计算哪些步进
+        steps_to_run = []
+        if not self.skip_original:
+            steps_to_run.append(("", base_ds))  # 原始步进，无后缀
+
+        for step in sorted(self.step_values):
+            theta_stride = max(1, int(round(step / orig_theta_step)))
+            phi_stride = max(1, int(round(step / orig_phi_step)))
+            suffix = f"_step{int(step)}"
+            # 去重：不同 stride 的步进都计算
+            resampled = ResampledDataSource(base_ds, theta_stride, phi_stride)
+            steps_to_run.append((suffix, resampled))
+
+        all_results = {}
+        total_steps = len(steps_to_run)
+
+        output_path = kwargs.pop("output_path", self.output_path)
+        temp_dir = os.path.dirname(output_path) or "."
+        os.makedirs(temp_dir, exist_ok=True)
+
+        # 合并工作簿
+        wb = openpyxl.Workbook()
+        wb.remove(wb.active)
+
+        for si, (suffix, ds) in enumerate(steps_to_run):
+            if self._cancelled:
+                break
+
+            label = suffix[1:] if suffix else "原始步进"
+            self.log.emit(f"📏 计算步进: {label}...")
+
+            # 用临时文件跑单个步进
+            with NamedTemporaryFile(suffix=".xlsx", dir=temp_dir, delete=False) as tf:
+                tmp_out = tf.name
+
+            try:
+                kw = dict(kwargs)
+                kw["output_path"] = tmp_out
+                kw["progress_callback"] = lambda c, t, m, s=si, ts=total_steps: \
+                    self._on_progress(s * 100 + c, ts * 100, m)
+
+                results = run_pipeline(datasource=ds, **kw)
+
+                # 把临时文件的 sheet 拷贝到合并工作簿
+                twb = openpyxl.load_workbook(tmp_out, data_only=True)
+                for ws in twb.worksheets:
+                    new_name = (ws.title + suffix)[:31]  # Excel max 31 chars
+                    nws = wb.create_sheet(title=new_name)
+                    for row in ws.iter_rows():
+                        for cell in row:
+                            ncell = nws.cell(row=cell.row, column=cell.column)
+                            ncell.value = cell.value
+                            if cell.has_style:
+                                ncell.font = cell.font
+                                ncell.fill = cell.fill
+                                ncell.alignment = cell.alignment
+                                ncell.border = cell.border
+                                ncell.number_format = cell.number_format
+                    # 拷贝列宽
+                    for col_letter, dim in ws.column_dimensions.items():
+                        nws.column_dimensions[col_letter].width = dim.width
+                    # 拷贝冻结窗格
+                    if ws.freeze_panes:
+                        nws.freeze_panes = ws.freeze_panes
+                twb.close()
+            finally:
+                try:
+                    os.unlink(tmp_out)
+                except OSError:
+                    pass
+
+        # 保存合并工作簿
+        wb.save(output_path)
+        wb.close()
+
+        return all_results
 
     def _on_progress(self, current, total, message):
         if not self._cancelled:
