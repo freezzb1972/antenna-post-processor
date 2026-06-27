@@ -381,7 +381,149 @@ OutputSettingsGroup(QGroupBox)
 
 ---
 
-## 十三、国际化 (i18n)
+## 十三、数据修复重构
+
+### 13.1 问题
+- 点击"数据修复"可能因 z-order 导致对话框弹到主窗口背后
+- RepairDialog 无扫描预览步骤，选文件直接执行修复
+- 用户不知道检测出多少坏点、用什么方法修复
+- 修复方法存在但不可见（MAD/Q25/KNN/手动）
+
+### 13.2 改造方案
+参考 BatchCalibrateDialog 的扫描-预览-执行模式:
+
+```
+RepairDialog (新设计)
+├─ [📂 添加数据文件...] [清除]
+├─ [文件列表]
+├─ [🔍 扫描数据质量]              ← 新增扫描按钮
+├─ 扫描结果表:                     ← 新增
+│   │ 文件 │ 格式 │ 坏点phi数 │ 坏点位置 │ 建议方法 │
+│   │ a.csv │ 标准 │ 3个     │ 12,15,18 │ MAD+KNN  │
+│   │ b.csv │ 异常 │ 6个     │ 5-10     │ Q25+KNN  │
+├─ 修复方法选择:                   ← 新增方法说明
+│   ○ MAD 异常检测 — 中位数绝对偏差，适合标准格式
+│   ○ Q25 比率检测 — 四分位数比率，适合异常终止格式
+│   ○ KNN 插值修复 — 逆距离加权K近邻插值
+│   ○ 手动指定 phi — 直接输入需修复的位置
+├─ [▶ 执行修复] [关闭]
+```
+
+### 13.3 技术实现
+- 复用 `src/data_quality.py` 中的 `detect_phi_anomalies()` 做扫描
+- `auto_detect_and_repair()` 已有全部逻辑，仅需包装扫描步骤
+- 修复 `z-order` 问题: 所有对话框创建后调用 `dlg.raise_()` + `dlg.activateWindow()`
+
+---
+
+## 十四、路径损耗补偿独立
+
+### 14.1 问题
+- "数据检查与转换"和"路径损耗补偿"打开同一个 `BatchCalibrateDialog`
+- 两个不同的功能用一个对话框，用户困惑
+
+### 14.2 拆分方案
+
+| 工具 | 对话框 | 职责 |
+|------|--------|------|
+| 数据检查与转换 | BatchCalibrateDialog | 扫描格式 → 显示结果 → Re/Im 转 LogMag |
+| 路径损耗补偿 | PathLossDialog (新) | 选文件 + RSP → 检查格式 → 执行补偿 |
+
+### 14.3 PathLossDialog 设计
+```
+PathLossDialog
+├─ 文件选择区
+│   ├─ [添加CSV文件...] [清除]
+│   └─ [文件列表]
+├─ RSP 校准文件
+│   ├─ H-pol: [path] [浏览] [从预设选择... ▾]
+│   └─ V-pol: [path] [浏览] [从预设选择... ▾]
+├─ [🔍 检查兼容性]               ← 扫描: 格式 + 频率覆盖
+│   └─ 结果: "3 文件为对数域 ✓ | 1 文件为实部/虚部 ⚠ 需先转换"
+├─ 处理选项
+│   ├─ ☑ 自动转换实部/虚部文件 (必须先转换为对数域)
+│   └─ ☑ 应用路径损耗补偿
+├─ [▶ 执行] [关闭]
+```
+
+### 14.4 实部/虚部处理逻辑
+- RSP 补偿只能对 LogMag/Phase（对数域）做，不能直接对 Re/Im 做
+- 发现有 Re/Im 文件 → 勾选"自动转换" → 先 `_to_logmag()` + `_to_phase()` → 再 `apply_path_loss_calibration()`
+- 未勾选转换 → 跳过该文件并警告
+
+---
+
+## 十五、RSP 校准预设管理
+
+### 15.1 问题
+- RSP 预设管理在"系统设置"中，但它是操作工具而非应用配置
+- `RspPickerDialog` 已经写好了但**从未被使用** — 预设和对话框是断开的
+- `BatchCalibrateDialog` 和 `MergeDialog` 都用 `QFileDialog` 手动浏览，不走预设
+
+### 15.2 调整
+```
+系统设置 → 只留: 字体 / 主题 / 语言 / LLM API（纯配置）
+RSP 预设管理 → 移到 工具菜单
+
+工具 →
+  ...
+  模板预设管理...
+  校准预设管理...          ← RSP预设（从系统设置移出）
+  EMQuest 数据导出...
+```
+
+### 15.3 连接预设到对话框
+- PathLossDialog 和 MergeDialog 添加 [从预设选择... ▾] 下拉框
+- 选中预设后自动填充 H-pol/V-pol 路径
+- 复用 `RspPickerDialog` 组件（目前已实现但未使用）
+
+---
+
+## 十六、菜单最终结构
+
+```
+文件 →
+  新建窗口  Ctrl+N
+  ─────────────
+  系统设置...
+  ─────────────
+  保存结果...  Ctrl+S
+  ─────────────
+  关闭窗口  Ctrl+W
+
+工具 →
+  数据检查与转换...        ← 仅格式检测+转换
+  路径损耗补偿...          ← 独立对话框 (PathLossDialog)
+  数据合并...
+  步进重采样...
+  ─────────────
+  数据修复...              ← 扫描→预览→选方法→执行
+  ─────────────
+  模板预设管理...           ← 模板识别合并入
+  校准预设管理...           ← RSP预设（从系统设置移出）
+  ─────────────
+  EMQuest 数据导出...
+
+窗口 →
+  新建窗口
+  ─────────────
+  [窗口列表...]
+
+帮助 →
+  使用说明  F1
+  许可管理...
+  关于...
+```
+
+**变动:**
+- 移除: 文件→LLM智能设置（已在系统设置内）
+- 拆分: 数据检查与转换 ≠ 路径损耗补偿（独立对话框）
+- 移出: RSP 预设管理（系统设置 → 工具菜单）
+- 合并: 模板识别 → 模板预设管理
+
+---
+
+## 十七、国际化 (i18n)
 
 **所有** 标签标题、GUI 标题、菜单标题、状态文本 必须 `self.tr()` 包裹，英文模式零中文。
 
@@ -404,19 +546,22 @@ pyside6-lrelease i18n/app_en_US.ts -qm i18n/app_en_US.qm
 
 ---
 
-## 十四、需修改的文件
+## 十八、需修改的文件
 
 | 文件 | 改动 | 说明 |
 |------|------|------|
-| `ui/main_window.py` | **重度重构** | 布局重建、方法增删、信号重连 |
-| `ui/dialogs.py` | 重度改动 | CalcParamsDialog→AntennaParamsPage, PlotConfigDialog→ChartSettingsPage, 新增 ReportPreviewDialog |
+| `ui/main_window.py` | **重度重构** | 布局重建、菜单重组、方法增删、信号重连 |
+| `ui/dialogs.py` | 重度改动 | CalcParamsDialog→AntennaParamsPage, PlotConfigDialog→ChartSettingsPage, 新增 ReportPreviewDialog, 新增 PathLossDialog, 重构 RepairDialog |
+| `ui/widgets.py` | **新建** | 可复用 Qt 组件 (AnglePickerWidget, TemplateSourceRow, OutputSettingsGroup) |
 | `src/ui_utils.py` | **新建** | 公共纯函数 |
-| `ui/widgets.py` | **新建** | 可复用 Qt 组件 |
+| `ui/rsp_picker_dialog.py` | 中等改动 | 连接到实际对话框，添加 [从预设选择] 功能 |
 | `ui/compiled/ui_main_window.py` | **不改** | 编译 UI 不变 |
+| `ui/template_recognizer.py` | 小改 | 整合入模板预设管理 |
+| `src/rsp_preset_manager.py` | 小改 | 暴露 API 供对话框调用 |
 
 ---
 
-## 十五、验证清单
+## 十九、验证清单
 
 | # | 验证项 | 方法 |
 |---|-------|------|
@@ -431,5 +576,12 @@ pyside6-lrelease i18n/app_en_US.ts -qm i18n/app_en_US.qm
 | 9 | 内置模板下拉 + 从电脑选择正常 | 两者各试一次 |
 | 10 | 多窗口 (Ctrl+N) 仍正常 | Ctrl+N → 两窗口独立 |
 | 11 | 切换英文后无中文 | 切换语言 → 遍历所有页面 |
-| 12 | GUI 完整性检查通过 | `python3 gui_integrity_check.py` |
-| 13 | E2E 测试通过 | `python3 -m pytest tests/ -q -x` |
+| 12 | 数据修复: 扫描→显示结果→选方法→执行 | 拿异常CSV测试完整流程 |
+| 13 | 路径损耗补偿: 独立对话框 | 检查文件+选RSP+执行补偿 |
+| 14 | 路径损耗: Re/Im文件正确提示先转换 | 拿Re/Im文件测试 |
+| 15 | RSP预设管理在工具菜单可用 | 打开→创建→选择预设 |
+| 16 | RSP预设连接到对话框(路径损耗+合并) | 对话框中选预设→自动填路径 |
+| 17 | 文件菜单无LLM智能设置 | 目视 |
+| 18 | 图表空状态非白屏 | 启动→切到图表查看标签 |
+| 19 | GUI 完整性检查通过 | `python3 gui_integrity_check.py` |
+| 20 | E2E 测试通过 | `python3 -m pytest tests/ -q -x` |
