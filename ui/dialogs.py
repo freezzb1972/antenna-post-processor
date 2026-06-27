@@ -80,6 +80,10 @@ class DataSourceDialog(QDialog):
         self._edit_template = QLineEdit(); self._edit_template.setPlaceholderText("选择模板 .xlsx ...")
         btn_tpl = QPushButton("浏览..."); btn_tpl.clicked.connect(self._on_browse_template)
         path_row.addWidget(self._edit_template); path_row.addWidget(btn_tpl)
+        # 预览列映射按钮
+        self._btn_preview_mapping = QPushButton(self.tr("🔍 预览列映射"))
+        self._btn_preview_mapping.clicked.connect(self._on_preview_mapping)
+        path_row.addWidget(self._btn_preview_mapping)
         tpl_layout.addLayout(path_row)
 
         # 数据文件
@@ -215,7 +219,70 @@ class DataSourceDialog(QDialog):
         from src.template_manager import TemplatePreset
         if isinstance(tpl, TemplatePreset):
             self._edit_template.setText(tpl.path)
-            self._run_auto_match()
+
+    def _on_preview_mapping(self):
+        """打开列映射预览弹窗。"""
+        path = self._edit_template.text().strip()
+        if not path or not os.path.exists(path):
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择模板文件。"))
+            return
+        try:
+            from src.column_mapping import detect_columns_from_template, ALL_COL_TYPE_LABELS
+            mappings = detect_columns_from_template(path)
+
+            dlg = QDialog(self)
+            dlg.setWindowTitle(self.tr("列映射预览"))
+            dlg.setMinimumSize(550, 400)
+            dl = QVBoxLayout(dlg)
+
+            table = QTableWidget()
+            table.setColumnCount(3)
+            table.setHorizontalHeaderLabels([self.tr("列"), self.tr("列头文本"), self.tr("类型")])
+            table.horizontalHeader().setStretchLastSection(True)
+            table.setRowCount(len(mappings))
+            for ri, m in enumerate(mappings):
+                table.setItem(ri, 0, QTableWidgetItem(m.col_letter))
+                table.setItem(ri, 1, QTableWidgetItem(m.raw_header))
+                cmb = QComboBox()
+                for ct, label in ALL_COL_TYPE_LABELS:
+                    cmb.addItem(f"{label} ({ct})", ct)
+                idx = cmb.findData(m.detected_type)
+                if idx >= 0:
+                    cmb.setCurrentIndex(idx)
+                table.setCellWidget(ri, 2, cmb)
+            dl.addWidget(table)
+
+            btn_save = QPushButton(self.tr("💾 保存为预设"))
+            btn_save.clicked.connect(lambda: self._save_mapping_from_preview(
+                dlg, path, mappings, table))
+            dl.addWidget(btn_save)
+            dlg.exec()
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("识别失败"), str(e))
+
+    def _save_mapping_from_preview(self, dlg, path, mappings, table):
+        """从预览弹窗保存列映射为模板预设。"""
+        from src.column_mapping import ColumnMapping, TemplatePreset, save_preset
+        import os
+        updated = []
+        for ri in range(table.rowCount()):
+            cmb = table.cellWidget(ri, 2)
+            new_type = cmb.currentData() if cmb else mappings[ri].detected_type
+            m = mappings[ri]
+            updated.append(ColumnMapping(
+                col_letter=m.col_letter, col_index=ri + 1,
+                raw_header=m.raw_header, detected_type=m.detected_type,
+                confirmed_type=new_type if new_type != m.detected_type else "",
+            ))
+        name = os.path.splitext(os.path.basename(path))[0]
+        ext = os.path.splitext(path)[1].lstrip(".")
+        preset = TemplatePreset(
+            name=name, path=path, file_type=ext,
+            column_mappings=updated)
+        save_preset(preset)
+        QMessageBox.information(dlg, self.tr("保存成功"),
+            self.tr(f"模板预设已保存: {name}"))
+        dlg.accept()
 
     def _on_add_files(self):
         paths, _ = QFileDialog.getOpenFileNames(self, "选择数据文件", "",

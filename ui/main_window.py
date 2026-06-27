@@ -138,6 +138,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._init_params_tab()
         self._init_param_overview()
         self._init_step_selector()
+        self._init_report_preview()
         self._connect_signals()
         self._update_lag_display()
         self._init_menu()
@@ -438,6 +439,142 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         sl.addWidget(self._chk_skip_original)
 
         vtab.addWidget(self._grp_step)
+
+    def _init_report_preview(self):
+        """添加测试报告预览面板 — 模板列映射 + 参数确认 + 保存预设。"""
+        from PySide6.QtWidgets import QLineEdit, QTableWidget, QHeaderView
+        vtab = self.ui.vTabFile
+
+        self._grp_preview = QGroupBox(self.tr("📋 测试报告预览"))
+        self._grp_preview.setCheckable(True)
+        self._grp_preview.setChecked(False)
+        pl = QVBoxLayout(self._grp_preview)
+        pl.setSpacing(6)
+
+        # 模板选择行
+        tpl_row = QHBoxLayout()
+        tpl_row.addWidget(QLabel(self.tr("模板:")))
+        self._edit_preview_tpl = QLineEdit()
+        self._edit_preview_tpl.setPlaceholderText(self.tr("选择模板文件 (.xlsx/.docx)..."))
+        self._edit_preview_tpl.textChanged.connect(self._on_preview_tpl_changed)
+        tpl_row.addWidget(self._edit_preview_tpl, 1)
+        btn_br = QPushButton(self.tr("浏览..."))
+        btn_br.clicked.connect(self._on_browse_preview_tpl)
+        tpl_row.addWidget(btn_br)
+        btn_detect = QPushButton(self.tr("🔍 识别列头"))
+        btn_detect.clicked.connect(self._on_detect_preview)
+        tpl_row.addWidget(btn_detect)
+        pl.addLayout(tpl_row)
+
+        # 列映射表
+        self._preview_table = QTableWidget()
+        self._preview_table.setColumnCount(4)
+        self._preview_table.setHorizontalHeaderLabels(
+            [self.tr("列"), self.tr("列头文本"), self.tr("检测类型"), self.tr("修正类型")])
+        self._preview_table.horizontalHeader().setStretchLastSection(True)
+        self._preview_table.setMaximumHeight(250)
+        self._preview_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        pl.addWidget(self._preview_table)
+
+        # 摘要 + 参数信息
+        self._lbl_preview_info = QLabel("")
+        self._lbl_preview_info.setStyleSheet("color: #666;")
+        pl.addWidget(self._lbl_preview_info)
+
+        # 保存按钮
+        save_row = QHBoxLayout()
+        self._btn_save_preset = QPushButton(self.tr("💾 保存为模板预设"))
+        self._btn_save_preset.clicked.connect(self._on_save_preview_preset)
+        self._btn_save_preset.setEnabled(False)
+        save_row.addWidget(self._btn_save_preset)
+        save_row.addStretch()
+        pl.addLayout(save_row)
+
+        vtab.addWidget(self._grp_preview)
+
+    def _on_browse_preview_tpl(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("选择模板文件"), "",
+            self.tr("所有支持格式 (*.xlsx *.xls *.docx *.doc);;Excel (*.xlsx *.xls);;Word (*.docx *.doc);;所有文件 (*)"))
+        if path:
+            self._edit_preview_tpl.setText(path)
+
+    def _on_preview_tpl_changed(self, _text):
+        self._btn_save_preset.setEnabled(False)
+
+    def _on_detect_preview(self):
+        path = self._edit_preview_tpl.text().strip()
+        if not path or not os.path.exists(path):
+            return
+        try:
+            from src.column_mapping import detect_columns_from_template
+            mappings = detect_columns_from_template(path)
+
+            self._preview_table.setRowCount(len(mappings))
+            detected = 0
+            for ri, m in enumerate(mappings):
+                self._preview_table.setItem(ri, 0, QTableWidgetItem(m.col_letter))
+                self._preview_table.setItem(ri, 1, QTableWidgetItem(m.raw_header))
+                self._preview_table.setItem(ri, 2, QTableWidgetItem(m.detected_type))
+                # 修正类型 — 下拉框
+                from PySide6.QtWidgets import QComboBox
+                cmb = QComboBox()
+                from src.column_mapping import ALL_COL_TYPE_LABELS
+                for ct, label in ALL_COL_TYPE_LABELS:
+                    cmb.addItem(label, ct)
+                idx = cmb.findData(m.detected_type)
+                if idx >= 0:
+                    cmb.setCurrentIndex(idx)
+                self._preview_table.setCellWidget(ri, 3, cmb)
+                if m.detected_type != "unknown":
+                    detected += 1
+
+            self._preview_table.resizeColumnsToContents()
+            self._lbl_preview_info.setText(
+                f"{self.tr('共')} {len(mappings)} {self.tr('列')}, "
+                f"{self.tr('识别')} {detected} {self.tr('列')}, "
+                f"{len(mappings) - detected} {self.tr('列未识别')}")
+            self._btn_save_preset.setEnabled(True)
+
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("识别失败"), str(e))
+
+    def _on_save_preview_preset(self):
+        """保存当前预览的模板映射为预设。"""
+        path = self._edit_preview_tpl.text().strip()
+        if not path:
+            return
+
+        mappings = []
+        for ri in range(self._preview_table.rowCount()):
+            col_letter = self._preview_table.item(ri, 0).text()
+            raw = self._preview_table.item(ri, 1).text()
+            detected = self._preview_table.item(ri, 2).text()
+            cmb = self._preview_table.cellWidget(ri, 3)
+            confirmed = cmb.currentData() if cmb else ""
+
+            from src.column_mapping import ColumnMapping
+            mappings.append(ColumnMapping(
+                col_letter=col_letter, col_index=ri + 1,
+                raw_header=raw, detected_type=detected,
+                confirmed_type=confirmed if confirmed != detected else "",
+            ))
+
+        from src.column_mapping import TemplatePreset, save_preset
+        import os
+        name = os.path.splitext(os.path.basename(path))[0]
+        ext = os.path.splitext(path)[1].lstrip(".")
+        preset = TemplatePreset(
+            name=name, path=path, file_type=ext,
+            column_mappings=mappings,
+            calc_params={
+                "extrapolate_theta": self._check_extrapolate.isChecked(),
+                "robust_peak": self._check_robust_peak.isChecked(),
+            },
+        )
+        save_preset(preset)
+        QMessageBox.information(self, self.tr("保存成功"),
+            self.tr(f"模板预设已保存: {name}\n包含 {len(mappings)} 列映射"))
 
     def _get_selected_steps(self) -> List[float]:
         """获取用户选中的步进值列表。未启用多步进则返回空。"""
