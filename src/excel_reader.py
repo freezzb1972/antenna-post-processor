@@ -69,42 +69,57 @@ def _load_column_patterns() -> List[dict]:
 
 
 def _classify_by_json_patterns(raw_header: str) -> Optional[str]:
-    """用 config/column_patterns.json 中的规则匹配列头。
+    """用 config/column_patterns.json 中的规则匹配列头（唯一分类器）。
 
-    返回匹配的 col_type，无匹配返回 None。
-    匹配逻辑（与 Python 函数一致）：
-      - "keywords" 中所有词都必须出现在规范化列头中（AND）
-      - "negate" 中的词都不能出现（如果有）
-      - 匹配在 normalize_header() 小写后进行
+    匹配优先级（按 JSON 顺序，先匹配者胜）：
+      1. "regex" — 正则匹配
+      2. "exact" — 精确匹配 compact form
+      3. "keywords" — 所有关键词都出现 (AND)
+      4. "negate" — 排除规则 (任一匹配则跳过)
     """
     patterns = _load_column_patterns()
     if not patterns:
         return None
 
-    # 用小写规范化列头，保留可读文本
     norm = normalize_header(raw_header).lower()
-    # 同时也检查 _normalize_key 版本（去除非字母/数字）
     compact = _normalize_key(raw_header)
 
     for entry in patterns:
         keywords = entry.get("keywords", [])
-        negate = entry.get("negate", [])
+        exact_list = entry.get("exact", [])
+        negate_words = entry.get("negate", [])
+        regex_str = entry.get("regex", "")
 
-        # 检查所有关键词 —— 在 norm 或 compact 中出现即可
-        all_matched = True
-        for kw in keywords:
-            kw_lower = kw.lower()
-            if kw_lower not in norm and kw_lower not in compact:
-                all_matched = False
-                break
-        if not all_matched:
+        matched = False
+
+        # ── Regex ──
+        if regex_str:
+            if re.search(regex_str, norm, re.IGNORECASE):
+                matched = True
+
+        # ── 精确匹配 ──
+        if not matched and exact_list:
+            for ex in exact_list:
+                if ex.lower() == compact:
+                    matched = True
+                    break
+
+        # ── 关键词 AND 匹配 ──
+        if not matched and keywords:
+            matched = True
+            for kw in keywords:
+                kw_lower = kw.lower()
+                if kw_lower not in norm and kw_lower not in compact:
+                    matched = False
+                    break
+
+        if not matched:
             continue
 
-        # 检查排除词
+        # ── 排除词 ──
         blocked = False
-        for nkw in negate:
-            nkw_lower = nkw.lower()
-            if nkw_lower in norm or nkw_lower in compact:
+        for nkw in negate_words:
+            if nkw.lower() in norm or nkw.lower() in compact:
                 blocked = True
                 break
         if blocked:
