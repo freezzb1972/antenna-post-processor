@@ -114,6 +114,10 @@ class ProcessingWorker(QObject):
                 log_callback=self._on_log,
             )
 
+            # ── 差值图表依赖差值表，若只勾图表未勾表则提醒 ──
+            if self.gen_diff_chart and not self.gen_diff:
+                self.log.emit("⚠ 差值图表需要差值表数据，请同时勾选「生成步进差值比较表」")
+
             # ── 多步进模式 ──
             if self.step_values:
                 # 获取基础 DataSource（单文件或 map 首项）
@@ -512,7 +516,6 @@ class ProcessingWorker(QObject):
     def _add_static_diff_charts_fallback(self, wb, sheets_by_base):
         """回退方案: 为每个参数生成独立静态图表 (旧逻辑)。"""
         from openpyxl.chart import ScatterChart, Reference, Series
-        # 扫描每个 base 的 diff sheet 并添加静态图表
         for base, suffixed in sheets_by_base.items():
             orig_ws = suffixed.get("")
             if orig_ws is None or len(suffixed) < 2:
@@ -529,35 +532,36 @@ class ProcessingWorker(QObject):
             if not data_rows:
                 continue
             n_rows = len(data_rows)
-            chart_row = n_rows + 5
-            # 重建 suffixed 的 step label
-            step_labels = {}
-            for suffix_key in sorted(suffixed.keys()):
-                if suffix_key == "":
-                    step_labels[suffix_key] = "原始"
-                else:
-                    try:
-                        step_labels[suffix_key] = f"步进{int(float(suffix_key.replace('_step','')))}°"
-                    except (ValueError, TypeError):
-                        step_labels[suffix_key] = suffix_key
-            col = 2
-            param_idx = 0
-            for hi, h in enumerate(headers):
-                if not h or h.lower() in ("frequency", "frequency (mhz)", "", "freq"):
+
+            # 解析列头, 按参数分组找到对应的差值列
+            # 列头格式: "Gain (步进3°)", "Gain 差值 (步进3°)", "AR (步进3°)", ...
+            # 目标: {param_name: [(step_label, diff_col_1based), ...]}
+            param_diff_map = {}  # param_name -> [(step_label, diff_col)]
+            for ci, h in enumerate(headers):
+                if not h or "差值" not in h:
                     continue
+                # 提取参数名和步进标号: "Gain 差值 (步进3°)" → param="Gain", step="步进3°"
+                parts = h.split(" 差值", 1)
+                param_name = parts[0].strip()
+                step_label = ""
+                if "(" in parts[1]:
+                    step_label = parts[1].split("(")[1].rstrip(")")
+                param_diff_map.setdefault(param_name, []).append((step_label, ci + 1))
+
+            if not param_diff_map:
+                continue
+
+            chart_row = n_rows + 5
+            param_idx = 0
+            x_vals = Reference(dws, min_col=1, min_row=2, max_row=n_rows + 1)
+
+            for param_name, step_diffs in param_diff_map.items():
                 chart = ScatterChart()
-                chart.title = f"{h} 步进差值 vs Frequency"
+                chart.title = f"{param_name} 步进差值 vs Frequency"
                 chart.style = 2
                 chart.width = 16; chart.height = 10
-                x_vals = Reference(dws, min_col=1, min_row=2, max_row=n_rows + 1)
-                for suffix_key in sorted(suffixed.keys()):
-                    if suffix_key == "":
-                        continue
-                    step_label = step_labels.get(suffix_key, suffix_key)
-                    y_col = col + hi * 2 + 1
-                    if y_col > dws.max_column:
-                        continue
-                    y_vals = Reference(dws, min_col=y_col, min_row=2, max_row=n_rows + 1)
+                for step_label, diff_col in step_diffs:
+                    y_vals = Reference(dws, min_col=diff_col, min_row=2, max_row=n_rows + 1)
                     series = Series(y_vals, x_vals, title=step_label)
                     series.marker.symbol = 'circle'
                     series.marker.size = 5
@@ -565,10 +569,9 @@ class ProcessingWorker(QObject):
                     series.smooth = True
                     chart.series.append(series)
                 chart.x_axis.title = "Frequency (MHz)"
-                chart.y_axis.title = f"{h} 差值"
+                chart.y_axis.title = f"{param_name} 差值"
                 chart.y_axis.numFmt = '0.000'
                 chart.legend.position = 'b'
                 chart_row_offset = chart_row + param_idx * 18
                 dws.add_chart(chart, f"E{chart_row_offset}")
                 param_idx += 1
-                col += 2
