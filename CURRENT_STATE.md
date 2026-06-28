@@ -1,72 +1,103 @@
-# CURRENT STATE — 2026-06-28 22:30
+# CURRENT STATE — 2026-06-29 00:00
 
-**Source:** session 天线后处理 Step 2-5 实施
-**Phase:** All 5 steps complete ✅
-**Last commit:** `12e907e` build: Step 1 建地基 — 公共模块提取
-**Updated:** 2026-06-28
+**Source:** session 2026-06-28 模型路由配置 + 上次会话后续
+**Last commit:** `90dcab7` feat: 差值表与差值图表分开控制(两个复选框)
+**Updated:** 2026-06-29
 
 ## Active plan
-- **Design doc:** `docs/superpowers/specs/2026-06-27-master-detail-design.md` 第九章 5 步集成策略
+- Master-Detail refactor 后续: UI修复+功能完善基本完成
 - **Branch:** master
-- **Progress:** ██████████ Step 1-5/5 done
+- **Progress:** 主要功能全部完成
 
-## Completed
+## Completed (previous sessions, cumulative)
 
-### Step 1 — 地基 (commit `12e907e`)
-- 公共模块提取: `TemplateSourceRow`, `OutputSettingsGroup`, `AngleConfigGroup` 等可复用 widget
+### UI 修复
+- 天线参数窗体: 弹窗 → 内联展开(QStackedWidget), QSplitter左右可调
+- 执行栏: 左=天线参数面板, 右=日志, QSplitter可调
+- 输入输出页: 左右分栏+垂直分栏
+- 移除qt-material → Fusion+QPalette(4精选主题), 灰字修复
 
-### Step 2 — 抽页面 `ui/pages.py` (~1800 行)
-- `FileSettingsPage` — 模板/数据文件/匹配表/输出设置
-- `AntennaParamsPage` — 天线参数配置（CalcParamsDialog → QWidget）
-- `ChartSettingsPage` — 图表配置（PlotConfigDialog → QWidget）
-- 每个 Page 独立可显示（无 parent 用本地状态，有 parent 读 MainWindow 属性）
-- **Signal:** `params_changed()` + `chart_config_changed()`
+### Codex 审查修复 (11/20 bugs)
+- #1/#3/#4/#5/#6/#9/#10/#11/#13/#17/#18
 
-### Step 3 — 搭框架 `ui/main_window.py`
-- `_build_parameter_tab()`: 左侧 QListWidget（140px） + 右侧 QStackedWidget + 3 Page
-- `_extract_execution_bar()`: 进度条/日志/按钮移至 rootVBox（跨标签共享）
-- `_hide_settings_tabs()`: 删除 tabLag/tabPlot/tabCalc，重命名为 📐处理设置 / 📊计算结果 / 📈图表查看
+### 菜单
+- 文件→打开/保存/另存/打印/退出, 窗口列表+✕关闭按钮
 
-### Step 4 — 接数据 `ui/main_window.py` + `ui/pages.py`
-- `_on_start()` 委派到 FileSettingsPage
-- `AntennaParamsPage._sync_to_mw()` / `ChartSettingsPage._sync_to_mw()` 实时写 MainWindow 属性
-- **跨测试 C++ GC 防护**: `try/except RuntimeError`
+### 图表
+- Gain/AR vs Frequency 图表: X/Y轴自动刻度, 标记统一红色, 平滑线深色
+- 多步进差值比较表+差值散点图(Y=0基线)
+- 差值表/图分开控制(两个复选框)
+- 交互式 PivotChart: PageField 参数/步进角度下拉筛选, 单一图表联动更新, 可右键插入切片器
+- PivotTable 异常时自动回退到静态图表
 
-### Step 5 — 清扫 (本轮完成)
-- 删除 7 个废弃方法: `_hide_old_tab_content`, `_show_data_source_dialog`, `_show_calc_params_dialog`, `_show_plot_config_dialog`, `_init_param_overview`, `_init_report_preview` + 4 个预览回调
-- 清理 `_connect_signals` 中 10 个 LAG 按钮旧信号连接
-- `_on_start` 改用 `AntennaParamsPage.get_current_params()` 读取参数
-- `_log_current_params` 优先从页面读取，保留后备
-- `_update_status` 扩展到显示 AR + Gain 双行概要
-- manifest 同步更新
-
-## Key decisions
+## Key decisions (this session)
 
 | # | Decision | Why |
 |---|----------|-----|
-| 1 | Page 直接读写 MainWindow 属性 | 不用内部状态+signal 双重模式，MainWindow 是唯一数据源 |
-| 2 | _hide_settings_tabs 用固定索引 | `_make_tab_scrollable` 包裹 QWidget 进 QScrollArea 导致 `indexOf` 失效 |
-| 3 | 隐藏旧内容不销毁 C++ 对象 | `setParent(None)` 导致子控件 C++ 对象被销毁，改用 `hide()` + `takeAt()` |
-| 4 | 跨测试 C++ GC 防护 | 前测试 MainWindow GC 回收时子控件 C++ 对象先于 Python wrapper 销毁 |
+| 6 | Agent 分级路由: haiku→flash, opus→pro | `CLAUDE_CODE_SUBAGENT_MODEL` 会锁定所有 agent 为同一模型，删掉后用 `ANTHROPIC_DEFAULT_*_MODEL` 实现 per-tier 路由 |
+| 7 | CC Switch 非必须 | Claude Code 自带 `ANTHROPIC_DEFAULT_*_MODEL` 路由，直连 DeepSeek 即可 |
+| 8 | 主会话用 pro (1M 上下文) | 大任务 1M 上下文效率更高，agent 按需分 flash/pro |
+| 9 | 差值图表用 PivotTable PageField 替代静态多图表 | openpyxl 无 Slicer API，PageField 下拉功能等价，用户可右键 PivotTable → 插入切片器转换 |
 
-## Files changed (this cycle)
+## Model routing configuration (final)
 
-| File | Lines | Change |
-|------|-------|--------|
-| `ui/pages.py` | ~1800 | **NEW** — 3 Page classes |
-| `ui/main_window.py` | -41 net | Methods deleted + _on_start/log/status refactored |
-| `ui/widgets.py` | +30 | Optional callback params to constructors |
-| `verify-manifest.json` | +8/-6 | Synced with deleted methods and added widgets |
+```
+~/.claude/settings.json env:
+  ANTHROPIC_MODEL = deepseek-v4-pro              (主会话)
+  ANTHROPIC_DEFAULT_OPUS_MODEL = deepseek-v4-pro (L3 agent)
+  ANTHROPIC_DEFAULT_SONNET_MODEL = deepseek-v4-flash
+  ANTHROPIC_DEFAULT_HAIKU_MODEL = deepseek-v4-flash (L2 agent)
+  ANTHROPIC_BASE_URL = https://api.deepseek.com/anthropic (直连)
+  ⚠️ 不能设 CLAUDE_CODE_SUBAGENT_MODEL
+```
 
-## Verification status
+| 级别 | 模型 | Agent |
+|------|------|-------|
+| L1 | pro (主会话) | 不 spawn |
+| L2 | pro (主会话) | 不 spawn |
+| L3 | haiku→flash / opus→pro | spawn agent |
+
+## Synced to ARM
+
+- `~/.claude/CLAUDE.md` — 全局规则(含路由)
+- `~/.claude/settings.json` — 模型配置
+- `~/.claude/projects/` — 所有项目记忆
+- `~/.paseo/config.json` — Paseo daemon 配置(对齐 WSL)
+- `~/projects/antenna-post-processor/` — 项目 CLAUDE.md + settings.json
+- Memory: `task-based-agent-routing.md` 从天线项目移至网络项目
+
+## Files changed (all sessions, cumulative)
+
+| File | Change |
+|------|--------|
+| `ui/main_window.py` | 天线参数内联/执行栏分栏/菜单/按钮对齐 |
+| `ui/pages.py` | 角度弹窗重写/输入输出分栏/差值复选框 |
+| `ui/widgets.py` | OutputSettingsGroup set_directory |
+| `src/worker.py` | 步进差值比较表+图表 (_add_diff_sheet) |
+| `src/exporter.py` | 图表X/Y轴自动刻度/标记颜色/smooth |
+| `src/column_mapping.py` | LAG正则修复 |
+| `config/column_patterns.json` | LAG前缀正则 |
+| `ui/theme_manager.py` | qt-material → Fusion+QPalette |
+| `ui/window_manager.py` | 窗口列表+关闭按钮 |
+| `ui/graph_viewer.py` | 移除硬编码灰字color |
+| `~/.claude/CLAUDE.md` | Agent分级路由规则 |
+| `~/.claude/settings.json` | 模型配置(直连DeepSeek, per-tier路由) |
+
+## Verification
 
 | Check | Result |
 |-------|--------|
 | Core tests (30) | 30/30 ✅ |
-| E2E features (20) | 20/20 ✅ |
-| GUI integrity (G1-G9) | 8/9 ✅ (G4 ScrollArea pre-existing) |
+| E2E features (24) | 24/24 ✅ |
+| GUI integrity (G1-G9) | 8/9 ✅ |
+| Agent routing (haiku→flash, opus→pro) | ✅ 已验证 |
 
-## Next steps
+## Open issues
 
-- **[ ]** 后续增强: 角度弹窗 UX 确认、多步进页面化
+- Edit 工具对含 Unicode 文件首次匹配总失败, 需直接用 Bash+Python
 
+## Discarded (noise)
+- CC Switch 代理路由尝试: 不是必须的, Claude Code 自带路由
+- agent frontmatter model=haiku 测试: 被 CLAUDE_CODE_SUBAGENT_MODEL 覆盖, frontmatter model 无效
+- Agent 的 model 参数测试(sonnet/opus/haiku): 被 CLAUDE_CODE_SUBAGENT_MODEL 全部转为 pro
+- `unset CLAUDE_CODE_SUBAGENT_MODEL` 无效: 运行时环境在会话启动时固化
