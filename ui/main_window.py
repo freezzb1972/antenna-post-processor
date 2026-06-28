@@ -347,7 +347,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._on_full_report_toggled(self.ui.checkFullReport.isChecked())
 
         # ---- 将整个 Tab 的内容包裹在可滚动区域中，防止内容溢出被压缩 ----
-        self._make_tab_scrollable(self.ui.tabFile)
         self._make_tab_scrollable(self.ui.tabLag)
 
         # ---- 图形展示 Tab: 启动时创建空 GraphViewer (工具栏立即可见) ----
@@ -513,11 +512,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         h_splitter.setSizes([300, 500])
         exec_layout.addWidget(h_splitter, 1)
 
-        # 按钮行
+        # 按钮行（左对齐）
         btn_row = QHBoxLayout()
-        btn_row.addStretch()
         btn_row.addWidget(self.ui.btnStart)
         btn_row.addWidget(self.ui.btnStop)
+        btn_row.addStretch()
         exec_layout.addLayout(btn_row)
 
         # 用 QSplitter 包裹 tabConfig + exec_bar，允许手动调整比例
@@ -1413,6 +1412,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._cached_template_params = set()  # 强制刷新模板参数缓存
             # 自动应用模板检测到的计算参数
             self._auto_apply_template_params()
+            # 立即从模板更新角度配置（不等自动匹配）
+            try:
+                from src.excel_reader import read_template
+                sheets = read_template(path)
+                self._auto_update_angle_config_from_template(sheets)
+            except Exception:
+                pass
             # 模板路径变更后，旧的匹配表基于旧模板的工作表名，无效
             if self._match_table is not None:
                 self._match_table.setRowCount(0)
@@ -1700,7 +1706,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         if not singles and not ranges:
             label = QLabel(self.tr("—"))
-            label.setStyleSheet("color: #888; padding: 8px;")
+            label.setStyleSheet("padding: 8px;")
             layout.addWidget(label)
             return
 

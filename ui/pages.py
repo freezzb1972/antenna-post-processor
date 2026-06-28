@@ -88,6 +88,8 @@ class FileSettingsPage(QWidget):
     def _template_path(self, v: str):
         if self._mw:
             self._mw.ui.editTemplatePath.setText(v)
+        if hasattr(self, '_tpl_path_label') and self._tpl_path_label is not None:
+            self._tpl_path_label.setText(v)
         self._local["template_path"] = v
 
     @property
@@ -130,15 +132,32 @@ class FileSettingsPage(QWidget):
 
     def _setup_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setSpacing(8)
+        main_layout.setSpacing(0)
 
-        # ────── 模板文件 ──────
+        # 左右分栏：左=输入设置 | 右=输出设置
+        h_splitter = QSplitter(Qt.Horizontal)
+
+        # === 左侧：输入设置（上下分栏：模版 + 数据文件） ===
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(4)
+
+        v_splitter = QSplitter(Qt.Vertical)
+
+        # 报告模版组
+        tpl_grp = QGroupBox(self.tr("报告模版"))
+        tpl_layout = QVBoxLayout(tpl_grp)
+        tpl_layout.setSpacing(4)
+        # 第一行：预设下拉 + 按钮
+        row1 = QHBoxLayout()
         self._tpl_row = TemplateSourceRow(
             on_browse=self._on_browse_template,
             on_preview=self._on_preview_report,
         )
-        main_layout.addWidget(self._tpl_row)
-        # 填充内置模板预设
+        # 从 TemplateSourceRow 提取内部控件重组布局
+        # TemplateSourceRow 有: _cmb_preset, 两个按钮, _lbl_path
+        # 直接用其内部布局
         if self._mw and hasattr(self._mw, '_tm'):
             presets = self._mw._tm.get_all_templates()
             presets_list = [
@@ -147,28 +166,20 @@ class FileSettingsPage(QWidget):
             ]
             self._tpl_row.populate_presets(presets_list)
         self._tpl_row.template_changed.connect(self._on_preset_template_selected)
+        tpl_layout.addWidget(self._tpl_row)
 
-        # ────── 数据文件 ──────
+        # 第二行：模版路径单独显示
+        self._tpl_path_label = QLineEdit()
+        self._tpl_path_label.setReadOnly(True)
+        self._tpl_path_label.setPlaceholderText(self.tr("(未选择模版)"))
+        tpl_layout.addWidget(self._tpl_path_label)
+
+        v_splitter.addWidget(tpl_grp)
+
+        # 数据文件组
         data_grp = QGroupBox(self.tr("数据文件"))
         data_layout = QVBoxLayout(data_grp)
-        data_layout.setSpacing(6)
-
-        # 按钮行
-        btn_row = QHBoxLayout()
-        self._btn_add_files = QPushButton(self.tr("📂 添加数据文件..."))
-        self._btn_add_files.setToolTip(self.tr("选择多个数据文件 (Ctrl+点击多选 / 拖拽)"))
-        self._btn_clear_selected = QPushButton(self.tr("清除选中"))
-        self._btn_clear_all = QPushButton(self.tr("全部清除"))
-        self._btn_add_files.clicked.connect(self._on_add_data_files)
-        self._btn_clear_selected.clicked.connect(self._on_clear_selected_files)
-        self._btn_clear_all.clicked.connect(self._on_clear_all_files)
-        btn_row.addWidget(self._btn_add_files)
-        btn_row.addWidget(self._btn_clear_selected)
-        btn_row.addWidget(self._btn_clear_all)
-        btn_row.addStretch()
-        data_layout.addLayout(btn_row)
-
-        # 文件列表
+        # 按钮行（数据文件按钮在 _init_multi_file_ui 中创建，这里用已存在的）
         self._file_list_widget = QTableWidget()
         self._file_list_widget.setColumnCount(2)
         self._file_list_widget.setHorizontalHeaderLabels([
@@ -237,27 +248,42 @@ class FileSettingsPage(QWidget):
         chart_row.addWidget(self._check_chart_lag)
         chart_row.addStretch()
         data_layout.addLayout(chart_row)
+        data_layout.addStretch()
 
-        main_layout.addWidget(data_grp)
+        # 关闭垂直分栏：数据文件组加入
+        v_splitter.addWidget(data_grp)
+        left_layout.addWidget(v_splitter)
+        h_splitter.addWidget(left_widget)
 
-        # ────── 输出设置 ──────
+        # === 右侧：输出设置 ===
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(4)
+
         self._output_group = OutputSettingsGroup(
             output_dir="",
             output_name="antenna_report.xlsx",
             on_browse_output=self._on_browse_output,
             on_browse_full_report=self._on_browse_full_report,
         )
-        main_layout.addWidget(self._output_group)
+        right_layout.addWidget(self._output_group)
 
-        # 保存任务包复选框
         self._check_save_task = QCheckBox(
             self.tr("☑ 保存任务包 (.ant) — 下次双击秒开，不重算"))
         self._check_save_task.setChecked(True)
         self._check_save_task.setToolTip(
             self.tr("保存为 .ant 任务包后，下次双击即可直接查看结果，无需重新计算。"))
-        main_layout.addWidget(self._check_save_task)
+        right_layout.addWidget(self._check_save_task)
+        right_layout.addStretch()
 
-        main_layout.addStretch()
+        h_splitter.addWidget(right_widget)
+        h_splitter.setSizes([600, 300])
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        scroll_area.setWidget(h_splitter)
+        main_layout.addWidget(scroll_area, 1)
 
     def _init_state(self):
         """初始化本地状态（无 MainWindow 时使用）。"""
@@ -336,6 +362,13 @@ class FileSettingsPage(QWidget):
             self._mw._chart_config_required = None
             self._mw._cached_template_params = set()
             self._mw._auto_apply_template_params()
+            # 立即从模板更新角度配置（不等自动匹配）
+            try:
+                from src.excel_reader import read_template
+                sheets = read_template(path)
+                self._mw._auto_update_angle_config_from_template(sheets)
+            except Exception:
+                pass
         self._match_table.setRowCount(0)
         self._lbl_match_status.setText("")
         if self._data_file_paths:
@@ -354,6 +387,13 @@ class FileSettingsPage(QWidget):
             self._mw._chart_config_required = None
             self._mw._cached_template_params = set()
             self._mw._auto_apply_template_params()
+            # 立即从模板更新角度配置（不等自动匹配）
+            try:
+                from src.excel_reader import read_template
+                sheets = read_template(path)
+                self._mw._auto_update_angle_config_from_template(sheets)
+            except Exception:
+                pass
         self._match_table.setRowCount(0)
         self._lbl_match_status.setText("")
         if self._data_file_paths:
@@ -448,7 +488,7 @@ class FileSettingsPage(QWidget):
         summary = QLabel(
             self.tr("共 {} 列, 识别 {} 列, {} 列未识别, 识别类型见「检测类型」行").format(
                 len(mappings), detected, len(mappings) - detected))
-        summary.setStyleSheet("color: #666;")
+        summary.setStyleSheet("")
         layout.addWidget(summary)
 
         # 按钮
@@ -604,6 +644,7 @@ class FileSettingsPage(QWidget):
         path = QFileDialog.getExistingDirectory(self, self.tr("选择输出目录"), start_dir)
         if path:
             self._output_dir = path
+            self._output_group.set_directory(path)
             if self._cfg:
                 self._cfg.config.last_output_dir = path
                 self._cfg._dirty = True
