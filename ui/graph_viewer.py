@@ -417,10 +417,12 @@ class GraphViewer(QWidget):
     @staticmethod
     def _build_graph_area():
         splitter = QSplitter(Qt.Horizontal)
-        fig = Figure(figsize=(7, 7), dpi=80)
+        fig = Figure(figsize=(7, 7), dpi=80, facecolor="black")
         canvas = FigureCanvas(fig)
+        canvas.setStyleSheet("background-color: black;")
         table = QTableWidget()
         table.setMinimumWidth(220)
+        table.setStyleSheet("background-color: #1e1e1e; color: #ddd; gridline-color: #444;")
         splitter.addWidget(canvas)
         splitter.addWidget(table)
         splitter.setSizes([650, 250])

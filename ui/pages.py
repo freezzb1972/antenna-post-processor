@@ -326,6 +326,7 @@ class FileSettingsPage(QWidget):
         if not path:
             return
         self._template_path = path  # 属性 setter
+        self._tpl_row.set_path(path)
         if self._cfg:
             self._cfg.config.last_template_path = path
             self._cfg._dirty = True
@@ -343,6 +344,7 @@ class FileSettingsPage(QWidget):
         if not path:
             return
         self._template_path = path
+        self._tpl_row.set_path(path)
         if self._cfg:
             self._cfg.config.last_template_path = path
             self._cfg._dirty = True
@@ -974,22 +976,6 @@ class AntennaParamsPage(QWidget):
 
         param_layout.addLayout(splitter, 1)
 
-        # ── Gain 角度 (AnglePickerWidget) ──
-        gain_sep = QFrame()
-        gain_sep.setFrameShape(QFrame.HLine)
-        param_layout.addWidget(gain_sep)
-        self._gain_angle_widget = AnglePickerWidget(self.tr("Gain 角度"))
-        self._gain_angle_widget.angle_changed.connect(lambda cfg: self._on_angle_changed("gain"))
-        param_layout.addWidget(self._gain_angle_widget)
-
-        # ── AR 角度 (AnglePickerWidget) ──
-        ar_sep = QFrame()
-        ar_sep.setFrameShape(QFrame.HLine)
-        param_layout.addWidget(ar_sep)
-        self._ar_angle_widget = AnglePickerWidget(self.tr("AR 角度"))
-        self._ar_angle_widget.angle_changed.connect(lambda cfg: self._on_angle_changed("ar"))
-        param_layout.addWidget(self._ar_angle_widget)
-
         # ── 算法选项 ──
         algo_grp = QGroupBox(self.tr("算法选项"))
         algo_layout = QVBoxLayout(algo_grp)
@@ -1120,6 +1106,49 @@ class AntennaParamsPage(QWidget):
         self._save_current_mode_state()
         self._sync_to_mw()
 
+    def _show_angle_popup(self, target: str):
+        """弹出角度配置对话框 (内含 AnglePickerWidget)。"""
+        is_ar = (target == "ar")
+        widget = AnglePickerWidget(
+            self.tr("AR 角度") if is_ar else self.tr("Gain 角度"))
+        # 加载当前配置
+        if is_ar and hasattr(self, '_ar_angle_widget') and self._ar_angle_widget:
+            widget.set_config(self._ar_angle_widget.get_config())
+        elif not is_ar and hasattr(self, '_gain_angle_widget') and self._gain_angle_widget:
+            widget.set_config(self._gain_angle_widget.get_config())
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"{'AR' if is_ar else 'Gain'} " + self.tr("角度配置"))
+        dlg.setMinimumSize(500, 380)
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(widget)
+        btn_row = QHBoxLayout()
+        btn_ok = QPushButton(self.tr("确定"))
+        btn_cancel = QPushButton(self.tr("取消"))
+        btn_row.addStretch()
+        btn_row.addWidget(btn_ok)
+        btn_row.addWidget(btn_cancel)
+        layout.addLayout(btn_row)
+
+        def on_accept():
+            cfg = widget.get_config()
+            if is_ar:
+                if not self._ar_angle_widget:
+                    self._ar_angle_widget = widget
+                else:
+                    self._ar_angle_widget.set_config(cfg)
+            else:
+                if not self._gain_angle_widget:
+                    self._gain_angle_widget = widget
+                else:
+                    self._gain_angle_widget.set_config(cfg)
+            self._on_angle_changed(target)
+            dlg.accept()
+
+        btn_ok.clicked.connect(on_accept)
+        btn_cancel.clicked.connect(dlg.reject)
+        dlg.exec()
+
     def _on_mode_changed(self, index: int):
         self._save_current_mode_state()
         self._load_mode_state(index)
@@ -1201,7 +1230,14 @@ class AntennaParamsPage(QWidget):
                 gl.addWidget(cb)
                 self._left_checkboxes[key] = cb
                 self._right_checkboxes[key] = cb
-            # AnglePickerWidget instances are inline in _setup_ui
+            if grp_name == "Gain":
+                btn = QPushButton(self.tr("📡 Gain 角度设置..."))
+                btn.clicked.connect(lambda: self._show_angle_popup("gain"))
+                gl.addWidget(btn)
+            elif grp_name == "Axial Ratio":
+                btn = QPushButton(self.tr("🔄 AR 角度设置..."))
+                btn.clicked.connect(lambda: self._show_angle_popup("ar"))
+                gl.addWidget(btn)
             vbox.addWidget(grp)
         vbox.addStretch()
 
@@ -1477,9 +1513,15 @@ class AntennaParamsPage(QWidget):
             self._cmb_test_mode.blockSignals(True)
             self._cmb_test_mode.setCurrentIndex(mw._test_mode)
             self._cmb_test_mode.blockSignals(False)
-        if hasattr(mw, '_lag_config') and self._gain_angle_widget:
+        if hasattr(mw, '_lag_config'):
+            if not self._gain_angle_widget:
+                from ui.widgets import AnglePickerWidget
+                self._gain_angle_widget = AnglePickerWidget(self.tr("Gain 角度"))
             self._gain_angle_widget.set_config(mw._lag_config)
-        if hasattr(mw, '_ar_lag_config') and self._ar_angle_widget:
+        if hasattr(mw, '_ar_lag_config'):
+            if not self._ar_angle_widget:
+                from ui.widgets import AnglePickerWidget
+                self._ar_angle_widget = AnglePickerWidget(self.tr("AR 角度"))
             self._ar_angle_widget.set_config(mw._ar_lag_config)
         # 以下读取 MainWindow UI 控件，可能因跨测试 GC 导致 C++ 对象已删除
         try:

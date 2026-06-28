@@ -16,6 +16,7 @@ from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from i18n.i18n_manager import I18nManager
+from ui.main_window import MainWindow
 from ui.splash_screen import SplashScreen
 from ui.theme_manager import ThemeManager
 
@@ -137,15 +138,17 @@ def main():
 
     # 国际化
     I18nManager.init(app)
-    splash.advance("正在创建 Shell...", 80)
+    splash.advance("正在创建主窗口...", 80)
 
-    # Shell 窗口 → 自动创建首个任务窗口
-    from ui.shell_window import ShellWindow
-    shell = ShellWindow(app)
+    # 主窗口
+    app.setQuitOnLastWindowClosed(False)
+    from ui.window_manager import WindowManager
+    wm = WindowManager.instance()
+    window = MainWindow(app)
     splash.advance("启动完成", 100)
 
-    splash.finish(shell)
-    shell.show()
+    splash.finish(window)
+    window.show()
 
     # 事件循环
     exit_code = app.exec()

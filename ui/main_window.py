@@ -140,6 +140,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._init_quick_angle_buttons()
         self._init_params_tab()
         self._build_parameter_tab()   # Master-Detail 布局 + 共享执行栏
+        # 执行栏默认可见（处理设置标签）
+        self.ui.tabConfig.currentChanged.connect(self._on_config_tab_changed)
         self._connect_signals()
         self._update_lag_display()
         self._init_menu()
@@ -508,6 +510,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """导航列表切换 → 切换页面栈。"""
         if hasattr(self, '_page_stack') and 0 <= row < self._page_stack.count():
             self._page_stack.setCurrentIndex(row)
+
+    def _on_config_tab_changed(self, index: int):
+        """切换标签页时显示/隐藏执行栏（仅 tab[0] 处理设置显示）。"""
+        if hasattr(self, '_execution_bar'):
+            self._execution_bar.setVisible(index == 0)
 
     def _make_tab_scrollable(self, tab: QWidget):
         """将指定 Tab 的内容包裹在 QScrollArea 中，防止内容溢出被压缩。"""
