@@ -793,6 +793,7 @@ class FileSettingsPage(QWidget):
                 fp = combo.currentData() or ""
                 if fp and fp != "—" and fp not in valid_paths:
                     combo.setCurrentIndex(0)
+                    self._log(f"⚠ 匹配表中 {fp} 已不在数据文件列表中，已重置")
 
         matched_files = set()
         for row in range(self._match_table.rowCount()):
@@ -1524,14 +1525,17 @@ class AntennaParamsPage(QWidget):
             idx = mw._cmb_freq_source.findData(data)
             if idx >= 0:
                 mw._cmb_freq_source.setCurrentIndex(idx)
-        if hasattr(mw, '_spin_trim_start'):
-            mw._spin_trim_start.setValue(self._spin_trim_start.value())
-            mw._spin_trim_end.setValue(self._spin_trim_end.value())
-        if hasattr(mw, '_check_extrapolate'):
-            mw._check_extrapolate.setChecked(self._check_extrap.isChecked())
-        if hasattr(mw, '_check_robust_peak'):
-            mw._check_robust_peak.setChecked(self._check_robust.isChecked())
-        mw._ar_output_db = self._cmb_ar_output.currentData()
+        try:
+            if hasattr(mw, '_spin_trim_start'):
+                mw._spin_trim_start.setValue(self._spin_trim_start.value())
+                mw._spin_trim_end.setValue(self._spin_trim_end.value())
+            if hasattr(mw, '_check_extrapolate'):
+                mw._check_extrapolate.setChecked(self._check_extrap.isChecked())
+            if hasattr(mw, '_check_robust_peak'):
+                mw._check_robust_peak.setChecked(self._check_robust.isChecked())
+            mw._ar_output_db = self._cmb_ar_output.currentData()
+        except RuntimeError:
+            pass
 
         self._update_summary()
         self.params_changed.emit()
@@ -1943,8 +1947,19 @@ class ChartSettingsPage(QWidget):
 
         step_deg = float(max(1, min(30, self._spin_step.value())))
 
+        # 保留已有 ChartConfig 的非标准字段
+        existing_req = getattr(mw, '_chart_config_required', None)
+        existing_extra = getattr(mw, '_chart_config_extra', None)
         required = ChartConfig()
         extra = ChartConfig()
+        if existing_req:
+            for k, v in vars(existing_req).items():
+                if k not in ChartConfig.all_chart_keys() and not k.startswith('_'):
+                    setattr(required, k, v)
+        if existing_extra:
+            for k, v in vars(existing_extra).items():
+                if k not in ChartConfig.all_chart_keys() and not k.startswith('_'):
+                    setattr(extra, k, v)
         for key in ChartConfig.all_chart_keys():
             setattr(required, key, self._chart_required.get(key, QCheckBox()).isChecked())
             setattr(extra, key, self._chart_extra.get(key, QCheckBox()).isChecked())

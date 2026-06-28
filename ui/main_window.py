@@ -472,9 +472,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             lyt = item.layout()
             w = item.widget()
             if lyt is self.ui.hProgress or lyt is self.ui.hButtons:
-                vtab.removeItem(vtab.takeAt(i))
+                vtab.takeAt(i)
             elif w is self.ui.logOutput:
-                vtab.removeItem(vtab.takeAt(i))
+                vtab.takeAt(i)
 
         # 创建执行栏容器
         exec_bar = QWidget()
@@ -534,6 +534,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             btn_ok.clicked.connect(_on_dialog_ok)
             layout.addWidget(btn_ok)
             dlg.exec()
+            # 同步 stack 页面状态（dialog 新实例写入 MW，stack 页面需重新加载）
+            if hasattr(self, '_antenna_params_page'):
+                self._antenna_params_page._load_state()
             self._nav_list.blockSignals(True)
             self._nav_list.setCurrentRow(0)
             self._nav_list.blockSignals(False)
@@ -1713,8 +1716,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 自动触发匹配 (从 FileSettingsPage 读取)
         file_page = getattr(self, '_file_settings_page', None)
-        match_table = file_page._match_table if file_page else getattr(self, '_match_table', None)
-        if match_table is not None and match_table.rowCount() == 0 and self._data_file_paths:
+        if file_page and file_page._match_table.rowCount() == 0 and self._data_file_paths:
             try:
                 if file_page:
                     file_page._on_auto_match()
@@ -1847,8 +1849,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         trim_end = self._spin_trim_end.value()
         robust_peak = self._check_robust_peak.isChecked()
         # 步进参数（dialog 关闭时保存到 self._dialog_*）
-        step_values = getattr(self, '_dialog_step_values', [])
+        step_values = list(getattr(self, '_dialog_step_values', []))
         skip_original = getattr(self, '_dialog_skip_original', False)
+        self._dialog_step_values = []
+        self._dialog_skip_original = False
 
         self._worker = ProcessingWorker(
             datasource_map=datasource_map,
