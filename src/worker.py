@@ -425,7 +425,15 @@ class ProcessingWorker(QObject):
             worksheetSource=WorksheetSource(ref=data_ref, sheet="_diff_flat")
         )
         cache_def = CacheDefinition(cacheSource=cache_src)
-        cache_def.cacheId = 0
+        # 自动分配 cacheId: 扫描已有 PivotTable, 避免冲突
+        existing_ids = set()
+        for ws in wb.worksheets:
+            for p in getattr(ws, '_pivots', []):
+                cid = getattr(p, 'cacheId', None)
+                if cid is not None:
+                    existing_ids.add(cid)
+        next_id = max(existing_ids, default=-1) + 1
+        cache_def.cacheId = next_id
 
         # 3. 创建 PivotTable sheet
         pt_ws = wb.create_sheet(title="DiffChart")
@@ -445,7 +453,7 @@ class ProcessingWorker(QObject):
         )
         pt = TableDefinition(
             name="DiffPivot",
-            cacheId=0,
+            cacheId=next_id,
             dataOnRows=True,
             dataCaption="Values",
             grandTotalCaption="Grand Total",
