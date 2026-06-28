@@ -140,6 +140,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._init_quick_angle_buttons()
         self._init_params_tab()
         self._build_parameter_tab()   # Master-Detail 布局 + 共享执行栏
+        self._update_exec_params()    # 初始化执行栏参数概览
         # 执行栏默认可见（处理设置标签）
         self.ui.tabConfig.currentChanged.connect(self._on_config_tab_changed)
         self._connect_signals()
@@ -455,6 +456,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             item.setData(Qt.UserRole, idx)
             self._nav_list.addItem(item)
 
+        # 天线参数变更 → 实时更新执行栏概览
+        self._antenna_params_page.params_changed.connect(self._update_exec_params)
+
         self._nav_list.currentRowChanged.connect(self._on_nav_changed)
         self._nav_list.setCurrentRow(0)
 
@@ -483,15 +487,25 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         exec_layout.setContentsMargins(0, 0, 0, 0)
         exec_layout.setSpacing(4)
 
+        # 天线参数概览（实时更新，处理时固定在顶部）
+        self._exec_params_label = QLabel(self.tr("天线参数: (未设置)"))
+        self._exec_params_label.setWordWrap(True)
+        self._exec_params_label.setStyleSheet(
+            "background: rgba(0,0,0,0.05); padding: 6px; border-radius: 4px; "
+            "font-size: 12px;")
+        self._exec_params_label.setMinimumHeight(28)
+        self._exec_params_label.setMaximumHeight(80)
+        exec_layout.addWidget(self._exec_params_label)
+
         # 进度行
         progress_row = QHBoxLayout()
         progress_row.addWidget(self.ui.progressBar)
         progress_row.addWidget(self.ui.lblProgressMsg)
         exec_layout.addLayout(progress_row)
 
-        # 日志
+        # 日志（可滚动，处理时参数区冻结）
         self.ui.logOutput.setParent(exec_bar)
-        exec_layout.addWidget(self.ui.logOutput)
+        exec_layout.addWidget(self.ui.logOutput, 1)
 
         # 按钮行
         btn_row = QHBoxLayout()
@@ -507,14 +521,66 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._execution_bar = exec_bar
 
     def _on_nav_changed(self, row: int):
-        """导航列表切换 → 切换页面栈。"""
-        if hasattr(self, '_page_stack') and 0 <= row < self._page_stack.count():
+        """导航列表切换 → 切换页面栈。天线参数弹出大窗口。"""
+        if row == 1:
+            # 天线参数弹出独立大窗口
+            page = self._antenna_params_page
+            dlg = QDialog(self)
+            dlg.setWindowTitle(self.tr("📡 天线参数设置"))
+            dlg.setMinimumSize(850, 650)
+            layout = QVBoxLayout(dlg)
+            layout.setContentsMargins(0, 0, 0, 0)
+            # 把页面从 stack 移到 dialog
+            self._page_stack.removeWidget(page)
+            layout.addWidget(page)
+            btn_bar = QHBoxLayout()
+            btn_bar.addStretch()
+            btn_ok = QPushButton(self.tr("确定"))
+            btn_ok.clicked.connect(dlg.accept)
+            btn_bar.addWidget(btn_ok)
+            layout.addLayout(btn_bar)
+            page.show()
+            dlg.exec()
+            # 放回 stack
+            layout.removeWidget(page)
+            self._page_stack.insertWidget(1, page)
+            # 回到输入输出页
+            self._nav_list.blockSignals(True)
+            self._nav_list.setCurrentRow(0)
+            self._nav_list.blockSignals(False)
+            self._page_stack.setCurrentIndex(0)
+        elif hasattr(self, '_page_stack') and 0 <= row < self._page_stack.count():
             self._page_stack.setCurrentIndex(row)
 
     def _on_config_tab_changed(self, index: int):
         """切换标签页时显示/隐藏执行栏（仅 tab[0] 处理设置显示）。"""
         if hasattr(self, '_execution_bar'):
             self._execution_bar.setVisible(index == 0)
+
+    def _update_exec_params(self):
+        """天线参数变更时刷新执行栏概览。"""
+        if not hasattr(self, '_exec_params_label') or not self._exec_params_label:
+            return
+        ant = getattr(self, '_antenna_params_page', None)
+        if not ant:
+            return
+        mode_names = {0: "📡 无源天线", 1: "📶 有源发射 TRP", 2: "📻 有源接收 TIS"}
+        mode_str = mode_names.get(ant._test_mode, "未知")
+        params = ant.get_current_params()
+        gain_cfg = params.get("lag_config") or LagConfig()
+        ar_cfg = params.get("ar_lag_config") or LagConfig()
+        gain_parts = [f"{a}°" for a in gain_cfg.singles_sorted]
+        if gain_cfg.ranges_sorted:
+            gain_parts += [f"({lo}–{hi}°)" for lo, hi in gain_cfg.ranges_sorted]
+        ar_parts = [f"{a}°" for a in ar_cfg.singles_sorted]
+        if ar_cfg.ranges_sorted:
+            ar_parts += [f"({lo}–{hi}°)" for lo, hi in ar_cfg.ranges_sorted]
+        extras = [k for k, cb in ant._left_checkboxes.items() if cb.isChecked()]
+        extra_str = f"({len(extras)}参数)" if extras else ""
+        gain_str = f"Gain: {', '.join(gain_parts)}" if gain_parts else "Gain: 未设置"
+        ar_str = f"AR: {', '.join(ar_parts)}" if ar_parts else "AR: 未设置"
+        self._exec_params_label.setText(
+            f"<b>{mode_str}</b> {extra_str} | {gain_str} | {ar_str}")
 
     def _make_tab_scrollable(self, tab: QWidget):
         """将指定 Tab 的内容包裹在 QScrollArea 中，防止内容溢出被压缩。"""

@@ -1026,19 +1026,19 @@ class AntennaParamsPage(QWidget):
         param_layout = QVBoxLayout(param_widget)
         param_layout.setSpacing(8)
 
-        # 双列参数
+        # 左右分栏: 左=天线参数(宽), 右=算法+多步进(窄)
         splitter = QHBoxLayout()
         splitter.setSpacing(8)
 
-        left_grp = QGroupBox(self.tr("报告必需参数（模板自动识别，可调整）"))
+        left_grp = QGroupBox(self.tr("天线参数（模板识别 + full_report）"))
         left_layout = QVBoxLayout(left_grp)
         self._left_scroll = QScrollArea()
         self._left_scroll.setWidgetResizable(True)
         self._left_scroll.setFrameShape(QScrollArea.NoFrame)
         left_layout.addWidget(self._left_scroll)
-        splitter.addWidget(left_grp, 1)
+        splitter.addWidget(left_grp, 3)
 
-        right_grp = QGroupBox(self.tr("额外计算参数（送 full_report）"))
+        right_grp = QGroupBox(self.tr("算法与步进"))
         right_layout = QVBoxLayout(right_grp)
         self._right_scroll = QScrollArea()
         self._right_scroll.setWidgetResizable(True)
@@ -1047,8 +1047,11 @@ class AntennaParamsPage(QWidget):
         splitter.addWidget(right_grp, 1)
 
         param_layout.addLayout(splitter, 1)
+        # 右侧栏内容: 算法选项 + 多步进
+        right_content = QWidget()
+        right_lyt = QVBoxLayout(right_content)
+        right_lyt.setSpacing(8)
 
-        # ── 算法选项 ──
         algo_grp = QGroupBox(self.tr("算法选项"))
         algo_layout = QVBoxLayout(algo_grp)
         algo_layout.setSpacing(4)
@@ -1056,45 +1059,41 @@ class AntennaParamsPage(QWidget):
         self._freq_widget = QWidget()
         freq_row = QHBoxLayout(self._freq_widget)
         freq_row.setContentsMargins(0, 0, 0, 0)
-        freq_row.addWidget(QLabel(self.tr("频点来源:")))
+        freq_row.addWidget(QLabel(self.tr("频点:")))
         self._cmb_freq_src = QComboBox()
-        self._cmb_freq_src.addItem(self.tr("新 sheet 频点: 数据源"), "datasource")
-        self._cmb_freq_src.addItem(self.tr("新 sheet 频点: 模板"), "template")
+        self._cmb_freq_src.addItem(self.tr("数据源"), "datasource")
+        self._cmb_freq_src.addItem(self.tr("模板"), "template")
         self._cmb_freq_src.currentIndexChanged.connect(lambda: self._sync_to_mw())
         freq_row.addWidget(self._cmb_freq_src)
-        freq_row.addWidget(QLabel(self.tr("  去除频点: 前")))
+        algo_layout.addWidget(self._freq_widget)
+
+        trim_row = QHBoxLayout()
+        trim_row.addWidget(QLabel(self.tr("去前")))
         self._spin_trim_start = QSpinBox()
         self._spin_trim_start.setRange(0, 50)
         self._spin_trim_start.setFixedWidth(50)
         self._spin_trim_start.valueChanged.connect(lambda: self._sync_to_mw())
-        freq_row.addWidget(self._spin_trim_start)
-        freq_row.addWidget(QLabel(self.tr("后")))
+        trim_row.addWidget(self._spin_trim_start)
+        trim_row.addWidget(QLabel(self.tr("去后")))
         self._spin_trim_end = QSpinBox()
         self._spin_trim_end.setRange(0, 50)
         self._spin_trim_end.setFixedWidth(50)
         self._spin_trim_end.valueChanged.connect(lambda: self._sync_to_mw())
-        freq_row.addWidget(self._spin_trim_end)
-        freq_row.addStretch()
-        algo_layout.addWidget(self._freq_widget)
+        trim_row.addWidget(self._spin_trim_end)
+        algo_layout.addLayout(trim_row)
 
-        check_row = QHBoxLayout()
-        self._check_extrap = QCheckBox(self.tr("Theta 外推到 180°"))
+        self._check_extrap = QCheckBox(self.tr("Theta 外推 180°"))
         self._check_extrap.toggled.connect(lambda: self._sync_to_mw())
-        check_row.addWidget(self._check_extrap)
-        self._check_robust = QCheckBox(self.tr("Robust peak detection（替代 np.max）"))
+        algo_layout.addWidget(self._check_extrap)
+        self._check_robust = QCheckBox(self.tr("Robust peak"))
         self._check_robust.toggled.connect(lambda: self._sync_to_mw())
-        check_row.addWidget(self._check_robust)
-        self._cmb_ar_output = QComboBox()
-        self._cmb_ar_output.addItem(self.tr("AR 输出 dB"), True)
-        self._cmb_ar_output.addItem(self.tr("AR 输出 线性"), False)
-        self._cmb_ar_output.setCurrentIndex(0)
-        self._cmb_ar_output.setToolTip(self.tr("AR 输出单位: dB (20·log₁₀) 或线性比值"))
-        self._cmb_ar_output.currentIndexChanged.connect(lambda: self._sync_to_mw())
-        check_row.addWidget(self._cmb_ar_output)
-        check_row.addStretch()
-        algo_layout.addLayout(check_row)
+        algo_layout.addWidget(self._check_robust)
 
-        param_layout.addWidget(algo_grp)
+        right_lyt.addWidget(algo_grp)
+        # 多步进（已移至右侧）
+        right_lyt.addWidget(self._grp_step)
+        right_lyt.addStretch()
+        self._right_scroll.setWidget(right_content)
 
         # ── 多步进计算 (原 _init_step_selector) ──
         self._grp_step = QGroupBox(self.tr("📏 多步进计算"))
@@ -1181,9 +1180,21 @@ class AntennaParamsPage(QWidget):
 
         dlg = QDialog(self)
         dlg.setWindowTitle(f"{'AR' if is_ar else 'Gain'} " + self.tr("角度配置"))
-        dlg.setMinimumSize(500, 380)
+        dlg.setMinimumSize(500, 420)
         layout = QVBoxLayout(dlg)
         layout.addWidget(widget)
+        # AR 输出单位选项（仅 AR 显示）
+        if is_ar:
+            ar_out_row = QHBoxLayout()
+            ar_out_row.addWidget(QLabel(self.tr("AR 输出单位:")))
+            cmb_ar_out = QComboBox()
+            cmb_ar_out.addItem(self.tr("dB (20·log₁₀)"), True)
+            cmb_ar_out.addItem(self.tr("线性比值"), False)
+            cmb_ar_out.setCurrentIndex(
+                0 if self._cmb_ar_output.currentData() else 1)
+            ar_out_row.addWidget(cmb_ar_out)
+            ar_out_row.addStretch()
+            layout.addLayout(ar_out_row)
         btn_row = QHBoxLayout()
         btn_ok = QPushButton(self.tr("确定"))
         btn_cancel = QPushButton(self.tr("取消"))
@@ -1199,6 +1210,8 @@ class AntennaParamsPage(QWidget):
                     self._ar_angle_widget = widget
                 else:
                     self._ar_angle_widget.set_config(cfg)
+                # 同步 AR 输出单位
+                self._cmb_ar_output.setCurrentIndex(cmb_ar_out.currentIndex())
             else:
                 if not self._gain_angle_widget:
                     self._gain_angle_widget = widget
@@ -1304,9 +1317,6 @@ class AntennaParamsPage(QWidget):
         vbox.addStretch()
 
         self._left_scroll.setWidget(content)
-        rw = self._right_scroll.parent()
-        if rw and hasattr(rw, 'hide'):
-            rw.hide()
         self._update_summary()
 
     
