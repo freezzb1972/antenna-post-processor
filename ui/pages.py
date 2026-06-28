@@ -526,9 +526,6 @@ class FileSettingsPage(QWidget):
                         parts = param_val.replace("°", "").split("–")
                         if len(parts) == 2:
                             self._mw._ar_lag_config.add_range(float(parts[0]), float(parts[1]))
-            # 更新执行栏
-            if hasattr(self._mw, '_update_exec_params'):
-                self._mw._update_exec_params()
             self._mw._log(f"✓ 已应用: {new_type} = {param_val}")
         QMessageBox.information(parent_dlg, self.tr("已应用"),
             self.tr(f"已更新参数: {new_type} = {param_val}"))
