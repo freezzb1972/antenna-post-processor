@@ -395,3 +395,39 @@ class TestStaleDataProtection:
 
         finally:
             tmp.unlink(missing_ok=True)
+
+
+# --- 4. Antenna params nav dialog ---
+
+class TestNavAntennaParams:
+    """Nav item "antenna params" opens popup dialog."""
+
+    def test_nav_item_exists(self, window):
+        """Nav list has 3 items, #2 is antenna params."""
+        assert window._nav_list.count() == 3
+        assert "天线" in window._nav_list.item(1).text() or "Antenna" in window._nav_list.item(1).text()
+
+    def test_on_nav_changed_no_crash(self, window, monkeypatch):
+        """Clicking nav #2 does not crash (mock QDialog.exec)."""
+        from PySide6.QtWidgets import QDialog
+        monkeypatch.setattr(QDialog, "exec", lambda self: 0)
+        window._nav_list.setCurrentRow(1)
+        assert window._nav_list.currentRow() == 0
+
+    def test_antenna_params_page_creatable(self, window):
+        """AntennaParamsPage can be created standalone with left/right columns."""
+        from ui.pages import AntennaParamsPage
+        page = AntennaParamsPage(window)
+        assert hasattr(page, "_left_scroll")
+        assert hasattr(page, "_right_scroll")
+        assert page._right_scroll.widget() is not None
+        assert page._right_scroll.widget().layout().count() >= 2
+
+    def test_dialog_close_returns_to_input(self, window, monkeypatch):
+        """After dialog closes, nav returns to item 0."""
+        from PySide6.QtWidgets import QDialog
+        monkeypatch.setattr(QDialog, "exec", lambda self: 0)
+        window._nav_list.setCurrentRow(0)
+        window._nav_list.setCurrentRow(1)
+        assert window._nav_list.currentRow() == 0
+        assert window._page_stack.currentIndex() == 0
