@@ -1586,6 +1586,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     f"从模板自动更新 AR 角度: "
                     f"单角度={ar_cfg.singles_sorted}, 范围={ar_cfg.ranges_sorted}"
                 )
+        self._update_params_display()
 
     def _auto_apply_template_params(self):
         """从模板自动识别并应用计算参数到主窗口。
