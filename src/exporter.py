@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import os
+import math
 import re
 from typing import Any, Callable, Dict, List, Optional
 
@@ -485,11 +486,35 @@ def _add_multi_line_chart(ws, title, x_col, y_cols, series_names,
     chart.x_axis.numFmt = '0'
     chart.x_axis.tickLblSkip = 1
     chart.x_axis.tickMarkSkip = 1
-    chart.x_axis.scaling.min = 1100
-    chart.x_axis.scaling.max = 1250
-    chart.x_axis.majorUnit = 50
+    # X 轴: 频率范围 + 刻度（从数据自动推导）
+    if data_start < data_end:
+        _x_vals = []
+        for _r in range(data_start, data_end + 1):
+            _cv = ws.cell(row=_r, column=x_col).value
+            if _cv is not None:
+                _x_vals.append(float(_cv))
+        if _x_vals:
+            _min_x = int(min(_x_vals) / 50) * 50
+            _max_x = (int(max(_x_vals) / 50) + 1) * 50
+            chart.x_axis.scaling.min = _min_x
+            chart.x_axis.scaling.max = _max_x
+            chart.x_axis.majorUnit = 50
     chart.y_axis.title = y_label
     chart.y_axis.numFmt = '0.00'
+    # Y 轴刻度自动
+    if data_start < data_end:
+        _y_vals = []
+        for _r in range(data_start, data_end + 1):
+            for _yc in y_cols:
+                if _yc is not None:
+                    _cv = ws.cell(row=_r, column=_yc).value
+                    if _cv is not None:
+                        _y_vals.append(float(_cv))
+        if _y_vals and y_step is None:
+            _y_range = max(_y_vals) - min(_y_vals)
+            if _y_range > 0:
+                _y_step = 10 ** int(math.log10(_y_range) - 0.5)
+                chart.y_axis.majorUnit = max(_y_step, 0.1)
     if y_step is not None:
         chart.y_axis.majorUnit = y_step
 
@@ -586,16 +611,38 @@ def _add_scatter_chart(ws, title, x_col, y_col, data_start, data_end,
     chart.x_axis.tickLblSkip = 1
     chart.x_axis.tickMarkSkip = 1
 
-    # X 轴: 频率范围 + 刻度
-    if x_col is not None:
-        chart.x_axis.scaling.min = 1100
-        chart.x_axis.scaling.max = 1250
-        chart.x_axis.majorUnit = 50
+    # X 轴: 频率范围 + 刻度（从数据自动推导）
+    if x_col is not None and data_start < data_end:
+        _x_vals = []
+        for _r in range(data_start, data_end + 1):
+            _cv = ws.cell(row=_r, column=x_col).value
+            if _cv is not None:
+                _x_vals.append(float(_cv))
+        if _x_vals:
+            _min_x = int(min(_x_vals) / 50) * 50
+            _max_x = (int(max(_x_vals) / 50) + 1) * 50
+            chart.x_axis.scaling.min = _min_x
+            chart.x_axis.scaling.max = _max_x
+            chart.x_axis.majorUnit = 50
 
     # Y 轴
     if y_label:
         chart.y_axis.title = y_label
     chart.y_axis.numFmt = '0.00'
+    # Y 轴刻度: 从数据自动推导
+    if data_start < data_end:
+        _y_vals = []
+        for _r in range(data_start, data_end + 1):
+            _cv = ws.cell(row=_r, column=y_col).value
+            if _cv is not None:
+                _y_vals.append(float(_cv))
+        if _y_vals and y_step is None:
+            _y_range = max(_y_vals) - min(_y_vals)
+            if _y_range > 0:
+                _y_step = 10 ** int(math.log10(_y_range) - 0.5)
+                chart.y_axis.majorUnit = max(_y_step, 0.1)
+                chart.y_axis.scaling.min = int(min(_y_vals) / _y_step) * _y_step if _y_step else None
+        chart.y_axis.tickLblSkip = 1
     if y_step is not None:
         chart.y_axis.majorUnit = y_step
     if y_min is not None:
