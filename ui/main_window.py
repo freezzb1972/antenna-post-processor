@@ -40,9 +40,11 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSpinBox,
+    QSplitter,
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTextEdit,
     QAbstractItemView,
     QDialog,
     QVBoxLayout,
@@ -141,6 +143,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._init_quick_angle_buttons()
         self._init_params_tab()
         self._build_parameter_tab()   # Master-Detail 布局 + 共享执行栏
+        self._update_params_display() # 初始化执行栏参数面板
         # 执行栏默认可见（处理设置标签）
         self.ui.tabConfig.currentChanged.connect(self._on_config_tab_changed)
         self._connect_signals()
@@ -458,6 +461,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._nav_list.currentRowChanged.connect(self._on_nav_changed)
         self._nav_list.setCurrentRow(0)
 
+        # 天线参数变更 → 实时更新执行栏参数面板
+        self._antenna_params_page.params_changed.connect(self._update_params_display)
+
         # 添加到 tabFile
         self.ui.vTabFile.addWidget(container)
 
@@ -489,9 +495,23 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         progress_row.addWidget(self.ui.lblProgressMsg)
         exec_layout.addLayout(progress_row)
 
-        # 日志（可滚动，处理时参数区冻结）
+        # 执行栏水平分割：左=天线参数显示 | 右=日志
+        h_splitter = QSplitter(Qt.Horizontal)
+
+        # 左侧天线参数显示面板
+        self._params_display = QTextEdit()
+        self._params_display.setReadOnly(True)
+        self._params_display.setStyleSheet(
+            "background: rgba(0,0,0,0.03); border: none; padding: 4px; font-size: 12px;")
+        self._params_display.setMinimumWidth(250)
+        h_splitter.addWidget(self._params_display)
+
+        # 右侧日志
         self.ui.logOutput.setParent(exec_bar)
-        exec_layout.addWidget(self.ui.logOutput, 1)
+        h_splitter.addWidget(self.ui.logOutput)
+
+        h_splitter.setSizes([300, 500])
+        exec_layout.addWidget(h_splitter, 1)
 
         # 按钮行
         btn_row = QHBoxLayout()
@@ -501,7 +521,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         exec_layout.addLayout(btn_row)
 
         # 用 QSplitter 包裹 tabConfig + exec_bar，允许手动调整比例
-        from PySide6.QtWidgets import QSplitter
         v_splitter = QSplitter(Qt.Vertical)
         # 把 tabConfig 从 rootVBox 移到 splitter
         idx = self.ui.rootVBox.indexOf(self.ui.tabConfig)
@@ -1406,6 +1425,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._lag_config.add_single(angle)
         self._sync_quick_buttons()
         self._update_lag_display()
+        self._update_params_display()
 
     def _add_custom_angle(self):
         angle = self.ui.spinCustomAngle.value()
@@ -1498,6 +1518,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         self._required_params = tp
         self._extra_params = set()
+        self._update_params_display()
 
     def _on_load_from_template(self):
         template_path = self.ui.editTemplatePath.text()
@@ -1646,6 +1667,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 layout.addWidget(row)
 
         layout.addStretch()
+        self._update_params_display()
 
     def _remove_single(self, angle: float):
         self._lag_config.remove_single(angle)
@@ -2126,83 +2148,42 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             ar_lag_config=self._ar_lag_config if hasattr(self, '_ar_lag_config') else None,
         )
 
-    def _log_current_params(self):
-        """将当前天线参数摘要打印到日志窗口。"""
-        mode_names = {0: "📡 无源天线", 1: "📶 有源发射 TRP", 2: "📻 有源接收 TIS"}
-        mode_str = mode_names.get(self._test_mode, "未知")
-
-        # 构建参数 key → 人类可读名称的映射
-        from ui.dialogs import CalcParamsDialog
-        param_labels = {}
-        for params_list in [CalcParamsDialog._COMMON_PARAMS,
-                            CalcParamsDialog._TRP_PARAMS,
-                            CalcParamsDialog._TIS_PARAMS]:
-            for _, items in params_list:
-                for key, label in items:
-                    param_labels[key] = label
-
-        lines = [
-            "══════ 当前天线参数 ══════",
-            f"  测试模式: {mode_str}",
-        ]
-
-        # 计算参数
-        all_params = sorted(self._required_params | self._extra_params)
-        param_names = [param_labels.get(k, k) for k in all_params]
-        if param_names:
-            lines.append(f"  计算参数: {', '.join(param_names)}")
-        else:
-            lines.append("  计算参数: (未选择)")
-
-        # Gain/LAG 角度
-        gain_singles = self._lag_config.singles_sorted
-        gain_ranges = self._lag_config.ranges_sorted
-        if gain_singles or gain_ranges:
-            parts = [f"{a}°" for a in gain_singles]
-            if gain_ranges:
-                parts.append("范围: " + ", ".join(f"({lo}°–{hi}°)" for lo, hi in gain_ranges))
-            lines.append(f"  Gain 角度: {', '.join(parts)}")
-        else:
-            lines.append("  Gain 角度: (未设置)")
-
-        # AR 角度
-        if hasattr(self, '_ar_lag_config'):
-            ar_cfg = self._ar_lag_config
-            ar_singles = ar_cfg.singles_sorted
-            ar_ranges = ar_cfg.ranges_sorted
-            if ar_singles or ar_ranges:
-                parts = [f"{a}°" for a in ar_singles]
-                if ar_ranges:
-                    parts.append("范围: " + ", ".join(f"({lo}°–{hi}°)" for lo, hi in ar_ranges))
-                lines.append(f"  AR 角度: {', '.join(parts)}")
-            else:
-                lines.append("  AR 角度: (未设置)")
-
-        # 从 MainWindow widget 读取（dialog 的 _sync_to_mw 写入此处）
-        freq_text = self._cmb_freq_source.currentText() if hasattr(self, '_cmb_freq_source') and self._cmb_freq_source else "—"
-        trim_start = self._spin_trim_start.value() if hasattr(self, '_spin_trim_start') else 0
-        trim_end = self._spin_trim_end.value() if hasattr(self, '_spin_trim_end') else 0
+    def _update_params_display(self):
+        """刷新执行栏左侧天线参数面板（实时更新，不累积）。"""
+        if not hasattr(self, '_params_display') or not self._params_display:
+            return
+        mode_names = {0: "📡 无源", 1: "📶 TRP", 2: "📻 TIS"}
+        mode_str = mode_names.get(self._test_mode, "?")
+        gain_s = self._lag_config.singles_sorted
+        gain_r = self._lag_config.ranges_sorted
+        ar_cfg = getattr(self, '_ar_lag_config', None)
+        ar_s = ar_cfg.singles_sorted if ar_cfg else []
+        ar_r = ar_cfg.ranges_sorted if ar_cfg else []
+        freq = self._cmb_freq_source.currentText() if hasattr(self, '_cmb_freq_source') else "—"
         extrap = hasattr(self, '_check_extrapolate') and self._check_extrapolate.isChecked()
         robust = hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked()
-        trim = f"去除: 前{trim_start} / 后{trim_end}"
-        lines.append(f"  频点: {freq_text} | {trim}")
 
-        # 算法
+        lines = [f"<b>模式:</b> {mode_str}"]
+        checked = sorted(getattr(self, '_required_params', set()) | getattr(self, '_extra_params', set()))
+        if checked:
+            lines.append(f"<b>参数:</b> {len(checked)}个")
+        if gain_s or gain_r:
+            parts = [f"{a}°" for a in gain_s]
+            if gain_r:
+                parts += [f"({lo}–{hi}°)" for lo, hi in gain_r]
+            lines.append(f"<b>Gain:</b> {', '.join(parts)}")
+        if ar_s or ar_r:
+            parts = [f"{a}°" for a in ar_s]
+            if ar_r:
+                parts += [f"({lo}–{hi}°)" for lo, hi in ar_r]
+            lines.append(f"<b>AR:</b> {', '.join(parts)}")
         algo = []
-        if extrap:
-            algo.append("Theta 外推 180°")
-        if robust:
-            algo.append("Robust peak")
-        lines.append(f"  算法: {', '.join(algo) if algo else '(默认)'}")
+        if extrap: algo.append("外推")
+        if robust: algo.append("Robust")
+        if algo: lines.append(f"<b>算法:</b> {', '.join(algo)}")
+        lines.append(f"<b>频点:</b> {freq}")
 
-        lines.append("════════════════════════════")
-
-        # 一次性打印到日志区（不加时间戳，保持格式整洁）
-        self.ui.logOutput.appendPlainText("\n".join(lines))
-        # 自动滚动
-        cursor = self.ui.logOutput.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.ui.logOutput.setTextCursor(cursor)
+        self._params_display.setHtml("<br>".join(lines))
 
     def _update_status(self):
         """更新状态栏 — 显示当前 Gain 和 AR 角度配置概要。"""
