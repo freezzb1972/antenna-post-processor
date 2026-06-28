@@ -485,6 +485,9 @@ def _add_multi_line_chart(ws, title, x_col, y_cols, series_names,
     chart.x_axis.numFmt = '0'
     chart.x_axis.tickLblSkip = 1
     chart.x_axis.tickMarkSkip = 1
+    chart.x_axis.scaling.min = 1100
+    chart.x_axis.scaling.max = 1250
+    chart.x_axis.majorUnit = 50
     chart.y_axis.title = y_label
     chart.y_axis.numFmt = '0.00'
     if y_step is not None:
@@ -582,6 +585,12 @@ def _add_scatter_chart(ws, title, x_col, y_col, data_start, data_end,
     chart.x_axis.numFmt = '0'
     chart.x_axis.tickLblSkip = 1
     chart.x_axis.tickMarkSkip = 1
+
+    # X 轴: 频率范围 + 刻度
+    if x_col is not None:
+        chart.x_axis.scaling.min = 1100
+        chart.x_axis.scaling.max = 1250
+        chart.x_axis.majorUnit = 50
 
     # Y 轴
     if y_label:
