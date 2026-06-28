@@ -302,8 +302,8 @@ class ProcessingWorker(QObject):
                 if ws.title.endswith(suffix):
                     base = ws.title[:-len(suffix)] if suffix else ws.title
                     sheets_by_base.setdefault(base, {})[suffix] = ws
-        # 对每个基础 sheet 生成差值
-        diff_sheets = {}
+        # 对每个基础 sheet 生成差值表; 同时收集 flat data 用于 PivotChart
+        all_flat_rows = []  # (freq_val, param_name, step_label, diff_val)
         for base, suffixed in sheets_by_base.items():
             orig_ws = suffixed.get("")
             if orig_ws is None or len(suffixed) < 2:
@@ -317,7 +317,6 @@ class ProcessingWorker(QObject):
             # 创建差值 sheet
             diff_name = f"{base}_diff"[:31]
             dws = wb.create_sheet(title=diff_name)
-            diff_sheets[base] = dws
             # 表头: 频率 | 参数_原始 | 参数_步进N | 差值_N
             col = 1
             dws.cell(1, col, "Frequency (MHz)")
@@ -352,6 +351,7 @@ class ProcessingWorker(QObject):
                 for suffix_key in sorted(suffixed.keys()):
                     if suffix_key == "":
                         continue
+                    step_label = f"步进{int(float(suffix_key.replace('_step','')))}°"
                     srow = step_data.get(suffix_key, [])
                     for hi, h in enumerate(headers):
                         if h and h.lower() not in ("frequency", "frequency (mhz)", "", "freq"):
@@ -365,47 +365,208 @@ class ProcessingWorker(QObject):
                                 oval_f = 0; sval_f = 0; diff = 0
                             dws.cell(er, col, round(sval_f, 4))
                             dws.cell(er, col + 1, round(diff, 4))
+                            # 收集 flat data 用于交互式 PivotChart
+                            all_flat_rows.append((freq_val, h, step_label, diff))
                             col += 2
-            # 创建差值图表（gen_diff_chart 控制）
-            if data_rows and self.gen_diff_chart:
-                n_rows = len(data_rows)
-                chart_row = n_rows + 5
-                col = 2
-                param_idx = 0
-                for hi, h in enumerate(headers):
-                    if not h or h.lower() in ("frequency", "frequency (mhz)", "", "freq"):
-                        continue
-                    # 每个参数一张图
-                    chart = ScatterChart()
-                    chart.title = f"{h} 步进差值 vs Frequency"
-                    chart.style = 2
-                    chart.width = 16; chart.height = 10
-                    x_vals = Reference(dws, min_col=1, min_row=2, max_row=n_rows + 1)
-                    for suffix_key in sorted(suffixed.keys()):
-                        if suffix_key == "":
-                            continue
-                        step_label = f"步进{int(float(suffix_key.replace('_step','')))}°"
-                        y_col = col + hi * 2 + 1  # diff column
-                        if y_col > dws.max_column:
-                            continue
-                        y_vals = Reference(dws, min_col=y_col, min_row=2, max_row=n_rows + 1)
-                        series = Series(y_vals, x_vals, title=step_label)
-                        series.marker.symbol = 'circle'
-                        series.marker.size = 5
-                        series.graphicalProperties.line.width = 14000
-                        series.smooth = True
-                        chart.series.append(series)
-                    # Y=0 参考线 (通过添加一个常量系列)
-                    try:
-                        from openpyxl.chart.series import DataPoint
-                    except ImportError:
-                        pass
-                    chart.x_axis.title = "Frequency (MHz)"
-                    chart.y_axis.title = f"{h} 差值"
-                    chart.y_axis.numFmt = '0.000'
-                    chart.legend.position = 'b'
-                    chart_row_offset = chart_row + param_idx * 18
-                    dws.add_chart(chart, f"E{chart_row_offset}")
-                    param_idx += 1
-                    col += 2
             self.log.emit(f"  📊 差值表已生成: {diff_name}")
+        # ── 交互式 PivotChart + 切片器（替代每参数静态图表）──
+        if all_flat_rows and self.gen_diff_chart:
+            try:
+                self._add_pivot_diff(wb, all_flat_rows)
+                self.log.emit("  📈 交互式差值图表（PivotChart + 切片器）已生成")
+            except Exception as e:
+                self.log.emit(f"  ⚠ PivotChart 生成失败，回退到静态图表: {e}")
+                # Fallback: 为每个 diff sheet 生成静态图表
+                self._add_static_diff_charts_fallback(wb, sheets_by_base)
+
+    def _add_pivot_diff(self, wb, all_flat_rows):
+        """创建交互式 PivotTable + 散点图（参数/步进角度切片切换）。
+
+        在隐藏 sheet 写入 long-format 数据，创建 PivotTable 含
+        PageField（参数 + 步进角度）下拉筛选器，ScatterChart 引用
+        PivotTable 数据区域实现联动更新。
+        用户可在 Excel 中右键 PivotTable → "插入切片器" 转为视觉切片器。
+        """
+        from openpyxl.pivot.cache import CacheDefinition, CacheSource, WorksheetSource
+        from openpyxl.pivot.table import (
+            TableDefinition, Location, PageField, DataField, RowColField, PivotField
+        )
+        from openpyxl.chart import ScatterChart, Reference, Series
+        from openpyxl.utils import get_column_letter
+
+        # 1. 将 flat data 写入隐藏 sheet
+        flat_ws = wb.create_sheet(title="_diff_flat")
+        flat_ws.sheet_state = 'hidden'
+        flat_ws.append(["Frequency", "Parameter", "StepAngle", "DiffValue"])
+        for freq_val, param_name, step_label, diff_val in all_flat_rows:
+            try:
+                f = float(freq_val) if freq_val is not None else 0.0
+            except (ValueError, TypeError):
+                f = 0.0
+            try:
+                d = float(diff_val) if diff_val is not None else 0.0
+            except (ValueError, TypeError):
+                d = 0.0
+            flat_ws.append([f, str(param_name), str(step_label), round(d, 6)])
+
+        n_data = len(all_flat_rows)
+        last_col_letter = get_column_letter(4)
+        data_ref = f"A1:{last_col_letter}{n_data + 1}"
+
+        # 2. CacheDefinition — 引用隐藏 sheet 数据
+        cache_src = CacheSource(
+            type="worksheet",
+            worksheetSource=WorksheetSource(ref=data_ref, sheet="_diff_flat")
+        )
+        cache_def = CacheDefinition(cacheSource=cache_src)
+        cache_def.cacheId = 0
+
+        # 3. 创建 PivotTable sheet
+        pt_ws = wb.create_sheet(title="DiffChart")
+
+        # 4. TableDefinition
+        pivot_fields = [
+            PivotField(name="Frequency"),
+            PivotField(name="Parameter", axis="axisPage"),
+            PivotField(name="StepAngle", axis="axisPage"),
+            PivotField(name="DiffValue"),
+        ]
+        pt_loc = Location(
+            ref="A3:D20",
+            firstHeaderRow=3,
+            firstDataRow=4,
+            firstDataCol=1
+        )
+        pt = TableDefinition(
+            name="DiffPivot",
+            cacheId=0,
+            dataOnRows=True,
+            dataCaption="Values",
+            grandTotalCaption="Grand Total",
+            errorCaption="#VALUE!",
+            showError=False,
+            missingCaption="",
+            showMissing=True,
+            updatedVersion=3,
+            minRefreshableVersion=3,
+            asteriskTotals=False,
+            showItems=True,
+            editData=False,
+            disableFieldList=False,
+            showCalcMbrs=True,
+            visualTotals=True,
+            showMultipleLabel=True,
+            showDataDropDown=True,
+            showDrill=True,
+            printDrill=False,
+            showMemberPropertyTips=True,
+            showDataTips=True,
+            location=pt_loc,
+            pivotFields=pivot_fields,
+            rowFields=[RowColField(x=0)],
+            pageFields=[
+                PageField(fld=1, name="参数"),
+                PageField(fld=2, name="步进"),
+            ],
+            dataFields=[DataField(name="差值", fld=3, numFmtId=2)],
+        )
+        pt.cache = cache_def
+        pt_ws.add_pivot(pt)
+
+        # 5. 提示文字
+        pt_ws.cell(1, 1, "📊 交互式差值图表 — 使用下方 PivotTable 下拉筛选 参数/步进角度")
+        pt_ws.cell(2, 1, "💡 右键 PivotTable → '插入切片器' 可添加视觉切片按钮")
+        from openpyxl.styles import Font, Alignment
+        for r in (1, 2):
+            cell = pt_ws.cell(r, 1)
+            cell.font = Font(bold=True, color="4472C4")
+            cell.alignment = Alignment(horizontal='left')
+
+        # 6. ScatterChart 引用 PivotTable 数据区域
+        # PivotTable 输出在 A4:B{4 + n_freq}，通过行列引用实现联动更新
+        chart = ScatterChart()
+        chart.title = "步进差值 vs Frequency（使用上方 PivotTable 下拉筛选）"
+        chart.style = 2
+        chart.width = 18
+        chart.height = 11
+        chart.x_axis.title = "Frequency (MHz)"
+        chart.y_axis.title = "差值"
+        chart.y_axis.numFmt = '0.000'
+        chart.legend.position = 'b'
+
+        # Series: Y=DiffValue (col 2), X=Frequency (col 1)
+        x_vals = Reference(pt_ws, min_col=1, min_row=5, max_row=4 + n_data)
+        y_vals = Reference(pt_ws, min_col=2, min_row=5, max_row=4 + n_data)
+        series = Series(y_vals, x_vals, title="差值")
+        series.marker.symbol = 'circle'
+        series.marker.size = 5
+        series.graphicalProperties.line.width = 14000
+        series.smooth = True
+        chart.series.append(series)
+
+        chart_anchor_row = 4 + n_data + 3
+        pt_ws.add_chart(chart, f"A{chart_anchor_row}")
+
+    def _add_static_diff_charts_fallback(self, wb, sheets_by_base):
+        """回退方案: 为每个参数生成独立静态图表 (旧逻辑)。"""
+        from openpyxl.chart import ScatterChart, Reference, Series
+        # 扫描每个 base 的 diff sheet 并添加静态图表
+        for base, suffixed in sheets_by_base.items():
+            orig_ws = suffixed.get("")
+            if orig_ws is None or len(suffixed) < 2:
+                continue
+            diff_name = f"{base}_diff"[:31]
+            if diff_name not in [ws.title for ws in wb.worksheets]:
+                continue
+            dws = wb[diff_name]
+            rows = list(dws.iter_rows(values_only=True))
+            if not rows:
+                continue
+            headers = [str(c or "") for c in rows[0]]
+            data_rows = rows[1:]
+            if not data_rows:
+                continue
+            n_rows = len(data_rows)
+            chart_row = n_rows + 5
+            # 重建 suffixed 的 step label
+            step_labels = {}
+            for suffix_key in sorted(suffixed.keys()):
+                if suffix_key == "":
+                    step_labels[suffix_key] = "原始"
+                else:
+                    try:
+                        step_labels[suffix_key] = f"步进{int(float(suffix_key.replace('_step','')))}°"
+                    except (ValueError, TypeError):
+                        step_labels[suffix_key] = suffix_key
+            col = 2
+            param_idx = 0
+            for hi, h in enumerate(headers):
+                if not h or h.lower() in ("frequency", "frequency (mhz)", "", "freq"):
+                    continue
+                chart = ScatterChart()
+                chart.title = f"{h} 步进差值 vs Frequency"
+                chart.style = 2
+                chart.width = 16; chart.height = 10
+                x_vals = Reference(dws, min_col=1, min_row=2, max_row=n_rows + 1)
+                for suffix_key in sorted(suffixed.keys()):
+                    if suffix_key == "":
+                        continue
+                    step_label = step_labels.get(suffix_key, suffix_key)
+                    y_col = col + hi * 2 + 1
+                    if y_col > dws.max_column:
+                        continue
+                    y_vals = Reference(dws, min_col=y_col, min_row=2, max_row=n_rows + 1)
+                    series = Series(y_vals, x_vals, title=step_label)
+                    series.marker.symbol = 'circle'
+                    series.marker.size = 5
+                    series.graphicalProperties.line.width = 14000
+                    series.smooth = True
+                    chart.series.append(series)
+                chart.x_axis.title = "Frequency (MHz)"
+                chart.y_axis.title = f"{h} 差值"
+                chart.y_axis.numFmt = '0.000'
+                chart.legend.position = 'b'
+                chart_row_offset = chart_row + param_idx * 18
+                dws.add_chart(chart, f"E{chart_row_offset}")
+                param_idx += 1
+                col += 2

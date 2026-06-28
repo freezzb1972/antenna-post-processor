@@ -1186,7 +1186,7 @@ class AntennaParamsPage(QWidget):
             self.tr("☑ 生成步进差值图表"))
         self._chk_gen_diff_chart.setChecked(True)
         self._chk_gen_diff_chart.setToolTip(
-            self.tr("勾选后将为每个参数生成步进差值散点图（Y=0基线）"))
+            self.tr("勾选后生成交互式差值散点图（支持按参数/步进角度筛选，可在 Excel 中右键 PivotTable 插入切片器）"))
         sl.addWidget(self._chk_gen_diff_chart)
 
         right_lyt.addWidget(algo_grp)
