@@ -1281,8 +1281,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         return result
 
     @staticmethod
+    @staticmethod
     def _auto_rename_if_exists(filepath: str) -> str:
-        """如果文件已存在，自动添加 _YYYYMMDD_NN 后缀避免覆盖。"""
+        """如果文件已存在，自动添加 _NN 后缀避免覆盖（与 .ant 逻辑一致）。"""
         p = Path(filepath)
         if not p.exists():
             return filepath
@@ -1291,9 +1292,15 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         stem = p.stem
         ext = p.suffix
         parent = p.parent
+        # 如果 stem 已包含日期后缀（如 name_20260628_01），去掉旧后缀重新编号
+        import re
+        m = re.search(r'_\d{8}_\d{2}$', stem)
+        if m:
+            stem = stem[:m.start()]
+        new_stem = f"{stem}_{today}"
         seq = 1
         while True:
-            new_name = f"{stem}_{today}_{seq:02d}{ext}"
+            new_name = f"{new_stem}_{seq:02d}{ext}"
             new_path = parent / new_name
             if not new_path.exists():
                 return str(new_path)
