@@ -281,11 +281,10 @@ def classify_header(raw_header: str) -> str:
     if is_pc_theta_column(raw_header):           return "pc_theta_mm"
     if is_pc_phi_column(raw_header):             return "pc_phi_mm"
 
-    # Regex fallback (LAG)
-    _norm = _normalize_key(raw_header)
-    if _RE_LAG_RANGE.search(_norm) or _RE_LAG_RANGE_NO_PREFIX.search(_norm):
+    # Regex fallback (LAG) — 用原始列头而非 _norm，因 _normalize_key 会去掉 = 号
+    if _RE_LAG_RANGE.search(raw_header) or _RE_LAG_RANGE_NO_PREFIX.search(raw_header):
         return "lag_range"
-    if _RE_LAG_SINGLE.search(_norm) or _RE_LAG_SINGLE_NO_PREFIX.search(_norm):
+    if _RE_LAG_SINGLE.search(raw_header) or _RE_LAG_SINGLE_NO_PREFIX.search(raw_header):
         return "lag_single"
     return "unknown"
 

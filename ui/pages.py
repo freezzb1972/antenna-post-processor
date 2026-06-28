@@ -925,7 +925,6 @@ class AntennaParamsPage(QWidget):
         self._right_checkboxes: Dict[str, QCheckBox] = {}
         self._left_scroll: Optional[QScrollArea] = None
         self._right_scroll: Optional[QScrollArea] = None
-        self._summary_label: Optional[QLabel] = None
 
         self._setup_ui()
         self._load_state()
@@ -1064,16 +1063,6 @@ class AntennaParamsPage(QWidget):
         scroll.setFrameShape(QScrollArea.NoFrame)
         scroll.setWidget(param_widget)
         main_layout.addWidget(scroll, 1)
-
-        # 已选参数概览
-        self._summary_grp = QGroupBox("📋 " + self.tr("已选参数概览"))
-        summary_layout = QVBoxLayout(self._summary_grp)
-        self._summary_label = QLabel()
-        self._summary_label.setWordWrap(True)
-        self._summary_label.setTextFormat(Qt.RichText)
-        self._summary_label.setStyleSheet("padding: 4px; font-size: 12px;")
-        summary_layout.addWidget(self._summary_label)
-        main_layout.addWidget(self._summary_grp)
 
         # NHPRP/NHPIS 自定义角度 (TRP/TIS 时显示)
         self._grp_nh = QGroupBox("NHPRP / NHPIS " + self.tr("自定义角度"))
@@ -1395,52 +1384,8 @@ class AntennaParamsPage(QWidget):
         return {k for k, cb in checkbox_dict.items() if cb.isChecked()}
 
     def _update_summary(self):
-        if not self._summary_label:
-            return
-        mode_names = {0: self.tr("📡 无源天线"), 1: self.tr("📶 有源发射 TRP"), 2: self.tr("📻 有源接收 TIS")}
-        mode_str = mode_names.get(self._test_mode, self.tr("未知"))
-        lines = [f"<b>{self.tr('测试模式')}:</b> {mode_str}"]
-
-        checked = sorted(set(cb.text() for cb in self._left_checkboxes.values() if cb.isChecked()))
-        if checked:
-            lines.append(f"<b>{self.tr('计算参数')} ({len(checked)}):</b> {', '.join(checked)}")
-        else:
-            lines.append(f"<b>{self.tr('计算参数')}:</b> <span style='color:#888;'>({self.tr('未选择')})</span>")
-
-        gain_cfg_s = self._gain_angle_widget.get_config() if self._gain_angle_widget else LagConfig()
-        gain_singles = sorted(set(gain_cfg_s.single_angles))
-        gain_ranges = sorted(set(gain_cfg_s.ranges))
-        if gain_singles or gain_ranges:
-            parts = [f"{a}°" for a in gain_singles] + [f"({lo}°–{hi}°)" for lo, hi in gain_ranges]
-            lines.append(f"<b>Gain {self.tr('角度')} ({len(parts)}):</b> {', '.join(parts)}")
-        else:
-            lines.append(f"<b>Gain {self.tr('角度')}:</b> <span style='color:#888;'>({self.tr('未设置')})</span>")
-
-        ar_cfg_s = self._ar_angle_widget.get_config() if self._ar_angle_widget else LagConfig()
-        ar_singles = sorted(set(ar_cfg_s.single_angles))
-        ar_ranges = sorted(set(ar_cfg_s.ranges))
-        if ar_singles or ar_ranges:
-            parts = [f"{a}°" for a in ar_singles] + [f"({lo}°–{hi}°)" for lo, hi in ar_ranges]
-            lines.append(f"<b>AR {self.tr('角度')} ({len(parts)}):</b> {', '.join(parts)}")
-        else:
-            lines.append(f"<b>AR {self.tr('角度')}:</b> <span style='color:#888;'>({self.tr('未设置')})</span>")
-
-        algo_parts = []
-        if self._check_extrap.isChecked():
-            algo_parts.append(self.tr("Theta 外推到 180°"))
-        if self._check_robust.isChecked():
-            algo_parts.append(self.tr("Robust peak detection"))
-        if not self._cmb_ar_output.currentData():
-            algo_parts.append(self.tr("AR 输出线性"))
-        algo_str = ", ".join(algo_parts) if algo_parts else (
-            "<span style='color:#888;'>(" + self.tr("默认") + ")</span>")
-        lines.append(f"<b>{self.tr('算法选项')}:</b> {algo_str}")
-
-        freq_src = self._cmb_freq_src.currentText()
-        trim = f"{self.tr('去除')}: {self.tr('前')} {self._spin_trim_start.value()} / {self.tr('后')} {self._spin_trim_end.value()}"
-        lines.append(f"<b>{self.tr('频点')}:</b> {freq_src} | {trim}")
-
-        self._summary_label.setText("<br>".join(lines))
+        """摘要已移至下方执行栏显示，此处留空。"""
+        pass
 
     # ── 同步到 MainWindow ──
 

@@ -446,6 +446,12 @@
     },
     {
       "col_type": "lag_single",
+      "label": "LAG 单角度 (前缀)",
+      "regex": "lag\\s*(?:theta|θ)\\s*[=＝]\\s*(\\d+\\.?\\d*)",
+      "builtin": true
+    },
+    {
+      "col_type": "lag_single",
       "label": "LAG 单角度",
       "regex": "(?:theta|θ)\\s*[=＝]\\s*(\\d+\\.?\\d*)\\s*(?:deg)?\\s*(?:lag|l\\.a\\.g\\.?)",
       "builtin": true
