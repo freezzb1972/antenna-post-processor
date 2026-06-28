@@ -265,6 +265,13 @@ class ProcessingWorker(QObject):
                 except OSError:
                     pass
 
+        # 步进差值比较表
+        if len(results) > 1:
+            try:
+                self._add_diff_sheet(wb, results)
+            except Exception as e:
+                self.log.emit(f"\u26a0 步进差值表生成失败: {e}")
+
         wb.save(output_path)
         wb.close()
 
@@ -277,3 +284,124 @@ class ProcessingWorker(QObject):
     def _on_log(self, message):
         if not self._cancelled:
             self.log.emit(message)
+
+    def _add_diff_sheet(self, wb, results):
+        """生成步进差值比较表 + 差值图表。"""
+        from openpyxl.chart import ScatterChart, Reference, Series
+        from openpyxl.chart.axis import NumericAxis
+        from openpyxl.utils import get_column_letter
+        import math
+        # 按 suffix 分组: original(suffix="") + steps
+        sheets_by_base = {}
+        for suffix, _ in results:
+            for ws in wb.worksheets:
+                if ws.title.endswith(suffix):
+                    base = ws.title[:-len(suffix)] if suffix else ws.title
+                    sheets_by_base.setdefault(base, {})[suffix] = ws
+        # 对每个基础 sheet 生成差值
+        diff_sheets = {}
+        for base, suffixed in sheets_by_base.items():
+            orig_ws = suffixed.get("")
+            if orig_ws is None or len(suffixed) < 2:
+                continue
+            # 读取原始数据
+            rows = list(orig_ws.iter_rows(values_only=True))
+            if not rows:
+                continue
+            headers = [str(c or "") for c in rows[0]]
+            data_rows = rows[1:]
+            # 创建差值 sheet
+            diff_name = f"{base}_diff"[:31]
+            dws = wb.create_sheet(title=diff_name)
+            diff_sheets[base] = dws
+            # 表头: 频率 | 参数_原始 | 参数_步进N | 差值_N
+            col = 1
+            dws.cell(1, col, "Frequency (MHz)")
+            col += 1
+            for suffix_key in sorted(suffixed.keys()):
+                label = "原始" if suffix_key == "" else f"步进{int(float(suffix_key.replace('_step','')))}°"
+                for hi, h in enumerate(headers):
+                    if h and h.lower() not in ("frequency", "frequency (mhz)", "", "freq"):
+                        dws.cell(1, col, f"{h} ({label})")
+                        dws.cell(1, col + 1, f"{h} 差值 ({label})")
+                        col += 2
+            # 写入数据: 逐行计算差值
+            freq_col = 0
+            for fi, h in enumerate(headers):
+                if h and h.lower() in ("frequency", "frequency (mhz)", "freq"):
+                    freq_col = fi
+                    break
+            for ri, data_row in enumerate(data_rows):
+                er = ri + 2
+                freq_val = data_row[freq_col] if freq_col < len(data_row) else None
+                dws.cell(er, 1, freq_val)
+                col = 2
+                step_data = {}
+                for suffix_key in sorted(suffixed.keys()):
+                    sws = suffixed[suffix_key]
+                    srows = list(sws.iter_rows(values_only=True))
+                    if ri + 1 < len(srows):
+                        step_data[suffix_key] = srows[ri + 1]
+                    else:
+                        step_data[suffix_key] = []
+                orig_row = step_data.get("", [])
+                for suffix_key in sorted(suffixed.keys()):
+                    if suffix_key == "":
+                        continue
+                    srow = step_data.get(suffix_key, [])
+                    for hi, h in enumerate(headers):
+                        if h and h.lower() not in ("frequency", "frequency (mhz)", "", "freq"):
+                            oval = orig_row[hi] if hi < len(orig_row) else None
+                            sval = srow[hi] if hi < len(srow) else None
+                            try:
+                                oval_f = float(oval) if oval is not None else 0
+                                sval_f = float(sval) if sval is not None else 0
+                                diff = sval_f - oval_f
+                            except (ValueError, TypeError):
+                                oval_f = 0; sval_f = 0; diff = 0
+                            dws.cell(er, col, round(sval_f, 4))
+                            dws.cell(er, col + 1, round(diff, 4))
+                            col += 2
+            # 创建差值图表
+            if data_rows:
+                n_rows = len(data_rows)
+                chart_row = n_rows + 5
+                col = 2
+                param_idx = 0
+                for hi, h in enumerate(headers):
+                    if not h or h.lower() in ("frequency", "frequency (mhz)", "", "freq"):
+                        continue
+                    # 每个参数一张图
+                    chart = ScatterChart()
+                    chart.title = f"{h} 步进差值 vs Frequency"
+                    chart.style = 2
+                    chart.width = 16; chart.height = 10
+                    x_vals = Reference(dws, min_col=1, min_row=2, max_row=n_rows + 1)
+                    for suffix_key in sorted(suffixed.keys()):
+                        if suffix_key == "":
+                            continue
+                        step_label = f"步进{int(float(suffix_key.replace('_step','')))}°"
+                        y_col = col + hi * 2 + 1  # diff column
+                        if y_col > dws.max_column:
+                            continue
+                        y_vals = Reference(dws, min_col=y_col, min_row=2, max_row=n_rows + 1)
+                        series = Series(y_vals, x_vals, title=step_label)
+                        series.marker.symbol = 'circle'
+                        series.marker.size = 5
+                        series.graphicalProperties.line.width = 14000
+                        series.smooth = True
+                        chart.series.append(series)
+                    # Y=0 参考线 (通过添加一个常量系列)
+                    try:
+                        from openpyxl.chart.series import DataPoint
+                    except ImportError:
+                        pass
+                    chart.x_axis.title = "Frequency (MHz)"
+                    chart.y_axis.title = f"{h} 差值"
+                    chart.y_axis.numFmt = '0.000'
+                    chart.legend.position = 'b'
+                    chart_row_offset = chart_row + param_idx * 18
+                    dws.add_chart(chart, f"E{chart_row_offset}")
+                    param_idx += 1
+                    col += 2
+            self.log.emit(f"  📊 差值表已生成: {diff_name}")
