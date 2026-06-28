@@ -140,8 +140,7 @@ def main():
     I18nManager.init(app)
     splash.advance("正在创建主窗口...", 80)
 
-    # 主窗口
-    app.setQuitOnLastWindowClosed(False)
+    # 主窗口（多窗口时关闭最后一个自动退出）
     from ui.window_manager import WindowManager
     wm = WindowManager.instance()
     window = MainWindow(app)
