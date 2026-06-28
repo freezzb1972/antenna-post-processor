@@ -494,34 +494,33 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         progress_row.addWidget(self.ui.lblProgressMsg)
         exec_layout.addLayout(progress_row)
 
-        # 执行栏水平分割：左=天线参数显示 + 按钮 | 右=日志
+        # 执行栏水平分割：左=天线参数 | 右=日志+按钮
         h_splitter = QSplitter(Qt.Horizontal)
 
-        # 左侧面板：天线参数 + 按钮行（按钮对齐分栏线左边缘）
-        left_panel = QWidget()
-        left_layout = QVBoxLayout()
-        left_layout.setContentsMargins(0, 0, 0, 0)
-
+        # 左侧面板：天线参数显示
         self._params_display = QTextEdit()
         self._params_display.setReadOnly(True)
         self._params_display.setStyleSheet(
             "background: rgba(0,0,0,0.03); border: none; padding: 4px; font-size: 12px;")
         self._params_display.setMinimumWidth(250)
-        left_layout.addWidget(self._params_display, 1)
+        h_splitter.addWidget(self._params_display)
 
-        # 按钮行（在左侧面板底部，与分栏线左边缘对齐）
+        # 右侧面板：日志 + 按钮（按钮在右侧栏左侧对齐）
+        right_panel = QWidget()
+        right_layout = QVBoxLayout()
+        right_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.ui.logOutput.setParent(exec_bar)
+        right_layout.addWidget(self.ui.logOutput, 1)
+
         btn_row = QHBoxLayout()
         btn_row.addWidget(self.ui.btnStart)
         btn_row.addWidget(self.ui.btnStop)
         btn_row.addStretch()
-        left_layout.addLayout(btn_row)
+        right_layout.addLayout(btn_row)
 
-        left_panel.setLayout(left_layout)
-        h_splitter.addWidget(left_panel)
-
-        # 右侧日志
-        self.ui.logOutput.setParent(exec_bar)
-        h_splitter.addWidget(self.ui.logOutput)
+        right_panel.setLayout(right_layout)
+        h_splitter.addWidget(right_panel)
 
         h_splitter.setSizes([300, 500])
         exec_layout.addWidget(h_splitter, 1)

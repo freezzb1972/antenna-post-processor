@@ -82,6 +82,9 @@ class TemplateRecognizerDialog(QDialog):
         self.setWindowTitle(self.tr("模板识别"))
         self.resize(900, 650)
         self.setMinimumSize(720, 500)
+        # 启用最大化按钮，方便全屏查看大量列头参数
+        self.setWindowFlags(
+            self.windowFlags() | Qt.WindowMaximizeButtonHint)
 
         self._template_path: str = ""
         self._sheet_names: list = []
