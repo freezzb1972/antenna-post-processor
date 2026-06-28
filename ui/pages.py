@@ -348,9 +348,99 @@ class FileSettingsPage(QWidget):
             self._on_auto_match()
 
     def _on_preview_report(self):
-        """打开报告预览对话框。"""
-        if self._mw:
-            self._mw._show_template_preview()
+        """打开模板列预览对话框 — 检测列头、允许修正、另存预设。"""
+        tpl_path = self._template_path or (self.ui.editTemplatePath.text().strip() if hasattr(self, 'ui') else "")
+        if not tpl_path:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择模板文件。"))
+            return
+        if not Path(tpl_path).exists():
+            QMessageBox.warning(self, self.tr("错误"), self.tr("模板文件不存在。"))
+            return
+
+        try:
+            from src.column_mapping import detect_columns_from_template, ALL_COL_TYPE_LABELS, TemplatePreset, save_preset
+            mappings = detect_columns_from_template(tpl_path)
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("检测失败"), self.tr(f"列头检测失败:\n{e}"))
+            return
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("模板列预览"))
+        dlg.setMinimumSize(600, 450)
+        layout = QVBoxLayout(dlg)
+
+        # 列映射表
+        table = QTableWidget()
+        table.setColumnCount(4)
+        table.setHorizontalHeaderLabels([
+            self.tr("列"), self.tr("列头文本"), self.tr("检测类型"), self.tr("修正类型")
+        ])
+        table.horizontalHeader().setStretchLastSection(True)
+        table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.setRowCount(len(mappings))
+        detected = 0
+        for ri, m in enumerate(mappings):
+            table.setItem(ri, 0, QTableWidgetItem(m.col_letter))
+            table.setItem(ri, 1, QTableWidgetItem(m.raw_header))
+            table.setItem(ri, 2, QTableWidgetItem(m.detected_type))
+            # 修正下拉
+            cmb = QComboBox()
+            for ct, label in ALL_COL_TYPE_LABELS:
+                cmb.addItem(label, ct)
+            idx = cmb.findData(m.detected_type)
+            if idx >= 0:
+                cmb.setCurrentIndex(idx)
+            table.setCellWidget(ri, 3, cmb)
+            if m.detected_type != "unknown":
+                detected += 1
+        table.resizeColumnsToContents()
+        layout.addWidget(table)
+
+        # 摘要
+        summary = QLabel(
+            self.tr("共 {} 列, 识别 {} 列, {} 列未识别").format(
+                len(mappings), detected, len(mappings) - detected))
+        summary.setStyleSheet("color: #666;")
+        layout.addWidget(summary)
+
+        # 按钮
+        btn_row = QHBoxLayout()
+        btn_save = QPushButton(self.tr("💾 保存为模板预设"))
+        btn_close = QPushButton(self.tr("关闭"))
+        btn_row.addWidget(btn_save)
+        btn_row.addStretch()
+        btn_row.addWidget(btn_close)
+        btn_close.clicked.connect(dlg.accept)
+        save_template_path = tpl_path  # capture for lambda
+
+        def _on_save():
+            rows = table.rowCount()
+            col_mappings = []
+            for ri in range(rows):
+                col_letter = table.item(ri, 0).text()
+                raw = table.item(ri, 1).text()
+                detected_type = table.item(ri, 2).text()
+                cmb = table.cellWidget(ri, 3)
+                confirmed = cmb.currentData() if cmb else ""
+                from src.column_mapping import ColumnMapping as CM
+                col_mappings.append(CM(
+                    col_letter=col_letter, col_index=ri + 1,
+                    raw_header=raw, detected_type=detected_type,
+                    confirmed_type=confirmed if confirmed != detected_type else "",
+                ))
+            name = Path(save_template_path).stem
+            ext = Path(save_template_path).suffix.lstrip(".")
+            preset = TemplatePreset(
+                name=name, path=save_template_path, file_type=ext,
+                column_mappings=col_mappings,
+            )
+            save_preset(preset)
+            QMessageBox.information(dlg, self.tr("保存成功"),
+                self.tr(f"模板预设已保存: {name}\n包含 {len(col_mappings)} 列映射"))
+
+        btn_save.clicked.connect(_on_save)
+        layout.addLayout(btn_row)
+        dlg.exec()
 
     def _on_add_data_files(self):
         if not self._cfg:
