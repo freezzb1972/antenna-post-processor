@@ -473,9 +473,13 @@ def _add_multi_line_chart(ws, title, x_col, y_cols, series_names,
         y_values = Reference(ws, min_col=y_col, min_row=data_start,
                              max_row=data_end, max_col=y_col)
         series = Series(y_values, x_values, title=name)
-        series.marker.symbol = ['circle', 'diamond', 'square', 'triangle'][i % 4]
-        series.marker.size = 4
-        series.graphicalProperties.line.width = 18000
+        colors = ["E74C3C", "2980B9", "27AE60", "F39C12"]
+        markers = ['circle', 'diamond', 'square', 'triangle']
+        series.marker.symbol = markers[i % 4]
+        series.marker.size = 6
+        series.marker.graphicalProperties.solidFill = colors[i % 4]
+        series.graphicalProperties.line.solidFill = "2C3E50"
+        series.graphicalProperties.line.width = 12000
         series.smooth = True
         chart.series.append(series)
 
@@ -594,12 +598,17 @@ def _add_scatter_chart(ws, title, x_col, y_col, data_start, data_end,
     # 单系列 — 标题即图例名
     series = Series(y_values, x_values, title=title)
     series.marker.symbol = 'circle'
-    series.marker.size = 4
-    series.graphicalProperties.line.width = 20000  # EMU
+    series.marker.size = 6
+    series.marker.graphicalProperties.solidFill = "E74C3C"  # 红色标记
+    series.graphicalProperties.line.solidFill = "2C3E50"     # 深色平滑线
+    series.graphicalProperties.line.width = 15000  # EMU (比标记细)
     # 平滑曲线
     series.smooth = True
     chart.series.append(series)
     chart.legend.position = 'b'
+    # 不显示数据表
+    if hasattr(chart, 'dTable'):
+        chart.dTable = None
 
     # 网格线
     chart.y_axis.majorGridlines = _chart_axis.ChartLines()
