@@ -134,9 +134,9 @@ class TestThemeI18n:
     """主题切换 + 中英文翻译。"""
 
     def test_theme_list_populated(self, window, qtbot):
-        """主题列表包含 28 个主题（通过 ThemeManager 直接验证）。"""
+        """主题列表包含 4 个精选主题（通过 ThemeManager 直接验证）。"""
         from ui.theme_manager import ThemeManager
-        assert len(ThemeManager.ALL_THEMES) >= 20  # 至少 20 个主题
+        assert len(ThemeManager.ALL_THEMES) >= 4  # 至少 4 个精选主题
 
     def test_theme_switch(self, window, qtbot):
         """切换主题不崩溃（通过 ThemeManager.apply 验证）。"""
