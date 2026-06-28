@@ -104,10 +104,11 @@ pyinstaller antenna_post_processor.spec
 <div class="card">
   <p><span class="step">1</span> <strong>选择输入文件</strong> — 点击 <code>浏览...</code> 按钮（📂 文件设置 Tab → 输入文件），选择 <code>.csv</code> 或 <code>.xlsx</code> 数据文件。</p>
   <p><span class="step">2</span> <strong>选择模板</strong> — 点击第二个 <code>浏览...</code>，选择模板 Excel（<code>.xlsx</code>）。选择后自动识别 LAG 列配置。</p>
-  <p><span class="step">3</span> <strong>确认 LAG 设置</strong> — 切换到 📐 <strong>LAG 配置</strong> Tab，确认快捷角度按钮和已配置项。可按需添加自定义角度或范围。</p>
-  <p><span class="step">4</span> <strong>选择外推</strong> — 勾选 <code>Theta 外推到 180°</code> 复选框（默认关闭）。外推会使 Directivity 降低约 0.04 dB，更接近 IEEE 标准全空间积分。</p>
-  <p><span class="step">5</span> <strong>开始处理</strong> — 点击 <code>▶ 开始处理</code> 按钮。进度条显示读取/计算/写入三阶段进度。完成后结果 CSV 自动导出到 <code>~/Downloads/</code>。</p>
-  <p><span class="step">6</span> <strong>查看结果</strong> — 输出 Excel 在输出目录中生成，每个 Sheet 填入对应频点的计算值。</p>
+  <p><span class="step">3</span> <strong>天线参数</strong> — 在左侧导航点击 <strong>📡 天线参数</strong>，选择测试模式和计算参数。点击 <strong>Gain 角度设置</strong> 或 <strong>AR 角度设置</strong> 弹出角度配置窗口，支持步进生成、自定义单角度和角度范围。</p>
+  <p><span class="step">4</span> <strong>选择算法</strong> — 勾选 <code>Theta 外推到 180°</code> 或 <code>Robust peak</code>（默认关闭）。外推使 Directivity 更接近 IEEE 标准全空间积分。</p>
+  <p><span class="step">5</span> <strong>图表配置</strong> — 在左侧导航点击 <strong>📊 图表配置</strong>，选择需要生成的图表类别、输出方式和视角参数。</p>
+  <p><span class="step">6</span> <strong>开始处理</strong> — 点击 <code>▶ 开始处理</code> 按钮。进度条显示读取/计算/写入三阶段进度。处理完成后结果自动填入输出 Excel。</p>
+  <p><span class="step">7</span> <strong>查看结果</strong> — 切换到 <strong>📊 计算结果</strong> 和 <strong>📈 图表查看</strong> 标签页查看参数表和 3D 方向图。计算完成后自动保存 .ant 任务包（下次双击秒开）。</p>
 </div>
 
 <h3>1.2 多文件批量模式</h3>
@@ -125,13 +126,15 @@ pyinstaller antenna_post_processor.spec
 
 <table>
   <tr><th>功能</th><th>位置</th><th>说明</th></tr>
-  <tr><td>📂 文件设置</td><td>Tab 0</td><td>选择数据文件、模板、输出目录</td></tr>
-  <tr><td>📐 LAG 配置</td><td>Tab 1</td><td>快捷角度按钮（点击切换）、步进批量生成、角度范围、保存/加载预设</td></tr>
-  <tr><td>📊 3D 图形设置</td><td>Tab 2</td><td>视角（仰角/方位角）、分辨率 (DPI)、嵌入 Excel / 独立 PNG</td></tr>
-  <tr><td>🔗 自动匹配</td><td>文件 Tab（多文件区）</td><td>工作表↔数据文件自动匹配，支持手动覆盖</td></tr>
-  <tr><td>📝 工作表名</td><td>文件 Tab（匹配表右侧）</td><td>输出工作表命名方式：保留模板原名 / 用数据源名替换</td></tr>
-  <tr><td>📏 外推开关</td><td>文件 Tab（底部）</td><td>Theta 0-110° → 0-180° 线性外推，默认关闭</td></tr>
-  <tr><td>🌐 语言切换</td><td>文件 → 系统设置</td><td>中文 / English 切换</td></tr>
+  <tr><td>📂 输入输出</td><td>导航项 0</td><td>选择模板（内置预设/从电脑选择）、数据文件、自动匹配、输出目录</td></tr>
+  <tr><td>📡 天线参数</td><td>导航项 1</td><td>测试模式（无源/TRP/TIS）、计算参数勾选、Gain/AR 角度配置、算法选项、多步进</td></tr>
+  <tr><td>📊 图表配置</td><td>导航项 2</td><td>图表类别选择、视角参数、嵌入 Excel / 保存 PNG</td></tr>
+  <tr><td>🔗 自动匹配</td><td>输入输出页</td><td>工作表↔数据文件自动匹配，支持手动覆盖</td></tr>
+  <tr><td>📝 工作表名</td><td>输入输出页</td><td>输出工作表命名方式：保留模板原名 / 用数据源名替换</td></tr>
+  <tr><td>📦 任务包 (.ant)</td><td>文件→保存任务包</td><td>保存/打开 .ant 任务包，包含数据/模板/配置快照，双击秒开</td></tr>
+  <tr><td>📋 模板预览</td><td>输入输出页📋按钮</td><td>按列显示检测结果，支持修正类型和参数值</td></tr>
+  <tr><td>🌐 语言切换</td><td>文件→系统设置</td><td>中文 / English 切换</td></tr>
+  <tr><td>🖨️ 打印</td><td>文件→打印</td><td>调用系统打印机/PDF 打印结果</td></tr>
   <tr><td>🎨 主题切换</td><td>文件 → 系统设置</td><td>下拉选择 Material Design 主题</td></tr>
   <tr><td>📄 完整报告</td><td>输出区域复选框</td><td>生成独立 Excel 含全部指标 + 图表</td></tr>
 </table>
