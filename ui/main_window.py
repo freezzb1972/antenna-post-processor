@@ -525,7 +525,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             layout.addWidget(page)
             btn_ok = QPushButton(self.tr("确定"))
             btn_ok.setMinimumHeight(36)
-            btn_ok.clicked.connect(lambda: (page._sync_to_mw(), dlg.accept()))
+            def _on_dialog_ok():
+                page._sync_to_mw()
+                # 保存步进参数到 MainWindow（dialog 关闭后 stack 页面读不到）
+                self._dialog_step_values = page.get_selected_steps()
+                self._dialog_skip_original = page.get_skip_original()
+                dlg.accept()
+            btn_ok.clicked.connect(_on_dialog_ok)
             layout.addWidget(btn_ok)
             dlg.exec()
             self._nav_list.blockSignals(True)
@@ -1834,30 +1840,15 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         png_dir = plot_config.save_png_folder
         full_chart_config.save_png_folder = png_dir
 
-        # 从天线参数页面读取当前参数（Step 5: 替代旧 widget 读取）
-        ant_page = getattr(self, '_antenna_params_page', None)
-        if ant_page:
-            params = ant_page.get_current_params()
-            extrapolate_theta = params["extrapolate"]
-            freq_source = params["freq_source"] or "datasource"
-            trim_start = params["trim_start"]
-            trim_end = params["trim_end"]
-            robust_peak = params["robust_peak"]
-        else:
-            extrapolate_theta = self._check_extrapolate.isChecked()
-            freq_source = self._cmb_freq_source.currentData() or "datasource"
-            trim_start = self._spin_trim_start.value()
-            trim_end = self._spin_trim_end.value()
-            robust_peak = self._check_robust_peak.isChecked()
-
-        # 多步进参数（从 AntennaParamsPage 读取）
-        ant_page = getattr(self, '_antenna_params_page', None)
-        if ant_page:
-            step_values = ant_page.get_selected_steps()
-            skip_original = ant_page.get_skip_original()
-        else:
-            step_values = []
-            skip_original = False
+        # 从 MainWindow widget 读取（天线参数 dialog 通过 _sync_to_mw 写入此处）
+        extrapolate_theta = self._check_extrapolate.isChecked()
+        freq_source = self._cmb_freq_source.currentData() or "datasource"
+        trim_start = self._spin_trim_start.value()
+        trim_end = self._spin_trim_end.value()
+        robust_peak = self._check_robust_peak.isChecked()
+        # 步进参数（dialog 关闭时保存到 self._dialog_*）
+        step_values = getattr(self, '_dialog_step_values', [])
+        skip_original = getattr(self, '_dialog_skip_original', False)
 
         self._worker = ProcessingWorker(
             datasource_map=datasource_map,
@@ -2208,22 +2199,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             else:
                 lines.append("  AR 角度: (未设置)")
 
-        # 频点 & 算法 — 优先从天线参数页面读取
-        ant_page = getattr(self, '_antenna_params_page', None)
-        if ant_page:
-            params = ant_page.get_current_params()
-            freq_src = params["freq_source"]
-            freq_text = "数据源" if freq_src == "datasource" else "模板"
-            trim_start = params["trim_start"]
-            trim_end = params["trim_end"]
-            extrap = params["extrapolate"]
-            robust = params["robust_peak"]
-        else:
-            freq_text = self._cmb_freq_source.currentText() if hasattr(self, '_cmb_freq_source') and self._cmb_freq_source else "—"
-            trim_start = self._spin_trim_start.value() if hasattr(self, '_spin_trim_start') else 0
-            trim_end = self._spin_trim_end.value() if hasattr(self, '_spin_trim_end') else 0
-            extrap = hasattr(self, '_check_extrapolate') and self._check_extrapolate.isChecked()
-            robust = hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked()
+        # 从 MainWindow widget 读取（dialog 的 _sync_to_mw 写入此处）
+        freq_text = self._cmb_freq_source.currentText() if hasattr(self, '_cmb_freq_source') and self._cmb_freq_source else "—"
+        trim_start = self._spin_trim_start.value() if hasattr(self, '_spin_trim_start') else 0
+        trim_end = self._spin_trim_end.value() if hasattr(self, '_spin_trim_end') else 0
+        extrap = hasattr(self, '_check_extrapolate') and self._check_extrapolate.isChecked()
+        robust = hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked()
         trim = f"去除: 前{trim_start} / 后{trim_end}"
         lines.append(f"  频点: {freq_text} | {trim}")
 
