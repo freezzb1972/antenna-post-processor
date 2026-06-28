@@ -2042,22 +2042,20 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._thread.quit()
             self._thread.wait(3000)
         self._thread = None
-        self._restore_start_button()
-        self.ui.btnStop.setEnabled(False)
-        self.ui.progressBar.setValue(self.ui.progressBar.maximum())
-        self.ui.lblProgressMsg.setText(self.tr("✓ 处理完成"))
-
         total_rows = sum(len(v) for v in results.values())
         total_imgs = sum(len(v) for v in images.values())
         self._log(f"\n{'='*50}")
         self._log(f"✓ 全部完成! 共 {len(results)} 个工作表, {total_rows} 行数据")
         if total_imgs:
             self._log(f"  生成 {total_imgs} 张 3D 方向图")
-        self._update_status()
 
-        # 保存 .ant 任务包
+        # 保存 .ant 任务包（在进度条置为完成前执行）
         file_page = getattr(self, '_file_settings_page', None)
         if file_page and getattr(file_page, '_check_save_task', None) and file_page._check_save_task.isChecked():
+            self.ui.lblProgressMsg.setText(self.tr("📦 正在打包任务包..."))
+            self.ui.progressBar.setMaximum(100)
+            self.ui.progressBar.setValue(70)
+            QApplication.processEvents()
             try:
                 from src.task_package import save_task_package, next_available_filename
                 output_dir = self.ui.editOutputDir.text().strip() or "."
@@ -2083,6 +2081,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 self._log(f"📦 任务包已保存: {Path(ant_path).name}")
             except Exception as e:
                 self._log(f"⚠ 任务包保存失败: {e}")
+
+        self._restore_start_button()
+        self.ui.btnStop.setEnabled(False)
+        self.ui.progressBar.setValue(100)
+        self.ui.lblProgressMsg.setText(self.tr("✓ 处理完成"))
+        self._update_status()
 
         # 填充参数结果表
         self._populate_results_table(results)
