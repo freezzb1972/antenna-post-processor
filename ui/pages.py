@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
+    QFrame,
     QFileDialog,
     QFormLayout,
     QGroupBox,
@@ -137,6 +138,15 @@ class FileSettingsPage(QWidget):
             on_preview=self._on_preview_report,
         )
         main_layout.addWidget(self._tpl_row)
+        # 填充内置模板预设
+        if self._mw and hasattr(self._mw, '_tm'):
+            presets = self._mw._tm.get_all_templates()
+            presets_list = [
+                {"manufacturer": t.manufacturer, "name": t.name, "path": t.path}
+                for t in presets
+            ]
+            self._tpl_row.populate_presets(presets_list)
+        self._tpl_row.template_changed.connect(self._on_preset_template_selected)
 
         # ────── 数据文件 ──────
         data_grp = QGroupBox(self.tr("数据文件"))
@@ -308,6 +318,23 @@ class FileSettingsPage(QWidget):
         if not path:
             return
         self._template_path = path  # 属性 setter
+        if self._cfg:
+            self._cfg.config.last_template_path = path
+            self._cfg._dirty = True
+        if self._mw:
+            self._mw._chart_config_required = None
+            self._mw._cached_template_params = set()
+            self._mw._auto_apply_template_params()
+        self._match_table.setRowCount(0)
+        self._lbl_match_status.setText("")
+        if self._data_file_paths:
+            self._on_auto_match()
+
+    def _on_preset_template_selected(self, path: str):
+        """内置预设被选中 → 更新模板路径并触发自动匹配。"""
+        if not path:
+            return
+        self._template_path = path
         if self._cfg:
             self._cfg.config.last_template_path = path
             self._cfg._dirty = True
@@ -784,10 +811,8 @@ class AntennaParamsPage(QWidget):
              "required": set(), "extra": set()},
         ]
 
-        self._angle_singles: List[float] = []
-        self._angle_ranges: List[tuple] = []
-        self._ar_angle_singles: List[float] = []
-        self._ar_angle_ranges: List[tuple] = []
+        self._gain_angle_widget: Optional[AnglePickerWidget] = None
+        self._ar_angle_widget: Optional[AnglePickerWidget] = None
         self._nh_custom_angles: List[float] = []
         self._extrapolate: bool = False
         self._robust_peak: bool = False
@@ -851,6 +876,22 @@ class AntennaParamsPage(QWidget):
 
         param_layout.addLayout(splitter, 1)
 
+        # ── Gain 角度 (AnglePickerWidget) ──
+        gain_sep = QFrame()
+        gain_sep.setFrameShape(QFrame.HLine)
+        param_layout.addWidget(gain_sep)
+        self._gain_angle_widget = AnglePickerWidget(self.tr("Gain 角度"))
+        self._gain_angle_widget.angle_changed.connect(lambda cfg: self._on_angle_changed("gain"))
+        param_layout.addWidget(self._gain_angle_widget)
+
+        # ── AR 角度 (AnglePickerWidget) ──
+        ar_sep = QFrame()
+        ar_sep.setFrameShape(QFrame.HLine)
+        param_layout.addWidget(ar_sep)
+        self._ar_angle_widget = AnglePickerWidget(self.tr("AR 角度"))
+        self._ar_angle_widget.angle_changed.connect(lambda cfg: self._on_angle_changed("ar"))
+        param_layout.addWidget(self._ar_angle_widget)
+
         # ── 算法选项 ──
         algo_grp = QGroupBox(self.tr("算法选项"))
         algo_layout = QVBoxLayout(algo_grp)
@@ -898,6 +939,40 @@ class AntennaParamsPage(QWidget):
         algo_layout.addLayout(check_row)
 
         param_layout.addWidget(algo_grp)
+
+        # ── 多步进计算 (原 _init_step_selector) ──
+        self._grp_step = QGroupBox(self.tr("📏 多步进计算"))
+        self._grp_step.setCheckable(True)
+        self._grp_step.setChecked(False)
+        self._grp_step.setToolTip(self.tr("勾选后可以选择多个步进值同时计算，结果输出到同一个Excel的不同Sheet"))
+        sl = QVBoxLayout(self._grp_step)
+        sl.setSpacing(6)
+        sl.addWidget(QLabel(self.tr("选择要计算的步进值（可多选）。未选中则使用源文件原始步进。")))
+        from PySide6.QtWidgets import QLineEdit
+        self._step_checks: Dict[float, QCheckBox] = {}
+        cb_row = QHBoxLayout()
+        cb_row.setSpacing(8)
+        COMMON_STEPS = [2, 5, 10, 15, 20, 30, 45]
+        for s in COMMON_STEPS:
+            cb = QCheckBox(f"{s}°")
+            cb.setChecked(s in [5, 10])
+            self._step_checks[s] = cb
+            cb_row.addWidget(cb)
+        cb_row.addStretch()
+        sl.addLayout(cb_row)
+        cust_row = QHBoxLayout()
+        cust_row.addWidget(QLabel(self.tr("自定义:")))
+        self._edit_step_custom = QLineEdit()
+        self._edit_step_custom.setPlaceholderText(self.tr("如: 3, 8, 25 (逗号分隔)"))
+        self._edit_step_custom.setMaximumWidth(250)
+        cust_row.addWidget(self._edit_step_custom)
+        cust_row.addStretch()
+        sl.addLayout(cust_row)
+        self._chk_skip_original = QCheckBox(
+            self.tr("☐ 跳过原始步进（仅计算上述选中的步进值）"))
+        sl.addWidget(self._chk_skip_original)
+        param_layout.addWidget(self._grp_step)
+
         param_layout.addStretch()
 
         scroll = QScrollArea()
@@ -942,6 +1017,11 @@ class AntennaParamsPage(QWidget):
 
     # ── 模式切换 ──
 
+    def _on_angle_changed(self, target: str):
+        """AnglePickerWidget 角度变更回调。"""
+        self._save_current_mode_state()
+        self._sync_to_mw()
+
     def _on_mode_changed(self, index: int):
         self._save_current_mode_state()
         self._load_mode_state(index)
@@ -957,10 +1037,12 @@ class AntennaParamsPage(QWidget):
     def _save_current_mode_state(self):
         m = self._test_mode
         s = self._mode_states[m]
-        s["singles"] = list(self._angle_singles)
-        s["ranges"] = list(self._angle_ranges)
-        s["ar_singles"] = list(self._ar_angle_singles)
-        s["ar_ranges"] = list(self._ar_angle_ranges)
+        gain_cfg = self._gain_angle_widget.get_config() if self._gain_angle_widget else LagConfig()
+        s["singles"] = list(gain_cfg.single_angles)
+        s["ranges"] = list(gain_cfg.ranges)
+        ar_cfg = self._ar_angle_widget.get_config() if self._ar_angle_widget else LagConfig()
+        s["ar_singles"] = list(ar_cfg.single_angles)
+        s["ar_ranges"] = list(ar_cfg.ranges)
         s["nh_custom_angles"] = list(self._nh_custom_angles)
         s["extrapolate"] = self._check_extrap.isChecked()
         s["robust_peak"] = self._check_robust.isChecked()
@@ -974,10 +1056,18 @@ class AntennaParamsPage(QWidget):
     def _load_mode_state(self, mode: int):
         self._test_mode = mode
         s = self._mode_states[mode]
-        self._angle_singles = list(s["singles"])
-        self._angle_ranges = list(s["ranges"])
-        self._ar_angle_singles = list(s["ar_singles"])
-        self._ar_angle_ranges = list(s["ar_ranges"])
+        gain_cfg = LagConfig(
+            single_angles=list(s.get("singles", [])),
+            ranges=list(s.get("ranges", [])),
+        )
+        if self._gain_angle_widget:
+            self._gain_angle_widget.set_config(gain_cfg)
+        ar_cfg = LagConfig(
+            single_angles=list(s.get("ar_singles", [])),
+            ranges=list(s.get("ar_ranges", [])),
+        )
+        if self._ar_angle_widget:
+            self._ar_angle_widget.set_config(ar_cfg)
         self._nh_custom_angles = list(s.get("nh_custom_angles", []))
         self._sync_nh_angle_display()
         self._check_extrap.setChecked(s["extrapolate"])
@@ -1013,14 +1103,7 @@ class AntennaParamsPage(QWidget):
                 gl.addWidget(cb)
                 self._left_checkboxes[key] = cb
                 self._right_checkboxes[key] = cb
-            if grp_name == "Gain":
-                btn_angle = QPushButton("📡 " + self.tr("Gain 角度设置..."))
-                btn_angle.clicked.connect(lambda: self._show_angle_popup("Gain"))
-                gl.addWidget(btn_angle)
-            elif grp_name == "Axial Ratio":
-                btn_ar = QPushButton("🔄 " + self.tr("AR 角度设置..."))
-                btn_ar.clicked.connect(lambda: self._show_angle_popup("AR"))
-                gl.addWidget(btn_ar)
+            # AnglePickerWidget instances are inline in _setup_ui
             vbox.addWidget(grp)
         vbox.addStretch()
 
@@ -1030,166 +1113,7 @@ class AntennaParamsPage(QWidget):
             rw.hide()
         self._update_summary()
 
-    # ── 角度弹窗 (复用自 CalcParamsDialog) ──
-
-    def _show_angle_popup(self, target: str):
-        dlg = QDialog(self)
-        dlg.setWindowTitle(f"{target} " + self.tr("角度配置"))
-        dlg.setMinimumSize(520, 460)
-
-        is_ar = (target == "AR")
-        import copy
-        _src_singles = self._ar_angle_singles if is_ar else self._angle_singles
-        _src_ranges = self._ar_angle_ranges if is_ar else self._angle_ranges
-        _singles = copy.deepcopy(_src_singles)
-        _ranges = copy.deepcopy(_src_ranges)
-
-        _display_grp = QGroupBox()
-        _display_layout = QVBoxLayout(_display_grp)
-
-        def _refresh_display():
-            while _display_layout.count():
-                item = _display_layout.takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
-            if _singles or _ranges:
-                scroll = QScrollArea()
-                scroll.setWidgetResizable(True)
-                dw = QWidget()
-                fl = FlowLayout(dw, margin=4, h_spacing=6, v_spacing=4)
-                for a in sorted(set(_singles)):
-                    tag = QWidget()
-                    tl = QHBoxLayout(tag)
-                    tl.setContentsMargins(2, 1, 2, 1)
-                    tl.setSpacing(2)
-                    tl.addWidget(QLabel(f"{a}°"))
-                    btn_del = QPushButton("✕")
-                    btn_del.setFixedSize(20, 20)
-                    btn_del.setStyleSheet("padding:0;")
-                    btn_del.clicked.connect(lambda checked, v=a: (_singles.remove(v), _refresh_display()))
-                    tl.addWidget(btn_del)
-                    fl.addWidget(tag)
-                for lo, hi in sorted(set(_ranges), key=lambda x: (x[0], x[1])):
-                    tag = QWidget()
-                    tl = QHBoxLayout(tag)
-                    tl.setContentsMargins(2, 1, 2, 1)
-                    tl.setSpacing(2)
-                    tl.addWidget(QLabel(f"{lo}°~{hi}°"))
-                    btn_del = QPushButton("✕")
-                    btn_del.setFixedSize(20, 20)
-                    btn_del.setStyleSheet("padding:0;")
-                    btn_del.clicked.connect(lambda checked, l=lo, h=hi: (_ranges.remove((l, h)), _refresh_display()))
-                    tl.addWidget(btn_del)
-                    fl.addWidget(tag)
-                scroll.setWidget(dw)
-                _display_layout.addWidget(scroll)
-                btn_clear = QPushButton("🗑 " + self.tr("清空全部"))
-                btn_clear.clicked.connect(lambda: (_singles.clear(), _ranges.clear(), _refresh_display()))
-                _display_layout.addWidget(btn_clear)
-            else:
-                _display_layout.addWidget(QLabel(self.tr("  (暂无配置)")))
-            _display_grp.setTitle(self.tr("已配置: {} 个单角度, {} 个范围").format(len(_singles), len(_ranges)))
-
-        _refresh_display()
-
-        splitter = QSplitter(Qt.Vertical)
-        bottom_ctls = QWidget()
-        bottom_layout = QVBoxLayout(bottom_ctls)
-        bottom_layout.setContentsMargins(0, 0, 0, 0)
-
-        # 自定义
-        cust_grp = QGroupBox(self.tr("自定义"))
-        cust_layout = QHBoxLayout(cust_grp)
-        spin_custom = QDoubleSpinBox()
-        spin_custom.setRange(0, 180)
-        spin_custom.setValue(45)
-        btn_add_custom = QPushButton("+ " + self.tr("添加"))
-        btn_add_custom.clicked.connect(lambda: (
-            _singles.append(spin_custom.value()) if spin_custom.value() not in _singles else None,
-            _refresh_display()
-        ))
-        cust_layout.addWidget(QLabel(self.tr("角度:")))
-        cust_layout.addWidget(spin_custom)
-        cust_layout.addWidget(btn_add_custom)
-        cust_layout.addStretch()
-        bottom_layout.addWidget(cust_grp)
-
-        # 步进
-        step_grp = QGroupBox(self.tr("步进批量生成"))
-        step_layout = QHBoxLayout(step_grp)
-        spin_start = QDoubleSpinBox()
-        spin_start.setRange(0, 180)
-        spin_start.setValue(0)
-        spin_end = QDoubleSpinBox()
-        spin_end.setRange(0, 180)
-        spin_end.setValue(90)
-        spin_step = QDoubleSpinBox()
-        spin_step.setRange(1, 90)
-        spin_step.setValue(10)
-        btn_gen = QPushButton(self.tr("生成"))
-        btn_gen.clicked.connect(lambda: (
-            [_singles.append(round(float(a), 6))
-             for a in np.arange(spin_start.value(), spin_end.value() + 1, spin_step.value())
-             if round(float(a), 6) not in _singles],
-            _refresh_display()
-        ))
-        step_layout.addWidget(QLabel(self.tr("起:")))
-        step_layout.addWidget(spin_start)
-        step_layout.addWidget(QLabel(self.tr("止:")))
-        step_layout.addWidget(spin_end)
-        step_layout.addWidget(QLabel(self.tr("步:")))
-        step_layout.addWidget(spin_step)
-        step_layout.addWidget(btn_gen)
-        bottom_layout.addWidget(step_grp)
-
-        # 范围
-        range_grp = QGroupBox(self.tr("角度范围"))
-        range_layout = QHBoxLayout(range_grp)
-        spin_rs = QDoubleSpinBox()
-        spin_rs.setRange(0, 180)
-        spin_rs.setValue(0)
-        spin_re = QDoubleSpinBox()
-        spin_re.setRange(0, 180)
-        spin_re.setValue(90)
-        btn_add_range = QPushButton(self.tr("添加范围"))
-
-        def _add_range():
-            lo, hi = spin_rs.value(), spin_re.value()
-            key = (min(lo, hi), max(lo, hi))
-            if key not in _ranges:
-                _ranges.append(key)
-                _refresh_display()
-
-        btn_add_range.clicked.connect(_add_range)
-        range_layout.addWidget(QLabel(self.tr("起:")))
-        range_layout.addWidget(spin_rs)
-        range_layout.addWidget(QLabel(self.tr("止:")))
-        range_layout.addWidget(spin_re)
-        range_layout.addWidget(btn_add_range)
-        range_layout.addStretch()
-        bottom_layout.addWidget(range_grp)
-
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        btns.accepted.connect(lambda: (
-            _src_singles.clear(),
-            _src_singles.extend(sorted(set(_singles))),
-            _src_ranges.clear(),
-            _src_ranges.extend(sorted(set(_ranges), key=lambda x: (x[0], x[1]))),
-            dlg.accept()
-        ))
-        btns.rejected.connect(dlg.reject)
-        bottom_layout.addWidget(btns)
-
-        splitter.addWidget(_display_grp)
-        splitter.addWidget(bottom_ctls)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 0)
-
-        layout = QVBoxLayout(dlg)
-        layout.addWidget(splitter)
-        dlg.exec()
-        self._sync_to_mw()
-
+    
     def _show_nh_angle_popup(self):
         dlg = QDialog(self)
         dlg.setWindowTitle("NHPRP / NHPIS " + self.tr("自定义角度"))
@@ -1349,16 +1273,18 @@ class AntennaParamsPage(QWidget):
         else:
             lines.append(f"<b>{self.tr('计算参数')}:</b> <span style='color:#888;'>({self.tr('未选择')})</span>")
 
-        gain_singles = sorted(set(self._angle_singles))
-        gain_ranges = sorted(set(self._angle_ranges))
+        gain_cfg_s = self._gain_angle_widget.get_config() if self._gain_angle_widget else LagConfig()
+        gain_singles = sorted(set(gain_cfg_s.single_angles))
+        gain_ranges = sorted(set(gain_cfg_s.ranges))
         if gain_singles or gain_ranges:
             parts = [f"{a}°" for a in gain_singles] + [f"({lo}°–{hi}°)" for lo, hi in gain_ranges]
             lines.append(f"<b>Gain {self.tr('角度')} ({len(parts)}):</b> {', '.join(parts)}")
         else:
             lines.append(f"<b>Gain {self.tr('角度')}:</b> <span style='color:#888;'>({self.tr('未设置')})</span>")
 
-        ar_singles = sorted(set(self._ar_angle_singles))
-        ar_ranges = sorted(set(self._ar_angle_ranges))
+        ar_cfg_s = self._ar_angle_widget.get_config() if self._ar_angle_widget else LagConfig()
+        ar_singles = sorted(set(ar_cfg_s.single_angles))
+        ar_ranges = sorted(set(ar_cfg_s.ranges))
         if ar_singles or ar_ranges:
             parts = [f"{a}°" for a in ar_singles] + [f"({lo}°–{hi}°)" for lo, hi in ar_ranges]
             lines.append(f"<b>AR {self.tr('角度')} ({len(parts)}):</b> {', '.join(parts)}")
@@ -1395,23 +1321,25 @@ class AntennaParamsPage(QWidget):
         mw._mode_states = [dict(s) for s in self._mode_states]
         mw._test_mode = self._test_mode
 
-        # 同步 Gain 角度
+        # 同步 Gain 角度 (从 AnglePickerWidget 读取)
+        gain_cfg = self._gain_angle_widget.get_config() if self._gain_angle_widget else LagConfig()
         if hasattr(mw, '_lag_config'):
             mw._lag_config.clear()
-            for a in sorted(set(self._angle_singles)):
+            for a in sorted(set(gain_cfg.single_angles)):
                 mw._lag_config.add_single(a)
-            for lo, hi in sorted(set(self._angle_ranges)):
+            for lo, hi in sorted(set(gain_cfg.ranges)):
                 mw._lag_config.add_range(lo, hi)
             mw._sync_quick_buttons()
             mw._update_lag_display()
 
-        # 同步 AR 角度
+        # 同步 AR 角度 (从 AnglePickerWidget 读取)
+        ar_cfg = self._ar_angle_widget.get_config() if self._ar_angle_widget else LagConfig()
         if not hasattr(mw, '_ar_lag_config'):
             mw._ar_lag_config = LagConfig()
         mw._ar_lag_config.clear()
-        for a in sorted(set(self._ar_angle_singles)):
+        for a in sorted(set(ar_cfg.single_angles)):
             mw._ar_lag_config.add_single(a)
-        for lo, hi in sorted(set(self._ar_angle_ranges)):
+        for lo, hi in sorted(set(ar_cfg.ranges)):
             mw._ar_lag_config.add_range(lo, hi)
 
         required = set(k for k, cb in self._left_checkboxes.items() if cb.isChecked())
@@ -1451,12 +1379,10 @@ class AntennaParamsPage(QWidget):
             self._cmb_test_mode.blockSignals(True)
             self._cmb_test_mode.setCurrentIndex(mw._test_mode)
             self._cmb_test_mode.blockSignals(False)
-        if hasattr(mw, '_lag_config'):
-            self._angle_singles = list(mw._lag_config.single_angles)
-            self._angle_ranges = list(mw._lag_config.ranges)
-        if hasattr(mw, '_ar_lag_config'):
-            self._ar_angle_singles = list(mw._ar_lag_config.single_angles)
-            self._ar_angle_ranges = list(mw._ar_lag_config.ranges)
+        if hasattr(mw, '_lag_config') and self._gain_angle_widget:
+            self._gain_angle_widget.set_config(mw._lag_config)
+        if hasattr(mw, '_ar_lag_config') and self._ar_angle_widget:
+            self._ar_angle_widget.set_config(mw._ar_lag_config)
         # 以下读取 MainWindow UI 控件，可能因跨测试 GC 导致 C++ 对象已删除
         try:
             if hasattr(mw, '_cmb_freq_source') and mw._cmb_freq_source:
@@ -1508,11 +1434,11 @@ class AntennaParamsPage(QWidget):
     def set_angle_config(self, cfg: "LagConfig", is_ar: bool = False):
         """从模板配置角度 (Gain 或 AR)。"""
         if is_ar:
-            self._ar_angle_singles = list(cfg.single_angles)
-            self._ar_angle_ranges = list(cfg.ranges)
+            if self._ar_angle_widget:
+                self._ar_angle_widget.set_config(cfg)
         else:
-            self._angle_singles = list(cfg.single_angles)
-            self._angle_ranges = list(cfg.ranges)
+            if self._gain_angle_widget:
+                self._gain_angle_widget.set_config(cfg)
         self._sync_to_mw()
 
     def update_ui(self):
@@ -1530,21 +1456,39 @@ class AntennaParamsPage(QWidget):
             "extra_params": set(
                 k for k, cb in self._right_checkboxes.items() if cb.isChecked()
             ),
-            "lag_config": (lambda: (
-                LagConfig(single_angles=list(self._angle_singles),
-                          ranges=list(self._angle_ranges))
-            ))(),
-            "ar_lag_config": (lambda: (
-                LagConfig(single_angles=list(self._ar_angle_singles),
-                          ranges=list(self._ar_angle_ranges))
-            ))(),
+            "lag_config": self._gain_angle_widget.get_config() if self._gain_angle_widget else LagConfig(),
+            "ar_lag_config": self._ar_angle_widget.get_config() if self._ar_angle_widget else LagConfig(),
             "extrapolate": self._check_extrap.isChecked(),
             "robust_peak": self._check_robust.isChecked(),
             "ar_output_db": self._cmb_ar_output.currentData(),
             "freq_source": self._cmb_freq_src.currentData(),
             "trim_start": self._spin_trim_start.value(),
             "trim_end": self._spin_trim_end.value(),
+            "step_values": self.get_selected_steps(),
+            "skip_original": self.get_skip_original(),
         }
+
+    def get_selected_steps(self) -> list:
+        """获取用户选中的步进值列表。未启用多步进则返回空。"""
+        if not hasattr(self, '_grp_step') or not self._grp_step.isChecked():
+            return []
+        steps = [s for s, cb in self._step_checks.items() if cb.isChecked()]
+        custom = self._edit_step_custom.text().strip()
+        if custom:
+            for part in custom.split(","):
+                part = part.strip()
+                if part:
+                    try:
+                        v = float(part)
+                        if v > 0 and v not in steps:
+                            steps.append(v)
+                    except ValueError:
+                        pass
+        return sorted(steps)
+
+    def get_skip_original(self) -> bool:
+        """是否跳过原始步进。"""
+        return hasattr(self, '_chk_skip_original') and self._chk_skip_original.isChecked()
 
 
 # ═══════════════════════════════════════════════════════════════

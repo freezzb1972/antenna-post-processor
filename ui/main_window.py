@@ -139,7 +139,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._init_multi_file_ui()
         self._init_quick_angle_buttons()
         self._init_params_tab()
-        self._init_step_selector()
         self._build_parameter_tab()   # Master-Detail 布局 + 共享执行栏
         self._connect_signals()
         self._update_lag_display()
@@ -397,51 +396,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         self._make_tab_scrollable(self.ui.tabCalc)
 
-    def _init_step_selector(self):
-        """在文件设置区添加多步进计算选择面板。"""
-        from PySide6.QtWidgets import QLineEdit
-        vtab = self.ui.vTabFile
-
-        self._grp_step = QGroupBox(self.tr("📏 多步进计算"))
-        self._grp_step.setCheckable(True)
-        self._grp_step.setChecked(False)
-        self._grp_step.setToolTip(self.tr("勾选后可以选择多个步进值同时计算，结果输出到同一个Excel的不同Sheet"))
-        sl = QVBoxLayout(self._grp_step)
-        sl.setSpacing(6)
-
-        # 说明标签
-        sl.addWidget(QLabel(self.tr("选择要计算的步进值（可多选）。未选中则使用源文件原始步进。")))
-
-        # Checkbox 行
-        self._step_checks: Dict[float, QCheckBox] = {}
-        cb_row = QHBoxLayout()
-        cb_row.setSpacing(8)
-        COMMON_STEPS = [2, 5, 10, 15, 20, 30, 45]
-        for s in COMMON_STEPS:
-            cb = QCheckBox(f"{s}°")
-            cb.setChecked(s in [5, 10])  # 默认选中常用
-            self._step_checks[s] = cb
-            cb_row.addWidget(cb)
-        cb_row.addStretch()
-        sl.addLayout(cb_row)
-
-        # 自定义输入
-        cust_row = QHBoxLayout()
-        cust_row.addWidget(QLabel(self.tr("自定义:")))
-        self._edit_step_custom = QLineEdit()
-        self._edit_step_custom.setPlaceholderText(self.tr("如: 3, 8, 25 (逗号分隔)"))
-        self._edit_step_custom.setMaximumWidth(250)
-        cust_row.addWidget(self._edit_step_custom)
-        cust_row.addStretch()
-        sl.addLayout(cust_row)
-
-        # 跳过原始步进
-        self._chk_skip_original = QCheckBox(
-            self.tr("☐ 跳过原始步进（仅计算上述选中的步进值）"))
-        sl.addWidget(self._chk_skip_original)
-
-        vtab.addWidget(self._grp_step)
-
     # ═══════════════════════════════════════════════════════════════
     # Step 3: Master-Detail 布局
     # ═══════════════════════════════════════════════════════════════
@@ -554,24 +508,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """导航列表切换 → 切换页面栈。"""
         if hasattr(self, '_page_stack') and 0 <= row < self._page_stack.count():
             self._page_stack.setCurrentIndex(row)
-
-    def _get_selected_steps(self) -> List[float]:
-        """获取用户选中的步进值列表。未启用多步进则返回空。"""
-        if not self._grp_step.isChecked():
-            return []
-        steps = [s for s, cb in self._step_checks.items() if cb.isChecked()]
-        custom = self._edit_step_custom.text().strip()
-        if custom:
-            for part in custom.split(","):
-                part = part.strip()
-                if part:
-                    try:
-                        v = float(part)
-                        if v > 0 and v not in steps:
-                            steps.append(v)
-                    except ValueError:
-                        pass
-        return sorted(steps)
 
     def _make_tab_scrollable(self, tab: QWidget):
         """将指定 Tab 的内容包裹在 QScrollArea 中，防止内容溢出被压缩。"""
@@ -1884,13 +1820,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             trim_end = self._spin_trim_end.value()
             robust_peak = self._check_robust_peak.isChecked()
 
-        # 多步进参数（Step 5: 委托到 file_page 或保留后备）
-        if file_page and hasattr(file_page, '_grp_step'):
-            step_values = file_page._get_selected_steps() if hasattr(file_page, '_get_selected_steps') else []
-            skip_original = file_page._chk_skip_original.isChecked() if hasattr(file_page, '_chk_skip_original') else False
+        # 多步进参数（从 AntennaParamsPage 读取）
+        ant_page = getattr(self, '_antenna_params_page', None)
+        if ant_page:
+            step_values = ant_page.get_selected_steps()
+            skip_original = ant_page.get_skip_original()
         else:
-            step_values = self._get_selected_steps() if hasattr(self, '_get_selected_steps') else []
-            skip_original = self._chk_skip_original.isChecked() if hasattr(self, '_chk_skip_original') else False
+            step_values = []
+            skip_original = False
 
         self._worker = ProcessingWorker(
             datasource_map=datasource_map,
