@@ -310,6 +310,8 @@ class FileSettingsPage(QWidget):
     def _log(self, message: str):
         if self._mw:
             self._mw._log(message)
+        else:
+            print(f"[FileSettingsPage] {message}")
 
     # ── 文件操作事件 ──
 
@@ -2032,7 +2034,6 @@ class ChartSettingsPage(QWidget):
         layout = QVBoxLayout(dlg)
 
         def _refresh_display():
-            from ui.layout_utils import FlowLayout
             while _display_layout.count():
                 item = _display_layout.takeAt(0)
                 if item.widget():
