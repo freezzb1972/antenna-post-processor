@@ -514,34 +514,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._execution_bar = exec_bar
 
     def _on_nav_changed(self, row: int):
-        """导航列表切换 → 切换页面栈。天线参数弹出大窗口。"""
-        if row == 1:
-            # 天线参数弹出独立大窗口（新建实例，不移动 stack 中的页面）
-            dlg = QDialog(self)
-            dlg.setWindowTitle(self.tr("📡 天线参数设置"))
-            dlg.setMinimumSize(850, 650)
-            layout = QVBoxLayout(dlg)
-            page = AntennaParamsPage(self)
-            layout.addWidget(page)
-            btn_ok = QPushButton(self.tr("确定"))
-            btn_ok.setMinimumHeight(36)
-            def _on_dialog_ok():
-                page._sync_to_mw()
-                # 保存步进参数到 MainWindow（dialog 关闭后 stack 页面读不到）
-                self._dialog_step_values = page.get_selected_steps()
-                self._dialog_skip_original = page.get_skip_original()
-                dlg.accept()
-            btn_ok.clicked.connect(_on_dialog_ok)
-            layout.addWidget(btn_ok)
-            dlg.exec()
-            # 同步 stack 页面状态（dialog 新实例写入 MW，stack 页面需重新加载）
-            if hasattr(self, '_antenna_params_page'):
+        """导航列表切换 → 切换页面栈。所有页面内联展开。"""
+        if hasattr(self, '_page_stack') and 0 <= row < self._page_stack.count():
+            # 切到天线参数页时同步状态到 stack 页面
+            if row == 1 and hasattr(self, '_antenna_params_page'):
                 self._antenna_params_page._load_state()
-            self._nav_list.blockSignals(True)
-            self._nav_list.setCurrentRow(0)
-            self._nav_list.blockSignals(False)
-            self._page_stack.setCurrentIndex(0)
-        elif hasattr(self, '_page_stack') and 0 <= row < self._page_stack.count():
             self._page_stack.setCurrentIndex(row)
 
     def _on_config_tab_changed(self, index: int):
@@ -1521,7 +1498,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         self._required_params = tp
         self._extra_params = set()
-        self._log_current_params()
 
     def _on_load_from_template(self):
         template_path = self.ui.editTemplatePath.text()
@@ -1670,7 +1646,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 layout.addWidget(row)
 
         layout.addStretch()
-        self._log_current_params()
 
     def _remove_single(self, angle: float):
         self._lag_config.remove_single(angle)

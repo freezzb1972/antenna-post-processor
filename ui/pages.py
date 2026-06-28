@@ -1034,9 +1034,9 @@ class AntennaParamsPage(QWidget):
         param_layout = QVBoxLayout(param_widget)
         param_layout.setSpacing(8)
 
-        # 左右分栏: 左=天线参数(宽), 右=算法+多步进(窄)
-        splitter = QHBoxLayout()
-        splitter.setSpacing(8)
+        # 左右分栏（QSplitter 可手动拖动调整宽度）
+        splitter_widget = QSplitter(Qt.Horizontal)
+        splitter_widget.setChildrenCollapsible(False)
 
         left_grp = QGroupBox(self.tr("天线参数（模板识别 + full_report）"))
         left_layout = QVBoxLayout(left_grp)
@@ -1044,7 +1044,7 @@ class AntennaParamsPage(QWidget):
         self._left_scroll.setWidgetResizable(True)
         self._left_scroll.setFrameShape(QScrollArea.NoFrame)
         left_layout.addWidget(self._left_scroll)
-        splitter.addWidget(left_grp, 3)
+        splitter_widget.addWidget(left_grp)
 
         right_grp = QGroupBox(self.tr("算法与步进"))
         right_layout = QVBoxLayout(right_grp)
@@ -1052,9 +1052,10 @@ class AntennaParamsPage(QWidget):
         self._right_scroll.setWidgetResizable(True)
         self._right_scroll.setFrameShape(QScrollArea.NoFrame)
         right_layout.addWidget(self._right_scroll)
-        splitter.addWidget(right_grp, 1)
+        splitter_widget.addWidget(right_grp)
 
-        param_layout.addLayout(splitter, 1)
+        splitter_widget.setSizes([600, 300])  # 左宽右窄初始比例
+        param_layout.addWidget(splitter_widget, 1)
         # 右侧栏内容: 算法选项 + 多步进
         right_content = QWidget()
         right_lyt = QVBoxLayout(right_content)
@@ -1180,33 +1181,149 @@ class AntennaParamsPage(QWidget):
         self._sync_to_mw()
 
     def _show_angle_popup(self, target: str):
-        """弹出角度配置对话框 (内含 AnglePickerWidget)。"""
+        """角度配置弹窗：加自定义角度+步进生成+汇总列表(可删)。"""
         is_ar = (target == "ar")
-        widget = AnglePickerWidget(
-            self.tr("AR 角度") if is_ar else self.tr("Gain 角度"))
-        # 加载当前配置
+        # 从现有配置加载
         if is_ar and hasattr(self, '_ar_angle_widget') and self._ar_angle_widget:
-            widget.set_config(self._ar_angle_widget.get_config())
+            src_cfg = self._ar_angle_widget.get_config()
         elif not is_ar and hasattr(self, '_gain_angle_widget') and self._gain_angle_widget:
-            widget.set_config(self._gain_angle_widget.get_config())
+            src_cfg = self._gain_angle_widget.get_config()
+        else:
+            src_cfg = LagConfig()
+        singles = list(src_cfg.single_angles)
+        ranges = list(src_cfg.ranges)
 
         dlg = QDialog(self)
         dlg.setWindowTitle(f"{'AR' if is_ar else 'Gain'} " + self.tr("角度配置"))
-        dlg.setMinimumSize(500, 420)
+        dlg.setMinimumSize(520, 460)
         layout = QVBoxLayout(dlg)
-        layout.addWidget(widget)
-        # AR 输出单位选项（仅 AR 显示）
+
+        # ── 已配置项汇总（FlowLayout + 删除按钮） ──
+        display_grp = QGroupBox()
+        display_layout = QVBoxLayout(display_grp)
+
+        def _refresh():
+            while display_layout.count():
+                item = display_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+            if singles or ranges:
+                scroll = QScrollArea()
+                scroll.setWidgetResizable(True)
+                dw = QWidget()
+                fl = FlowLayout(dw, margin=4, h_spacing=6, v_spacing=4)
+                for a in sorted(set(singles)):
+                    tag = QWidget()
+                    tl = QHBoxLayout(tag)
+                    tl.setContentsMargins(2, 1, 2, 1)
+                    tl.addWidget(QLabel(f"{a}°"))
+                    btn_del = QPushButton("✕")
+                    btn_del.setFixedSize(20, 20)
+                    btn_del.setStyleSheet("padding:0;")
+                    btn_del.clicked.connect(lambda checked, v=a: (singles.remove(v), _refresh()))
+                    tl.addWidget(btn_del)
+                    fl.addWidget(tag)
+                for lo, hi in sorted(set(ranges), key=lambda x: (x[0], x[1])):
+                    tag = QWidget()
+                    tl = QHBoxLayout(tag)
+                    tl.setContentsMargins(2, 1, 2, 1)
+                    tl.addWidget(QLabel(f"{lo}°~{hi}°"))
+                    btn_del = QPushButton("✕")
+                    btn_del.setFixedSize(20, 20)
+                    btn_del.setStyleSheet("padding:0;")
+                    btn_del.clicked.connect(lambda checked, l=lo, h=hi: (ranges.remove((l, h)), _refresh()))
+                    tl.addWidget(btn_del)
+                    fl.addWidget(tag)
+                scroll.setWidget(dw)
+                display_layout.addWidget(scroll)
+                btn_clear = QPushButton(self.tr("🗑 清空全部"))
+                btn_clear.clicked.connect(lambda: (singles.clear(), ranges.clear(), _refresh()))
+                display_layout.addWidget(btn_clear)
+            else:
+                display_layout.addWidget(QLabel(self.tr("  (暂无配置)")))
+            display_grp.setTitle(self.tr("已配置: {} 个单角度, {} 个范围").format(len(singles), len(ranges)))
+
+        _refresh()
+        layout.addWidget(display_grp)
+
+        # ── 下半部：添加控件 ──
+        splitter = QSplitter(Qt.Vertical)
+        bottom = QWidget()
+        btm = QVBoxLayout(bottom)
+        btm.setContentsMargins(0, 0, 0, 0)
+
+        # 自定义单角度
+        cust_grp = QGroupBox(self.tr("添加单角度"))
+        cust_row = QHBoxLayout(cust_grp)
+        spin_custom = QDoubleSpinBox()
+        spin_custom.setRange(0, 180)
+        spin_custom.setValue(45)
+        btn_add = QPushButton("+ " + self.tr("添加"))
+        btn_add.clicked.connect(lambda: (
+            singles.append(spin_custom.value()) if spin_custom.value() not in singles else None,
+            _refresh()))
+        cust_row.addWidget(QLabel(self.tr("角度:")))
+        cust_row.addWidget(spin_custom)
+        cust_row.addWidget(btn_add)
+        cust_row.addStretch()
+        btm.addWidget(cust_grp)
+
+        # 步进批量生成
+        step_grp = QGroupBox(self.tr("步进批量生成"))
+        step_row = QHBoxLayout(step_grp)
+        spin_s = QDoubleSpinBox(); spin_s.setRange(0, 180); spin_s.setValue(0)
+        spin_e = QDoubleSpinBox(); spin_e.setRange(0, 180); spin_e.setValue(90)
+        spin_st = QDoubleSpinBox(); spin_st.setRange(1, 90); spin_st.setValue(10)
+        btn_gen = QPushButton(self.tr("生成"))
+        btn_gen.clicked.connect(lambda: (
+            [singles.append(round(float(a), 6))
+             for a in np.linspace(spin_s.value(), spin_e.value(), int((spin_e.value()-spin_s.value())/spin_st.value())+1)
+             if round(float(a), 6) not in singles],
+            _refresh()))
+        step_row.addWidget(QLabel(self.tr("起:")))
+        step_row.addWidget(spin_s)
+        step_row.addWidget(QLabel(self.tr("止:")))
+        step_row.addWidget(spin_e)
+        step_row.addWidget(QLabel(self.tr("步:")))
+        step_row.addWidget(spin_st)
+        step_row.addWidget(btn_gen)
+        step_row.addStretch()
+        btm.addWidget(step_grp)
+
+        # 角度范围
+        range_grp = QGroupBox(self.tr("角度范围"))
+        range_row = QHBoxLayout(range_grp)
+        spin_rs = QDoubleSpinBox(); spin_rs.setRange(0, 180); spin_rs.setValue(0)
+        spin_re = QDoubleSpinBox(); spin_re.setRange(0, 180); spin_re.setValue(90)
+        btn_range = QPushButton(self.tr("添加范围"))
+        btn_range.clicked.connect(lambda: (
+            ranges.append((spin_rs.value(), spin_re.value()))
+            if spin_rs.value() < spin_re.value() else None,
+            _refresh()))
+        range_row.addWidget(QLabel(self.tr("起始:")))
+        range_row.addWidget(spin_rs)
+        range_row.addWidget(QLabel(self.tr("结束:")))
+        range_row.addWidget(spin_re)
+        range_row.addWidget(btn_range)
+        range_row.addStretch()
+        btm.addWidget(range_grp)
+
+        splitter.addWidget(bottom)
+        layout.addWidget(splitter)
+
+        # AR 输出单位
         if is_ar:
-            ar_out_row = QHBoxLayout()
-            ar_out_row.addWidget(QLabel(self.tr("AR 输出单位:")))
+            ar_row = QHBoxLayout()
+            ar_row.addWidget(QLabel(self.tr("AR 输出单位:")))
             cmb_ar_out = QComboBox()
             cmb_ar_out.addItem(self.tr("dB (20·log₁₀)"), True)
             cmb_ar_out.addItem(self.tr("线性比值"), False)
-            cmb_ar_out.setCurrentIndex(
-                0 if self._cmb_ar_output.currentData() else 1)
-            ar_out_row.addWidget(cmb_ar_out)
-            ar_out_row.addStretch()
-            layout.addLayout(ar_out_row)
+            cmb_ar_out.setCurrentIndex(0 if self._cmb_ar_output.currentData() else 1)
+            ar_row.addWidget(cmb_ar_out)
+            ar_row.addStretch()
+            layout.addLayout(ar_row)
+
+        # 按钮
         btn_row = QHBoxLayout()
         btn_ok = QPushButton(self.tr("确定"))
         btn_cancel = QPushButton(self.tr("取消"))
@@ -1216,19 +1333,18 @@ class AntennaParamsPage(QWidget):
         layout.addLayout(btn_row)
 
         def on_accept():
-            cfg = widget.get_config()
+            new_cfg = LagConfig(single_angles=singles, ranges=ranges)
             if is_ar:
                 if not self._ar_angle_widget:
-                    self._ar_angle_widget = widget
-                else:
-                    self._ar_angle_widget.set_config(cfg)
-                # 同步 AR 输出单位
+                    from ui.widgets import AnglePickerWidget
+                    self._ar_angle_widget = AnglePickerWidget()
+                self._ar_angle_widget.set_config(new_cfg)
                 self._cmb_ar_output.setCurrentIndex(cmb_ar_out.currentIndex())
             else:
                 if not self._gain_angle_widget:
-                    self._gain_angle_widget = widget
-                else:
-                    self._gain_angle_widget.set_config(cfg)
+                    from ui.widgets import AnglePickerWidget
+                    self._gain_angle_widget = AnglePickerWidget()
+                self._gain_angle_widget.set_config(new_cfg)
             self._on_angle_changed(target)
             dlg.accept()
 
