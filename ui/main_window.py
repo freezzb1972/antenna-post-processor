@@ -583,7 +583,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         fm.addAction(self.tr("保存任务包"), self._on_save_task_package, QKeySequence("Ctrl+S"))
         fm.addAction(self.tr("另存任务包..."), self._on_saveas_task_package, QKeySequence("Ctrl+Shift+S"))
         fm.addSeparator()
-        fm.addAction(self.tr("导出报告..."), self._on_browse_output, QKeySequence("Ctrl+E"))
+        fm.addAction(self.tr("打印..."), self._on_print, QKeySequence("Ctrl+P"))
+        fm.addSeparator()
+        fm.addAction(self.tr("导出报告..."), self._on_browse_output)
         fm.addSeparator()
         fm.addAction(self.tr("系统设置..."), self._show_system_settings)
         fm.addSeparator()
@@ -776,6 +778,17 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             template_path=self.ui.editTemplatePath.text().strip(),
             config_snapshot=config_snapshot)
         self._log(f"📦 任务包已保存: {Path(path).name}")
+
+    def _on_print(self):
+        """打印当前参数结果（调用系统打印机/PDF）。"""
+        from PySide6.QtPrintSupport import QPrinter, QPrintDialog
+        printer = QPrinter(QPrinter.HighResolution)
+        dlg = QPrintDialog(printer, self)
+        dlg.setWindowTitle(self.tr("打印"))
+        if dlg.exec() != QDialog.Accepted:
+            return
+        # 打印日志内容
+        self.ui.logOutput.print_(printer)
 
     def _on_help(self):
         from ui.dialogs import HelpDialog

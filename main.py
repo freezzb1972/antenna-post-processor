@@ -104,6 +104,14 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("AntennaPostProcessor")
     app.setOrganizationName("AntennaPP")
+    app.setApplicationDisplayName("天线参数后处理")
+    # Windows 任务栏分组: 所有窗口归入同一图标
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            "AntennaPP.AntennaPostProcessor.1")
+    except Exception:
+        pass
 
     # 闪屏 — 立即显示, 告知用户程序正在加载
     splash = SplashScreen(app)
