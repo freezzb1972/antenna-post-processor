@@ -1949,6 +1949,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         step_values = ant_page.get_selected_steps() if ant_page else []
         skip_original = ant_page.get_skip_original() if ant_page else False
         gen_diff = ant_page.get_gen_diff() if ant_page else False
+        gen_diff_chart = ant_page.get_gen_diff_chart() if ant_page else False
 
         self._worker = ProcessingWorker(
             datasource_map=datasource_map,
@@ -1973,6 +1974,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             step_values=step_values,
             skip_original=skip_original,
             gen_diff=gen_diff,
+            gen_diff_chart=gen_diff_chart,
         )
         self._worker.moveToThread(self._thread)
 

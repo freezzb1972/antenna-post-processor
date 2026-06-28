@@ -1177,11 +1177,17 @@ class AntennaParamsPage(QWidget):
             self.tr("☐ 跳过原始步进（仅计算上述选中的步进值）"))
         sl.addWidget(self._chk_skip_original)
         self._chk_gen_diff = QCheckBox(
-            self.tr("☑ 生成步进差值比较表（含差值图表）"))
+            self.tr("☑ 生成步进差值比较表"))
         self._chk_gen_diff.setChecked(True)
         self._chk_gen_diff.setToolTip(
-            self.tr("勾选后将为每个参数生成步进结果与原始结果的差值表和差值曲线图"))
+            self.tr("勾选后将为每个参数生成步进结果与原始结果的差值表"))
         sl.addWidget(self._chk_gen_diff)
+        self._chk_gen_diff_chart = QCheckBox(
+            self.tr("☑ 生成步进差值图表"))
+        self._chk_gen_diff_chart.setChecked(True)
+        self._chk_gen_diff_chart.setToolTip(
+            self.tr("勾选后将为每个参数生成步进差值散点图（Y=0基线）"))
+        sl.addWidget(self._chk_gen_diff_chart)
 
         right_lyt.addWidget(algo_grp)
         right_lyt.addWidget(self._grp_step)
@@ -1825,10 +1831,14 @@ class AntennaParamsPage(QWidget):
             "step_values": self.get_selected_steps(),
             "skip_original": self.get_skip_original(),
             "gen_diff": self.get_gen_diff(),
+            "gen_diff_chart": self.get_gen_diff_chart(),
         }
 
     def get_gen_diff(self) -> bool:
         return hasattr(self, '_chk_gen_diff') and self._chk_gen_diff.isChecked()
+
+    def get_gen_diff_chart(self) -> bool:
+        return hasattr(self, '_chk_gen_diff_chart') and self._chk_gen_diff_chart.isChecked()
 
     def get_selected_steps(self) -> list:
         """获取用户选中的步进值列表。未启用多步进则返回空。"""

@@ -50,6 +50,7 @@ class ProcessingWorker(QObject):
         step_values: Optional[List[float]] = None,
         skip_original: bool = False,
         gen_diff: bool = False,
+        gen_diff_chart: bool = False,
     ):
         super().__init__()
         self.csv_path = csv_path
@@ -75,6 +76,7 @@ class ProcessingWorker(QObject):
         self.step_values = step_values or []
         self.skip_original = skip_original
         self.gen_diff = gen_diff
+        self.gen_diff_chart = gen_diff_chart
         self._cancelled = False
 
     def cancel(self):
@@ -364,8 +366,8 @@ class ProcessingWorker(QObject):
                             dws.cell(er, col, round(sval_f, 4))
                             dws.cell(er, col + 1, round(diff, 4))
                             col += 2
-            # 创建差值图表
-            if data_rows:
+            # 创建差值图表（gen_diff_chart 控制）
+            if data_rows and self.gen_diff_chart:
                 n_rows = len(data_rows)
                 chart_row = n_rows + 5
                 col = 2
