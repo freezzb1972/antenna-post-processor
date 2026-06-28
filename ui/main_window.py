@@ -1933,6 +1933,35 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._log(f"  生成 {total_imgs} 张 3D 方向图")
         self._update_status()
 
+        # 保存 .ant 任务包
+        file_page = getattr(self, '_file_settings_page', None)
+        if file_page and getattr(file_page, '_check_save_task', None) and file_page._check_save_task.isChecked():
+            try:
+                from src.task_package import save_task_package, next_available_filename
+                output_dir = self.ui.editOutputDir.text().strip() or "."
+                tpl_name = Path(self.ui.editTemplatePath.text().strip()).stem if self.ui.editTemplatePath.text().strip() else "task"
+                ant_path = next_available_filename(output_dir, tpl_name)
+                config_snapshot = {
+                    "test_mode": self._test_mode,
+                    "template_path": self.ui.editTemplatePath.text().strip(),
+                    "output_path": self._worker.output_path if hasattr(self._worker, 'output_path') else "",
+                    "lag_singles": self._lag_config.singles_sorted,
+                    "lag_ranges": self._lag_config.ranges_sorted,
+                    "ar_singles": self._ar_lag_config.singles_sorted if hasattr(self, '_ar_lag_config') else [],
+                    "ar_ranges": self._ar_lag_config.ranges_sorted if hasattr(self, '_ar_lag_config') else [],
+                    "extrapolate": self._check_extrapolate.isChecked() if hasattr(self, '_check_extrapolate') else False,
+                }
+                save_task_package(
+                    ant_path, tpl_name,
+                    data_file_paths=list(self._data_file_paths),
+                    template_path=self.ui.editTemplatePath.text().strip(),
+                    config_snapshot=config_snapshot,
+                    results=results, images=images,
+                )
+                self._log(f"📦 任务包已保存: {Path(ant_path).name}")
+            except Exception as e:
+                self._log(f"⚠ 任务包保存失败: {e}")
+
         # 填充参数结果表
         self._populate_results_table(results)
         # 生成图形展示

@@ -249,6 +249,14 @@ class FileSettingsPage(QWidget):
         )
         main_layout.addWidget(self._output_group)
 
+        # 保存任务包复选框
+        self._check_save_task = QCheckBox(
+            self.tr("☑ 保存任务包 (.ant) — 下次双击秒开，不重算"))
+        self._check_save_task.setChecked(True)
+        self._check_save_task.setToolTip(
+            self.tr("保存为 .ant 任务包后，下次双击即可直接查看结果，无需重新计算。"))
+        main_layout.addWidget(self._check_save_task)
+
         main_layout.addStretch()
 
     def _init_state(self):

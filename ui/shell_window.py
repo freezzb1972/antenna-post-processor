@@ -106,9 +106,33 @@ class ShellWindow(QMainWindow):
             win.activateWindow()
 
     def _on_open_task(self):
-        """打开 .ant 任务包（占位，待 P4 实现）。"""
-        QMessageBox.information(self, self.tr("提示"),
-            self.tr("任务包功能尚在开发中。"))
+        """打开 .ant 任务包。"""
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("打开任务包"), "",
+            self.tr("任务包 (*.ant);;所有文件 (*)"))
+        if not path:
+            return
+        try:
+            from src.task_package import load_task_package, verify_data_integrity
+            meta = load_task_package(path)
+            integrity = verify_data_integrity(meta)
+            modified = [k for k, v in integrity.items() if v == "modified"]
+            missing = [k for k, v in integrity.items() if v == "missing"]
+            msg_parts = [self.tr(f"任务: {meta.get('task_name', '?')}"),
+                         self.tr(f"创建: {meta.get('created', '?')}"),
+                         self.tr(f"工作表: {len(meta.get('results', {}))}")]
+            if modified:
+                msg_parts.append(self.tr(f"\n⚠ {len(modified)} 个数据文件已修改，建议重新计算。"))
+            if missing:
+                msg_parts.append(self.tr(f"\n❌ {len(missing)} 个数据文件已移动，请查找。"))
+            QMessageBox.information(self, self.tr("任务包信息"),
+                "\n".join(msg_parts))
+            # 如果有未修改的结果，直接显示
+            # (完整加载需要创建 MainWindow 并填充结果，待完善)
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("打开失败"),
+                self.tr(f"无法打开任务包:\n{e}"))
 
     def _refresh_recent(self):
         """刷新最近任务列表。"""
