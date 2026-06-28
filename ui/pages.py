@@ -374,17 +374,26 @@ class FileSettingsPage(QWidget):
             QMessageBox.warning(self, self.tr("检测失败"), self.tr(f"列头检测失败:\n{e}"))
             return
 
-        from src.lag_config import _RE_LAG_SINGLE, _RE_LAG_RANGE, _RE_AR_SINGLE, _RE_AR_RANGE
+        import re
+        # AR 正则（_RE_AR_* 在 lag_config 中是局部变量，在此定义）
+        _RE_AR_S = re.compile(
+            r"(?:AR|Axial\s*Ratio)\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)",
+            re.IGNORECASE)
+        _RE_AR_R = re.compile(
+            r"(?:AR|Axial\s*Ratio)\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)\s*[-–—~]\s*(\d+\.?\d*)",
+            re.IGNORECASE)
+
+        from src.lag_config import _RE_LAG_SINGLE, _RE_LAG_RANGE
 
         def _extract_angle(raw: str, ctype: str) -> str:
             """从列头提取角度值。"""
             if ctype in ("lag_single", "ar_single"):
-                rx = _RE_LAG_SINGLE if ctype == "lag_single" else _RE_AR_SINGLE
+                rx = _RE_LAG_SINGLE if ctype == "lag_single" else _RE_AR_S
                 m = rx.search(raw)
                 if m:
                     return f"{m.group(1)}°"
             if ctype in ("lag_range", "ar_range"):
-                rx = _RE_LAG_RANGE if ctype == "lag_range" else _RE_AR_RANGE
+                rx = _RE_LAG_RANGE if ctype == "lag_range" else _RE_AR_R
                 m = rx.search(raw)
                 if m:
                     return f"{m.group(1)}–{m.group(2)}°"
@@ -1089,13 +1098,13 @@ class AntennaParamsPage(QWidget):
         self._check_robust.toggled.connect(lambda: self._sync_to_mw())
         algo_layout.addWidget(self._check_robust)
 
-        right_lyt.addWidget(algo_grp)
-        # 多步进（已移至右侧）
-        right_lyt.addWidget(self._grp_step)
-        right_lyt.addStretch()
-        self._right_scroll.setWidget(right_content)
+        # AR 输出单位（数据属性，在 AR 弹窗中设置）
+        self._cmb_ar_output = QComboBox()
+        self._cmb_ar_output.addItem("dB", True)
+        self._cmb_ar_output.addItem(self.tr("线性"), False)
+        self._cmb_ar_output.setVisible(False)  # 不显示在主界面
 
-        # ── 多步进计算 (原 _init_step_selector) ──
+        # ── 多步进计算（移至右侧栏） ──
         self._grp_step = QGroupBox(self.tr("📏 多步进计算"))
         self._grp_step.setCheckable(True)
         self._grp_step.setChecked(False)
@@ -1126,7 +1135,11 @@ class AntennaParamsPage(QWidget):
         self._chk_skip_original = QCheckBox(
             self.tr("☐ 跳过原始步进（仅计算上述选中的步进值）"))
         sl.addWidget(self._chk_skip_original)
-        param_layout.addWidget(self._grp_step)
+
+        right_lyt.addWidget(algo_grp)
+        right_lyt.addWidget(self._grp_step)
+        right_lyt.addStretch()
+        self._right_scroll.setWidget(right_content)
 
         param_layout.addStretch()
 
