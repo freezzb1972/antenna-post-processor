@@ -3582,18 +3582,19 @@ class MergeDialog(QDialog):
 # ═══════════════════════════════════════════════════════════════
 
 class RepairDialog(QDialog):
-    """自动检测并修复 CSV phi 损坏数据。"""
+    """数据修复 — 扫描→预览→选方法→执行。"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("数据修复"))
-        self.setMinimumSize(560, 380)
+        self.setMinimumSize(700, 550)
         self._paths: List[str] = []
+        self._scan_results: List[dict] = []
         self._setup_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setSpacing(10)
+        layout.setSpacing(8)
 
         # ── 文件 ──
         grp = QGroupBox(self.tr("待修复的 CSV 文件"))
@@ -3605,34 +3606,70 @@ class RepairDialog(QDialog):
         btn_clr = QPushButton(self.tr("清除"))
         btn_clr.clicked.connect(self._on_clear)
         br.addWidget(btn_clr)
-        br.addStretch()
         self._lbl_count = QLabel("")
         br.addWidget(self._lbl_count)
+        br.addStretch()
+        btn_scan = QPushButton(self.tr("🔍 扫描数据质量"))
+        btn_scan.clicked.connect(self._on_scan)
+        br.addWidget(btn_scan)
         fl.addLayout(br)
-        self._file_list = QListWidget()
-        fl.addWidget(self._file_list)
         layout.addWidget(grp)
 
-        # ── 修复模式 ──
-        grp_mode = QGroupBox(self.tr("修复模式"))
-        ml = QVBoxLayout(grp_mode)
-        self._rb_auto = QRadioButton(self.tr("🔍 自动检测损坏 (推荐)"))
-        self._rb_auto.setChecked(True)
-        self._rb_manual = QRadioButton(self.tr("🔧 手动指定 phi (修复奇数点位)"))
-        ml.addWidget(self._rb_auto)
-        ml.addWidget(self._rb_manual)
-        layout.addWidget(grp_mode)
+        # ── 扫描结果表 ──
+        self._result_table = QTableWidget()
+        self._result_table.setColumnCount(5)
+        self._result_table.setHorizontalHeaderLabels([
+            self.tr("文件"), self.tr("格式"), self.tr("坏点数"),
+            self.tr("坏点位置"), self.tr("建议方法")
+        ])
+        self._result_table.horizontalHeader().setStretchLastSection(True)
+        self._result_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._result_table.setMaximumHeight(200)
+        self._result_table.setAlternatingRowColors(True)
+        layout.addWidget(self._result_table)
 
-        layout.addStretch()
+        # ── 修复方法 ──
+        grp_method = QGroupBox(self.tr("修复方法"))
+        ml = QVBoxLayout(grp_method)
+        self._rb_mad = QRadioButton(
+            self.tr("MAD 异常检测 — 中位数绝对偏差，适合标准格式"))
+        self._rb_mad.setChecked(True)
+        ml.addWidget(self._rb_mad)
+        self._rb_q25 = QRadioButton(
+            self.tr("Q25 比率检测 — 四分位数比率，适合异常终止格式"))
+        ml.addWidget(self._rb_q25)
+        self._rb_knn = QRadioButton(
+            self.tr("KNN 插值修复 — 逆距离加权 K 近邻插值，通用"))
+        ml.addWidget(self._rb_knn)
+        self._rb_manual = QRadioButton(
+            self.tr("手动指定 phi — 直接输入需修复的 phi 索引"))
+        ml.addWidget(self._rb_manual)
+        self._edit_manual_phi = QLineEdit()
+        self._edit_manual_phi.setPlaceholderText(self.tr("如: 5, 7, 9 (逗号分隔, 0-based)"))
+        self._edit_manual_phi.setEnabled(False)
+        self._rb_manual.toggled.connect(lambda c: self._edit_manual_phi.setEnabled(c))
+        ml.addWidget(self._edit_manual_phi)
+        layout.addWidget(grp_method)
+
+        # ── 输出目录 ──
+        out_row = QHBoxLayout()
+        out_row.addWidget(QLabel(self.tr("输出目录:")))
+        self._edit_out = QLineEdit()
+        self._edit_out.setPlaceholderText(self.tr("默认: 源文件目录 (文件名 _repaired.csv)"))
+        out_row.addWidget(self._edit_out)
+        btn_out = QPushButton(self.tr("浏览..."))
+        btn_out.clicked.connect(self._on_browse_out)
+        out_row.addWidget(btn_out)
+        layout.addLayout(out_row)
 
         # ── 按钮 ──
         brow = QHBoxLayout()
-        self._btn_run = QPushButton(self.tr("▶ 开始修复"))
+        brow.addStretch()
+        self._btn_run = QPushButton(self.tr("▶ 执行修复"))
         self._btn_run.clicked.connect(self._on_run)
         self._btn_run.setMinimumHeight(36)
         self._btn_run.setEnabled(False)
         brow.addWidget(self._btn_run)
-        brow.addStretch()
         bc = QPushButton(self.tr("关闭"))
         bc.clicked.connect(self.reject)
         brow.addWidget(bc)
@@ -3646,57 +3683,120 @@ class RepairDialog(QDialog):
             for p in paths:
                 if p not in self._paths:
                     self._paths.append(p)
-                    self._file_list.addItem(Path(p).name)
             self._lbl_count.setText(f"{len(self._paths)} {self.tr('个文件')}")
             self._btn_run.setEnabled(True)
 
     def _on_clear(self):
         self._paths.clear()
-        self._file_list.clear()
+        self._scan_results.clear()
+        self._result_table.setRowCount(0)
         self._lbl_count.setText("")
         self._btn_run.setEnabled(False)
+
+    def _on_scan(self):
+        """扫描文件，检测坏点。"""
+        if not self._paths:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请先添加文件。"))
+            return
+        from src.data_quality import detect_phi_anomalies
+        from src.raw_converter import _detect_format
+        self._scan_results.clear()
+        for p in self._paths:
+            try:
+                fmt = _detect_format(p)
+                anomalies = detect_phi_anomalies(p)
+                bad_phis = sorted(anomalies.get("phi_indices", []))
+                suggested = anomalies.get("suggested_method", "MAD")
+                self._scan_results.append({
+                    "path": p, "format": fmt,
+                    "bad_count": len(bad_phis),
+                    "bad_phis": bad_phis,
+                    "suggested": suggested,
+                })
+            except Exception as e:
+                self._scan_results.append({
+                    "path": p, "format": "error",
+                    "bad_count": 0, "bad_phis": [], "suggested": "",
+                    "error": str(e),
+                })
+        self._refresh_scan_table()
+
+    def _refresh_scan_table(self):
+        self._result_table.setRowCount(len(self._scan_results))
+        for i, r in enumerate(self._scan_results):
+            self._result_table.setItem(i, 0, QTableWidgetItem(Path(r["path"]).name))
+            fmt_text = r.get("format", "?")
+            if "error" in r:
+                fmt_text = f"❌ {r['error']}"
+            self._result_table.setItem(i, 1, QTableWidgetItem(fmt_text))
+            self._result_table.setItem(i, 2, QTableWidgetItem(str(r["bad_count"])))
+            bad_str = ", ".join(str(b) for b in r["bad_phis"][:10])
+            if len(r["bad_phis"]) > 10:
+                bad_str += "..."
+            self._result_table.setItem(i, 3, QTableWidgetItem(bad_str or "—"))
+            self._result_table.setItem(i, 4, QTableWidgetItem(r.get("suggested", "—")))
+        self._result_table.resizeColumnsToContents()
+        self._btn_run.setEnabled(True)
+
+    def _on_browse_out(self):
+        d = QFileDialog.getExistingDirectory(self, self.tr("选择输出目录"))
+        if d:
+            self._edit_out.setText(d)
 
     def _on_run(self):
         if not self._paths:
             return
-        manual = self._rb_manual.isChecked()
-        ok, fail = 0, 0
+        output_dir = self._edit_out.text().strip()
+        # 确定修复方法
+        method = "mad"
+        force_phis = None
+        if self._rb_q25.isChecked():
+            method = "q25"
+        elif self._rb_knn.isChecked():
+            method = "knn"
+        elif self._rb_manual.isChecked():
+            method = "manual"
+            try:
+                force_phis = [int(x.strip()) for x in self._edit_manual_phi.text().split(",") if x.strip()]
+            except ValueError:
+                QMessageBox.warning(self, self.tr("输入错误"),
+                    self.tr("手动 phi 格式无效，请用逗号分隔数字。"))
+                return
 
         self._btn_run.setEnabled(False)
         self._btn_run.setText(self.tr("⏳ 修复中..."))
         QApplication.processEvents()
-
+        ok, fail = 0, 0
         try:
             from src.data_quality import auto_detect_and_repair
             for p in self._paths:
                 pobj = Path(p)
-                out = str(pobj.parent / f"{pobj.stem}_repaired.csv")
-                if manual:
-                    from src.raw_converter import _detect_format, _parse_aborted, _parse_standard
-                    fmt = _detect_format(p)
-                    if fmt == 'aborted':
-                        _, _, _, _, phis = _parse_aborted(p)
-                    else:
-                        _, _, _, _, phis = _parse_standard(p)
-                    force_phis = list(range(1, len(phis), 2))
-                    r = auto_detect_and_repair(p, out, force_phis=force_phis)
-                else:
-                    r = auto_detect_and_repair(p, out)
-                ok += 1
-
-            QMessageBox.information(self, self.tr("完成"),
-                f"{self.tr('修复完成')}: {ok}/{len(self._paths)} {self.tr('个文件')}")
-            self.accept()
+                out = str(Path(output_dir or pobj.parent) / f"{pobj.stem}_repaired.csv")
+                try:
+                    r = auto_detect_and_repair(
+                        p, out, method=method, force_phis=force_phis)
+                    ok += 1
+                except Exception as e:
+                    fail += 1
+                    self._log(f"✗ {pobj.name}: {e}")
+            msg = self.tr("修复完成: {} 成功, {} 失败").format(ok, fail)
+            QMessageBox.information(self, self.tr("完成"), msg)
+            if fail == 0:
+                self.accept()
         except Exception as e:
-            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('修复失败')}: {e}")
+            QMessageBox.critical(self, self.tr("错误"),
+                self.tr(f"修复失败: {e}"))
         finally:
-            self._btn_run.setText(self.tr("▶ 开始修复"))
-            self._btn_run.setEnabled(True)
+            self._btn_run.setText(self.tr("▶ 执行修复"))
+
+    def _log(self, msg: str):
+        parent_mw = self.parent()
+        if hasattr(parent_mw, '_log'):
+            parent_mw._log(msg)
+        else:
+            print(msg)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 在线激活对话框
-# ═══════════════════════════════════════════════════════════════
 
 class ActivationDialog(QDialog):
     """在线激活对话框。
