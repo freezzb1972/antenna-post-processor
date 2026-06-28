@@ -1932,28 +1932,7 @@ class ChartSettingsPage(QWidget):
             content_layout.setSpacing(4)
             outer_layout.addWidget(content_widget)
 
-            # 全选/取消全选 — 报告需要
-            btn_row = QHBoxLayout()
-            btn_row.setSpacing(6)
-            lbl_req = QLabel(self.tr("报告:"))
-            lbl_req.setStyleSheet("color: #888; font-weight: normal;")
-            btn_row.addWidget(lbl_req)
-            btn_select_all = QPushButton(self.tr("全选"))
-            btn_select_all.setFixedWidth(60)
-            btn_deselect_all = QPushButton(self.tr("取消全选"))
-            btn_deselect_all.setFixedWidth(72)
-            btn_select_all.clicked.connect(
-                lambda checked, ks=keys: (
-                    [self._chart_required[k].setChecked(True) for k in ks if k in self._chart_required]
-                ))
-            btn_deselect_all.clicked.connect(
-                lambda checked, ks=keys: (
-                    [self._chart_required[k].setChecked(False) for k in ks if k in self._chart_required]
-                ))
-            btn_row.addWidget(btn_select_all)
-            btn_row.addWidget(btn_deselect_all)
-            btn_row.addStretch()
-            content_layout.addLayout(btn_row)
+            content_layout.addStretch()  # 占位, 左右 box 内自有按钮
 
             row_layout = QHBoxLayout()
             row_layout.setSpacing(8)
@@ -1962,6 +1941,26 @@ class ChartSettingsPage(QWidget):
             left_box = QGroupBox(self.tr("报告需要"))
             left_layout = QVBoxLayout(left_box)
             left_layout.setSpacing(3)
+
+            # 报告侧全选/取消全选 (与右侧对称)
+            left_btn_row = QHBoxLayout()
+            left_btn_row.setSpacing(6)
+            left_select_all = QPushButton(self.tr("全选"))
+            left_select_all.setFixedWidth(60)
+            left_deselect_all = QPushButton(self.tr("取消全选"))
+            left_deselect_all.setFixedWidth(72)
+            left_select_all.clicked.connect(
+                lambda checked, ks=keys: (
+                    [self._chart_required[k].setChecked(True) for k in ks if k in self._chart_required]
+                ))
+            left_deselect_all.clicked.connect(
+                lambda checked, ks=keys: (
+                    [self._chart_required[k].setChecked(False) for k in ks if k in self._chart_required]
+                ))
+            left_btn_row.addWidget(left_select_all)
+            left_btn_row.addWidget(left_deselect_all)
+            left_btn_row.addStretch()
+            left_layout.addLayout(left_btn_row)
             for key in keys:
                 row = QHBoxLayout()
                 cb = QCheckBox(labels.get(key, key))
