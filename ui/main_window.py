@@ -544,7 +544,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         fm.addAction(self.tr("新建窗口"), self._on_new_window, QKeySequence("Ctrl+N"))
         fm.addSeparator()
         fm.addAction(self.tr("系统设置..."), self._show_system_settings)
-        fm.addAction(self.tr("LLM 智能设置..."), self._show_llm_settings)
         fm.addSeparator()
         fm.addAction(self.tr("保存结果..."), self._on_browse_output, QKeySequence("Ctrl+S"))
         fm.addSeparator()
@@ -565,7 +564,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         tm.addSeparator()
         tm.addAction(self.tr("数据修复 (插值)"), self._on_tool_quality_repair)
         tm.addSeparator()
-        tm.addAction(self.tr("模板识别..."), self._on_tool_template_recognizer)
+        tm.addAction(self.tr("模板预设管理..."), self._on_tool_template_recognizer)
+        tm.addAction(self.tr("校准预设管理..."), self._on_show_rsp_presets)
         tm.addAction(self.tr("EMQuest 数据导出..."), self._on_tool_emq_export)
 
         # ── 帮助 ──
@@ -605,13 +605,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _show_system_settings(self):
         from ui.dialogs import SystemSettingsDialog
         SystemSettingsDialog(self).exec()
-
-    def _show_llm_settings(self):
-        """打开系统设置并自动滚动到 AI 辅助设置区域。"""
-        from ui.dialogs import SystemSettingsDialog
-        dlg = SystemSettingsDialog(self)
-        dlg.scroll_to_ai_settings()
-        dlg.exec()
 
     def _get_template_params(self) -> set:
         """读取模板，提取所有 Sheet 的列类型集合（结果缓存，仅路径变化时重读）。"""
@@ -702,9 +695,15 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         ResampleDialog(self).exec()
 
     def _on_tool_template_recognizer(self):
-        """模板识别: 加载模板 Excel，显示列头检测，支持手动修正并保存。"""
+        """模板预设管理: 加载模板 Excel，显示列头检测，支持手动修正并保存。"""
         from ui.template_recognizer import TemplateRecognizerDialog
         TemplateRecognizerDialog(self).exec()
+
+    def _on_show_rsp_presets(self):
+        """校准预设管理: 打开 RSP 预设管理对话框。"""
+        from ui.rsp_picker_dialog import RspPickerDialog
+        dlg = RspPickerDialog(self)
+        dlg.exec()
 
     def _on_tool_emq_export(self):
         """EMQuest 数据导出: 将 .raw 文件通过 EMQuest CLI 导出为 CSV/Excel/JSON。"""
