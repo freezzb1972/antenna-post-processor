@@ -49,6 +49,7 @@ class ProcessingWorker(QObject):
         # 多步进参数
         step_values: Optional[List[float]] = None,
         skip_original: bool = False,
+        gen_diff: bool = False,
     ):
         super().__init__()
         self.csv_path = csv_path
@@ -73,6 +74,7 @@ class ProcessingWorker(QObject):
         self.worksheet_naming_mode = worksheet_naming_mode
         self.step_values = step_values or []
         self.skip_original = skip_original
+        self.gen_diff = gen_diff
         self._cancelled = False
 
     def cancel(self):
@@ -266,7 +268,7 @@ class ProcessingWorker(QObject):
                     pass
 
         # 步进差值比较表
-        if len(results) > 1:
+        if self.gen_diff and len(results) > 1:
             try:
                 self._add_diff_sheet(wb, results)
             except Exception as e:

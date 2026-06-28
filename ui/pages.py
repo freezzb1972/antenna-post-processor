@@ -1176,6 +1176,12 @@ class AntennaParamsPage(QWidget):
         self._chk_skip_original = QCheckBox(
             self.tr("☐ 跳过原始步进（仅计算上述选中的步进值）"))
         sl.addWidget(self._chk_skip_original)
+        self._chk_gen_diff = QCheckBox(
+            self.tr("☑ 生成步进差值比较表（含差值图表）"))
+        self._chk_gen_diff.setChecked(True)
+        self._chk_gen_diff.setToolTip(
+            self.tr("勾选后将为每个参数生成步进结果与原始结果的差值表和差值曲线图"))
+        sl.addWidget(self._chk_gen_diff)
 
         right_lyt.addWidget(algo_grp)
         right_lyt.addWidget(self._grp_step)
@@ -1818,7 +1824,11 @@ class AntennaParamsPage(QWidget):
             "trim_end": self._spin_trim_end.value(),
             "step_values": self.get_selected_steps(),
             "skip_original": self.get_skip_original(),
+            "gen_diff": self.get_gen_diff(),
         }
+
+    def get_gen_diff(self) -> bool:
+        return hasattr(self, '_chk_gen_diff') and self._chk_gen_diff.isChecked()
 
     def get_selected_steps(self) -> list:
         """获取用户选中的步进值列表。未启用多步进则返回空。"""

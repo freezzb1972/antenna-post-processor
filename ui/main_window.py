@@ -1944,11 +1944,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         trim_start = self._spin_trim_start.value()
         trim_end = self._spin_trim_end.value()
         robust_peak = self._check_robust_peak.isChecked()
-        # 步进参数（dialog 关闭时保存到 self._dialog_*）
-        step_values = list(getattr(self, '_dialog_step_values', []))
-        skip_original = getattr(self, '_dialog_skip_original', False)
-        self._dialog_step_values = []
-        self._dialog_skip_original = False
+        # 步进参数（从 inline AntennaParamsPage 读取）
+        ant_page = getattr(self, '_antenna_params_page', None)
+        step_values = ant_page.get_selected_steps() if ant_page else []
+        skip_original = ant_page.get_skip_original() if ant_page else False
+        gen_diff = ant_page.get_gen_diff() if ant_page else False
 
         self._worker = ProcessingWorker(
             datasource_map=datasource_map,
@@ -1972,6 +1972,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             # 多步进参数
             step_values=step_values,
             skip_original=skip_original,
+            gen_diff=gen_diff,
         )
         self._worker.moveToThread(self._thread)
 
