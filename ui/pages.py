@@ -374,16 +374,33 @@ class FileSettingsPage(QWidget):
             QMessageBox.warning(self, self.tr("检测失败"), self.tr(f"列头检测失败:\n{e}"))
             return
 
+        from src.lag_config import _RE_LAG_SINGLE, _RE_LAG_RANGE, _RE_AR_SINGLE, _RE_AR_RANGE
+
+        def _extract_angle(raw: str, ctype: str) -> str:
+            """从列头提取角度值。"""
+            if ctype in ("lag_single", "ar_single"):
+                rx = _RE_LAG_SINGLE if ctype == "lag_single" else _RE_AR_SINGLE
+                m = rx.search(raw)
+                if m:
+                    return f"{m.group(1)}°"
+            if ctype in ("lag_range", "ar_range"):
+                rx = _RE_LAG_RANGE if ctype == "lag_range" else _RE_AR_RANGE
+                m = rx.search(raw)
+                if m:
+                    return f"{m.group(1)}–{m.group(2)}°"
+            return ""
+
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("模板列预览"))
-        dlg.setMinimumSize(600, 450)
+        dlg.setMinimumSize(720, 480)
         layout = QVBoxLayout(dlg)
 
-        # 列映射表
+        # 列映射表: 列 | 列头文本 | 检测类型 | 参数值 | 修正类型 | 操作
         table = QTableWidget()
-        table.setColumnCount(4)
+        table.setColumnCount(6)
         table.setHorizontalHeaderLabels([
-            self.tr("列"), self.tr("列头文本"), self.tr("检测类型"), self.tr("修正类型")
+            self.tr("列"), self.tr("列头文本"), self.tr("检测类型"),
+            self.tr("参数值"), self.tr("修正类型"), self.tr("操作")
         ])
         table.horizontalHeader().setStretchLastSection(True)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -393,6 +410,8 @@ class FileSettingsPage(QWidget):
             table.setItem(ri, 0, QTableWidgetItem(m.col_letter))
             table.setItem(ri, 1, QTableWidgetItem(m.raw_header))
             table.setItem(ri, 2, QTableWidgetItem(m.detected_type))
+            angle_val = _extract_angle(m.raw_header, m.detected_type)
+            table.setItem(ri, 3, QTableWidgetItem(angle_val))
             # 修正下拉
             cmb = QComboBox()
             for ct, label in ALL_COL_TYPE_LABELS:
@@ -400,7 +419,14 @@ class FileSettingsPage(QWidget):
             idx = cmb.findData(m.detected_type)
             if idx >= 0:
                 cmb.setCurrentIndex(idx)
-            table.setCellWidget(ri, 3, cmb)
+            table.setCellWidget(ri, 4, cmb)
+            # 修改按钮（仅角度类型显示）
+            if m.detected_type in ("lag_single", "lag_range", "ar_single", "ar_range"):
+                btn_mod = QPushButton(self.tr("修改"))
+                btn_mod.setFixedWidth(50)
+                btn_mod.clicked.connect(lambda checked, row=ri, ct=m.detected_type, rh=m.raw_header:
+                    self._on_preview_modify_param(dlg, row, ct, rh, table))
+                table.setCellWidget(ri, 5, btn_mod)
             if m.detected_type != "unknown":
                 detected += 1
         table.resizeColumnsToContents()
@@ -421,7 +447,7 @@ class FileSettingsPage(QWidget):
         btn_row.addStretch()
         btn_row.addWidget(btn_close)
         btn_close.clicked.connect(dlg.accept)
-        save_template_path = tpl_path  # capture for lambda
+        save_template_path = tpl_path
 
         def _on_save():
             rows = table.rowCount()
@@ -430,7 +456,7 @@ class FileSettingsPage(QWidget):
                 col_letter = table.item(ri, 0).text()
                 raw = table.item(ri, 1).text()
                 detected_type = table.item(ri, 2).text()
-                cmb = table.cellWidget(ri, 3)
+                cmb = table.cellWidget(ri, 4)
                 confirmed = cmb.currentData() if cmb else ""
                 from src.column_mapping import ColumnMapping as CM
                 col_mappings.append(CM(
@@ -449,6 +475,53 @@ class FileSettingsPage(QWidget):
                 self.tr(f"模板预设已保存: {name}\n包含 {len(col_mappings)} 列映射"))
 
         btn_save.clicked.connect(_on_save)
+        layout.addLayout(btn_row)
+        dlg.exec()
+
+    def _on_preview_modify_param(self, parent_dlg, row: int, ctype: str, raw_header: str, table):
+        """修改单参数: 弹出天线参数选择，仅更新当前列。"""
+        dlg = QDialog(parent_dlg)
+        dlg.setWindowTitle(self.tr("选择参数类型"))
+        dlg.setMinimumSize(400, 300)
+        layout = QVBoxLayout(dlg)
+
+        from src.column_mapping import ALL_COL_TYPE_LABELS
+        lbl = QLabel(self.tr(f"列头: {raw_header}\n当前类型: {ctype}"))
+        layout.addWidget(lbl)
+
+        list_widget = QListWidget()
+        current_idx = 0
+        for i, (ct, label) in enumerate(ALL_COL_TYPE_LABELS):
+            item = QListWidgetItem(f"{label} ({ct})")
+            item.setData(Qt.UserRole, ct)
+            list_widget.addItem(item)
+            if ct == ctype:
+                current_idx = i
+        list_widget.setCurrentRow(current_idx)
+        layout.addWidget(list_widget)
+
+        btn_row = QHBoxLayout()
+        btn_ok = QPushButton(self.tr("确定"))
+        btn_cancel = QPushButton(self.tr("取消"))
+        btn_row.addStretch()
+        btn_row.addWidget(btn_ok)
+        btn_row.addWidget(btn_cancel)
+
+        def on_accept():
+            item = list_widget.currentItem()
+            if item:
+                new_type = item.data(Qt.UserRole)
+                # 只更新当前行的类型
+                table.item(row, 2).setText(new_type)
+                cmb = table.cellWidget(row, 4)
+                if cmb:
+                    idx = cmb.findData(new_type)
+                    if idx >= 0:
+                        cmb.setCurrentIndex(idx)
+            dlg.accept()
+
+        btn_ok.clicked.connect(on_accept)
+        btn_cancel.clicked.connect(dlg.reject)
         layout.addLayout(btn_row)
         dlg.exec()
 
