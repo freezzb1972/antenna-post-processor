@@ -679,8 +679,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         BatchCalibrateDialog(self).exec()
 
     def _on_tool_calibrate(self):
-        from ui.dialogs import BatchCalibrateDialog
-        BatchCalibrateDialog(self).exec()
+        from ui.dialogs import PathLossDialog
+        PathLossDialog(self).exec()
 
     def _on_tool_merge(self):
         from ui.dialogs import MergeDialog

@@ -3816,3 +3816,259 @@ class ActivationDialog(QDialog):
             self._lbl_status.setText(self.tr(f"❌ 激活失败: {result}"))
             self._btn_activate.setEnabled(True)
             self._edit_code.setEnabled(True)
+
+# ═══════════════════════════════════════════════════════════════
+# PathLossDialog — 路径损耗补偿（独立于数据检查与转换）
+# ═══════════════════════════════════════════════════════════════
+
+class PathLossDialog(QDialog):
+    """路径损耗补偿: 检查文件格式 + 选RSP校准 + 转换+补偿。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("路径损耗补偿"))
+        self.setMinimumSize(650, 500)
+        self._paths: List[str] = []
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(8)
+
+        # ── 文件列表 ──
+        grp_files = QGroupBox(self.tr("CSV 数据文件"))
+        fl = QVBoxLayout(grp_files)
+        br = QHBoxLayout()
+        btn_add = QPushButton(self.tr("📂 添加文件..."))
+        btn_add.clicked.connect(self._on_add_files)
+        br.addWidget(btn_add)
+        btn_clr = QPushButton(self.tr("清除"))
+        btn_clr.clicked.connect(self._on_clear)
+        br.addWidget(btn_clr)
+        br.addStretch()
+        self._lbl_count = QLabel("")
+        br.addWidget(self._lbl_count)
+        fl.addLayout(br)
+        self._file_table = QTableWidget()
+        self._file_table.setColumnCount(3)
+        self._file_table.setHorizontalHeaderLabels([
+            self.tr("文件名"), self.tr("格式"), self.tr("状态")])
+        self._file_table.horizontalHeader().setStretchLastSection(True)
+        self._file_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._file_table.setMaximumHeight(160)
+        fl.addWidget(self._file_table)
+        layout.addWidget(grp_files)
+
+        # ── RSP 校准文件 ──
+        grp_rsp = QGroupBox(self.tr("RSP 路径损耗校准"))
+        rl = QFormLayout(grp_rsp)
+        rl.setSpacing(6)
+
+        h_row = QHBoxLayout()
+        self._edit_rsp_h = QLineEdit()
+        self._edit_rsp_h.setPlaceholderText(self.tr("选择 H-pol RSP 校准文件..."))
+        h_row.addWidget(self._edit_rsp_h)
+        btn_h = QPushButton(self.tr("浏览..."))
+        btn_h.clicked.connect(lambda: self._browse_rsp("h"))
+        h_row.addWidget(btn_h)
+        btn_h_pre = QPushButton(self.tr("从预设选择..."))
+        btn_h_pre.clicked.connect(lambda: self._pick_rsp_preset("h"))
+        h_row.addWidget(btn_h_pre)
+        rl.addRow("H-pol:", h_row)
+
+        v_row = QHBoxLayout()
+        self._edit_rsp_v = QLineEdit()
+        self._edit_rsp_v.setPlaceholderText(self.tr("选择 V-pol RSP 校准文件..."))
+        v_row.addWidget(self._edit_rsp_v)
+        btn_v = QPushButton(self.tr("浏览..."))
+        btn_v.clicked.connect(lambda: self._browse_rsp("v"))
+        v_row.addWidget(btn_v)
+        btn_v_pre = QPushButton(self.tr("从预设选择..."))
+        btn_v_pre.clicked.connect(lambda: self._pick_rsp_preset("v"))
+        v_row.addWidget(btn_v_pre)
+        rl.addRow("V-pol:", v_row)
+
+        layout.addWidget(grp_rsp)
+
+        # ── 处理选项 ──
+        grp_opt = QGroupBox(self.tr("处理选项"))
+        ol = QVBoxLayout(grp_opt)
+        self._chk_convert = QCheckBox(
+            self.tr("自动转换实部/虚部文件（必须先转换为对数域）"))
+        self._chk_convert.setChecked(True)
+        ol.addWidget(self._chk_convert)
+        self._chk_apply = QCheckBox(self.tr("应用路径损耗补偿"))
+        self._chk_apply.setChecked(True)
+        ol.addWidget(self._chk_apply)
+        layout.addWidget(grp_opt)
+
+        # ── 输出目录 ──
+        out_row = QHBoxLayout()
+        out_row.addWidget(QLabel(self.tr("输出目录:")))
+        self._edit_out = QLineEdit()
+        self._edit_out.setPlaceholderText(self.tr("默认: 源文件目录"))
+        out_row.addWidget(self._edit_out)
+        btn_out = QPushButton(self.tr("浏览..."))
+        btn_out.clicked.connect(self._on_browse_out)
+        out_row.addWidget(btn_out)
+        layout.addLayout(out_row)
+
+        # ── 按钮 ──
+        btn_row = QHBoxLayout()
+        self._btn_scan = QPushButton(self.tr("🔍 检查兼容性"))
+        self._btn_scan.clicked.connect(self._on_scan)
+        btn_row.addWidget(self._btn_scan)
+        btn_row.addStretch()
+        self._btn_run = QPushButton(self.tr("▶ 执行"))
+        self._btn_run.clicked.connect(self._on_run)
+        self._btn_run.setEnabled(False)
+        self._btn_run.setMinimumHeight(36)
+        btn_row.addWidget(self._btn_run)
+        btn_close = QPushButton(self.tr("关闭"))
+        btn_close.clicked.connect(self.reject)
+        btn_row.addWidget(btn_close)
+        layout.addLayout(btn_row)
+
+    def _on_add_files(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, self.tr("选择 CSV 文件"), "",
+            self.tr("CSV 文件 (*.csv);;所有文件 (*)"))
+        if paths:
+            for p in paths:
+                if p not in self._paths:
+                    self._paths.append(p)
+            self._refresh_table()
+            if not self._edit_out.text().strip() and self._paths:
+                self._edit_out.setText(str(Path(self._paths[0]).parent))
+
+    def _on_clear(self):
+        self._paths.clear()
+        self._file_table.setRowCount(0)
+        self._lbl_count.setText("")
+        self._btn_run.setEnabled(False)
+
+    def _refresh_table(self):
+        from src.raw_converter import _detect_format
+        self._file_table.setRowCount(len(self._paths))
+        self._lbl_count.setText(f"{len(self._paths)} {self.tr('个文件')}")
+        has_aborted = False
+        for i, p in enumerate(self._paths):
+            self._file_table.setItem(i, 0, QTableWidgetItem(Path(p).name))
+            try:
+                fmt = _detect_format(p)
+                if fmt == 'standard':
+                    self._file_table.setItem(i, 1, QTableWidgetItem(
+                        self.tr("对数域 (LogMag/Phase)")))
+                    self._file_table.setItem(i, 2, QTableWidgetItem("✅"))
+                elif fmt == 'aborted':
+                    has_aborted = True
+                    self._file_table.setItem(i, 1, QTableWidgetItem(
+                        self.tr("实部/虚部 (Real/Imag)")))
+                    self._file_table.setItem(i, 2, QTableWidgetItem(
+                        self.tr("⚠ 需转换")))
+                else:
+                    self._file_table.setItem(i, 1, QTableWidgetItem(self.tr("未知")))
+                    self._file_table.setItem(i, 2, QTableWidgetItem("❓"))
+            except Exception:
+                self._file_table.setItem(i, 1, QTableWidgetItem("?"))
+                self._file_table.setItem(i, 2, QTableWidgetItem(self.tr("读取失败")))
+        self._file_table.resizeColumnsToContents()
+        self._btn_run.setEnabled(True)
+
+    def _on_scan(self):
+        if not self._paths:
+            self._on_add_files()
+        else:
+            self._refresh_table()
+
+    def _browse_rsp(self, pol: str):
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("选择 RSP 校准文件"), "",
+            self.tr("CSV 文件 (*.csv);;所有文件 (*)"))
+        if path:
+            if pol == "h":
+                self._edit_rsp_h.setText(path)
+            else:
+                self._edit_rsp_v.setText(path)
+
+    def _pick_rsp_preset(self, pol: str):
+        """从 RSP 预设中选择。"""
+        from ui.rsp_picker_dialog import RspPickerDialog
+        h_path, v_path = RspPickerDialog.pick(self)
+        if pol == "h" and h_path:
+            self._edit_rsp_h.setText(h_path)
+        elif pol == "v" and v_path:
+            self._edit_rsp_v.setText(v_path)
+
+    def _on_browse_out(self):
+        d = QFileDialog.getExistingDirectory(self, self.tr("选择输出目录"))
+        if d:
+            self._edit_out.setText(d)
+
+    def _on_run(self):
+        """执行转换 + RSP 校准。"""
+        if not self._paths:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请先添加文件。"))
+            return
+        from src.raw_converter import _detect_format, convert_file
+        rsp_h = self._edit_rsp_h.text().strip() or None
+        rsp_v = self._edit_rsp_v.text().strip() or None
+        output_dir = self._edit_out.text().strip() or str(Path(self._paths[0]).parent)
+        os.makedirs(output_dir, exist_ok=True)
+        convert_needed = self._chk_convert.isChecked()
+        apply_rsp = self._chk_apply.isChecked()
+
+        results = {"ok": 0, "fail": 0, "errors": []}
+        for p in self._paths:
+            try:
+                fmt = _detect_format(p)
+                fname = Path(p).name
+                # Step 1: 如果是不完整格式且勾选了自动转换
+                if fmt == 'aborted' and convert_needed:
+                    out_name = f"converted_{fname}"
+                    out_path = str(Path(output_dir) / out_name)
+                    convert_file(p, out_path)
+                    self._log(f"✓ {fname} → {out_name}")
+                    if apply_rsp:
+                        p = out_path  # 后续用转换后的文件做 RSP
+                    else:
+                        results["ok"] += 1
+                        continue
+                elif fmt == 'aborted' and not convert_needed:
+                    results["fail"] += 1
+                    results["errors"].append(f"{fname}: {self.tr('需先转换')}")
+                    continue
+
+                # Step 2: 应用 RSP 校准
+                if apply_rsp and (rsp_h or rsp_v):
+                    from src.rsp_calibration import parse_rsp_csv, parse_rsp_phase, _apply_rsp_calibration
+                    import re
+                    is_hpol = bool(re.search(r'[Hh].*[Pp]ol|[Pp]ol.*[Hh]|[Hh]_', fname))
+                    rsp_path = rsp_h if is_hpol else (rsp_v or rsp_h)
+                    if rsp_path:
+                        rsp_amp = parse_rsp_csv(rsp_path)
+                        rsp_phase_data = parse_rsp_phase(rsp_path) if rsp_path else {}
+                        out_name = f"calibrated_{fname}"
+                        out_path = str(Path(output_dir) / out_name)
+                        _apply_rsp_calibration(p, rsp_amp, rsp_phase_data, out_path)
+                        self._log(f"✓ {fname} → {out_name} (RSP 已应用)")
+                    else:
+                        self._log(f"  {fname}: {self.tr('无对应 RSP 文件，跳过')}")
+                results["ok"] += 1
+            except Exception as e:
+                results["fail"] += 1
+                results["errors"].append(f"{Path(p).name}: {e}")
+
+        msg = self.tr("处理完成: {} 成功, {} 失败").format(results["ok"], results["fail"])
+        if results["errors"]:
+            msg += "\n\n" + self.tr("错误详情:\n") + "\n".join(results["errors"][:5])
+        QMessageBox.information(self, self.tr("完成"), msg)
+        self.accept()
+
+    def _log(self, msg: str):
+        """简易日志（打印到父窗口日志或 stderr）。"""
+        parent_mw = self.parent()
+        if hasattr(parent_mw, '_log'):
+            parent_mw._log(msg)
+        else:
+            print(msg)
