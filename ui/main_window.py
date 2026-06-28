@@ -578,12 +578,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # ── 文件 ──
         fm = menubar.addMenu(self.tr("&文件"))
         fm.addAction(self.tr("新建窗口"), self._on_new_window, QKeySequence("Ctrl+N"))
+        fm.addAction(self.tr("打开任务包..."), self._on_open_task_package, QKeySequence("Ctrl+O"))
+        fm.addSeparator()
+        fm.addAction(self.tr("保存任务包"), self._on_save_task_package, QKeySequence("Ctrl+S"))
+        fm.addAction(self.tr("另存任务包..."), self._on_saveas_task_package, QKeySequence("Ctrl+Shift+S"))
+        fm.addSeparator()
+        fm.addAction(self.tr("导出报告..."), self._on_browse_output, QKeySequence("Ctrl+E"))
         fm.addSeparator()
         fm.addAction(self.tr("系统设置..."), self._show_system_settings)
         fm.addSeparator()
-        fm.addAction(self.tr("保存结果..."), self._on_browse_output, QKeySequence("Ctrl+S"))
-        fm.addSeparator()
-        fm.addAction(self.tr("关闭窗口"), self.close, QKeySequence("Ctrl+W"))
+        fm.addAction(self.tr("退出"), QApplication.instance().quit, QKeySequence("Ctrl+Q"))
 
         # ── 窗口 ──
         self._menu_window = menubar.addMenu(self.tr("&窗口"))
@@ -704,6 +708,74 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """创建新的工作窗口。"""
         from ui.window_manager import WindowManager
         WindowManager.instance().create_window(self.app)
+
+    def _on_open_task_package(self):
+        """打开 .ant 任务包。"""
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("打开任务包"), "",
+            self.tr("任务包 (*.ant);;所有文件 (*)"))
+        if not path:
+            return
+        try:
+            from src.task_package import load_task_package, verify_data_integrity
+            meta = load_task_package(path)
+            integrity = verify_data_integrity(meta)
+            modified = [k for k, v in integrity.items() if v == "modified"]
+            missing = [k for k, v in integrity.items() if v == "missing"]
+            msg = [self.tr(f"任务: {meta.get('task_name', '?')}"),
+                   self.tr(f"创建: {meta.get('created', '?')}")]
+            if modified:
+                msg.append(self.tr(f"\n⚠ {len(modified)} 个数据文件已修改，建议重新计算。"))
+            if missing:
+                msg.append(self.tr(f"\n❌ {len(missing)} 个数据文件已移动。"))
+            QMessageBox.information(self, self.tr("任务包信息"), "\n".join(msg))
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("打开失败"), self.tr(f"无法打开任务包:\n{e}"))
+
+    def _on_save_task_package(self):
+        """快速保存任务包（自动命名，覆盖已存在）。"""
+        tpl_name = Path(self.ui.editTemplatePath.text().strip()).stem if self.ui.editTemplatePath.text().strip() else "task"
+        output_dir = self.ui.editOutputDir.text().strip() or "."
+        from src.task_package import next_available_filename, save_task_package
+        ant_path = next_available_filename(output_dir, tpl_name)
+        config_snapshot = {
+            "test_mode": self._test_mode,
+            "template_path": self.ui.editTemplatePath.text().strip(),
+            "lag_singles": self._lag_config.singles_sorted,
+            "lag_ranges": self._lag_config.ranges_sorted,
+            "ar_singles": self._ar_lag_config.singles_sorted if hasattr(self, '_ar_lag_config') else [],
+            "ar_ranges": self._ar_lag_config.ranges_sorted if hasattr(self, '_ar_lag_config') else [],
+        }
+        save_task_package(ant_path, tpl_name,
+            data_file_paths=list(self._data_file_paths),
+            template_path=self.ui.editTemplatePath.text().strip(),
+            config_snapshot=config_snapshot)
+        self._log(f"📦 任务包已保存: {Path(ant_path).name}")
+
+    def _on_saveas_task_package(self):
+        """另存任务包 — 选择路径保存。"""
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getSaveFileName(
+            self, self.tr("另存任务包"), "",
+            self.tr("任务包 (*.ant);;所有文件 (*)"))
+        if not path:
+            return
+        tpl_name = Path(path).stem
+        from src.task_package import save_task_package
+        config_snapshot = {
+            "test_mode": self._test_mode,
+            "template_path": self.ui.editTemplatePath.text().strip(),
+            "lag_singles": self._lag_config.singles_sorted,
+            "lag_ranges": self._lag_config.ranges_sorted,
+            "ar_singles": self._ar_lag_config.singles_sorted if hasattr(self, '_ar_lag_config') else [],
+            "ar_ranges": self._ar_lag_config.ranges_sorted if hasattr(self, '_ar_lag_config') else [],
+        }
+        save_task_package(path, tpl_name,
+            data_file_paths=list(self._data_file_paths),
+            template_path=self.ui.editTemplatePath.text().strip(),
+            config_snapshot=config_snapshot)
+        self._log(f"📦 任务包已保存: {Path(path).name}")
 
     def _on_help(self):
         from ui.dialogs import HelpDialog

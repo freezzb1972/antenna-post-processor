@@ -91,14 +91,28 @@ class WindowManager:
             for action in actions[sep_index + 1:]:
                 menu.removeAction(action)
 
-        # 重新添加窗口列表
+        # 重新添加窗口列表（每个带关闭按钮）
         for win in self._windows:
             title = win.window_title()
-            action = QAction(title, menu)
-            action.setCheckable(True)
-            action.setChecked(win is window)
-            action.triggered.connect(lambda checked, w=win: self.focus_window(w))
-            menu.addAction(action)
+            wa = QWidgetAction(menu)
+            wgt = QWidget()
+            hl = QHBoxLayout(wgt)
+            hl.setContentsMargins(4, 2, 4, 2)
+            hl.setSpacing(8)
+            lbl = QPushButton(title)
+            lbl.setFlat(True)
+            lbl.setCheckable(True)
+            lbl.setChecked(win is window)
+            lbl.setStyleSheet("text-align:left; border:none;")
+            lbl.clicked.connect(lambda checked, w=win: self.focus_window(w))
+            hl.addWidget(lbl, 1)
+            btn_close = QPushButton("✕")
+            btn_close.setFixedSize(20, 20)
+            btn_close.setStyleSheet("border:none; color:#999;")
+            btn_close.clicked.connect(lambda checked, w=win: self.close_window(w))
+            hl.addWidget(btn_close)
+            wa.setDefaultWidget(wgt)
+            menu.addAction(wa)
 
     # ── 工具 ──
 
