@@ -44,6 +44,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QAbstractItemView,
+    QDialog,
     QVBoxLayout,
     QWidget,
 )
@@ -520,7 +521,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             dlg.setWindowTitle(self.tr("📡 天线参数设置"))
             dlg.setMinimumSize(850, 650)
             layout = QVBoxLayout(dlg)
-            from ui.pages import AntennaParamsPage
             page = AntennaParamsPage(self)
             layout.addWidget(page)
             btn_ok = QPushButton(self.tr("确定"))
