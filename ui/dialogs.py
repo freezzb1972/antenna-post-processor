@@ -3390,6 +3390,9 @@ class MergeDialog(QDialog):
         btn_h = QPushButton(self.tr("浏览..."))
         btn_h.clicked.connect(lambda: self._browse_rsp("h"))
         h_row.addWidget(btn_h)
+        btn_h_pre = QPushButton(self.tr("从预设选择..."))
+        btn_h_pre.clicked.connect(lambda: self._pick_rsp_preset("h"))
+        h_row.addWidget(btn_h_pre)
         rsp_layout.addRow("H-pol:", h_row)
 
         v_row = QHBoxLayout()
@@ -3399,6 +3402,9 @@ class MergeDialog(QDialog):
         btn_v = QPushButton(self.tr("浏览..."))
         btn_v.clicked.connect(lambda: self._browse_rsp("v"))
         v_row.addWidget(btn_v)
+        btn_v_pre = QPushButton(self.tr("从预设选择..."))
+        btn_v_pre.clicked.connect(lambda: self._pick_rsp_preset("v"))
+        v_row.addWidget(btn_v_pre)
         rsp_layout.addRow("V-pol:", v_row)
 
         self._lbl_rsp_info = QLabel(
@@ -3475,6 +3481,17 @@ class MergeDialog(QDialog):
             else:
                 self._edit_rsp_v.setText(path)
                 self._rsp_v_path = path
+
+    def _pick_rsp_preset(self, pol: str):
+        """从 RSP 预设中选择。"""
+        from ui.rsp_picker_dialog import RspPickerDialog
+        h_path, v_path = RspPickerDialog.pick(self)
+        if pol == "h" and h_path:
+            self._edit_rsp_h.setText(h_path)
+            self._rsp_h_path = h_path
+        elif pol == "v" and v_path:
+            self._edit_rsp_v.setText(v_path)
+            self._rsp_v_path = v_path
 
     # ── 输出 ──
 
