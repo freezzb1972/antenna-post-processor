@@ -606,7 +606,7 @@ def _load_and_compute(
 
     # 阶段 A: 加载数据
     _log(log_callback, f"读取 {total} 个频点数据...")
-    _report(progress_callback, 0, progress_max, f"读取中 0/{total}")
+    _report(progress_callback, 0, progress_max, "📂 加载数据 0%")
     compute_tasks = []
     for i, (sheet_name, freq, csv_idx, lag_cfg, task_ds, needed_params) in enumerate(tasks):
         if cancel_callback and cancel_callback():
@@ -617,10 +617,10 @@ def _load_and_compute(
         ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
         compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db))
         if (i + 1) % 20 == 0 or (i + 1) == total:
-            _report(progress_callback, i + 1, progress_max, f"读取中 {i + 1}/{total}")
+            _report(progress_callback, i + 1, progress_max, f"📂 加载数据 {int((i+1)/total*100)}%")
 
     data_done = len(compute_tasks)
-    _report(progress_callback, data_done, progress_max, "计算中...")
+    _report(progress_callback, data_done, progress_max, "🧮 计算中...")
 
     # 阶段 B: 计算（支持并行）
     if parallel > 1 and data_done > 1:
@@ -639,7 +639,7 @@ def _load_and_compute(
                     sheet_results[sheet_name].append(row)
                     completed += 1
                 _report(progress_callback, data_done + completed, progress_max,
-                        f"计算中 {completed}/{data_done}")
+                        f"🧮 计算中 {int((data_done+completed)/progress_max*100)}%")
     else:
         _run_compute_serial(compute_tasks, sheet_results, data_done, progress_max,
                             cancel_callback, progress_callback, log_cb=log_callback)
@@ -663,7 +663,7 @@ def _run_compute_serial(
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
         if (i + 1) % 10 == 0 or (i + 1) == data_done:
             _report(progress_callback, data_done + i + 1, progress_max,
-                    f"计算中 {i + 1}/{data_done}")
+                    f"🧮 计算中 {int((data_done+i+1)/progress_max*100)}%")
 
 
 def _close_datasources(
@@ -811,7 +811,7 @@ def run_pipeline(
     total = len(tasks)
     progress_max = total * 2 + 5
     _log(log_callback, f"写入输出: {output_path}")
-    _report(progress_callback, progress_max - 3, progress_max, "写入 Excel...")
+    _report(progress_callback, progress_max - 3, progress_max, "💾 写入 Excel...")
 
     export_results(
         template_path=template_path,
@@ -823,7 +823,7 @@ def run_pipeline(
         log_callback=log_callback,
         remove_template_sheets=template_sheet_names_to_remove,
     )
-    _report(progress_callback, progress_max - 1, progress_max, "Excel 写入完成")
+    _report(progress_callback, progress_max - 1, progress_max, "✅ Excel 写入完成")
 
     # ---- 4. 完整报告 (可选) ----
     if full_report_path:
@@ -836,7 +836,7 @@ def run_pipeline(
     elapsed = time.time() - t0
     total_rows = sum(len(v) for v in sheet_results.values())
     _log(log_callback, f"✓ 完成: {total_rows} 行, {elapsed:.1f}s")
-    _report(progress_callback, progress_max, progress_max, "完成")
+    _report(progress_callback, progress_max, progress_max, "✅ 完成")
 
     return sheet_results
 
