@@ -127,7 +127,13 @@
       "_lbl_naming_mode",
       "_match_table",
       "_thread",
-      "_cmb_naming_mode"
+      "_cmb_naming_mode",
+      "_nav_list",
+      "_page_stack",
+      "_grp_step",
+      "_edit_step_custom",
+      "_chk_skip_original",
+      "_step_checks"
     ],
     "methods": [
       "__init__",
@@ -144,7 +150,6 @@
       "_init_file_paths",
       "_init_menu",
       "_init_multi_file_ui",
-      "_init_param_overview",
       "_init_params_tab",
       "_init_quick_angle_buttons",
       "_init_theme_selector",
@@ -194,10 +199,7 @@
       "_restore_start_button",
       "_retry_unmatched_files",
       "_save_template_path",
-      "_show_calc_params_dialog",
-      "_show_data_source_dialog",
       "_show_llm_settings",
-      "_show_plot_config_dialog",
       "_show_save_preset_dialog",
       "_show_system_settings",
       "_sync_file_entries",
@@ -255,6 +257,7 @@
       "ui/graph_viewer.py",
       "ui/layout_utils.py",
       "ui/main_window.py",
+      "ui/pages.py",
       "ui/rsp_picker_dialog.py",
       "ui/splash_screen.py",
       "ui/theme_manager.py",
@@ -828,6 +831,21 @@
         "tests/test_e2e_features.py::TestStaleDataProtection::test_datasource_close_reopen_consistency",
         "tests/test_e2e_features.py::TestStaleDataProtection::test_main_window_state_reset_on_new_files"
       ]
+    },
+    {
+      "id": "master-detail-pages",
+      "name": "Master-Detail 右侧页面组件",
+      "description": "3 个独立右侧页面: FileSettingsPage(模板/数据/输出), AntennaParamsPage(模式/参数/角度/算法), ChartSettingsPage(图表分类/视角/输出)",
+      "type": "ui",
+      "src_modules": [
+        "ui/pages.py"
+      ],
+      "widgets": [],
+      "methods": [],
+      "tests": [],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "3 page classes directly read/write MainWindow properties, no parent mode shows defaults"
     }
   ]
 }

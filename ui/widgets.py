@@ -223,8 +223,10 @@ class TemplateSourceRow(QWidget):
 
     template_changed = Signal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, on_browse=None, on_preview=None):
         super().__init__(parent)
+        self._on_browse_cb = on_browse
+        self._on_preview_cb = on_preview
         self._setup_ui()
 
     def _setup_ui(self):
@@ -245,12 +247,12 @@ class TemplateSourceRow(QWidget):
 
         # 从电脑选择
         btn_browse = QPushButton(self.tr("从电脑选择..."))
-        btn_browse.clicked.connect(self._on_browse)
+        btn_browse.clicked.connect(self._on_browse_cb if self._on_browse_cb else self._on_browse)
         layout.addWidget(btn_browse)
 
         # 预览报告
         btn_preview = QPushButton(self.tr("📋 预览报告"))
-        btn_preview.clicked.connect(self._on_preview)
+        btn_preview.clicked.connect(self._on_preview_cb if self._on_preview_cb else self._on_preview)
         layout.addWidget(btn_preview)
 
         # 路径显示
@@ -336,27 +338,33 @@ class OutputSettingsGroup(QGroupBox):
 
     output_changed = Signal(str, str)  # (output_dir, output_name)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, output_dir="", output_name="antenna_report.xlsx",
+                 on_browse_output=None, on_browse_full_report=None):
         super().__init__(parent)
         self.setTitle(self.tr("输出设置"))
-        self._setup_ui()
+        self._on_browse_output_cb = on_browse_output
+        self._on_browse_full_report_cb = on_browse_full_report
+        self._setup_ui(output_dir, output_name)
 
-    def _setup_ui(self):
+    def _setup_ui(self, output_dir="", output_name="antenna_report.xlsx"):
         layout = QFormLayout(self)
         layout.setSpacing(6)
 
         # 输出目录
         dir_row = QHBoxLayout()
-        self._edit_dir = QLineEdit()
+        self._edit_dir = QLineEdit(output_dir)
         self._edit_dir.setPlaceholderText(self.tr("默认: ./output"))
         dir_row.addWidget(self._edit_dir, 1)
         btn_dir = QPushButton(self.tr("浏览..."))
-        btn_dir.clicked.connect(self._on_browse_dir)
+        if self._on_browse_output_cb:
+            btn_dir.clicked.connect(self._on_browse_output_cb)
+        else:
+            btn_dir.clicked.connect(self._on_browse_dir)
         dir_row.addWidget(btn_dir)
         layout.addRow(self.tr("输出目录:"), dir_row)
 
         # 文件名
-        self._edit_name = QLineEdit("antenna_report.xlsx")
+        self._edit_name = QLineEdit(output_name)
         layout.addRow(self.tr("文件名:"), self._edit_name)
 
         # 完整报告

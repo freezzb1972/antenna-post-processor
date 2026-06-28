@@ -33,12 +33,14 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
     QSpinBox,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QAbstractItemView,
@@ -50,6 +52,7 @@ from src.file_entry import FileEntry, mode_name, infer_mode_from_sheet
 from src.lag_config import LagConfig, PRESET_AUTOMOTIVE
 from src.scale_manager import ScaleManager, AdaptiveWidgetMixin
 from ui.compiled.ui_main_window import Ui_MainWindow
+from ui.pages import FileSettingsPage, AntennaParamsPage, ChartSettingsPage
 
 if TYPE_CHECKING:
     from src.worker import ProcessingWorker
@@ -62,7 +65,7 @@ if TYPE_CHECKING:
 class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     """天线参数后处理工具主窗口。"""
 
-    # 快捷按钮角度映射（单一定义，_connect_signals 和 _sync_quick_buttons 共享）
+    # 快捷按钮角度映射（_sync_quick_buttons 使用）
     _QUICK_ANGLES: dict = {
         0.0: "btnQuick0",
         10.0: "btnQuick10",
@@ -136,9 +139,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._init_multi_file_ui()
         self._init_quick_angle_buttons()
         self._init_params_tab()
-        self._init_param_overview()
         self._init_step_selector()
-        self._init_report_preview()
+        self._build_parameter_tab()   # Master-Detail 布局 + 共享执行栏
         self._connect_signals()
         self._update_lag_display()
         self._init_menu()
@@ -440,141 +442,118 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         vtab.addWidget(self._grp_step)
 
-    def _init_report_preview(self):
-        """添加测试报告预览面板 — 模板列映射 + 参数确认 + 保存预设。"""
-        from PySide6.QtWidgets import QLineEdit, QTableWidget, QHeaderView
+    # ═══════════════════════════════════════════════════════════════
+    # Step 3: Master-Detail 布局
+    # ═══════════════════════════════════════════════════════════════
+
+    def _build_parameter_tab(self):
+        """构建 Master-Detail 布局 + 提取共享执行栏到 rootVBox。"""
+        from PySide6.QtWidgets import QListWidgetItem, QStackedWidget, QSizePolicy as SP
+
+        # 1. 提取执行栏（移除 hProgress/hButtons/logOutput 到 rootVBox）
+        self._extract_execution_bar()
+
+        # 2. 隐藏 vTabFile 剩余旧内容，移出布局但不销毁 widget 对象
+        for _ in range(self.ui.vTabFile.count()):
+            item = self.ui.vTabFile.takeAt(0)
+            if item is None:
+                continue
+            w = item.widget()
+            if w is not None:
+                w.hide()
+
+        # 3. 构建 Master-Detail 布局
+        container = QWidget()
+        h_layout = QHBoxLayout(container)
+        h_layout.setSpacing(8)
+        h_layout.setContentsMargins(0, 0, 0, 0)
+
+        # 左侧导航
+        self._nav_list = QListWidget()
+        self._nav_list.setFixedWidth(140)
+        self._nav_list.setSpacing(2)
+        self._nav_list.setStyleSheet("QListWidget::item { padding: 8px 4px; }")
+        h_layout.addWidget(self._nav_list)
+
+        # 右侧页面栈
+        self._page_stack = QStackedWidget()
+        h_layout.addWidget(self._page_stack, 1)
+
+        # 创建 3 个页面
+        self._file_settings_page = FileSettingsPage(self)
+        self._antenna_params_page = AntennaParamsPage(self)
+        self._chart_settings_page = ChartSettingsPage(self)
+
+        self._page_stack.addWidget(self._file_settings_page)    # 0
+        self._page_stack.addWidget(self._antenna_params_page)   # 1
+        self._page_stack.addWidget(self._chart_settings_page)   # 2
+
+        # 导航项
+        nav_items = [
+            ("📂 " + self.tr("输入输出"), 0),
+            ("📡 " + self.tr("天线参数"), 1),
+            ("📊 " + self.tr("图表配置"), 2),
+        ]
+        for label, idx in nav_items:
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, idx)
+            self._nav_list.addItem(item)
+
+        self._nav_list.currentRowChanged.connect(self._on_nav_changed)
+        self._nav_list.setCurrentRow(0)
+
+        # 添加到 tabFile
+        self.ui.vTabFile.addWidget(container)
+
+    def _extract_execution_bar(self):
+        """将执行栏从 tabFile 移动到 rootVBox（跨标签页共享）。"""
         vtab = self.ui.vTabFile
 
-        self._grp_preview = QGroupBox(self.tr("📋 测试报告预览"))
-        self._grp_preview.setCheckable(True)
-        self._grp_preview.setChecked(False)
-        pl = QVBoxLayout(self._grp_preview)
-        pl.setSpacing(6)
+        # 找到并移除执行栏相关布局项
+        for i in reversed(range(vtab.count())):
+            item = vtab.itemAt(i)
+            if item is None:
+                continue
+            lyt = item.layout()
+            w = item.widget()
+            if lyt is self.ui.hProgress or lyt is self.ui.hButtons:
+                vtab.removeItem(vtab.takeAt(i))
+            elif w is self.ui.logOutput:
+                vtab.removeItem(vtab.takeAt(i))
 
-        # 模板选择行
-        tpl_row = QHBoxLayout()
-        tpl_row.addWidget(QLabel(self.tr("模板:")))
-        self._edit_preview_tpl = QLineEdit()
-        self._edit_preview_tpl.setPlaceholderText(self.tr("选择模板文件 (.xlsx/.docx)..."))
-        self._edit_preview_tpl.textChanged.connect(self._on_preview_tpl_changed)
-        tpl_row.addWidget(self._edit_preview_tpl, 1)
-        btn_br = QPushButton(self.tr("浏览..."))
-        btn_br.clicked.connect(self._on_browse_preview_tpl)
-        tpl_row.addWidget(btn_br)
-        btn_detect = QPushButton(self.tr("🔍 识别列头"))
-        btn_detect.clicked.connect(self._on_detect_preview)
-        tpl_row.addWidget(btn_detect)
-        pl.addLayout(tpl_row)
+        # 创建执行栏容器
+        exec_bar = QWidget()
+        exec_layout = QVBoxLayout(exec_bar)
+        exec_layout.setContentsMargins(0, 0, 0, 0)
+        exec_layout.setSpacing(4)
 
-        # 列映射表
-        self._preview_table = QTableWidget()
-        self._preview_table.setColumnCount(4)
-        self._preview_table.setHorizontalHeaderLabels(
-            [self.tr("列"), self.tr("列头文本"), self.tr("检测类型"), self.tr("修正类型")])
-        self._preview_table.horizontalHeader().setStretchLastSection(True)
-        self._preview_table.setMaximumHeight(250)
-        self._preview_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        pl.addWidget(self._preview_table)
+        # 进度行
+        progress_row = QHBoxLayout()
+        progress_row.addWidget(self.ui.progressBar)
+        progress_row.addWidget(self.ui.lblProgressMsg)
+        exec_layout.addLayout(progress_row)
 
-        # 摘要 + 参数信息
-        self._lbl_preview_info = QLabel("")
-        self._lbl_preview_info.setStyleSheet("color: #666;")
-        pl.addWidget(self._lbl_preview_info)
+        # 日志
+        self.ui.logOutput.setParent(exec_bar)
+        exec_layout.addWidget(self.ui.logOutput)
 
-        # 保存按钮
-        save_row = QHBoxLayout()
-        self._btn_save_preset = QPushButton(self.tr("💾 保存为模板预设"))
-        self._btn_save_preset.clicked.connect(self._on_save_preview_preset)
-        self._btn_save_preset.setEnabled(False)
-        save_row.addWidget(self._btn_save_preset)
-        save_row.addStretch()
-        pl.addLayout(save_row)
+        # 按钮行
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        btn_row.addWidget(self.ui.btnStart)
+        btn_row.addWidget(self.ui.btnStop)
+        exec_layout.addLayout(btn_row)
 
-        vtab.addWidget(self._grp_preview)
-
-    def _on_browse_preview_tpl(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("选择模板文件"), "",
-            self.tr("所有支持格式 (*.xlsx *.xls *.docx *.doc);;Excel (*.xlsx *.xls);;Word (*.docx *.doc);;所有文件 (*)"))
-        if path:
-            self._edit_preview_tpl.setText(path)
-
-    def _on_preview_tpl_changed(self, _text):
-        self._btn_save_preset.setEnabled(False)
-
-    def _on_detect_preview(self):
-        path = self._edit_preview_tpl.text().strip()
-        if not path or not os.path.exists(path):
-            return
-        try:
-            from src.column_mapping import detect_columns_from_template
-            mappings = detect_columns_from_template(path)
-
-            self._preview_table.setRowCount(len(mappings))
-            detected = 0
-            for ri, m in enumerate(mappings):
-                self._preview_table.setItem(ri, 0, QTableWidgetItem(m.col_letter))
-                self._preview_table.setItem(ri, 1, QTableWidgetItem(m.raw_header))
-                self._preview_table.setItem(ri, 2, QTableWidgetItem(m.detected_type))
-                # 修正类型 — 下拉框
-                from PySide6.QtWidgets import QComboBox
-                cmb = QComboBox()
-                from src.column_mapping import ALL_COL_TYPE_LABELS
-                for ct, label in ALL_COL_TYPE_LABELS:
-                    cmb.addItem(label, ct)
-                idx = cmb.findData(m.detected_type)
-                if idx >= 0:
-                    cmb.setCurrentIndex(idx)
-                self._preview_table.setCellWidget(ri, 3, cmb)
-                if m.detected_type != "unknown":
-                    detected += 1
-
-            self._preview_table.resizeColumnsToContents()
-            self._lbl_preview_info.setText(
-                f"{self.tr('共')} {len(mappings)} {self.tr('列')}, "
-                f"{self.tr('识别')} {detected} {self.tr('列')}, "
-                f"{len(mappings) - detected} {self.tr('列未识别')}")
-            self._btn_save_preset.setEnabled(True)
-
-        except Exception as e:
-            QMessageBox.warning(self, self.tr("识别失败"), str(e))
-
-    def _on_save_preview_preset(self):
-        """保存当前预览的模板映射为预设。"""
-        path = self._edit_preview_tpl.text().strip()
-        if not path:
-            return
-
-        mappings = []
-        for ri in range(self._preview_table.rowCount()):
-            col_letter = self._preview_table.item(ri, 0).text()
-            raw = self._preview_table.item(ri, 1).text()
-            detected = self._preview_table.item(ri, 2).text()
-            cmb = self._preview_table.cellWidget(ri, 3)
-            confirmed = cmb.currentData() if cmb else ""
-
-            from src.column_mapping import ColumnMapping
-            mappings.append(ColumnMapping(
-                col_letter=col_letter, col_index=ri + 1,
-                raw_header=raw, detected_type=detected,
-                confirmed_type=confirmed if confirmed != detected else "",
-            ))
-
-        from src.column_mapping import TemplatePreset, save_preset
-        import os
-        name = os.path.splitext(os.path.basename(path))[0]
-        ext = os.path.splitext(path)[1].lstrip(".")
-        preset = TemplatePreset(
-            name=name, path=path, file_type=ext,
-            column_mappings=mappings,
-            calc_params={
-                "extrapolate_theta": self._check_extrapolate.isChecked(),
-                "robust_peak": self._check_robust_peak.isChecked(),
-            },
+        # 插入到 rootVBox（tabConfig 下方）
+        self.ui.rootVBox.insertWidget(
+            self.ui.rootVBox.indexOf(self.ui.tabConfig) + 1, exec_bar
         )
-        save_preset(preset)
-        QMessageBox.information(self, self.tr("保存成功"),
-            self.tr(f"模板预设已保存: {name}\n包含 {len(mappings)} 列映射"))
+        self._execution_bar = exec_bar
+
+    def _on_nav_changed(self, row: int):
+        """导航列表切换 → 切换页面栈。"""
+        if hasattr(self, '_page_stack') and 0 <= row < self._page_stack.count():
+            self._page_stack.setCurrentIndex(row)
 
     def _get_selected_steps(self) -> List[float]:
         """获取用户选中的步进值列表。未启用多步进则返回空。"""
@@ -593,29 +572,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     except ValueError:
                         pass
         return sorted(steps)
-
-    def _init_param_overview(self):
-        """在 tabFile 中插入参数分类概览面板（天线参数子节）。"""
-        vtab = self.ui.vTabFile
-
-        overview = QGroupBox(self.tr("计算参数分类"))
-        ov_layout = QVBoxLayout(overview)
-        ov_layout.setSpacing(3)
-
-        params = [
-            ("📡", self.tr("无源天线参数"), self.tr("Gain, Directivity, Efficiency, LAG, AR, 波束, 功率统计")),
-            ("📶", self.tr("有源发射 TRP"), self.tr("TRP, Peak EIRP, NHPRP, 半球 PRP, 比率")),
-            ("📻", self.tr("有源接收 TIS"), self.tr("TIS, NHPIS, 半球 PIS, 比率")),
-        ]
-        for icon, name, desc in params:
-            row = QHBoxLayout()
-            lbl = QLabel(f"{icon} {name}: {desc}")
-            lbl.setStyleSheet("color: #aaa;")
-            row.addWidget(lbl)
-            row.addStretch()
-            ov_layout.addLayout(row)
-
-        vtab.insertWidget(0, overview)
 
     def _make_tab_scrollable(self, tab: QWidget):
         """将指定 Tab 的内容包裹在 QScrollArea 中，防止内容溢出被压缩。"""
@@ -687,20 +643,28 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         WindowManager.instance().register(self)
 
     def _hide_settings_tabs(self):
-        """重组标签页：将天线参数和图形设置放入可见区域。
+        """重组标签页：移除废弃标签，重命名保留标签。
 
         Tab 最终顺序：
-          0 - 参数设置 (包含文件设置 + 天线参数 + LAG配置 + 图形设置)
-          1 - 参数结果
-          2 - 图形展示
-        tabCalc 的内容已通过 _init_params_tab/_init_param_overview 移入 tabFile，
-        本方法移除空壳标签页并保持 tabLag/tabPlot 可见。
+          0 - 📐 处理设置 (Master-Detail: 文件/天线参数/图表配置)
+          1 - 📊 计算结果 (原 tabResults)
+          2 - 📈 图表查看 (原 tabCharts)
+        tabLag/tabPlot/tabCalc 被移除（控件对象保持存活，Step 5 清扫）。
+
+        注意: _make_tab_scrollable 会替换 QTabWidget 中的页 widget
+        （将 QWidget 包裹进 QScrollArea），导致 indexOf(widget) 失效，
+        因此按固定索引而非 widget 引用来移除。
         """
         tc = self.ui.tabConfig
-        # 移除 tabCalc（内容已移入 tabFile）
-        idx_calc = tc.indexOf(self.ui.tabCalc)
-        if idx_calc >= 0:
-            tc.removeTab(idx_calc)
+        # 固定索引: tabFile(0), tabLag(1), tabPlot(2), tabCalc(3), tabResults(4), tabCharts(5)
+        # 倒序移除 tabLag(1), tabPlot(2), tabCalc(3) — 倒序防止索引漂移
+        for idx in reversed([1, 2, 3]):
+            tc.removeTab(idx)
+
+        # 重命名保留的三个标签 (0=tabFile, 1=tabResults, 2=tabCharts)
+        tc.setTabText(0, self.tr("📐 处理设置"))
+        tc.setTabText(1, self.tr("📊 计算结果"))
+        tc.setTabText(2, self.tr("📈 图表查看"))
 
     def _show_system_settings(self):
         from ui.dialogs import SystemSettingsDialog
@@ -712,50 +676,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         dlg = SystemSettingsDialog(self)
         dlg.scroll_to_ai_settings()
         dlg.exec()
-
-    def _show_data_source_dialog(self):
-        from ui.dialogs import DataSourceDialog
-        DataSourceDialog(self).exec()
-
-    def _show_calc_params_dialog(self):
-        from ui.dialogs import CalcParamsDialog
-        dlg = CalcParamsDialog(self)
-        tp = self._get_template_params()
-        if tp:
-            dlg.set_template_params(tp)
-        # 从模板自动配置 Gain/AR 角度
-        template_path = self.ui.editTemplatePath.text().strip()
-        if template_path and Path(template_path).exists():
-            try:
-                from src.excel_reader import read_template
-                from src.lag_config import LagConfig
-                sheets = read_template(template_path)
-                headers = []
-                for si in sheets:
-                    for c in si.columns:
-                        headers.append(c.raw_header)
-                lag_cfg = LagConfig.from_template_headers(headers)
-                if not lag_cfg.is_empty():
-                    dlg.set_angle_config(lag_cfg, is_ar=False)
-                ar_cfg = LagConfig.from_ar_headers(headers)
-                if not ar_cfg.is_empty():
-                    dlg.set_angle_config(ar_cfg, is_ar=True)
-            except Exception:
-                pass
-
-        # LLM 辅助兜底: 模板识别检测到 <2 参数类型时调用 LLM
-        if template_path and Path(template_path).exists() and len(tp) < 2:
-            from src.llm_assist import LLMAssist
-            llm_params = LLMAssist.suggest_template_params(
-                template_path, logger=self._log
-            )
-            if llm_params:
-                dlg.set_template_params(tp | llm_params)
-                self._log(
-                    f"🤖 LLM 辅助: 补充识别到 {len(llm_params)} 个参数"
-                )
-        if dlg.exec():
-            self._log_current_params()
 
     def _get_template_params(self) -> set:
         """读取模板，提取所有 Sheet 的列类型集合（结果缓存，仅路径变化时重读）。"""
@@ -798,31 +718,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             return result
         except Exception:
             return set()
-
-    def _show_plot_config_dialog(self):
-        try:
-            from ui.dialogs import PlotConfigDialog
-            from src.chart_config import ChartConfig
-
-            # 首次打开时，从模板自动检测图形需求
-            if self._chart_config_required is None:
-                tp = self.ui.editTemplatePath.text().strip()
-                if tp and Path(tp).exists():
-                    try:
-                        self._chart_config_required = ChartConfig.from_template(tp)
-                    except Exception:
-                        self._chart_config_required = ChartConfig()
-                else:
-                    self._chart_config_required = ChartConfig()
-            if self._chart_config_extra is None:
-                self._chart_config_extra = ChartConfig()
-
-            dlg = PlotConfigDialog(self)
-            dlg.exec()
-        except Exception as e:
-            self._log(f"⚠ 图形配置对话框打开失败: {e}")
-            QMessageBox.warning(self, self.tr("错误"),
-                self.tr(f"图形配置对话框无法打开:\n{e}"))
 
     def window_title(self) -> str:
         """返回窗口标题，用于窗口菜单列表。"""
@@ -1389,28 +1284,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._log(f"LLM 匹配建议失败: {e}")
 
     def _build_sheet_mode_map(self, datasource_map: dict) -> dict:
-        """从 _file_entries 和 _match_table 构建 sheet→test_mode 映射。
-
-        遍历匹配表，查找每个已匹配文件的 test_mode 并关联到工作表名。
-        未映射到的 sheet 使用当前 _test_mode 作为默认值。
-        当 _worksheet_naming_mode==1 时，用数据源名（extract_key）做映射键。
-        """
-        from src.sheet_file_matcher import extract_key, sanitize_sheet_name
-        sheet_mode_map: Dict[str, int] = {}
-        file_mode_lookup = {e.path: e.test_mode for e in self._file_entries}
-        use_file_names = self._worksheet_naming_mode == 1
-        for row in range(self._match_table.rowCount()):
-            sn = self._match_table.item(row, 0)
-            combo = self._match_table.cellWidget(row, 1)
-            if sn and combo:
-                fp = combo.currentData() or ""
-                if fp and fp in file_mode_lookup:
-                    key = sanitize_sheet_name(extract_key(fp)) if use_file_names else sanitize_sheet_name(sn.text())
-                    sheet_mode_map[key] = file_mode_lookup[fp]
-        for sn in datasource_map:
-            if sn not in sheet_mode_map:
-                sheet_mode_map[sn] = self._test_mode
-        return sheet_mode_map
+        """委托到 FileSettingsPage.build_sheet_mode_map。"""
+        return self._file_settings_page.build_sheet_mode_map(datasource_map)
 
 
 
@@ -1440,34 +1315,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
     def _connect_signals(self):
         """连接所有信号/槽。"""
-        # 主题切换
-
         # 文件浏览
         self.ui.btnBrowseTemplate.clicked.connect(self._on_browse_template)
         self.ui.btnBrowseOutput.clicked.connect(self._on_browse_output)
         self.ui.btnBrowseFullReport.clicked.connect(self._on_browse_full_report)
 
-        # LAG 快捷按钮
-        for angle, btn_attr in self._QUICK_ANGLES.items():
-            btn = getattr(self.ui, btn_attr)
-            btn.clicked.connect(lambda checked, a=angle: self._toggle_quick_angle(a))
-        self.ui.btnAddCustomAngle.clicked.connect(self._add_custom_angle)
-
-        # LAG 步进
-        self.ui.btnStepGenerate.clicked.connect(self._on_step_generate)
-        # LAG 范围
-        self.ui.btnAddRange.clicked.connect(self._on_add_range)
-        # LAG 操作按钮
-        self.ui.btnLoadFromTemplate.clicked.connect(self._on_load_from_template)
-        self.ui.btnClearConfig.clicked.connect(self._on_clear_config)
-        self.ui.btnSavePreset.clicked.connect(self._on_save_preset)
-        self.ui.btnLoadPreset.clicked.connect(self._on_load_preset)
-
         # 运行
         self.ui.btnStart.clicked.connect(self._on_start)
         self.ui.btnStop.clicked.connect(self._on_stop)
-
-        # 语言切换
 
     # ==================================================================
     # 文件浏览
@@ -1884,10 +1739,15 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 self.tr("请先通过「设置→数据源配置」添加数据文件并执行自动匹配。"))
             return
 
-        # 自动触发匹配
-        if self._match_table.rowCount() == 0 and self._data_file_paths:
+        # 自动触发匹配 (从 FileSettingsPage 读取)
+        file_page = getattr(self, '_file_settings_page', None)
+        match_table = file_page._match_table if file_page else getattr(self, '_match_table', None)
+        if match_table is not None and match_table.rowCount() == 0 and self._data_file_paths:
             try:
-                self._on_auto_match()
+                if file_page:
+                    file_page._on_auto_match()
+                else:
+                    self._on_auto_match()
             except Exception as e:
                 self._log(f"⚠ 自动匹配失败: {e}")
                 QMessageBox.warning(self, self.tr("自动匹配失败"),
@@ -1951,17 +1811,28 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 为什么要节流: 每次 processEvents 会刷新整个 Qt 事件循环,
         # 在大量文件(>200)时每文件都调用会导致 UI 卡死. 每 20 个文件刷新一次
         # 在响应性和性能之间取得了平衡.
-        total_files = max(self._match_table.rowCount(), 1)
+        file_page = getattr(self, '_file_settings_page', None)
+        match_table = file_page._match_table if file_page else getattr(self, '_match_table', None)
+        total_files = max(match_table.rowCount() if match_table else 0, 1)
         self.ui.progressBar.setMaximum(total_files)
         self.ui.progressBar.setValue(0)
         self.ui.lblProgressMsg.setText(self.tr("正在加载数据文件..."))
-        datasource_map = self._build_datasource_map(
-            progress_callback=lambda c, t, m: (
-                self.ui.progressBar.setValue(c),
-                self.ui.lblProgressMsg.setText(m),
-                QApplication.processEvents() if c % 20 == 0 else None
+        if file_page:
+            datasource_map = file_page.build_datasource_map(
+                progress_callback=lambda c, t, m: (
+                    self.ui.progressBar.setValue(c),
+                    self.ui.lblProgressMsg.setText(m),
+                    QApplication.processEvents() if c % 20 == 0 else None
+                )
             )
-        )
+        else:
+            datasource_map = self._build_datasource_map(
+                progress_callback=lambda c, t, m: (
+                    self.ui.progressBar.setValue(c),
+                    self.ui.lblProgressMsg.setText(m),
+                    QApplication.processEvents() if c % 20 == 0 else None
+                )
+            )
         if not datasource_map:
             QMessageBox.warning(self, self.tr("警告"),
                 self.tr("没有有效的工作表↔文件匹配，请先执行自动匹配。"))
@@ -1972,7 +1843,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._log(f"  {sn} ← {type(ds).__name__}")
 
         # 构建 sheet → test_mode 映射 (混合批处理)
-        sheet_mode_map: Dict[str, int] = self._build_sheet_mode_map(datasource_map)
+        if file_page:
+            sheet_mode_map: Dict[str, int] = file_page.build_sheet_mode_map(datasource_map)
+        else:
+            sheet_mode_map: Dict[str, int] = self._build_sheet_mode_map(datasource_map)
 
         self.ui.logOutput.clear()
         self.ui.progressBar.setValue(0)
@@ -1987,10 +1861,36 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             xtr = self._chart_config_extra or ChartConfig()
             full_chart_config = req.merge(xtr)
         # GUI checkbox 状态覆盖 ChartConfig 默认 (用户意图优先)
-        full_chart_config.chart_eff_freq = self._check_chart_eff.isChecked()
-        full_chart_config.chart_gain_freq = self._check_chart_lag.isChecked()
+        if file_page:
+            chart_flags = file_page.get_lag_checkboxes()
+            full_chart_config.chart_eff_freq = chart_flags["chart_eff"]
+            full_chart_config.chart_gain_freq = chart_flags["chart_lag"]
         png_dir = plot_config.save_png_folder
         full_chart_config.save_png_folder = png_dir
+
+        # 从天线参数页面读取当前参数（Step 5: 替代旧 widget 读取）
+        ant_page = getattr(self, '_antenna_params_page', None)
+        if ant_page:
+            params = ant_page.get_current_params()
+            extrapolate_theta = params["extrapolate"]
+            freq_source = params["freq_source"] or "datasource"
+            trim_start = params["trim_start"]
+            trim_end = params["trim_end"]
+            robust_peak = params["robust_peak"]
+        else:
+            extrapolate_theta = self._check_extrapolate.isChecked()
+            freq_source = self._cmb_freq_source.currentData() or "datasource"
+            trim_start = self._spin_trim_start.value()
+            trim_end = self._spin_trim_end.value()
+            robust_peak = self._check_robust_peak.isChecked()
+
+        # 多步进参数（Step 5: 委托到 file_page 或保留后备）
+        if file_page and hasattr(file_page, '_grp_step'):
+            step_values = file_page._get_selected_steps() if hasattr(file_page, '_get_selected_steps') else []
+            skip_original = file_page._chk_skip_original.isChecked() if hasattr(file_page, '_chk_skip_original') else False
+        else:
+            step_values = self._get_selected_steps() if hasattr(self, '_get_selected_steps') else []
+            skip_original = self._chk_skip_original.isChecked() if hasattr(self, '_chk_skip_original') else False
 
         self._worker = ProcessingWorker(
             datasource_map=datasource_map,
@@ -2000,11 +1900,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             lag_config=self._lag_config,
             plot_config=plot_config,
             full_report_path=full_report_path,
-            extrapolate_theta=self._check_extrapolate.isChecked(),
-            freq_source=self._cmb_freq_source.currentData() or "datasource",
-            trim_start=self._spin_trim_start.value(),
-            trim_end=self._spin_trim_end.value(),
-            robust_peak=self._check_robust_peak.isChecked(),
+            extrapolate_theta=extrapolate_theta,
+            freq_source=freq_source,
+            trim_start=trim_start,
+            trim_end=trim_end,
+            robust_peak=robust_peak,
             extra_params=self._extra_params if self._extra_params else None,
             nh_custom_angles=self._nh_custom_angles if self._nh_custom_angles else None,
             worksheet_naming_mode=self._worksheet_naming_mode,
@@ -2012,8 +1912,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             ar_lag_config=self._ar_lag_config if hasattr(self, '_ar_lag_config') and not self._ar_lag_config.is_empty() else None,
             ar_output_db=self._ar_output_db,
             # 多步进参数
-            step_values=self._get_selected_steps() if hasattr(self, '_get_selected_steps') else [],
-            skip_original=self._chk_skip_original.isChecked() if hasattr(self, '_chk_skip_original') else False,
+            step_values=step_values,
+            skip_original=skip_original,
         )
         self._worker.moveToThread(self._thread)
 
@@ -2312,16 +2212,30 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             else:
                 lines.append("  AR 角度: (未设置)")
 
-        # 频点
-        freq_text = self._cmb_freq_source.currentText() if hasattr(self, '_cmb_freq_source') and self._cmb_freq_source else "—"
-        trim = f"去除: 前{self._spin_trim_start.value()} / 后{self._spin_trim_end.value()}"
+        # 频点 & 算法 — 优先从天线参数页面读取
+        ant_page = getattr(self, '_antenna_params_page', None)
+        if ant_page:
+            params = ant_page.get_current_params()
+            freq_src = params["freq_source"]
+            freq_text = "数据源" if freq_src == "datasource" else "模板"
+            trim_start = params["trim_start"]
+            trim_end = params["trim_end"]
+            extrap = params["extrapolate"]
+            robust = params["robust_peak"]
+        else:
+            freq_text = self._cmb_freq_source.currentText() if hasattr(self, '_cmb_freq_source') and self._cmb_freq_source else "—"
+            trim_start = self._spin_trim_start.value() if hasattr(self, '_spin_trim_start') else 0
+            trim_end = self._spin_trim_end.value() if hasattr(self, '_spin_trim_end') else 0
+            extrap = hasattr(self, '_check_extrapolate') and self._check_extrapolate.isChecked()
+            robust = hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked()
+        trim = f"去除: 前{trim_start} / 后{trim_end}"
         lines.append(f"  频点: {freq_text} | {trim}")
 
         # 算法
         algo = []
-        if hasattr(self, '_check_extrapolate') and self._check_extrapolate.isChecked():
+        if extrap:
             algo.append("Theta 外推 180°")
-        if hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked():
+        if robust:
             algo.append("Robust peak")
         lines.append(f"  算法: {', '.join(algo) if algo else '(默认)'}")
 
@@ -2335,12 +2249,17 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.logOutput.setTextCursor(cursor)
 
     def _update_status(self):
-        """更新状态栏。"""
-        singles = len(self._lag_config.singles_sorted)
-        ranges = len(self._lag_config.ranges_sorted)
+        """更新状态栏 — 显示当前 Gain 和 AR 角度配置概要。"""
+        gain_singles = len(self._lag_config.singles_sorted)
+        gain_ranges = len(self._lag_config.ranges_sorted)
+        ar_cfg = getattr(self, '_ar_lag_config', None)
+        ar_singles = len(ar_cfg.singles_sorted) if ar_cfg else 0
+        ar_ranges = len(ar_cfg.ranges_sorted) if ar_cfg else 0
+        parts = [f"Gain: {gain_singles}单+{gain_ranges}范围"]
+        if ar_singles or ar_ranges:
+            parts.append(f"AR: {ar_singles}单+{ar_ranges}范围")
         self.statusBar().showMessage(
-            self.tr(f"LAG: {singles} 单角度 + {ranges} 范围 | 就绪")
-        )
+            self.tr(" | ".join(parts) + " | 就绪"))
 
     # ==================================================================
     # 拖拽文件 (优先级2)
