@@ -697,7 +697,7 @@ class GraphViewer(QWidget):
             max_n = rows * cols
             lbl_3d_count.setText(f"已选 {n} 项 / 布局可显示 {max_n} 项  (超出部分不显示)")
             if n > max_n:
-                lbl_3d_count.setStyleSheet("font-weight: bold;")
+                lbl_3d_count.setStyleSheet("font-weight: bold; color: #e67e22;")
             else:
                 lbl_3d_count.setStyleSheet("")
 

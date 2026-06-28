@@ -317,12 +317,14 @@ class ProcessingWorker(QObject):
             # 创建差值 sheet
             diff_name = f"{base}_diff"[:31]
             dws = wb.create_sheet(title=diff_name)
-            # 表头: 频率 | 参数_原始 | 参数_步进N | 差值_N
+            # 表头: 频率 | 参数_步进N | 差值_N (与数据写入顺序一致: 外层=步进, 内层=参数)
             col = 1
             dws.cell(1, col, "Frequency (MHz)")
             col += 1
             for suffix_key in sorted(suffixed.keys()):
-                label = "原始" if suffix_key == "" else f"步进{int(float(suffix_key.replace('_step','')))}°"
+                if suffix_key == "":
+                    continue  # 跳过原始, 只写步进列 (与数据写入对齐)
+                label = f"步进{int(float(suffix_key.replace('_step','')))}°"
                 for hi, h in enumerate(headers):
                     if h and h.lower() not in ("frequency", "frequency (mhz)", "", "freq"):
                         dws.cell(1, col, f"{h} ({label})")
@@ -474,18 +476,18 @@ class ProcessingWorker(QObject):
         pt_ws.add_pivot(pt)
 
         # 5. 提示文字
-        pt_ws.cell(1, 1, "📊 交互式差值图表 — 使用下方 PivotTable 下拉筛选 参数/步进角度")
-        pt_ws.cell(2, 1, "💡 右键 PivotTable → '插入切片器' 可添加视觉切片按钮")
+        pt_ws.cell(1, 1, "📊 交互式差值分析 — PivotTable 支持 参数/步进角度 下拉筛选")
+        pt_ws.cell(2, 1, "💡 右键 PivotTable → '插入切片器' 添加视觉切片按钮 | 下方图表为全量数据概览")
         from openpyxl.styles import Font, Alignment
         for r in (1, 2):
             cell = pt_ws.cell(r, 1)
             cell.font = Font(bold=True, color="4472C4")
             cell.alignment = Alignment(horizontal='left')
 
-        # 6. ScatterChart 引用 PivotTable 数据区域
-        # PivotTable 输出在 A4:B{4 + n_freq}，通过行列引用实现联动更新
+        # 6. ScatterChart 引用隐藏 flat data (Frequency vs DiffValue)
+        # openpyxl 不支持 PivotChart 联动，图表展示全量差值概览
         chart = ScatterChart()
-        chart.title = "步进差值 vs Frequency（使用上方 PivotTable 下拉筛选）"
+        chart.title = "步进差值 vs Frequency（全量概览 — 使用 PivotTable 筛选分析）"
         chart.style = 2
         chart.width = 18
         chart.height = 11
@@ -494,14 +496,14 @@ class ProcessingWorker(QObject):
         chart.y_axis.numFmt = '0.000'
         chart.legend.position = 'b'
 
-        # Series: Y=DiffValue (col 2), X=Frequency (col 1)
-        x_vals = Reference(pt_ws, min_col=1, min_row=5, max_row=4 + n_data)
-        y_vals = Reference(pt_ws, min_col=2, min_row=5, max_row=4 + n_data)
+        # X=Frequency(col A), Y=DiffValue(col D) from hidden flat data sheet
+        x_vals = Reference(flat_ws, min_col=1, min_row=2, max_row=n_data + 1)
+        y_vals = Reference(flat_ws, min_col=4, min_row=2, max_row=n_data + 1)
         series = Series(y_vals, x_vals, title="差值")
         series.marker.symbol = 'circle'
         series.marker.size = 5
         series.graphicalProperties.line.width = 14000
-        series.smooth = True
+        series.smooth = False  # 全量数据点不加平滑，避免误导
         chart.series.append(series)
 
         chart_anchor_row = 4 + n_data + 3
