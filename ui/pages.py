@@ -359,7 +359,7 @@ class FileSettingsPage(QWidget):
 
     def _on_preview_report(self):
         """打开模板列预览对话框 — 按列显示、参数修正、另存预设。"""
-        tpl_path = self._template_path or (self.ui.editTemplatePath.text().strip() if hasattr(self, 'ui') else "")
+        tpl_path = self._template_path
         if not tpl_path:
             QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择模板文件。"))
             return
@@ -1324,6 +1324,18 @@ class AntennaParamsPage(QWidget):
                 btn.clicked.connect(lambda: self._show_angle_popup("ar"))
                 gl.addWidget(btn)
             vbox.addWidget(grp)
+        # 额外参数（full_report 专用，不自动选中）
+        extra_grp = QGroupBox(self.tr("额外参数（full_report）"))
+        extra_gl = QVBoxLayout(extra_grp)
+        extra_gl.setSpacing(2)
+        for grp_name, items in params:
+            for key, label in items:
+                cb = QCheckBox(label)
+                cb.setChecked(False)  # 不自动选中
+                cb.toggled.connect(lambda checked, k=key: self._sync_to_mw())
+                extra_gl.addWidget(cb)
+                self._right_checkboxes[key] = cb
+        vbox.addWidget(extra_grp)
         vbox.addStretch()
 
         self._left_scroll.setWidget(content)
@@ -1429,7 +1441,7 @@ class AntennaParamsPage(QWidget):
         btn_gen = QPushButton(self.tr("生成"))
         btn_gen.clicked.connect(lambda: (
             [_angles.append(round(float(a), 6))
-             for a in np.arange(spin_start.value(), spin_end.value() + 1, spin_step.value())
+             for a in np.linspace(spin_start.value(), spin_end.value() , int((spin_end.value() -spin_start.value())/spin_step.value()+1))
              if round(float(a), 6) not in _angles],
             _refresh_display()
         ))
@@ -2115,7 +2127,7 @@ class ChartSettingsPage(QWidget):
         btn_gen = QPushButton(self.tr("生成"))
         btn_gen.clicked.connect(lambda: (
             [_singles.append(round(float(a), 6))
-             for a in np.arange(spin_start.value(), spin_end.value() + 1, spin_step.value())
+             for a in np.linspace(spin_start.value(), spin_end.value() , int((spin_end.value() -spin_start.value())/spin_step.value()+1))
              if round(float(a), 6) not in _singles],
             _refresh_display()
         ))

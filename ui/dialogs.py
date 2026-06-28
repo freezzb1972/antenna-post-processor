@@ -931,7 +931,7 @@ class CalcParamsDialog(QDialog):
         spin_step = QDoubleSpinBox(); spin_step.setRange(1, 90); spin_step.setValue(10)
         btn_gen = QPushButton("生成")
         btn_gen.clicked.connect(lambda: (
-            [_singles.append(round(float(a), 6)) for a in np.arange(spin_start.value(), spin_end.value()+1, spin_step.value())
+            [_singles.append(round(float(a), 6)) for a in np.linspace(spin_start.value(), spin_end.value(), int((spin_end.value()-spin_start.value())/spin_step.value()+1))
              if round(float(a), 6) not in _singles],
             _refresh_display()
         ))
@@ -1076,7 +1076,7 @@ class CalcParamsDialog(QDialog):
         spin_step = QDoubleSpinBox(); spin_step.setRange(1, 45); spin_step.setValue(15)
         btn_gen = QPushButton("生成")
         btn_gen.clicked.connect(lambda: (
-            [_angles.append(round(float(a), 6)) for a in np.arange(spin_start.value(), spin_end.value()+1, spin_step.value())
+            [_angles.append(round(float(a), 6)) for a in np.linspace(spin_start.value(), spin_end.value(), int((spin_end.value()-spin_start.value())/spin_step.value()+1))
              if round(float(a), 6) not in _angles],
             _refresh_display()
         ))
@@ -1890,7 +1890,7 @@ class PlotConfigDialog(QDialog):
         import numpy as np
         btn_gen = QPushButton("生成")
         btn_gen.clicked.connect(lambda: (
-            [_singles.append(round(float(a), 6)) for a in np.arange(spin_start.value(), spin_end.value()+1, spin_step.value())
+            [_singles.append(round(float(a), 6)) for a in np.linspace(spin_start.value(), spin_end.value(), int((spin_end.value()-spin_start.value())/spin_step.value()+1))
              if round(float(a), 6) not in _singles],
             _refresh_display()
         ))
@@ -3662,6 +3662,11 @@ class RepairDialog(QDialog):
         out_row.addWidget(btn_out)
         layout.addLayout(out_row)
 
+        # ── 状态信息（standalone 模式反馈） ──
+        self._lbl_status = QLabel("")
+        self._lbl_status.setStyleSheet("color: #666; padding: 2px 0;")
+        layout.addWidget(self._lbl_status)
+
         # ── 按钮 ──
         brow = QHBoxLayout()
         brow.addStretch()
@@ -3793,8 +3798,10 @@ class RepairDialog(QDialog):
         parent_mw = self.parent()
         if hasattr(parent_mw, '_log'):
             parent_mw._log(msg)
-        else:
-            print(msg)
+        if hasattr(self, '_lbl_status') and self._lbl_status:
+            self._lbl_status.setText(msg)
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()
 
 
 
