@@ -270,7 +270,7 @@ class FileSettingsPage(QWidget):
         right_layout.addWidget(self._output_group)
 
         self._check_save_task = QCheckBox(
-            self.tr("☑ 保存任务包 (.ant) — 下次双击秒开，不重算"))
+            self.tr("保存任务包 (.ant) — 下次双击秒开，不重算"))
         self._check_save_task.setChecked(True)
         self._check_save_task.setToolTip(
             self.tr("保存为 .ant 任务包后，下次双击即可直接查看结果，无需重新计算。"))
@@ -1177,13 +1177,13 @@ class AntennaParamsPage(QWidget):
             self.tr("☐ 跳过原始步进（仅计算上述选中的步进值）"))
         sl.addWidget(self._chk_skip_original)
         self._chk_gen_diff = QCheckBox(
-            self.tr("☑ 生成步进差值比较表"))
+            self.tr("生成步进差值比较表"))
         self._chk_gen_diff.setChecked(True)
         self._chk_gen_diff.setToolTip(
             self.tr("勾选后将为每个参数生成步进结果与原始结果的差值表"))
         sl.addWidget(self._chk_gen_diff)
         self._chk_gen_diff_chart = QCheckBox(
-            self.tr("☑ 生成步进差值图表"))
+            self.tr("生成步进差值图表"))
         self._chk_gen_diff_chart.setChecked(True)
         self._chk_gen_diff_chart.setToolTip(
             self.tr("勾选后生成交互式差值散点图（支持按参数/步进角度筛选，可在 Excel 中右键 PivotTable 插入切片器）"))
@@ -1932,22 +1932,23 @@ class ChartSettingsPage(QWidget):
             content_layout.setSpacing(4)
             outer_layout.addWidget(content_widget)
 
-            # 全选/取消全选
+            # 全选/取消全选 — 报告需要
             btn_row = QHBoxLayout()
             btn_row.setSpacing(6)
+            lbl_req = QLabel(self.tr("报告:"))
+            lbl_req.setStyleSheet("color: #888; font-weight: normal;")
+            btn_row.addWidget(lbl_req)
             btn_select_all = QPushButton(self.tr("全选"))
             btn_select_all.setFixedWidth(60)
             btn_deselect_all = QPushButton(self.tr("取消全选"))
             btn_deselect_all.setFixedWidth(72)
             btn_select_all.clicked.connect(
                 lambda checked, ks=keys: (
-                    [self._chart_required[k].setChecked(True) for k in ks if k in self._chart_required] or
-                    [self._chart_extra[k].setChecked(True) for k in ks if k in self._chart_extra]
+                    [self._chart_required[k].setChecked(True) for k in ks if k in self._chart_required]
                 ))
             btn_deselect_all.clicked.connect(
                 lambda checked, ks=keys: (
-                    [self._chart_required[k].setChecked(False) for k in ks if k in self._chart_required] or
-                    [self._chart_extra[k].setChecked(False) for k in ks if k in self._chart_extra]
+                    [self._chart_required[k].setChecked(False) for k in ks if k in self._chart_required]
                 ))
             btn_row.addWidget(btn_select_all)
             btn_row.addWidget(btn_deselect_all)
@@ -1987,6 +1988,27 @@ class ChartSettingsPage(QWidget):
             right_box = QGroupBox(self.tr("额外 (full_report)"))
             right_layout = QVBoxLayout(right_box)
             right_layout.setSpacing(3)
+
+            # full_report 独立全选/取消全选按钮
+            full_btn_row = QHBoxLayout()
+            full_btn_row.setSpacing(6)
+            full_select_all = QPushButton(self.tr("全选"))
+            full_select_all.setFixedWidth(60)
+            full_deselect_all = QPushButton(self.tr("取消全选"))
+            full_deselect_all.setFixedWidth(72)
+            full_select_all.clicked.connect(
+                lambda checked, ks=keys: (
+                    [self._chart_extra[k].setChecked(True) for k in ks if k in self._chart_extra]
+                ))
+            full_deselect_all.clicked.connect(
+                lambda checked, ks=keys: (
+                    [self._chart_extra[k].setChecked(False) for k in ks if k in self._chart_extra]
+                ))
+            full_btn_row.addWidget(full_select_all)
+            full_btn_row.addWidget(full_deselect_all)
+            full_btn_row.addStretch()
+            right_layout.addLayout(full_btn_row)
+
             for key in keys:
                 row = QHBoxLayout()
                 cb = QCheckBox(labels.get(key, key))

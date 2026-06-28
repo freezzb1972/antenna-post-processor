@@ -494,16 +494,30 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         progress_row.addWidget(self.ui.lblProgressMsg)
         exec_layout.addLayout(progress_row)
 
-        # 执行栏水平分割：左=天线参数显示 | 右=日志
+        # 执行栏水平分割：左=天线参数显示 + 按钮 | 右=日志
         h_splitter = QSplitter(Qt.Horizontal)
 
-        # 左侧天线参数显示面板
+        # 左侧面板：天线参数 + 按钮行（按钮对齐分栏线左边缘）
+        left_panel = QWidget()
+        left_layout = QVBoxLayout()
+        left_layout.setContentsMargins(0, 0, 0, 0)
+
         self._params_display = QTextEdit()
         self._params_display.setReadOnly(True)
         self._params_display.setStyleSheet(
             "background: rgba(0,0,0,0.03); border: none; padding: 4px; font-size: 12px;")
         self._params_display.setMinimumWidth(250)
-        h_splitter.addWidget(self._params_display)
+        left_layout.addWidget(self._params_display, 1)
+
+        # 按钮行（在左侧面板底部，与分栏线左边缘对齐）
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(self.ui.btnStart)
+        btn_row.addWidget(self.ui.btnStop)
+        btn_row.addStretch()
+        left_layout.addLayout(btn_row)
+
+        left_panel.setLayout(left_layout)
+        h_splitter.addWidget(left_panel)
 
         # 右侧日志
         self.ui.logOutput.setParent(exec_bar)
@@ -511,13 +525,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         h_splitter.setSizes([300, 500])
         exec_layout.addWidget(h_splitter, 1)
-
-        # 按钮行（左对齐）
-        btn_row = QHBoxLayout()
-        btn_row.addWidget(self.ui.btnStart)
-        btn_row.addWidget(self.ui.btnStop)
-        btn_row.addStretch()
-        exec_layout.addLayout(btn_row)
 
         # 用 QSplitter 包裹 tabConfig + exec_bar，允许手动调整比例
         v_splitter = QSplitter(Qt.Vertical)

@@ -17,6 +17,9 @@ class ThemeManager:
     ALL_THEMES = [
         ("dark_teal",       "暗色 青绿 ★"),
         ("dark_blue",       "暗色 蓝色"),
+        ("dark_amber",      "暗色 琥珀"),
+        ("dark_gruvbox",    "暗色 复古暖"),
+        ("dark_mono",       "暗色 白框白字"),
         ("light_blue",      "亮色 蓝色"),
         ("light_teal",      "亮色 青绿"),
     ]
@@ -28,6 +31,15 @@ class ThemeManager:
     def current_theme(cls) -> str:
         return cls._current_theme
 
+    # 暗色主题强调色映射 — 用于 QCheckBox/QRadioButton 指示器着色
+    _ACCENT_COLORS = {
+        "dark_teal": "#2dd4bf",
+        "dark_blue": "#60a5fa",
+        "dark_amber": "#f59e0b",
+        "dark_gruvbox": "#d79921",
+        "dark_mono": "#ffffff",
+    }
+
     @classmethod
     def apply(cls, theme_name: str = DEFAULT_THEME):
         app = QApplication.instance()
@@ -37,7 +49,32 @@ class ThemeManager:
         app.setStyle(QStyleFactory.create("Fusion"))
         palette = cls._make_palette(theme_name)
         app.setPalette(palette)
-        app.setStyleSheet("")  # 清除旧 QSS
+
+        # 暗色主题: 为复选框/单选框指示器注入可见边框 + 勾选色
+        if theme_name.startswith("dark"):
+            accent = cls._ACCENT_COLORS.get(theme_name, "#2dd4bf")
+            app.setStyleSheet(f"""
+                QCheckBox::indicator, QRadioButton::indicator {{
+                    border: 1px solid #666;
+                    background: #2a2a2a;
+                    width: 14px; height: 14px;
+                    border-radius: 2px;
+                }}
+                QCheckBox::indicator:checked, QRadioButton::indicator:checked {{
+                    background: {accent};
+                    border-color: {accent};
+                }}
+                QGroupBox::indicator {{
+                    width: 14px; height: 14px;
+                }}
+                QGroupBox::indicator:checked {{
+                    background: {accent};
+                    border-color: {accent};
+                }}
+            """)
+        else:
+            app.setStyleSheet("")  # 亮色主题使用系统原生指示器
+
         cls._current_theme = theme_name
 
     @classmethod
@@ -56,6 +93,24 @@ class ThemeManager:
             base = QColor("#16162a"); sel = QColor("#60a5fa")
             btn = QColor("#2a2a4a")
             return cls._build(p, bg, fg, base, sel, btn, "#9090c0")
+
+        elif theme == "dark_amber":
+            bg = QColor("#1e1e1e"); fg = QColor("#e8e0d0")
+            base = QColor("#181818"); sel = QColor("#f59e0b")
+            btn = QColor("#2d2d2d")
+            return cls._build(p, bg, fg, base, sel, btn, "#887766")
+
+        elif theme == "dark_gruvbox":
+            bg = QColor("#282828"); fg = QColor("#ebdbb2")
+            base = QColor("#1d2021"); sel = QColor("#d79921")
+            btn = QColor("#3c3836")
+            return cls._build(p, bg, fg, base, sel, btn, "#a89984")
+
+        elif theme == "dark_mono":
+            bg = QColor("#1a1a1a"); fg = QColor("#ffffff")
+            base = QColor("#111111"); sel = QColor("#ffffff")
+            btn = QColor("#2a2a2a")
+            return cls._build(p, bg, fg, base, sel, btn, "#888888")
 
         elif theme == "light_blue":
             bg = QColor("#f8f9fa"); fg = QColor("#1a1a2e")
