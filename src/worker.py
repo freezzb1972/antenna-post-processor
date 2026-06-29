@@ -137,9 +137,9 @@ class ProcessingWorker(QObject):
             )
 
             if self.gen_diff_chart and not self.gen_diff:
-            raise ValueError("gen_diff_chart requires gen_diff")
+                raise ValueError("gen_diff_chart requires gen_diff")
 
-        # ── 多步进模式 ──
+            # ── 多步进模式 ──
             if self.step_values:
                 # 获取基础 DataSource（单文件或 map 首项）
                 base = self.datasource
@@ -397,7 +397,7 @@ class ProcessingWorker(QObject):
                             if freq_val is not None:
                                 all_flat_rows.append((freq_val, h, step_label, diff))
                             col += 2
-            self.log.emit(f"  📊 差值表已生成: {diff_name}")
+            self.log.emit(f"  📊 差值表已生成: {dws.title}")
         # ── 交互式 PivotChart + 切片器（替代每参数静态图表）──
         if all_flat_rows and self.gen_diff_chart:
             # 内存保护: 超大数据集跳过 PivotChart，直接回退静态图表
@@ -487,7 +487,7 @@ class ProcessingWorker(QObject):
         pt_ws.add_pivot(pt)
 
         pt_ws.cell(1, 1, "📊 交互式差值分析 — PivotTable 支持 参数/步进角度 下拉筛选")
-        pt_ws.cell(2, 1, "💡 右键 PivotTable → "插入切片器" 添加视觉切片按钮 | 下方图表为全量数据概览")
+        pt_ws.cell(2, 1, '💡 右键 PivotTable → "插入切片器" 添加视觉切片按钮 | 下方图表为全量数据概览')
         for r in (1, 2):
             cell = pt_ws.cell(r, 1)
             cell.font = Font(bold=True, color="4472C4")
@@ -517,7 +517,7 @@ class ProcessingWorker(QObject):
 
     def _add_static_diff_charts_fallback(self, wb, sheets_by_base):
         """回退方案: 为每个参数生成独立静态图表 (旧逻辑)。"""
-for base, suffixed in sheets_by_base.items():
+        for base, suffixed in sheets_by_base.items():
             orig_ws = suffixed.get("")
             if orig_ws is None or len(suffixed) < 2:
                 continue
