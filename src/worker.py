@@ -20,6 +20,23 @@ from openpyxl.utils import get_column_letter
 from .datasource import DataSource, ResampledDataSource
 
 
+# ── 工具 ──────────────────────────────────────────────────────
+
+def _safe_create_sheet(wb, base_name, suffix="", max_len=31):
+    """创建工作表: 自动截断到 Excel 31字符限制，冲突时加 _01/_02 编号。"""
+    max_base = max_len - len(suffix)
+    safe = base_name[:max_base] if len(base_name) > max_base else base_name
+    name = f"{safe}{suffix}"
+    existing = {ws.title for ws in wb.worksheets}
+    if name not in existing:
+        return wb.create_sheet(title=name)
+    for i in range(1, 100):
+        alt = f"{safe[:max_base - 3]}_{i:02d}{suffix}"
+        if alt not in existing:
+            return wb.create_sheet(title=alt)
+    raise RuntimeError(f"无法为 '{base_name}' 生成唯一工作表名")
+
+
 class ProcessingWorker(QObject):
     """后台天线参数处理 Worker。"""
 
@@ -118,10 +135,6 @@ class ProcessingWorker(QObject):
                 progress_callback=self._on_progress,
                 log_callback=self._on_log,
             )
-
-            # ── 差值图表依赖差值表，若只勾图表未勾表则提醒 ──
-            if self.gen_diff_chart and not self.gen_diff:
-                self.log.emit("⚠ 差值图表需要差值表数据，请同时勾选「生成步进差值比较表」")
 
             # ── 多步进模式 ──
             if self.step_values:
@@ -256,7 +269,7 @@ class ProcessingWorker(QObject):
                 twb = openpyxl.load_workbook(tmp_out, data_only=True)
                 for ws in twb.worksheets:
                     new_name = (ws.title + suffix)[:31]
-                    nws = wb.create_sheet(title=new_name)
+                    nws = _safe_create_sheet(wb, ws.title, suffix)
                     for row in ws.iter_rows():
                         for cell in row:
                             ncell = nws.cell(row=cell.row, column=cell.column)
@@ -321,19 +334,7 @@ class ProcessingWorker(QObject):
             headers = [str(c or "") for c in rows[0]]
             data_rows = rows[1:]
             # 创建差值 sheet
-            # 安全截断：31字符限制下加后缀防冲突
-            max_base = 31 - len("_diff")
-            safe_base = base[:max_base] if len(base) > max_base else base
-            diff_name = f"{safe_base}_diff"
-            # 如果仍然冲突（极端情况），加序号
-            existing = {ws.title for ws in wb.worksheets}
-            if diff_name in existing:
-                for i in range(1, 100):
-                    alt = f"{safe_base[:max_base - 3]}_{i:02d}"
-                    if alt not in existing:
-                        diff_name = alt
-                        break
-            dws = wb.create_sheet(title=diff_name)
+            dws = _safe_create_sheet(wb, base, "_diff")
             # 表头: 频率 | 参数_步进N | 差值_N (与数据写入顺序一致: 外层=步进, 内层=参数)
             col = 1
             dws.cell(1, col, "Frequency (MHz)")
@@ -419,7 +420,7 @@ class ProcessingWorker(QObject):
         用户可在 Excel 中右键 PivotTable → "插入切片器" 转为视觉切片器。
         """
 # 1. 将 flat data 写入隐藏 sheet
-        flat_ws = wb.create_sheet(title="_diff_flat")
+        flat_ws = _safe_create_sheet(wb, "_diff_flat")
         # 不隐藏 — 隐藏 sheet 可能触发 Excel 安全警告
         flat_ws.append(["Frequency", "Parameter", "StepAngle", "DiffValue"])
         for freq_val, param_name, step_label, diff_val in all_flat_rows:
@@ -454,7 +455,7 @@ class ProcessingWorker(QObject):
         cache_def.cacheId = next_id
 
         # 3. 创建 PivotTable sheet
-        pt_ws = wb.create_sheet(title="DiffChart")
+        pt_ws = _safe_create_sheet(wb, "DiffChart")
 
         # 4. TableDefinition
         pivot_fields = [
@@ -545,8 +546,11 @@ for base, suffixed in sheets_by_base.items():
             orig_ws = suffixed.get("")
             if orig_ws is None or len(suffixed) < 2:
                 continue
-            diff_name = f"{base}_diff"[:31]
-            if diff_name not in [ws.title for ws in wb.worksheets]:
+            # 用 _safe_create_sheet 计算名称，但 fallback 只需要读取已存在的 sheet
+            max_base = 31 - len("_diff")
+            safe_base = base[:max_base] if len(base) > max_base else base
+            diff_name = f"{safe_base}_diff"
+            if diff_name not in {ws.title for ws in wb.worksheets}:
                 continue
             dws = wb[diff_name]
             rows = list(dws.iter_rows(values_only=True))

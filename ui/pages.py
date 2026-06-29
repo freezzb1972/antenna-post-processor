@@ -1215,6 +1215,13 @@ class AntennaParamsPage(QWidget):
             self.tr("勾选后生成交互式差值散点图（支持按参数/步进角度筛选，可在 Excel 中右键 PivotTable 插入切片器）"))
         sl.addWidget(self._chk_gen_diff_chart)
 
+        # UI 联动: 图表依赖差值表 → 勾选图表时自动勾选并锁定差值表
+        self._chk_gen_diff_chart.toggled.connect(
+            lambda checked: self._chk_gen_diff.setEnabled(not checked))
+        # 初始化状态: 图表勾选时差值表禁用 (不可单独取消)
+        if self._chk_gen_diff_chart.isChecked():
+            self._chk_gen_diff.setEnabled(False)
+
         right_lyt.addWidget(algo_grp)
         right_lyt.addWidget(self._grp_step)
         right_lyt.addStretch()
