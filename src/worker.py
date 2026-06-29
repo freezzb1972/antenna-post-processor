@@ -46,10 +46,11 @@ def _find_header_row(rows):
 
 
 def _trim_trailing_empty(rows):
-    """去掉末尾全空行 (类比 VBA: .End(xlUp) 找到最后非空行)。"""
-    while rows and all(v is None or v == "" for v in (rows[-1] or [])):
-        rows.pop()
-    return rows
+    """去掉末尾全空行, 返回新列表 (类比 VBA: .End(xlUp) 找到最后非空行)。"""
+    end = len(rows)
+    while end > 0 and all(v is None or v == "" for v in (rows[end - 1] or [])):
+        end -= 1
+    return rows[:end]
 
 
 def _safe_create_sheet(wb, base_name, suffix="", max_len=31):
