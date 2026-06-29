@@ -278,7 +278,9 @@ class ProcessingWorker(QObject):
             try:
                 self._add_diff_sheet(wb, results)
             except Exception as e:
+                import traceback
                 self.log.emit(f"\u26a0 步进差值表生成失败: {e}")
+                self.log.emit(traceback.format_exc())
 
         wb.save(output_path)
         wb.close()
@@ -371,8 +373,9 @@ class ProcessingWorker(QObject):
                                 oval_f = 0; sval_f = 0; diff = 0
                             dws.cell(er, col, round(sval_f, 4))
                             dws.cell(er, col + 1, round(diff, 4))
-                            # 收集 flat data 用于交互式 PivotChart
-                            all_flat_rows.append((freq_val, h, step_label, diff))
+                            # 收集 flat data 用于交互式 PivotChart (跳过空频率)
+                            if freq_val is not None:
+                                all_flat_rows.append((freq_val, h, step_label, diff))
                             col += 2
             self.log.emit(f"  📊 差值表已生成: {diff_name}")
         # ── 交互式 PivotChart + 切片器（替代每参数静态图表）──
@@ -543,17 +546,17 @@ class ProcessingWorker(QObject):
 
             # 解析列头, 按参数分组找到对应的差值列
             # 列头格式: "Gain (步进3°)", "Gain 差值 (步进3°)", "AR (步进3°)", ...
-            # 目标: {param_name: [(step_label, diff_col_1based), ...]}
+            # 布局: 每个步进块内交替出现 value 列和 diff 列 (diff 列在步进块中的奇数位置)
+            # 差值列特征: 列头包含 " 差值 (" 而非参数名本身含 "差值"
             param_diff_map = {}  # param_name -> [(step_label, diff_col)]
             for ci, h in enumerate(headers):
-                if not h or "差值" not in h:
+                marker = " 差值 ("
+                if not h or marker not in h:
                     continue
-                # 提取参数名和步进标号: "Gain 差值 (步进3°)" → param="Gain", step="步进3°"
-                parts = h.split(" 差值", 1)
-                param_name = parts[0].strip()
-                step_label = ""
-                if "(" in parts[1]:
-                    step_label = parts[1].split("(")[1].rstrip(")")
+                # 安全解析: 用 " 差值 (" 分隔，确保参数名不含此标记
+                idx = h.index(marker)
+                param_name = h[:idx].strip()
+                step_label = h[idx + len(marker):].rstrip(")")
                 param_diff_map.setdefault(param_name, []).append((step_label, ci + 1))
 
             if not param_diff_map:

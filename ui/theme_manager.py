@@ -52,7 +52,11 @@ class ThemeManager:
 
         # 暗色主题: 为复选框/单选框指示器注入可见边框 + 勾选色
         if theme_name.startswith("dark"):
-            accent = cls._ACCENT_COLORS.get(theme_name, "#2dd4bf")
+            accent = cls._ACCENT_COLORS.get(theme_name)
+            if accent is None:
+                import sys
+                print(f"[theme] WARNING: no accent color for '{theme_name}', using teal as fallback", file=sys.stderr)
+                accent = "#2dd4bf"
             app.setStyleSheet(f"""
                 QCheckBox::indicator, QRadioButton::indicator {{
                     border: 1px solid #666;
