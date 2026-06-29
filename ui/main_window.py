@@ -460,20 +460,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         left_layout = QVBoxLayout()
         left_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 参数显示 — 按钮上方
+        # 按钮行 — 参数文字在左侧，按钮在右侧
+        btn_row = QHBoxLayout()
         self._params_display = QLabel()
         self._params_display.setTextFormat(Qt.RichText)
         self._params_display.setWordWrap(True)
-        self._params_display.setStyleSheet(
-            "padding: 2px 4px; font-size: 12px; background: rgba(0,0,0,0.03); border: none;")
-        left_layout.addWidget(self._params_display, 1)
-
-        # 按钮行 — 参数文字在左侧，按钮在右侧
-        btn_row = QHBoxLayout()
-        self._params_display_inline = QLabel()
-        self._params_display_inline.setTextFormat(Qt.RichText)
-        self._params_display_inline.setStyleSheet("padding: 2px 4px; font-size: 12px;")
-        btn_row.addWidget(self._params_display_inline, 1)
+        self._params_display.setStyleSheet("padding: 2px 4px; font-size: 12px;")
+        btn_row.addWidget(self._params_display, 1)
         btn_row.addWidget(self.ui.btnStart)
         btn_row.addWidget(self.ui.btnStop)
         left_layout.addLayout(btn_row)
@@ -2179,8 +2172,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """刷新执行栏左侧天线参数面板（实时更新，不累积）。"""
         if not hasattr(self, '_params_display') or not self._params_display:
             return
-        mode_names = {0: "📡 无源", 1: "📶 TRP", 2: "📻 TIS"}
-        mode_str = mode_names.get(self._test_mode, "?")
         gain_s = self._lag_config.singles_sorted
         gain_r = self._lag_config.ranges_sorted
         ar_cfg = getattr(self, '_ar_lag_config', None)
@@ -2190,7 +2181,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         extrap = hasattr(self, '_check_extrapolate') and self._check_extrapolate.isChecked()
         robust = hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked()
 
-        parts = [f"<b>模式:</b> {mode_str}"]
+        parts = []
 
         checked = sorted(getattr(self, '_required_params', set()) | getattr(self, '_extra_params', set()))
         if checked:
@@ -2207,19 +2198,20 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if algo: parts.append(f"<b>算法:</b> {', '.join(algo)}")
         parts.append(f"<b>频点:</b> {freq}")
 
-        text = " | ".join(parts)
-        self._params_display.setText(text)
-        if hasattr(self, '_params_display_inline') and self._params_display_inline:
-            self._params_display_inline.setText(text)
+        self._params_display.setText(" | ".join(parts))
 
     def _update_status(self):
-        """更新状态栏 — 显示当前 Gain 和 AR 角度配置概要。"""
+        """更新状态栏 — 显示模式 + Gain/AR 角度配置概要。"""
+        mode_names = {0: "📡 无源", 1: "📶 TRP", 2: "📻 TIS"}
+        mode_str = mode_names.get(self._test_mode, "?")
+        parts = [mode_str]
         gain_singles = len(self._lag_config.singles_sorted)
         gain_ranges = len(self._lag_config.ranges_sorted)
         ar_cfg = getattr(self, '_ar_lag_config', None)
         ar_singles = len(ar_cfg.singles_sorted) if ar_cfg else 0
         ar_ranges = len(ar_cfg.ranges_sorted) if ar_cfg else 0
-        parts = [f"Gain: {gain_singles}单+{gain_ranges}范围"]
+        if gain_singles or gain_ranges:
+            parts.append(f"Gain: {gain_singles}单+{gain_ranges}范围")
         if ar_singles or ar_ranges:
             parts.append(f"AR: {ar_singles}单+{ar_ranges}范围")
         self.statusBar().showMessage(
