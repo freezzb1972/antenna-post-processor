@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+import sys
+
 from PySide6.QtCore import QSettings
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication, QStyleFactory
@@ -54,7 +56,6 @@ class ThemeManager:
         if theme_name.startswith("dark"):
             accent = cls._ACCENT_COLORS.get(theme_name)
             if accent is None:
-                import sys
                 print(f"[theme] WARNING: no accent color for '{theme_name}', using teal as fallback", file=sys.stderr)
                 accent = "#2dd4bf"
             app.setStyleSheet(f"""

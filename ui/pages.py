@@ -1968,25 +1968,7 @@ class ChartSettingsPage(QWidget):
             left_layout = QVBoxLayout(left_box)
             left_layout.setSpacing(3)
 
-            # 报告侧全选/取消全选 (与右侧对称)
-            left_btn_row = QHBoxLayout()
-            left_btn_row.setSpacing(6)
-            left_select_all = QPushButton(self.tr("全选"))
-            left_select_all.setFixedWidth(60)
-            left_deselect_all = QPushButton(self.tr("取消全选"))
-            left_deselect_all.setFixedWidth(72)
-            left_select_all.clicked.connect(
-                lambda checked, ks=keys: (
-                    [self._chart_required[k].setChecked(True) for k in ks if k in self._chart_required]
-                ))
-            left_deselect_all.clicked.connect(
-                lambda checked, ks=keys: (
-                    [self._chart_required[k].setChecked(False) for k in ks if k in self._chart_required]
-                ))
-            left_btn_row.addWidget(left_select_all)
-            left_btn_row.addWidget(left_deselect_all)
-            left_btn_row.addStretch()
-            left_layout.addLayout(left_btn_row)
+            self._add_select_all_row(self._chart_required, keys, left_layout)
             for key in keys:
                 row = QHBoxLayout()
                 cb = QCheckBox(labels.get(key, key))
@@ -2015,24 +1997,7 @@ class ChartSettingsPage(QWidget):
             right_layout.setSpacing(3)
 
             # full_report 独立全选/取消全选按钮
-            full_btn_row = QHBoxLayout()
-            full_btn_row.setSpacing(6)
-            full_select_all = QPushButton(self.tr("全选"))
-            full_select_all.setFixedWidth(60)
-            full_deselect_all = QPushButton(self.tr("取消全选"))
-            full_deselect_all.setFixedWidth(72)
-            full_select_all.clicked.connect(
-                lambda checked, ks=keys: (
-                    [self._chart_extra[k].setChecked(True) for k in ks if k in self._chart_extra]
-                ))
-            full_deselect_all.clicked.connect(
-                lambda checked, ks=keys: (
-                    [self._chart_extra[k].setChecked(False) for k in ks if k in self._chart_extra]
-                ))
-            full_btn_row.addWidget(full_select_all)
-            full_btn_row.addWidget(full_deselect_all)
-            full_btn_row.addStretch()
-            right_layout.addLayout(full_btn_row)
+            self._add_select_all_row(self._chart_extra, keys, right_layout)
 
             for key in keys:
                 row = QHBoxLayout()
@@ -2175,6 +2140,27 @@ class ChartSettingsPage(QWidget):
             self._gain_ranges_x = list(xtr.gain_chart_ranges)
             self._ar_angles_x = list(xtr.ar_chart_angles)
             self._ar_ranges_x = list(xtr.ar_chart_ranges)
+
+    def _add_select_all_row(self, target_dict, keys, parent_layout):
+        """添加全选/取消全选按钮行到指定布局。"""
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(6)
+        sel = QPushButton(self.tr("全选"))
+        des = QPushButton(self.tr("取消全选"))
+        sel.setFixedWidth(60)
+        des.setFixedWidth(72)
+        sel.clicked.connect(
+            lambda checked, ks=keys: (
+                [target_dict[k].setChecked(True) for k in ks if k in target_dict]
+            ))
+        des.clicked.connect(
+            lambda checked, ks=keys: (
+                [target_dict[k].setChecked(False) for k in ks if k in target_dict]
+            ))
+        btn_row.addWidget(sel)
+        btn_row.addWidget(des)
+        btn_row.addStretch()
+        parent_layout.addLayout(btn_row)
 
     def _sync_to_mw(self):
         """同步当前配置到 MainWindow。"""

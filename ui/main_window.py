@@ -262,36 +262,20 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         p = getattr(self, '_file_settings_page', None)
         return p._file_list_widget if p else None
 
-    @_file_list_widget.setter
-    def _file_list_widget(self, v):
-        pass  # 忽略旧代码中的赋值，实际控件在 FileSettingsPage
-
     @property
     def _match_table(self):
         p = getattr(self, '_file_settings_page', None)
         return p._match_table if p else None
-
-    @_match_table.setter
-    def _match_table(self, v):
-        pass
 
     @property
     def _lbl_match_status(self):
         p = getattr(self, '_file_settings_page', None)
         return p._lbl_match_status if p else None
 
-    @_lbl_match_status.setter
-    def _lbl_match_status(self, v):
-        pass
-
     @property
     def _cmb_naming_mode(self):
         p = getattr(self, '_file_settings_page', None)
         return p._cmb_naming_mode if p else None
-
-    @_cmb_naming_mode.setter
-    def _cmb_naming_mode(self, v):
-        pass
 
     def _init_params_tab(self):
         """构建「天线参数」子节 — 频点 + 算法选项，加入 tabFile。"""

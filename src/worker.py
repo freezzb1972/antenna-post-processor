@@ -12,6 +12,11 @@ from .lag_config import LagConfig
 from .plot_config import PlotConfig
 from .chart_config import ChartConfig
 from .pipeline import run_pipeline, run_batch_pipeline
+import math
+import traceback
+from openpyxl.chart import ScatterChart, Reference, Series
+from openpyxl.chart.axis import NumericAxis
+from openpyxl.utils import get_column_letter
 from .datasource import DataSource, ResampledDataSource
 
 
@@ -278,7 +283,6 @@ class ProcessingWorker(QObject):
             try:
                 self._add_diff_sheet(wb, results)
             except Exception as e:
-                import traceback
                 self.log.emit(f"\u26a0 步进差值表生成失败: {e}")
                 self.log.emit(traceback.format_exc())
 
@@ -297,10 +301,6 @@ class ProcessingWorker(QObject):
 
     def _add_diff_sheet(self, wb, results):
         """生成步进差值比较表 + 差值图表。"""
-        from openpyxl.chart import ScatterChart, Reference, Series
-        from openpyxl.chart.axis import NumericAxis
-        from openpyxl.utils import get_column_letter
-        import math
         # 按 suffix 分组: original(suffix="") + steps
         sheets_by_base = {}
         for suffix, _ in results:
@@ -353,6 +353,12 @@ class ProcessingWorker(QObject):
                 if h and h.lower() in ("frequency", "frequency (mhz)", "freq"):
                     freq_col = fi
                     break
+            # 预加载所有步进工作表数据 (避免每行重读 O(N*M) -> O(M))
+            all_step_rows = {}
+            for suffix_key in sorted(suffixed.keys()):
+                sws = suffixed[suffix_key]
+                all_step_rows[suffix_key] = list(sws.iter_rows(values_only=True))
+
             for ri, data_row in enumerate(data_rows):
                 er = ri + 2
                 freq_val = data_row[freq_col] if freq_col < len(data_row) else None
@@ -360,8 +366,7 @@ class ProcessingWorker(QObject):
                 col = 2
                 step_data = {}
                 for suffix_key in sorted(suffixed.keys()):
-                    sws = suffixed[suffix_key]
-                    srows = list(sws.iter_rows(values_only=True))
+                    srows = all_step_rows[suffix_key]
                     if ri + 1 < len(srows):
                         step_data[suffix_key] = srows[ri + 1]
                     else:
@@ -399,10 +404,11 @@ class ProcessingWorker(QObject):
                 try:
                     self._add_pivot_diff(wb, all_flat_rows)
                     self.log.emit("  📈 交互式差值图表（PivotChart + 切片器）已生成")
-            except Exception as e:
-                self.log.emit(f"  ⚠ PivotChart 生成失败，回退到静态图表: {e}")
-                # Fallback: 为每个 diff sheet 生成静态图表
-                self._add_static_diff_charts_fallback(wb, sheets_by_base)
+                except Exception as e:
+                    self.log.emit(f"  ⚠ PivotChart 生成失败，回退到静态图表: {e}")
+                    self.log.emit(traceback.format_exc())
+                    # Fallback: 为每个 diff sheet 生成静态图表
+                    self._add_static_diff_charts_fallback(wb, sheets_by_base)
 
     def _add_pivot_diff(self, wb, all_flat_rows):
         """创建交互式 PivotTable + 散点图（参数/步进角度切片切换）。
@@ -412,14 +418,7 @@ class ProcessingWorker(QObject):
         PivotTable 数据区域实现联动更新。
         用户可在 Excel 中右键 PivotTable → "插入切片器" 转为视觉切片器。
         """
-        from openpyxl.pivot.cache import CacheDefinition, CacheSource, WorksheetSource
-        from openpyxl.pivot.table import (
-            TableDefinition, Location, PageField, DataField, RowColField, PivotField
-        )
-        from openpyxl.chart import ScatterChart, Reference, Series
-        from openpyxl.utils import get_column_letter
-
-        # 1. 将 flat data 写入隐藏 sheet
+# 1. 将 flat data 写入隐藏 sheet
         flat_ws = wb.create_sheet(title="_diff_flat")
         # 不隐藏 — 隐藏 sheet 可能触发 Excel 安全警告
         flat_ws.append(["Frequency", "Parameter", "StepAngle", "DiffValue"])
@@ -542,8 +541,7 @@ class ProcessingWorker(QObject):
 
     def _add_static_diff_charts_fallback(self, wb, sheets_by_base):
         """回退方案: 为每个参数生成独立静态图表 (旧逻辑)。"""
-        from openpyxl.chart import ScatterChart, Reference, Series
-        for base, suffixed in sheets_by_base.items():
+for base, suffixed in sheets_by_base.items():
             orig_ws = suffixed.get("")
             if orig_ws is None or len(suffixed) < 2:
                 continue
