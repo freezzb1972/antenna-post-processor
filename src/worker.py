@@ -262,7 +262,7 @@ class ProcessingWorker(QObject):
             return {}
 
         # ── 合并工作簿（串行，按步进排序） ──
-        results.sort(key=lambda x: (x[0] == "", float(x[0].replace("_step", "") or "0")))
+        results.sort(key=lambda x: (x[0] != "", float(x[0].replace("_step", "") or "0")))
 
         wb = openpyxl.Workbook()
         wb.remove(wb.active)
@@ -342,12 +342,19 @@ class ProcessingWorker(QObject):
             orig_ws = suffixed.get("")
             if orig_ws is None or len(suffixed) < 2:
                 continue
-            # 读取原始数据
+            # 读取原始数据 (自动检测 header 行位置)
             rows = list(orig_ws.iter_rows(values_only=True))
             if not rows:
                 continue
-            headers = [str(c or "") for c in rows[0]]
-            data_rows = rows[1:]
+            # 扫描前 10 行找到含 "Frequency" 的行作为 header
+            header_row = 0
+            for ri in range(min(10, len(rows))):
+                r0 = str(rows[ri][0] or "").lower() if rows[ri] else ""
+                if "frequency" in r0 or "freq" in r0:
+                    header_row = ri
+                    break
+            headers = [str(c or "") for c in rows[header_row]]
+            data_rows = rows[header_row + 1:]
             # 创建差值 sheet
             dws = _safe_create_sheet(wb, base, "_diff")
             # 表头: 频率 | 参数_步进N | 差值_N (与数据写入顺序一致: 外层=步进, 内层=参数)
@@ -543,8 +550,15 @@ class ProcessingWorker(QObject):
             rows = list(dws.iter_rows(values_only=True))
             if not rows:
                 continue
-            headers = [str(c or "") for c in rows[0]]
-            data_rows = rows[1:]
+            # 自动检测 header 行 (同 _add_diff_sheet)
+            header_row = 0
+            for ri in range(min(10, len(rows))):
+                r0 = str(rows[ri][0] or "").lower() if rows[ri] else ""
+                if "frequency" in r0 or "freq" in r0:
+                    header_row = ri
+                    break
+            headers = [str(c or "") for c in rows[header_row]]
+            data_rows = rows[header_row + 1:]
             if not data_rows:
                 continue
             n_rows = len(data_rows)
