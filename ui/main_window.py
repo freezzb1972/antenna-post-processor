@@ -460,16 +460,20 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         left_layout = QVBoxLayout()
         left_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 参数显示 — 按钮上方，紧凑单行
+        # 参数显示 — 按钮上方
         self._params_display = QLabel()
         self._params_display.setTextFormat(Qt.RichText)
-        self._params_display.setWordWrap(False)
+        self._params_display.setWordWrap(True)
         self._params_display.setStyleSheet(
             "padding: 2px 4px; font-size: 12px; background: rgba(0,0,0,0.03); border: none;")
-        left_layout.addWidget(self._params_display)
+        left_layout.addWidget(self._params_display, 1)
 
+        # 按钮行 — 参数文字在左侧，按钮在右侧
         btn_row = QHBoxLayout()
-        btn_row.addStretch()
+        self._params_display_inline = QLabel()
+        self._params_display_inline.setTextFormat(Qt.RichText)
+        self._params_display_inline.setStyleSheet("padding: 2px 4px; font-size: 12px;")
+        btn_row.addWidget(self._params_display_inline, 1)
         btn_row.addWidget(self.ui.btnStart)
         btn_row.addWidget(self.ui.btnStop)
         left_layout.addLayout(btn_row)
@@ -2203,7 +2207,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if algo: parts.append(f"<b>算法:</b> {', '.join(algo)}")
         parts.append(f"<b>频点:</b> {freq}")
 
-        self._params_display.setText(" | ".join(parts))
+        text = " | ".join(parts)
+        self._params_display.setText(text)
+        if hasattr(self, '_params_display_inline') and self._params_display_inline:
+            self._params_display_inline.setText(text)
 
     def _update_status(self):
         """更新状态栏 — 显示当前 Gain 和 AR 角度配置概要。"""
