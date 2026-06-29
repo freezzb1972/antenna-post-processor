@@ -22,12 +22,16 @@ from .datasource import DataSource, ResampledDataSource
 
 # ── 工具 ──────────────────────────────────────────────────────
 
-def _find_header_row(rows, max_scan=10):
-    """扫描前 max_scan 行，找到含 'Frequency' 的 header 行索引。"""
+def _find_header_row(rows, max_scan=50):
+    """扫描前 max_scan 行查找 header 行（复用 excel_reader 的 Frequency 检测逻辑）。"""
+    from .excel_reader import is_frequency_column
     for ri in range(min(max_scan, len(rows))):
-        r0 = str(rows[ri][0] or "").lower() if rows[ri] else ""
-        if "frequency" in r0 or "freq" in r0:
-            return ri
+        row = rows[ri]
+        if row is None:
+            continue
+        for cell in row:
+            if cell and is_frequency_column(str(cell)):
+                return ri
     return 0  # 回退到第 0 行
 
 
