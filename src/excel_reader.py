@@ -379,6 +379,47 @@ def read_template(template_path: str) -> List[SheetInfo]:
     return sheets
 
 
+def _classify_by_builtin(raw: str, norm: str) -> Optional[str]:
+    """内置函数检测链（不含 JSON 匹配），用于 JSON 冲突校验。"""
+    if is_frequency_column(raw):        return "frequency"
+    if is_directivity_column(raw):      return "directivity"
+    if is_total_efficiency_column(raw):
+        if "%" in norm or "％" in norm or "pct" in norm.lower():
+            return "total_efficiency_pct"
+        if "db" in norm.lower():
+            return "total_efficiency_db"
+        return "total_efficiency_pct"
+    if is_efficiency_column(raw):
+        if "%" in norm or "％" in norm or "pct" in norm.lower():
+            return "efficiency_pct"
+        if "db" in norm.lower():
+            return "efficiency_db"
+        return "efficiency_pct"
+    if is_gain_column(raw):             return "gain"
+    if is_trp_column(raw):              return "trp"
+    if is_nhprp_45_column(raw):         return "nhprp_45"
+    if is_nhprp_30_column(raw):         return "nhprp_30"
+    if is_peak_eirp_column(raw):        return "peak_eirp"
+    if is_ar_single_column(raw):        return "ar_single"
+    if is_ar_range_column(raw):         return "ar_range"
+    if is_nhprp_225_column(raw):        return "nhprp_225"
+    if is_uh_prp_column(raw):           return "uh_prp"
+    if is_lh_prp_column(raw):           return "lh_prp"
+    if is_boresight_phi_column(raw):    return "boresight_phi"
+    if is_boresight_theta_column(raw):  return "boresight_theta"
+    if is_max_power_column(raw):        return "max_power"
+    if is_min_power_column(raw):        return "min_power"
+    if is_avg_gain_column(raw):         return "avg_gain"
+    if is_avg_power_column(raw):        return "avg_power"
+    if is_xpi_boresight_column(raw):    return "xpi_boresight"
+    if is_xpi_mean_column(raw):         return "xpi_mean"
+    if is_xpi_min_column(raw):          return "xpi_min"
+    if is_mismatch_loss_column(raw):    return "mismatch_loss_db"
+    if is_pc_theta_column(raw):         return "pc_theta_mm"
+    if is_pc_phi_column(raw):           return "pc_phi_mm"
+    return None
+
+
 def _parse_sheet(ws) -> Optional[SheetInfo]:
     """解析单个 Sheet。返回 None 表示非天线数据 Sheet（无 Frequency 列）。"""
     name = ws.title
@@ -418,10 +459,19 @@ def _parse_sheet(ws) -> Optional[SheetInfo]:
         norm = normalize_header(raw)
         col_letter = openpyxl.utils.get_column_letter(c)
 
-        # 分类 — JSON 用户模式优先，fallback 到内置正则
+        # 分类 — 内置函数检测优先，JSON 仅做补充覆盖
+        builtin_type = _classify_by_builtin(raw, norm)
         json_type = _classify_by_json_patterns(raw)
         if json_type is not None:
+            # JSON 覆盖内置 → 检测冲突并警告
+            if builtin_type is not None and json_type != builtin_type:
+                import sys
+                print(f"[WARNING] column_patterns.json '{json_type}' overrides "
+                      f"builtin '{builtin_type}' for header '{raw}' — "
+                      f"fix JSON to match or remove the rule", file=sys.stderr)
             ctype = json_type
+        elif builtin_type is not None:
+            ctype = builtin_type
         elif is_frequency_column(raw):
             ctype = "frequency"
         elif is_directivity_column(raw):
