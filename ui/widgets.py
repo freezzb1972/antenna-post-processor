@@ -227,6 +227,7 @@ class TemplateSourceRow(QWidget):
         super().__init__(parent)
         self._on_browse_cb = on_browse
         self._on_preview_cb = on_preview
+        self._path: str = ""
         self._setup_ui()
 
     def _setup_ui(self):
@@ -254,13 +255,7 @@ class TemplateSourceRow(QWidget):
         btn_preview = QPushButton(self.tr("📋 预览报告"))
         btn_preview.clicked.connect(self._on_preview_cb if self._on_preview_cb else self._on_preview)
         layout.addWidget(btn_preview)
-
-        # 路径显示
-        self._lbl_path = QLineEdit()
-        self._lbl_path.setReadOnly(True)
-        self._lbl_path.setPlaceholderText(self.tr("(未选择模板)"))
-        self._lbl_path.setStyleSheet("color: #888;")
-        layout.addWidget(self._lbl_path, 1)
+        layout.addStretch()
 
     def populate_presets(self, presets: List[dict]):
         """填充内置模板下拉列表。"""
@@ -274,15 +269,15 @@ class TemplateSourceRow(QWidget):
 
     def set_path(self, path: str):
         """外部设置模板路径（不触发 signal）。"""
-        self._lbl_path.setText(path)
+        self._path = path
 
     def get_path(self) -> str:
-        return self._lbl_path.text()
+        return self._path
 
     def _on_preset_selected(self, index: int):
         path = self._cmb_preset.currentData()
         if path:
-            self._lbl_path.setText(path)
+            self._path = path
             self.template_changed.emit(path)
 
     def _on_browse(self):
@@ -290,12 +285,12 @@ class TemplateSourceRow(QWidget):
             self, self.tr("选择模板文件"), "",
             self.tr("所有支持格式 (*.xlsx *.xls *.docx *.doc);;Excel (*.xlsx *.xls);;Word (*.docx *.doc);;所有文件 (*)"))
         if path:
-            self._lbl_path.setText(path)
+            self._path = path
             self.template_changed.emit(path)
 
     def _on_preview(self):
         """打开报告预览。"""
-        path = self._lbl_path.text()
+        path = self._path
         if not path or not os.path.exists(path):
             return
         from src.column_mapping import detect_columns_from_template, ALL_COL_TYPE_LABELS
@@ -305,6 +300,7 @@ class TemplateSourceRow(QWidget):
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("报告预览 — 列头检测结果"))
         dlg.setMinimumSize(600, 400)
+        dlg.setWindowFlags(dlg.windowFlags() | Qt.WindowMaximizeButtonHint)
         dl = QVBoxLayout(dlg)
 
         table = QTableWidget()

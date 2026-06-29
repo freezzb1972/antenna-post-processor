@@ -168,8 +168,9 @@ class FileSettingsPage(QWidget):
         self._tpl_row.template_changed.connect(self._on_preset_template_selected)
         tpl_layout.addWidget(self._tpl_row)
 
-        # 第二行：模版路径单独显示
+        # 第二行：模版路径单独显示, 与 TemplateSourceRow._lbl_path 同步
         self._tpl_path_label = QLineEdit()
+        self._tpl_row.template_changed.connect(self._tpl_path_label.setText)
         self._tpl_path_label.setReadOnly(True)
         self._tpl_path_label.setPlaceholderText(self.tr("(未选择模版)"))
         tpl_layout.addWidget(self._tpl_path_label)

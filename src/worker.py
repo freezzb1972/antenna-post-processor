@@ -278,10 +278,22 @@ class ProcessingWorker(QObject):
                             ncell = nws.cell(row=cell.row, column=cell.column)
                             ncell.value = cell.value
                             if cell.has_style:
-                                ncell.font = cell.font
-                                ncell.fill = cell.fill
-                                ncell.alignment = cell.alignment
-                                ncell.border = cell.border
+                                try:
+                                    ncell.font = cell.font.copy()
+                                except Exception:
+                                    pass
+                                try:
+                                    ncell.fill = cell.fill.copy()
+                                except Exception:
+                                    pass
+                                try:
+                                    ncell.alignment = cell.alignment.copy()
+                                except Exception:
+                                    pass
+                                try:
+                                    ncell.border = cell.border.copy()
+                                except Exception:
+                                    pass
                                 ncell.number_format = cell.number_format
                     for col_letter, dim in ws.column_dimensions.items():
                         nws.column_dimensions[col_letter].width = dim.width
