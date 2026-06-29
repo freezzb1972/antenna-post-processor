@@ -276,11 +276,7 @@
         "peak",
         "eirp"
       ],
-      "builtin": true,
-      "exact": [
-        "pkgain",
-        "peakgain"
-      ]
+      "builtin": true
     },
     {
       "col_type": "ar_single",
