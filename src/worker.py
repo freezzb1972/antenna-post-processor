@@ -22,17 +22,34 @@ from .datasource import DataSource, ResampledDataSource
 
 # ── 工具 ──────────────────────────────────────────────────────
 
-def _find_header_row(rows, max_scan=50):
-    """扫描前 max_scan 行查找 header 行（复用 excel_reader 的 Frequency 检测逻辑）。"""
+def _find_header_row(rows):
+    """扫描全部行查找 header 行（复用 excel_reader 的 Frequency 检测逻辑）。
+
+    类比 VBA: ws.Cells(1,1).End(xlDown) 找到第一个含 Frequency 的单元格所在行。
+    校验: 候选行至少需 3 个非空单元格，避免 metadata 行(如 "Frequency Range")误判。
+    不限制扫描行数，确保不漏数据。
+    """
     from .excel_reader import is_frequency_column
-    for ri in range(min(max_scan, len(rows))):
-        row = rows[ri]
+    for ri, row in enumerate(rows):
         if row is None:
             continue
+        has_freq = False
+        non_empty = 0
         for cell in row:
-            if cell and is_frequency_column(str(cell)):
-                return ri
+            if cell is not None and str(cell).strip():
+                non_empty += 1
+                if is_frequency_column(str(cell)):
+                    has_freq = True
+        if has_freq and non_empty >= 3:  # header 行通常有多个列名
+            return ri
     return 0  # 回退到第 0 行
+
+
+def _trim_trailing_empty(rows):
+    """去掉末尾全空行 (类比 VBA: .End(xlUp) 找到最后非空行)。"""
+    while rows and all(v is None or v == "" for v in (rows[-1] or [])):
+        rows.pop()
+    return rows
 
 
 def _safe_create_sheet(wb, base_name, suffix="", max_len=31):
@@ -355,8 +372,8 @@ class ProcessingWorker(QObject):
             orig_ws = suffixed.get("")
             if orig_ws is None or len(suffixed) < 2:
                 continue
-            # 读取原始数据 (自动检测 header 行位置，不硬编码 row=0)
-            rows = list(orig_ws.iter_rows(values_only=True))
+            # 读取原始数据 (自动检测 header + 去尾空行，不漏数据)
+            rows = _trim_trailing_empty(list(orig_ws.iter_rows(values_only=True)))
             if not rows:
                 continue
             header_row = _find_header_row(rows)
@@ -554,10 +571,9 @@ class ProcessingWorker(QObject):
             if diff_name not in {ws.title for ws in wb.worksheets}:
                 continue
             dws = wb[diff_name]
-            rows = list(dws.iter_rows(values_only=True))
+            rows = _trim_trailing_empty(list(dws.iter_rows(values_only=True)))
             if not rows:
                 continue
-            # 自动检测 header 行 (不硬编码 row=0)
             header_row = _find_header_row(rows)
             headers = [str(c or "") for c in rows[header_row]]
             data_rows = rows[header_row + 1:]
