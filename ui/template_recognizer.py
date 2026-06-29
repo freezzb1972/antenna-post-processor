@@ -83,6 +83,7 @@ class TemplateRecognizerDialog(QDialog):
         self.resize(900, 650)
         self.setMinimumSize(720, 500)
         # 启用最大化按钮，方便全屏查看大量列头参数
+        # 注意: setWindowFlags 必须在 show() 之前调用，否则会触发 hide()
         self.setWindowFlags(
             self.windowFlags() | Qt.WindowMaximizeButtonHint)
 

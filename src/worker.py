@@ -321,7 +321,18 @@ class ProcessingWorker(QObject):
             headers = [str(c or "") for c in rows[0]]
             data_rows = rows[1:]
             # 创建差值 sheet
-            diff_name = f"{base}_diff"[:31]
+            # 安全截断：31字符限制下加后缀防冲突
+            max_base = 31 - len("_diff")
+            safe_base = base[:max_base] if len(base) > max_base else base
+            diff_name = f"{safe_base}_diff"
+            # 如果仍然冲突（极端情况），加序号
+            existing = {ws.title for ws in wb.worksheets}
+            if diff_name in existing:
+                for i in range(1, 100):
+                    alt = f"{safe_base[:max_base - 3]}_{i:02d}"
+                    if alt not in existing:
+                        diff_name = alt
+                        break
             dws = wb.create_sheet(title=diff_name)
             # 表头: 频率 | 参数_步进N | 差值_N (与数据写入顺序一致: 外层=步进, 内层=参数)
             col = 1
@@ -373,16 +384,21 @@ class ProcessingWorker(QObject):
                                 oval_f = 0; sval_f = 0; diff = 0
                             dws.cell(er, col, round(sval_f, 4))
                             dws.cell(er, col + 1, round(diff, 4))
-                            # 收集 flat data 用于交互式 PivotChart (跳过空频率)
+                                            # 收集 flat data 用于交互式 PivotChart (跳过空频率)
                             if freq_val is not None:
                                 all_flat_rows.append((freq_val, h, step_label, diff))
                             col += 2
             self.log.emit(f"  📊 差值表已生成: {diff_name}")
         # ── 交互式 PivotChart + 切片器（替代每参数静态图表）──
         if all_flat_rows and self.gen_diff_chart:
-            try:
-                self._add_pivot_diff(wb, all_flat_rows)
-                self.log.emit("  📈 交互式差值图表（PivotChart + 切片器）已生成")
+            # 内存保护: 超大数据集跳过 PivotChart，直接回退静态图表
+            if len(all_flat_rows) > 50000:
+                self.log.emit(f"  ⚠ 差值数据量过大({len(all_flat_rows)}行), 跳过高开销交互式图表")
+                self._add_static_diff_charts_fallback(wb, sheets_by_base)
+            else:
+                try:
+                    self._add_pivot_diff(wb, all_flat_rows)
+                    self.log.emit("  📈 交互式差值图表（PivotChart + 切片器）已生成")
             except Exception as e:
                 self.log.emit(f"  ⚠ PivotChart 生成失败，回退到静态图表: {e}")
                 # Fallback: 为每个 diff sheet 生成静态图表
@@ -405,7 +421,7 @@ class ProcessingWorker(QObject):
 
         # 1. 将 flat data 写入隐藏 sheet
         flat_ws = wb.create_sheet(title="_diff_flat")
-        flat_ws.sheet_state = 'hidden'
+        # 不隐藏 — 隐藏 sheet 可能触发 Excel 安全警告
         flat_ws.append(["Frequency", "Parameter", "StepAngle", "DiffValue"])
         for freq_val, param_name, step_label, diff_val in all_flat_rows:
             try:
