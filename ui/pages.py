@@ -179,7 +179,23 @@ class FileSettingsPage(QWidget):
         # 数据文件组
         data_grp = QGroupBox(self.tr("数据文件"))
         data_layout = QVBoxLayout(data_grp)
-        # 按钮行（数据文件按钮在 _init_multi_file_ui 中创建，这里用已存在的）
+
+        # 按钮行: 添加/清除数据文件 (复用 MainWindow 的 handler)
+        mw = self._mw
+        btn_row = QHBoxLayout()
+        self._btn_add_files = QPushButton(self.tr("📂 添加数据文件..."))
+        self._btn_add_files.setToolTip(self.tr("选择多个数据文件 (Ctrl+点击多选 / 拖拽)"))
+        self._btn_clear_selected = QPushButton(self.tr("清除选中"))
+        self._btn_clear_all = QPushButton(self.tr("全部清除"))
+        self._btn_add_files.clicked.connect(self._on_add_data_files)
+        self._btn_clear_selected.clicked.connect(self._on_clear_selected_files)
+        self._btn_clear_all.clicked.connect(self._on_clear_all_files)
+        btn_row.addWidget(self._btn_add_files)
+        btn_row.addWidget(self._btn_clear_selected)
+        btn_row.addWidget(self._btn_clear_all)
+        btn_row.addStretch()
+        data_layout.addLayout(btn_row)
+
         self._file_list_widget = QTableWidget()
         self._file_list_widget.setColumnCount(2)
         self._file_list_widget.setHorizontalHeaderLabels([
