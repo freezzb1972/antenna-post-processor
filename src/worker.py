@@ -136,7 +136,10 @@ class ProcessingWorker(QObject):
                 log_callback=self._on_log,
             )
 
-            # ── 多步进模式 ──
+            if self.gen_diff_chart and not self.gen_diff:
+            raise ValueError("gen_diff_chart requires gen_diff")
+
+        # ── 多步进模式 ──
             if self.step_values:
                 # 获取基础 DataSource（单文件或 map 首项）
                 base = self.datasource
@@ -412,16 +415,17 @@ class ProcessingWorker(QObject):
                     self._add_static_diff_charts_fallback(wb, sheets_by_base)
 
     def _add_pivot_diff(self, wb, all_flat_rows):
-        """创建交互式 PivotTable + 散点图（参数/步进角度切片切换）。
+        """创建交互式 PivotTable + 散点图（参数/步进角度切片切换）。"""
+        flat_ws, n_data = self._write_flat_data(wb, all_flat_rows)
+        pt_ws = self._build_pivot_table(wb, flat_ws, n_data)
+        self._add_diff_scatter_chart(pt_ws, flat_ws, n_data)
 
-        在隐藏 sheet 写入 long-format 数据，创建 PivotTable 含
-        PageField（参数 + 步进角度）下拉筛选器，ScatterChart 引用
-        PivotTable 数据区域实现联动更新。
-        用户可在 Excel 中右键 PivotTable → "插入切片器" 转为视觉切片器。
-        """
-# 1. 将 flat data 写入隐藏 sheet
+    # ── _add_pivot_diff 子方法 ──────────────────────────────────
+
+    @staticmethod
+    def _write_flat_data(wb, all_flat_rows):
+        """写入 long-format 数据到 _diff_flat sheet, 返回 (ws, n_data)。"""
         flat_ws = _safe_create_sheet(wb, "_diff_flat")
-        # 不隐藏 — 隐藏 sheet 可能触发 Excel 安全警告
         flat_ws.append(["Frequency", "Parameter", "StepAngle", "DiffValue"])
         for freq_val, param_name, step_label, diff_val in all_flat_rows:
             try:
@@ -433,112 +437,83 @@ class ProcessingWorker(QObject):
             except (ValueError, TypeError):
                 d = 0.0
             flat_ws.append([f, str(param_name), str(step_label), round(d, 6)])
+        return flat_ws, len(all_flat_rows)
 
-        n_data = len(all_flat_rows)
+    @staticmethod
+    def _build_pivot_table(wb, flat_ws, n_data):
+        """在 DiffChart sheet 创建含 PageField 下拉筛选的 PivotTable。"""
+        from openpyxl.pivot.cache import CacheDefinition, CacheSource, WorksheetSource
+        from openpyxl.pivot.table import (
+            TableDefinition, Location, PageField, DataField, RowColField, PivotField
+        )
+        from openpyxl.styles import Font, Alignment
+
         last_col_letter = get_column_letter(4)
         data_ref = f"A1:{last_col_letter}{n_data + 1}"
 
-        # 2. CacheDefinition — 引用隐藏 sheet 数据
         cache_src = CacheSource(
             type="worksheet",
             worksheetSource=WorksheetSource(ref=data_ref, sheet="_diff_flat")
         )
         cache_def = CacheDefinition(cacheSource=cache_src)
-        # 自动分配 cacheId: 扫描已有 PivotTable, 避免冲突
-        existing_ids = set()
-        for ws in wb.worksheets:
-            for p in getattr(ws, '_pivots', []):
-                cid = getattr(p, 'cacheId', None)
-                if cid is not None:
-                    existing_ids.add(cid)
-        next_id = max(existing_ids, default=-1) + 1
-        cache_def.cacheId = next_id
+        existing_ids = {getattr(p, "cacheId", None) for ws in wb.worksheets
+                        for p in getattr(ws, "_pivots", [])}
+        existing_ids.discard(None)
+        cache_def.cacheId = max(existing_ids, default=-1) + 1
 
-        # 3. 创建 PivotTable sheet
         pt_ws = _safe_create_sheet(wb, "DiffChart")
-
-        # 4. TableDefinition
         pivot_fields = [
             PivotField(name="Frequency"),
             PivotField(name="Parameter", axis="axisPage"),
             PivotField(name="StepAngle", axis="axisPage"),
             PivotField(name="DiffValue"),
         ]
-        pt_loc = Location(
-            ref="A3:D20",
-            firstHeaderRow=3,
-            firstDataRow=4,
-            firstDataCol=1
-        )
         pt = TableDefinition(
-            name="DiffPivot",
-            cacheId=next_id,
-            dataOnRows=True,
-            dataCaption="Values",
-            grandTotalCaption="Grand Total",
-            errorCaption="#VALUE!",
-            showError=False,
-            missingCaption="",
-            showMissing=True,
-            updatedVersion=3,
-            minRefreshableVersion=3,
-            asteriskTotals=False,
-            showItems=True,
-            editData=False,
-            disableFieldList=False,
-            showCalcMbrs=True,
-            visualTotals=True,
-            showMultipleLabel=True,
-            showDataDropDown=True,
-            showDrill=True,
-            printDrill=False,
-            showMemberPropertyTips=True,
-            showDataTips=True,
-            location=pt_loc,
+            name="DiffPivot", cacheId=cache_def.cacheId,
+            dataOnRows=True, dataCaption="Values",
+            grandTotalCaption="Grand Total", errorCaption="#VALUE!", showError=False,
+            missingCaption="", showMissing=True, updatedVersion=3, minRefreshableVersion=3,
+            asteriskTotals=False, showItems=True, editData=False, disableFieldList=False,
+            showCalcMbrs=True, visualTotals=True, showMultipleLabel=True,
+            showDataDropDown=True, showDrill=True, printDrill=False,
+            showMemberPropertyTips=True, showDataTips=True,
+            location=Location(ref="A3:D20", firstHeaderRow=3, firstDataRow=4, firstDataCol=1),
             pivotFields=pivot_fields,
             rowFields=[RowColField(x=0)],
-            pageFields=[
-                PageField(fld=1, name="参数"),
-                PageField(fld=2, name="步进"),
-            ],
+            pageFields=[PageField(fld=1, name="参数"), PageField(fld=2, name="步进")],
             dataFields=[DataField(name="差值", fld=3, numFmtId=2)],
         )
         pt.cache = cache_def
         pt_ws.add_pivot(pt)
 
-        # 5. 提示文字
         pt_ws.cell(1, 1, "📊 交互式差值分析 — PivotTable 支持 参数/步进角度 下拉筛选")
-        pt_ws.cell(2, 1, "💡 右键 PivotTable → '插入切片器' 添加视觉切片按钮 | 下方图表为全量数据概览")
-        from openpyxl.styles import Font, Alignment
+        pt_ws.cell(2, 1, "💡 右键 PivotTable → "插入切片器" 添加视觉切片按钮 | 下方图表为全量数据概览")
         for r in (1, 2):
             cell = pt_ws.cell(r, 1)
             cell.font = Font(bold=True, color="4472C4")
-            cell.alignment = Alignment(horizontal='left')
+            cell.alignment = Alignment(horizontal="left")
+        return pt_ws
 
-        # 6. ScatterChart 引用隐藏 flat data (Frequency vs DiffValue)
-        # openpyxl 不支持 PivotChart 联动，图表展示全量差值概览
+    @staticmethod
+    def _add_diff_scatter_chart(pt_ws, flat_ws, n_data):
+        """在 PivotTable sheet 添加全量差值概览散点图。"""
         chart = ScatterChart()
         chart.title = "步进差值 vs Frequency（全量概览 — 使用 PivotTable 筛选分析）"
-        chart.style = 2
-        chart.width = 18
-        chart.height = 11
+        chart.style = 2; chart.width = 18; chart.height = 11
         chart.x_axis.title = "Frequency (MHz)"
         chart.y_axis.title = "差值"
-        chart.y_axis.numFmt = '0.000'
-        chart.legend.position = 'b'
+        chart.y_axis.numFmt = "0.000"
+        chart.legend.position = "b"
 
-        # X=Frequency(col A), Y=DiffValue(col D) from hidden flat data sheet
         x_vals = Reference(flat_ws, min_col=1, min_row=2, max_row=n_data + 1)
         y_vals = Reference(flat_ws, min_col=4, min_row=2, max_row=n_data + 1)
         series = Series(y_vals, x_vals, title="差值")
-        series.marker.symbol = 'circle'
-        series.marker.size = 5
+        series.marker.symbol = "circle"; series.marker.size = 5
         series.graphicalProperties.line.width = 14000
-        series.smooth = False  # 全量数据点不加平滑，避免误导
+        series.smooth = False
         chart.series.append(series)
 
-        chart_anchor_row = 4 + n_data + 3
-        pt_ws.add_chart(chart, f"A{chart_anchor_row}")
+        pt_ws.add_chart(chart, f"A{4 + n_data + 3}")
 
     def _add_static_diff_charts_fallback(self, wb, sheets_by_base):
         """回退方案: 为每个参数生成独立静态图表 (旧逻辑)。"""

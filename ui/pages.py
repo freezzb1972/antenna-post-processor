@@ -176,98 +176,30 @@ class FileSettingsPage(QWidget):
 
         v_splitter.addWidget(tpl_grp)
 
-        # 数据文件组
-        data_grp = QGroupBox(self.tr("数据文件"))
-        data_layout = QVBoxLayout(data_grp)
+        # 数据文件选择器 (widgets.DataFileSelector)
+        from ui.widgets import DataFileSelector
+        self._data_sel = DataFileSelector()
+        ds = self._data_sel
+        ds.btn_add_files.clicked.connect(self._on_add_data_files)
+        ds.btn_clear_selected.clicked.connect(self._on_clear_selected_files)
+        ds.btn_clear_all.clicked.connect(self._on_clear_all_files)
+        ds.btn_auto_match.clicked.connect(self._on_auto_match)
+        ds.cmb_naming_mode.currentIndexChanged.connect(self._on_naming_mode_changed)
 
-        # 按钮行: 添加/清除数据文件 (复用 MainWindow 的 handler)
-        mw = self._mw
-        btn_row = QHBoxLayout()
-        self._btn_add_files = QPushButton(self.tr("📂 添加数据文件..."))
-        self._btn_add_files.setToolTip(self.tr("选择多个数据文件 (Ctrl+点击多选 / 拖拽)"))
-        self._btn_clear_selected = QPushButton(self.tr("清除选中"))
-        self._btn_clear_all = QPushButton(self.tr("全部清除"))
-        self._btn_add_files.clicked.connect(self._on_add_data_files)
-        self._btn_clear_selected.clicked.connect(self._on_clear_selected_files)
-        self._btn_clear_all.clicked.connect(self._on_clear_all_files)
-        btn_row.addWidget(self._btn_add_files)
-        btn_row.addWidget(self._btn_clear_selected)
-        btn_row.addWidget(self._btn_clear_all)
-        btn_row.addStretch()
-        data_layout.addLayout(btn_row)
+        # 公开属性别名 (保持旧代码兼容)
+        self._btn_add_files = ds.btn_add_files
+        self._btn_clear_selected = ds.btn_clear_selected
+        self._btn_clear_all = ds.btn_clear_all
+        self._file_list_widget = ds.file_list_widget
+        self._match_table = ds.match_table
+        self._btn_auto_match = ds.btn_auto_match
+        self._lbl_match_status = ds.lbl_match_status
+        self._lbl_naming_mode = ds.lbl_naming_mode
+        self._cmb_naming_mode = ds.cmb_naming_mode
+        self._check_chart_eff = ds.check_chart_eff
+        self._check_chart_lag = ds.check_chart_lag
 
-        self._file_list_widget = QTableWidget()
-        self._file_list_widget.setColumnCount(2)
-        self._file_list_widget.setHorizontalHeaderLabels([
-            self.tr("数据源文件"), self.tr("测试模式")
-        ])
-        self._file_list_widget.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self._file_list_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
-        self._file_list_widget.setColumnWidth(1, 140)
-        self._file_list_widget.verticalHeader().setDefaultSectionSize(28)
-        self._file_list_widget.verticalHeader().setVisible(False)
-        self._file_list_widget.setMinimumHeight(80)
-        self._file_list_widget.setMaximumHeight(180)
-        self._file_list_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._file_list_widget.setAlternatingRowColors(True)
-        self._file_list_widget.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self._file_list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        data_layout.addWidget(self._file_list_widget)
-
-        # 匹配表
-        self._match_table = QTableWidget()
-        self._match_table.setColumnCount(3)
-        self._match_table.setHorizontalHeaderLabels([
-            self.tr("工作表"), self.tr("数据文件"), self.tr("状态")
-        ])
-        self._match_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
-        self._match_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self._match_table.setColumnWidth(0, 120)
-        self._match_table.verticalHeader().setDefaultSectionSize(28)
-        self._match_table.verticalHeader().setVisible(False)
-        self._match_table.setMinimumHeight(120)
-        self._match_table.setMaximumHeight(280)
-        self._match_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._match_table.setAlternatingRowColors(True)
-        data_layout.addWidget(self._match_table)
-
-        # 自动匹配按钮行
-        match_row = QHBoxLayout()
-        self._btn_auto_match = QPushButton(self.tr("🔗 自动匹配"))
-        self._btn_auto_match.clicked.connect(self._on_auto_match)
-        self._btn_auto_match.setToolTip(self.tr("按文件命名自动匹配工作表"))
-        self._lbl_match_status = QLabel("")
-        self._lbl_match_status.setMinimumHeight(22)
-        self._lbl_match_status.setStyleSheet("padding: 2px 0;")
-        match_row.addWidget(self._btn_auto_match)
-        match_row.addWidget(self._lbl_match_status)
-        match_row.addSpacing(12)
-        self._lbl_naming_mode = QLabel(self.tr("工作表命名:"))
-        match_row.addWidget(self._lbl_naming_mode)
-        self._cmb_naming_mode = QComboBox()
-        self._cmb_naming_mode.addItem(self.tr("保留原模板工作表名"), 0)
-        self._cmb_naming_mode.addItem(self.tr("用数据源名替换"), 1)
-        self._cmb_naming_mode.setToolTip(self.tr("多数据源时，选择工作表命名方式"))
-        self._cmb_naming_mode.setFixedWidth(190)
-        self._cmb_naming_mode.currentIndexChanged.connect(self._on_naming_mode_changed)
-        match_row.addWidget(self._cmb_naming_mode)
-        match_row.addStretch()
-        data_layout.addLayout(match_row)
-
-        # 图表选择行
-        chart_row = QHBoxLayout()
-        self._check_chart_eff = QCheckBox(self.tr("效率曲线"))
-        self._check_chart_eff.setChecked(True)
-        chart_row.addWidget(self._check_chart_eff)
-        self._check_chart_lag = QCheckBox(self.tr("增益曲线"))
-        self._check_chart_lag.setChecked(True)
-        chart_row.addWidget(self._check_chart_lag)
-        chart_row.addStretch()
-        data_layout.addLayout(chart_row)
-        data_layout.addStretch()
-
-        # 关闭垂直分栏：数据文件组加入
-        v_splitter.addWidget(data_grp)
+        v_splitter.addWidget(ds)
         left_layout.addWidget(v_splitter)
         h_splitter.addWidget(left_widget)
 
