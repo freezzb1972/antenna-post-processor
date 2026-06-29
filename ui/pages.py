@@ -999,9 +999,6 @@ class AntennaParamsPage(QWidget):
         self._robust_peak: bool = False
         self._active_tab: int = 0
         self._test_mode: int = 0
-        self._required_params: set = set()
-        self._extra_params: set = set()
-
         self._left_checkboxes: Dict[str, QCheckBox] = {}
         self._right_checkboxes: Dict[str, QCheckBox] = {}
         self._left_scroll: Optional[QScrollArea] = None
@@ -1010,6 +1007,25 @@ class AntennaParamsPage(QWidget):
         self._setup_ui()
         self._load_state()
         self._rebuild_param_columns()
+
+    # _required_params / _extra_params 代理到 MainWindow (单一数据源)
+    @property
+    def _required_params(self) -> set:
+        return getattr(self._mw, '_required_params', set()) if self._mw else set()
+
+    @_required_params.setter
+    def _required_params(self, v: set):
+        if self._mw:
+            self._mw._required_params = v
+
+    @property
+    def _extra_params(self) -> set:
+        return getattr(self._mw, '_extra_params', set()) if self._mw else set()
+
+    @_extra_params.setter
+    def _extra_params(self, v: set):
+        if self._mw:
+            self._mw._extra_params = v
 
     # ── UI 构建 ──
 
@@ -1441,17 +1457,19 @@ class AntennaParamsPage(QWidget):
         self._left_checkboxes.clear()
         self._right_checkboxes.clear()
 
+        # 阻止信号，全部构建完成后一次性同步（避免部分构建状态覆盖 MainWindow）
         for grp_name, items in params:
             grp = QGroupBox(grp_name)
             gl = QVBoxLayout(grp)
             gl.setSpacing(2)
             for key, label in items:
                 cb = QCheckBox(label)
-                # 先加入 dict，再 setChecked（否则 toggled 信号触发时 cb 不在 dict 中）
                 self._left_checkboxes[key] = cb
                 self._right_checkboxes[key] = cb
                 cb.toggled.connect(lambda checked, k=key: self._sync_to_mw())
+                cb.blockSignals(True)
                 cb.setChecked(key in self._template_params)
+                cb.blockSignals(False)
                 gl.addWidget(cb)
             if grp_name == "Gain":
                 btn = QPushButton(self.tr("📡 Gain 角度设置..."))
@@ -1471,12 +1489,14 @@ class AntennaParamsPage(QWidget):
                 cb = QCheckBox(label)
                 self._right_checkboxes[key] = cb
                 cb.toggled.connect(lambda checked, k=key: self._sync_to_mw())
-                cb.setChecked(False)  # 不自动选中
+                cb.setChecked(False)
                 extra_gl.addWidget(cb)
         vbox.addWidget(extra_grp)
         vbox.addStretch()
 
         self._left_scroll.setWidget(content)
+        # 构建完成后一次性同步到 MainWindow
+        self._sync_to_mw()
         self._update_summary()
 
     
@@ -1708,8 +1728,7 @@ class AntennaParamsPage(QWidget):
         # 加载参数勾选状态：模板自动识别的 _required_params → checkbox 选中
         if hasattr(mw, '_required_params'):
             self._template_params = set(mw._required_params)
-        if hasattr(mw, '_extra_params'):
-            self._extra_params = set(mw._extra_params)
+        # _extra_params 通过 property 直接读写 MainWindow，不存本地副本
 
         if hasattr(mw, '_lag_config'):
             if not self._gain_angle_widget:

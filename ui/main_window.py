@@ -460,12 +460,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         left_layout = QVBoxLayout()
         left_layout.setContentsMargins(0, 0, 0, 0)
 
-        self._params_display = QTextEdit()
-        self._params_display.setReadOnly(True)
+        # 参数显示 — 按钮上方，紧凑单行
+        self._params_display = QLabel()
+        self._params_display.setTextFormat(Qt.RichText)
+        self._params_display.setWordWrap(False)
         self._params_display.setStyleSheet(
-            "background: rgba(0,0,0,0.03); border: none; padding: 4px; font-size: 12px;")
-        self._params_display.setMinimumWidth(250)
-        left_layout.addWidget(self._params_display, 1)
+            "padding: 2px 4px; font-size: 12px; background: rgba(0,0,0,0.03); border: none;")
+        left_layout.addWidget(self._params_display)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -2185,25 +2186,24 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         extrap = hasattr(self, '_check_extrapolate') and self._check_extrapolate.isChecked()
         robust = hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked()
 
-        lines = [f"<b>模式:</b> {mode_str}"]
+        parts = [f"<b>模式:</b> {mode_str}"]
 
-        # 显示具体参数名（非只计数）
         checked = sorted(getattr(self, '_required_params', set()) | getattr(self, '_extra_params', set()))
         if checked:
-            from src.ui_utils import _get_param_labels  # 已有函数，直接复用
+            from src.ui_utils import _get_param_labels
             labels = _get_param_labels()
             param_names = [labels.get(k, k) for k in checked]
-            lines.append(f"<b>参数:</b> {', '.join(param_names)}")
+            parts.append(f"<b>参数:</b> {', '.join(param_names)}")
         else:
-            lines.append("<b>参数:</b> <span style='color:#888;'>(未选择)</span>")
+            parts.append("<b>参数:</b> <span style='color:#888;'>(未选择)</span>")
 
         algo = []
         if extrap: algo.append("外推")
         if robust: algo.append("Robust")
-        if algo: lines.append(f"<b>算法:</b> {', '.join(algo)}")
-        lines.append(f"<b>频点:</b> {freq}")
+        if algo: parts.append(f"<b>算法:</b> {', '.join(algo)}")
+        parts.append(f"<b>频点:</b> {freq}")
 
-        self._params_display.setHtml("<br>".join(lines))
+        self._params_display.setText(" | ".join(parts))
 
     def _update_status(self):
         """更新状态栏 — 显示当前 Gain 和 AR 角度配置概要。"""
