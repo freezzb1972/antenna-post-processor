@@ -153,15 +153,17 @@ def is_efficiency_column(header: str) -> bool:
 
 
 def is_gain_column(header: str) -> bool:
-    """峰值增益列（不是 LAG / Average Gain / Gain at Theta）。"""
+    """峰值增益列（不是 LAG / Average Gain / Gain at Theta / Peak EIRP / PKGain）。
+
+    注意: PKGain / Peak Gain / Peak EIRP 由 is_peak_eirp_column() 处理。
+    """
     h = _normalize_key(header)
     if "average" in h:
         return False
     if "theta" in h:
         return False
-    # PKGain, Peak Gain, Gain (peak)
     if "pkgain" in h or "peakgain" in h or "peakeirp" in h:
-        return True
+        return False  # 交由 is_peak_eirp_column() 检测
     return h.startswith("gain") or h in ("g(dbi)", "pk")
 
 
@@ -186,9 +188,9 @@ def is_nhprp_30_column(header: str) -> bool:
 
 
 def is_peak_eirp_column(header: str) -> bool:
-    """Peak EIRP 列。"""
+    """Peak EIRP / PKGain / Peak Gain 列。"""
     h = _normalize_key(header)
-    return "peakeirp" in h or "eirppeak" in h
+    return "peakeirp" in h or "eirppeak" in h or "pkgain" in h or "peakgain" in h
 
 
 def is_ar_single_column(header: str) -> bool:

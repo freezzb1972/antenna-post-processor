@@ -70,7 +70,10 @@ class ThemeManager:
                     border-color: {accent};
                 }}
                 QGroupBox::indicator {{
+                    border: 1px solid #666;
+                    background: #2a2a2a;
                     width: 14px; height: 14px;
+                    border-radius: 2px;
                 }}
                 QGroupBox::indicator:checked {{
                     background: {accent};

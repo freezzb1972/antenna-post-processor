@@ -1133,7 +1133,7 @@ class AntennaParamsPage(QWidget):
         cust_row.addStretch()
         sl.addLayout(cust_row)
         self._chk_skip_original = QCheckBox(
-            self.tr("☐ 跳过原始步进（仅计算上述选中的步进值）"))
+            self.tr("跳过原始步进（仅计算上述选中的步进值）"))
         sl.addWidget(self._chk_skip_original)
         self._chk_gen_diff = QCheckBox(
             self.tr("生成步进差值比较表"))
