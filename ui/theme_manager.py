@@ -52,6 +52,11 @@ class ThemeManager:
         palette = cls._make_palette(theme_name)
         app.setPalette(palette)
 
+        # 全局: QSplitter 分割线 1px 细线
+        splitter_qss = """
+            QSplitter::handle { width: 1px; height: 1px; background: #555; }
+        """
+
         # 暗色主题: 为复选框/单选框指示器注入可见边框 + 勾选色
         if theme_name.startswith("dark"):
             accent = cls._ACCENT_COLORS.get(theme_name)
@@ -79,9 +84,9 @@ class ThemeManager:
                     background: {accent};
                     border-color: {accent};
                 }}
-            """)
+            """ + splitter_qss)
         else:
-            app.setStyleSheet("")  # 亮色主题使用系统原生指示器
+            app.setStyleSheet(splitter_qss)  # 亮色主题: 仅细分割线
 
         cls._current_theme = theme_name
 
