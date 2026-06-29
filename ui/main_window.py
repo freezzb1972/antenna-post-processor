@@ -2197,16 +2197,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         else:
             lines.append("<b>参数:</b> <span style='color:#888;'>(未选择)</span>")
 
-        if gain_s or gain_r:
-            parts = [f"{a}°" for a in gain_s]
-            if gain_r:
-                parts += [f"({lo}–{hi}°)" for lo, hi in gain_r]
-            lines.append(f"<b>Gain:</b> {', '.join(parts)}")
-        if ar_s or ar_r:
-            parts = [f"{a}°" for a in ar_s]
-            if ar_r:
-                parts += [f"({lo}–{hi}°)" for lo, hi in ar_r]
-            lines.append(f"<b>AR:</b> {', '.join(parts)}")
         algo = []
         if extrap: algo.append("外推")
         if robust: algo.append("Robust")

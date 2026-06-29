@@ -87,8 +87,6 @@
         "eirp"
       ],
       "exact": [
-        "pkgain",
-        "peakgain",
         "g(dbi)",
         "pk",
         "gain(dbi)"
@@ -278,7 +276,11 @@
         "peak",
         "eirp"
       ],
-      "builtin": true
+      "builtin": true,
+      "exact": [
+        "pkgain",
+        "peakgain"
+      ]
     },
     {
       "col_type": "ar_single",
