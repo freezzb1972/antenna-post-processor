@@ -1447,11 +1447,12 @@ class AntennaParamsPage(QWidget):
             gl.setSpacing(2)
             for key, label in items:
                 cb = QCheckBox(label)
-                cb.setChecked(key in self._template_params)
-                cb.toggled.connect(lambda checked, k=key: self._sync_to_mw())
-                gl.addWidget(cb)
+                # 先加入 dict，再 setChecked（否则 toggled 信号触发时 cb 不在 dict 中）
                 self._left_checkboxes[key] = cb
                 self._right_checkboxes[key] = cb
+                cb.toggled.connect(lambda checked, k=key: self._sync_to_mw())
+                cb.setChecked(key in self._template_params)
+                gl.addWidget(cb)
             if grp_name == "Gain":
                 btn = QPushButton(self.tr("📡 Gain 角度设置..."))
                 btn.clicked.connect(lambda: self._show_angle_popup("gain"))
@@ -1468,10 +1469,10 @@ class AntennaParamsPage(QWidget):
         for grp_name, items in params:
             for key, label in items:
                 cb = QCheckBox(label)
-                cb.setChecked(False)  # 不自动选中
-                cb.toggled.connect(lambda checked, k=key: self._sync_to_mw())
-                extra_gl.addWidget(cb)
                 self._right_checkboxes[key] = cb
+                cb.toggled.connect(lambda checked, k=key: self._sync_to_mw())
+                cb.setChecked(False)  # 不自动选中
+                extra_gl.addWidget(cb)
         vbox.addWidget(extra_grp)
         vbox.addStretch()
 
@@ -1692,7 +1693,7 @@ class AntennaParamsPage(QWidget):
     # ── 加载/保存状态（与 MainWindow 双向同步） ──
 
     def _load_state(self):
-        """从 MainWindow 加载状态。"""
+        """从 MainWindow 加载状态（测试模式/角度/频点/算法/参数勾选）。"""
         if not self._mw:
             return
         mw = self._mw
@@ -1703,6 +1704,13 @@ class AntennaParamsPage(QWidget):
             self._cmb_test_mode.blockSignals(True)
             self._cmb_test_mode.setCurrentIndex(mw._test_mode)
             self._cmb_test_mode.blockSignals(False)
+
+        # 加载参数勾选状态：模板自动识别的 _required_params → checkbox 选中
+        if hasattr(mw, '_required_params'):
+            self._template_params = set(mw._required_params)
+        if hasattr(mw, '_extra_params'):
+            self._extra_params = set(mw._extra_params)
+
         if hasattr(mw, '_lag_config'):
             if not self._gain_angle_widget:
                 from ui.widgets import AnglePickerWidget
@@ -1739,6 +1747,9 @@ class AntennaParamsPage(QWidget):
             self._nh_custom_angles = list(mw._nh_custom_angles)
         self._cmb_ar_output.setCurrentIndex(0 if getattr(mw, '_ar_output_db', True) else 1)
         self._sync_nh_angle_display()
+
+        # 重建参数列（checkbox 根据 _template_params 选中）
+        self._rebuild_param_columns()
 
     # ── 公共接口 ──
 

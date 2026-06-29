@@ -277,6 +277,41 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         p = getattr(self, '_file_settings_page', None)
         return p._cmb_naming_mode if p else None
 
+    @property
+    def _data_file_widget(self):
+        p = getattr(self, '_file_settings_page', None)
+        return p if p else None
+
+    @property
+    def _btn_add_files(self):
+        p = getattr(self, '_file_settings_page', None)
+        return p._btn_add_files if p else None
+
+    @property
+    def _btn_clear_selected(self):
+        p = getattr(self, '_file_settings_page', None)
+        return p._btn_clear_selected if p else None
+
+    @property
+    def _btn_clear_all(self):
+        p = getattr(self, '_file_settings_page', None)
+        return p._btn_clear_all if p else None
+
+    @property
+    def _btn_auto_match(self):
+        p = getattr(self, '_file_settings_page', None)
+        return p._btn_auto_match if p else None
+
+    @property
+    def _check_chart_eff(self):
+        p = getattr(self, '_file_settings_page', None)
+        return p._check_chart_eff if p else None
+
+    @property
+    def _check_chart_lag(self):
+        p = getattr(self, '_file_settings_page', None)
+        return p._check_chart_lag if p else None
+
     def _init_params_tab(self):
         """构建「天线参数」子节 — 频点 + 算法选项，加入 tabFile。"""
         vtab = self.ui.vTabFile  # 放入文件设置区域
@@ -1478,10 +1513,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._update_params_display()
 
     def _auto_apply_template_params(self):
-        """从模板自动识别并应用计算参数到主窗口。
+        """从模板自动识别并应用计算参数到主窗口 + AntennaParamsPage。
 
         选择模板后自动调用，无需用户打开计算参数对话框。
-        仅当检测到参数时才更新，避免覆盖用户手动设置。
+        同步更新三个目标: _required_params, AntennaParamsPage checkbox, 执行栏显示。
         """
         tp = self._get_template_params()
         if not tp:
@@ -1493,6 +1528,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         self._required_params = tp
         self._extra_params = set()
+
+        # 同步到 AntennaParamsPage（checkbox 勾选 + 模式匹配 + 角度配置）
+        if hasattr(self, '_antenna_params_page') and self._antenna_params_page:
+            self._antenna_params_page.set_template_params(tp)
+
         self._update_params_display()
 
     def _on_load_from_template(self):
@@ -2146,9 +2186,17 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         robust = hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked()
 
         lines = [f"<b>模式:</b> {mode_str}"]
+
+        # 显示具体参数名（非只计数）
         checked = sorted(getattr(self, '_required_params', set()) | getattr(self, '_extra_params', set()))
         if checked:
-            lines.append(f"<b>参数:</b> {len(checked)}个")
+            from src.ui_utils import _get_param_labels  # 已有函数，直接复用
+            labels = _get_param_labels()
+            param_names = [labels.get(k, k) for k in checked]
+            lines.append(f"<b>参数:</b> {', '.join(param_names)}")
+        else:
+            lines.append("<b>参数:</b> <span style='color:#888;'>(未选择)</span>")
+
         if gain_s or gain_r:
             parts = [f"{a}°" for a in gain_s]
             if gain_r:

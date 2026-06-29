@@ -279,10 +279,11 @@ class TestPlaceholderText:
     """输入框提示语"""
 
     def test_multi_file_widget_visible(self, window):
-        """多文件输入 Widget 已创建且可见。"""
-        assert window._data_file_widget is not None
-        assert window._btn_add_files is not None
-        assert "添加" in window._btn_add_files.text() or "add" in window._btn_add_files.text().lower()
+        """多文件输入 Widget 已创建且可见（FileSettingsPage 替代旧 _data_file_widget）。"""
+        assert window._file_settings_page is not None
+        page = window._file_settings_page
+        assert page._btn_add_files is not None
+        assert "添加" in page._btn_add_files.text() or "add" in page._btn_add_files.text().lower()
 
     def test_template_placeholder_mentions_xlsx(self, window):
         pt = window.ui.editTemplatePath.placeholderText().lower()
