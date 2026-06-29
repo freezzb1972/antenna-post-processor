@@ -22,6 +22,15 @@ from .datasource import DataSource, ResampledDataSource
 
 # ── 工具 ──────────────────────────────────────────────────────
 
+def _find_header_row(rows, max_scan=10):
+    """扫描前 max_scan 行，找到含 'Frequency' 的 header 行索引。"""
+    for ri in range(min(max_scan, len(rows))):
+        r0 = str(rows[ri][0] or "").lower() if rows[ri] else ""
+        if "frequency" in r0 or "freq" in r0:
+            return ri
+    return 0  # 回退到第 0 行
+
+
 def _safe_create_sheet(wb, base_name, suffix="", max_len=31):
     """创建工作表: 自动截断到 Excel 31字符限制，冲突时加 _01/_02 编号。"""
     max_base = max_len - len(suffix)
@@ -342,17 +351,11 @@ class ProcessingWorker(QObject):
             orig_ws = suffixed.get("")
             if orig_ws is None or len(suffixed) < 2:
                 continue
-            # 读取原始数据 (自动检测 header 行位置)
+            # 读取原始数据 (自动检测 header 行位置，不硬编码 row=0)
             rows = list(orig_ws.iter_rows(values_only=True))
             if not rows:
                 continue
-            # 扫描前 10 行找到含 "Frequency" 的行作为 header
-            header_row = 0
-            for ri in range(min(10, len(rows))):
-                r0 = str(rows[ri][0] or "").lower() if rows[ri] else ""
-                if "frequency" in r0 or "freq" in r0:
-                    header_row = ri
-                    break
+            header_row = _find_header_row(rows)
             headers = [str(c or "") for c in rows[header_row]]
             data_rows = rows[header_row + 1:]
             # 创建差值 sheet
@@ -550,13 +553,8 @@ class ProcessingWorker(QObject):
             rows = list(dws.iter_rows(values_only=True))
             if not rows:
                 continue
-            # 自动检测 header 行 (同 _add_diff_sheet)
-            header_row = 0
-            for ri in range(min(10, len(rows))):
-                r0 = str(rows[ri][0] or "").lower() if rows[ri] else ""
-                if "frequency" in r0 or "freq" in r0:
-                    header_row = ri
-                    break
+            # 自动检测 header 行 (不硬编码 row=0)
+            header_row = _find_header_row(rows)
             headers = [str(c or "") for c in rows[header_row]]
             data_rows = rows[header_row + 1:]
             if not data_rows:
