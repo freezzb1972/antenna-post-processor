@@ -114,12 +114,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self.restoreGeometry(geo)
         self._data_file_paths: List[str] = []
         self._file_entries: List[FileEntry] = []  # Phase 1: FileEntry 并行列表
-        self._data_file_widget: Optional[QWidget] = None
-        self._file_list_widget: Optional[QTableWidget] = None
-        self._match_table: Optional[QTableWidget] = None
-        self._lbl_match_status: Optional[QLabel] = None
-        self._lbl_naming_mode: Optional[QLabel] = None
-        self._cmb_naming_mode: Optional[QComboBox] = None
+        # 以下 widget 由 FileSettingsPage 统一管理，MainWindow 通过 @property 代理访问
         self._required_params: set = set()   # 用户确认的报告必需参数
         self._extra_params: set = set()      # 用户额外选择的计算参数
         self._test_mode: int = 0             # 0=passive, 1=TRP, 2=TIS
@@ -235,7 +230,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.editFullReportPath.setMinimumWidth(200)
 
     def _init_multi_file_ui(self):
-        """构建多文件选择 + 自动匹配 UI（动态插入到 vTabFile）。"""
+        """构建多文件选择 + 自动匹配 UI。
+
+        注意: 具体的按钮/列表/匹配表控件已由 FileSettingsPage._setup_ui() 统一管理，
+        此方法仅保留旧版单文件 UI 隐藏 + 全局设置。
+        """
         # ---- 隐藏旧的单文件输入行（与多文件功能重复） ----
         self.ui.lblCsv.hide()
         self.ui.editCsvPath.hide()
@@ -243,104 +242,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.groupInput.setTitle(self.tr("模板文件"))
 
         self._apply_minimum_sizes()
-
-        self._data_file_widget = QWidget()
-        layout = QVBoxLayout(self._data_file_widget)
-        layout.setContentsMargins(0, 4, 0, 0)
-        layout.setSpacing(6)
-
-        # 数据文件按钮行
-        btn_row = QHBoxLayout()
-        self._btn_add_files = QPushButton(self.tr("📂 添加数据文件..."))
-        self._btn_add_files.setToolTip(self.tr("选择多个数据文件 (Ctrl+点击多选 / 拖拽)"))
-        self._btn_clear_selected = QPushButton(self.tr("清除选中"))
-        self._btn_clear_all = QPushButton(self.tr("全部清除"))
-        self._btn_add_files.clicked.connect(self._on_add_data_files)
-        self._btn_clear_selected.clicked.connect(self._on_clear_selected_files)
-        self._btn_clear_all.clicked.connect(self._on_clear_all_files)
-        btn_row.addWidget(self._btn_add_files)
-        btn_row.addWidget(self._btn_clear_selected)
-        btn_row.addWidget(self._btn_clear_all)
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
-
-        # 文件列表 — 可滚动、自适应高度
-        self._file_list_widget = QTableWidget()
-        self._file_list_widget.setColumnCount(2)
-        self._file_list_widget.setHorizontalHeaderLabels([
-            self.tr("数据源文件"), self.tr("测试模式")
-        ])
-        self._file_list_widget.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self._file_list_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
-        self._file_list_widget.setColumnWidth(1, 140)
-        self._file_list_widget.verticalHeader().setDefaultSectionSize(28)
-        self._file_list_widget.verticalHeader().setVisible(False)
-        self._file_list_widget.setMinimumHeight(80)
-        self._file_list_widget.setMaximumHeight(180)
-        self._file_list_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._file_list_widget.setAlternatingRowColors(True)
-        self._file_list_widget.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self._file_list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        layout.addWidget(self._file_list_widget)
-
-        # 匹配表
-        self._match_table = QTableWidget()
-        self._match_table.setColumnCount(3)
-        self._match_table.setHorizontalHeaderLabels([
-            self.tr("工作表"), self.tr("数据文件"), self.tr("状态")
-        ])
-        self._match_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
-        self._match_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self._match_table.setColumnWidth(0, 120)
-        self._match_table.verticalHeader().setDefaultSectionSize(28)
-        self._match_table.verticalHeader().setVisible(False)
-        self._match_table.setMinimumHeight(120)
-        self._match_table.setMaximumHeight(280)
-        self._match_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._match_table.setAlternatingRowColors(True)
-        layout.addWidget(self._match_table)
-
-        # 自动匹配按钮行
-        match_row = QHBoxLayout()
-        self._btn_auto_match = QPushButton(self.tr("🔗 自动匹配"))
-        self._btn_auto_match.clicked.connect(self._on_auto_match)
-        self._btn_auto_match.setToolTip(self.tr("按文件命名自动匹配工作表"))
-        self._lbl_match_status = QLabel("")
-        self._lbl_match_status.setMinimumHeight(22)
-        self._lbl_match_status.setStyleSheet("padding: 2px 0;")
-        match_row.addWidget(self._btn_auto_match)
-        match_row.addWidget(self._lbl_match_status)
-        match_row.addSpacing(12)
-        # 工作表命名选项 — 紧跟在匹配按钮后面，stretch 之前
-        self._lbl_naming_mode = QLabel(self.tr("工作表命名:"))
-        match_row.addWidget(self._lbl_naming_mode)
-        self._cmb_naming_mode = QComboBox()
-        self._cmb_naming_mode.addItem(self.tr("保留原模板工作表名"), 0)
-        self._cmb_naming_mode.addItem(self.tr("用数据源名替换"), 1)
-        self._cmb_naming_mode.setToolTip(
-            self.tr("多数据源时，选择工作表命名方式：保留原模板名称 或 用数据源文件名替换"))
-        self._cmb_naming_mode.setFixedWidth(190)
-        self._cmb_naming_mode.currentIndexChanged.connect(self._on_naming_mode_changed)
-        match_row.addWidget(self._cmb_naming_mode)
-        match_row.addStretch()
-        layout.addLayout(match_row)
-
-        # 图表选择行
-        chart_row = QHBoxLayout()
-        self._check_chart_eff = QCheckBox(self.tr("效率曲线"))
-        self._check_chart_eff.setChecked(True)
-        chart_row.addWidget(self._check_chart_eff)
-        self._check_chart_lag = QCheckBox(self.tr("增益曲线"))
-        self._check_chart_lag.setChecked(True)
-        chart_row.addWidget(self._check_chart_lag)
-        chart_row.addStretch()
-        layout.addLayout(chart_row)
-
-        # 插入到 groupInput 之后
-        vtab = self.ui.vTabFile
-        idx = vtab.indexOf(self.ui.groupInput)
-        if idx >= 0:
-            vtab.insertWidget(idx + 1, self._data_file_widget)
 
         # 完整报告路径显示/隐藏
         self.ui.checkFullReport.toggled.connect(self._on_full_report_toggled)
@@ -353,6 +254,44 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         from ui.graph_viewer import GraphViewer
         self._graph_viewer = GraphViewer()
         self.ui.vTabCharts.addWidget(self._graph_viewer)
+
+    # ── Widget 代理 — 所有控件现在由 FileSettingsPage 统一管理 ──
+
+    @property
+    def _file_list_widget(self):
+        p = getattr(self, '_file_settings_page', None)
+        return p._file_list_widget if p else None
+
+    @_file_list_widget.setter
+    def _file_list_widget(self, v):
+        pass  # 忽略旧代码中的赋值，实际控件在 FileSettingsPage
+
+    @property
+    def _match_table(self):
+        p = getattr(self, '_file_settings_page', None)
+        return p._match_table if p else None
+
+    @_match_table.setter
+    def _match_table(self, v):
+        pass
+
+    @property
+    def _lbl_match_status(self):
+        p = getattr(self, '_file_settings_page', None)
+        return p._lbl_match_status if p else None
+
+    @_lbl_match_status.setter
+    def _lbl_match_status(self, v):
+        pass
+
+    @property
+    def _cmb_naming_mode(self):
+        p = getattr(self, '_file_settings_page', None)
+        return p._cmb_naming_mode if p else None
+
+    @_cmb_naming_mode.setter
+    def _cmb_naming_mode(self, v):
+        pass
 
     def _init_params_tab(self):
         """构建「天线参数」子节 — 频点 + 算法选项，加入 tabFile。"""
@@ -1022,72 +961,19 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     # 多文件操作
     # ==================================================================
 
+    # ── 旧方法代理到 FileSettingsPage (保持向后兼容) ──
+
     def _on_add_data_files(self):
-        paths, _ = QFileDialog.getOpenFileNames(
-            self, self.tr("选择数据文件 (可多选)"),
-            self._cfg.config.last_csv_paths[0] if self._cfg.config.last_csv_paths else "",
-            self.tr("所有支持格式 (*.csv *.xlsx *.xls);;CSV 文件 (*.csv);;Excel 新版 (*.xlsx);;Excel 旧版 (*.xls);;所有文件 (*)")
-        )
-        if not paths:
-            return
-        # 自动清除上次计算遗留的陈旧数据 (即使 _data_file_paths 为空仍须清 UI)
-        if self._data_stale:
-            n_stale = len(self._data_file_paths)
-            if n_stale > 0:
-                self._log(f"🗑 自动清除上次计算遗留的 {n_stale} 个文件")
-            self._data_file_paths.clear()
-            self._file_entries.clear()
-            self._file_list_widget.setRowCount(0)
-            self._match_table.setRowCount(0)
-            self._lbl_match_status.setText("")
-        existing = set(self._data_file_paths)
-        new_paths = [p for p in paths if p not in existing]
-        if not new_paths:
-            return
-        self._data_file_paths.extend(new_paths)
-        self._data_stale = False
-        self._sync_file_entries()
-        self._cfg.config.last_csv_paths = [new_paths[0]] if new_paths else []
-        self._cfg._dirty = True
-        self._refresh_data_file_ui()
-        # 无预设模板时，输出目录自动设为数据源目录
-        if not self.ui.editOutputDir.text().strip() or self.ui.editOutputDir.text() == str(Path.cwd() / "output"):
-            self.ui.editOutputDir.setText(str(Path(new_paths[0]).parent))
-        if self.ui.editTemplatePath.text().strip():
-            self._on_auto_match()
+        p = getattr(self, '_file_settings_page', None)
+        if p: p._on_add_data_files()
 
     def _on_clear_selected_files(self):
-        """清除选中数据行。"""
-        rows = sorted({idx.row() for idx in self._file_list_widget.selectedIndexes()}, reverse=True)
-        if not rows:
-            QMessageBox.information(self, self.tr("提示"), self.tr("请先在文件列表中选中要清除的行。"))
-            return
-        for r in rows:
-            if r < len(self._data_file_paths):
-                del self._data_file_paths[r]
-                if r < len(self._file_entries):
-                    del self._file_entries[r]
-        # 重建 UI (行索引已变)
-        self._refresh_data_file_ui()
-        if not self._data_file_paths:
-            self._match_table.setRowCount(0)
-            self._lbl_match_status.setText("")
-            self._data_stale = True
-        else:
-            # 剩余文件 → 重建匹配表，移除已删除文件的旧条目
-            self._data_stale = False
-            template_path = self.ui.editTemplatePath.text().strip()
-            if template_path and Path(template_path).exists():
-                self._on_auto_match()
-        self._log(f"🗑 已清除 {len(rows)} 行, 剩余 {len(self._data_file_paths)} 个文件")
+        p = getattr(self, '_file_settings_page', None)
+        if p: p._on_clear_selected_files()
 
     def _on_clear_all_files(self):
-        self._data_file_paths.clear()
-        self._file_entries.clear()
-        self._file_list_widget.setRowCount(0)
-        self._match_table.setRowCount(0)
-        self._lbl_match_status.setText("")
-        self._data_stale = True
+        p = getattr(self, '_file_settings_page', None)
+        if p: p._on_clear_all_files()
 
     def _sync_file_entries(self):
         """同步 _file_entries 与 _data_file_paths，保留已设置的 test_mode。"""

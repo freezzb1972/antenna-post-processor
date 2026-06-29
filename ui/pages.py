@@ -306,7 +306,6 @@ class FileSettingsPage(QWidget):
         self._local: dict = {}
         self._file_entries: List[FileEntry] = []
         self._worksheet_naming_mode: int = 0
-        self._data_stale: bool = True
         self._cfg = None
         if self._mw:
             from src.config_manager import get_config_manager
@@ -314,13 +313,24 @@ class FileSettingsPage(QWidget):
         # 绑定 mainwindow 已有的文件列表
         self._sync_from_mw()
 
+    @property
+    def _data_stale(self) -> bool:
+        if self._mw:
+            return getattr(self._mw, '_data_stale', True)
+        return self._local.setdefault("data_stale", True)
+
+    @_data_stale.setter
+    def _data_stale(self, v: bool):
+        if self._mw:
+            self._mw._data_stale = v
+        self._local["data_stale"] = v
+
     def _sync_from_mw(self):
         """从 MainWindow 同步已有状态。"""
         if not self._mw:
             return
         self._file_entries = list(getattr(self._mw, '_file_entries', []))
         self._worksheet_naming_mode = getattr(self._mw, '_worksheet_naming_mode', 0)
-        self._data_stale = getattr(self._mw, '_data_stale', True)
         # 刷新 UI
         self._refresh_data_file_ui()
         self._sync_match_table_from_mw()
