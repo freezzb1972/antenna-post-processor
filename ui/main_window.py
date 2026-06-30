@@ -456,18 +456,22 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 执行栏水平分割：左=天线参数+按钮 | 右=日志
         h_splitter = ThinSplitter(Qt.Horizontal)
 
-        # 左侧面板：天线参数 + 按钮 (按钮右对齐，不遮挡其他信息)
+        # 左侧面板：天线参数 + 按钮
         left_panel = QWidget()
         left_layout = QVBoxLayout()
         left_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 按钮行 — 参数文字在左侧，按钮在右侧
+        # 参数显示 — 按钮上方
+        self._params_display = QTextEdit()
+        self._params_display.setReadOnly(True)
+        self._params_display.setStyleSheet(
+            "background: rgba(0,0,0,0.03); border: none; padding: 4px; font-size: 12px;")
+        self._params_display.setMinimumWidth(250)
+        left_layout.addWidget(self._params_display, 1)
+
+        # 按钮行
         btn_row = QHBoxLayout()
-        self._params_display = QLabel()
-        self._params_display.setTextFormat(Qt.RichText)
-        self._params_display.setWordWrap(True)
-        self._params_display.setStyleSheet("padding: 2px 4px; font-size: 12px;")
-        btn_row.addWidget(self._params_display, 1)
+        btn_row.addStretch()
         btn_row.addWidget(self.ui.btnStart)
         btn_row.addWidget(self.ui.btnStop)
         left_layout.addLayout(btn_row)
@@ -2173,6 +2177,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """刷新执行栏左侧天线参数面板（实时更新，不累积）。"""
         if not hasattr(self, '_params_display') or not self._params_display:
             return
+        mode_names = {0: "📡 无源", 1: "📶 TRP", 2: "📻 TIS"}
+        mode_str = mode_names.get(self._test_mode, "?")
         gain_s = self._lag_config.singles_sorted
         gain_r = self._lag_config.ranges_sorted
         ar_cfg = getattr(self, '_ar_lag_config', None)
@@ -2182,24 +2188,24 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         extrap = hasattr(self, '_check_extrapolate') and self._check_extrapolate.isChecked()
         robust = hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked()
 
-        parts = []
+        lines = [f"<b>模式:</b> {mode_str}"]
 
         checked = sorted(getattr(self, '_required_params', set()) | getattr(self, '_extra_params', set()))
         if checked:
             from src.ui_utils import _get_param_labels
             labels = _get_param_labels()
             param_names = [labels.get(k, k) for k in checked]
-            parts.append(f"<b>参数:</b> {', '.join(param_names)}")
+            lines.append(f"<b>参数:</b> {', '.join(param_names)}")
         else:
-            parts.append("<b>参数:</b> <span style='color:#888;'>(未选择)</span>")
+            lines.append("<b>参数:</b> <span style='color:#888;'>(未选择)</span>")
 
         algo = []
         if extrap: algo.append("外推")
         if robust: algo.append("Robust")
-        if algo: parts.append(f"<b>算法:</b> {', '.join(algo)}")
-        parts.append(f"<b>频点:</b> {freq}")
+        if algo: lines.append(f"<b>算法:</b> {', '.join(algo)}")
+        lines.append(f"<b>频点:</b> {freq}")
 
-        self._params_display.setText(" | ".join(parts))
+        self._params_display.setHtml("<br>".join(lines))
 
     def _update_status(self):
         """更新状态栏 — 显示模式 + Gain/AR 角度配置概要。"""
