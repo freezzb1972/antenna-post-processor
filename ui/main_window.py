@@ -469,8 +469,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._params_display.setMinimumWidth(250)
         left_layout.addWidget(self._params_display, 1)
 
-        # 按钮行
+        # 按钮行: 模式+频点在左, 按钮在右
         btn_row = QHBoxLayout()
+        self._mode_freq_label = QLabel()
+        self._mode_freq_label.setTextFormat(Qt.RichText)
+        self._mode_freq_label.setStyleSheet("padding: 2px 4px; font-size: 12px;")
+        btn_row.addWidget(self._mode_freq_label)
         btn_row.addStretch()
         btn_row.addWidget(self.ui.btnStart)
         btn_row.addWidget(self.ui.btnStop)
@@ -2188,7 +2192,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         extrap = hasattr(self, '_check_extrapolate') and self._check_extrapolate.isChecked()
         robust = hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked()
 
-        lines = [f"<b>模式:</b> {mode_str}"]
+        # ── 上方参数面板 ──
+        lines = []
 
         # 显示具体参数名（按当前测试模式过滤）
         all_params = getattr(self, '_required_params', set()) | getattr(self, '_extra_params', set())
@@ -2205,10 +2210,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if self._test_mode == 1:
             mode_filter = passive_only | trp_only
         elif self._test_mode == 2:
-            mode_filter = passive_only | tis_only | trp_only  # TIS 含 TRP 参照
+            mode_filter = passive_only | tis_only | trp_only
         checked = sorted(k for k in all_params if k in mode_filter)
         if checked:
-            from src.ui_utils import _get_param_labels  # 已有函数，直接复用
+            from src.ui_utils import _get_param_labels
             labels = _get_param_labels()
             param_names = [labels.get(k, k) for k in checked]
             lines.append(f"<b>参数:</b> {', '.join(param_names)}")
@@ -2229,10 +2234,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if extrap: algo.append("外推")
         if robust: algo.append("Robust")
         if algo: lines.append(f"<b>算法:</b> {', '.join(algo)}")
-        lines.append(f"<b>频点:</b> {freq}")
 
         self._params_display.setHtml("<br>".join(lines))
 
+        # ── 按钮行左对齐: 模式 + 频点 ──
+        if hasattr(self, '_mode_freq_label') and self._mode_freq_label:
+            self._mode_freq_label.setText(f"<b>模式:</b> {mode_str} | <b>频点:</b> {freq}")
     def _update_status(self):
         """更新状态栏 — 显示模式 + Gain/AR 角度配置概要。"""
         mode_names = {0: "📡 无源", 1: "📶 TRP", 2: "📻 TIS"}
