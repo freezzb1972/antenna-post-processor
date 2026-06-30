@@ -52,7 +52,8 @@ from src.file_entry import FileEntry, mode_name, infer_mode_from_sheet
 from src.lag_config import LagConfig
 from src.sheet_file_matcher import extract_key, sanitize_sheet_name
 from ui.layout_utils import FlowLayout, auto_size_dialog
-from ui.widgets import AnglePickerWidget, TemplateSourceRow, OutputSettingsGroup
+from ui.widgets import (AnglePickerWidget, DataFileSelector, OutputSettingsGroup,
+    TemplateSourceRow, ThinSplitter)
 
 if TYPE_CHECKING:
     pass
@@ -135,9 +136,7 @@ class FileSettingsPage(QWidget):
         main_layout.setSpacing(0)
 
         # 左右分栏：左=输入设置 | 右=输出设置
-        h_splitter = QSplitter(Qt.Horizontal)
-        h_splitter.setHandleWidth(1)
-        h_splitter.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
+        h_splitter = ThinSplitter(Qt.Horizontal)
 
         # === 左侧：输入设置（上下分栏：模版 + 数据文件） ===
         left_widget = QWidget()
@@ -145,9 +144,7 @@ class FileSettingsPage(QWidget):
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(4)
 
-        v_splitter = QSplitter(Qt.Vertical)
-        v_splitter.setHandleWidth(1)
-        v_splitter.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
+        v_splitter = ThinSplitter(Qt.Vertical)
 
         # 报告模版组
         tpl_grp = QGroupBox(self.tr("报告模版"))
@@ -1055,9 +1052,7 @@ class AntennaParamsPage(QWidget):
         param_layout.setSpacing(8)
 
         # 左右分栏（QSplitter 可手动拖动调整宽度）
-        splitter_widget = QSplitter(Qt.Horizontal)
-        splitter_widget.setHandleWidth(1)
-        splitter_widget.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
+        splitter_widget = ThinSplitter(Qt.Horizontal)
         splitter_widget.setChildrenCollapsible(False)
 
         left_grp = QGroupBox(self.tr("天线参数（模板识别 + full_report）"))
@@ -1288,9 +1283,7 @@ class AntennaParamsPage(QWidget):
         layout.addWidget(display_grp)
 
         # ── 下半部：添加控件 ──
-        splitter = QSplitter(Qt.Vertical)
-        splitter.setHandleWidth(1)
-        splitter.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
+        splitter = ThinSplitter(Qt.Vertical)
         bottom = QWidget()
         btm = QVBoxLayout(bottom)
         btm.setContentsMargins(0, 0, 0, 0)
@@ -1629,9 +1622,7 @@ class AntennaParamsPage(QWidget):
         btns.rejected.connect(dlg.reject)
         bottom_layout.addWidget(btns)
 
-        splitter = QSplitter(Qt.Vertical)
-        splitter.setHandleWidth(1)
-        splitter.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
+        splitter = ThinSplitter(Qt.Vertical)
         splitter.addWidget(_display_grp)
         splitter.addWidget(bottom_ctls)
         splitter.setStretchFactor(0, 1)
@@ -2270,9 +2261,7 @@ class ChartSettingsPage(QWidget):
         _display_layout = QVBoxLayout(_display_grp)
         _refresh_display()
 
-        splitter = QSplitter(Qt.Vertical)
-        splitter.setHandleWidth(1)
-        splitter.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
+        splitter = ThinSplitter(Qt.Vertical)
         bottom_ctls = QWidget()
         bottom_layout = QVBoxLayout(bottom_ctls)
         bottom_layout.setContentsMargins(0, 0, 0, 0)

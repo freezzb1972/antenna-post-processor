@@ -56,6 +56,7 @@ from src.lag_config import LagConfig, PRESET_AUTOMOTIVE
 from src.scale_manager import ScaleManager, AdaptiveWidgetMixin
 from ui.compiled.ui_main_window import Ui_MainWindow
 from ui.pages import FileSettingsPage, AntennaParamsPage, ChartSettingsPage
+from ui.widgets import ThinSplitter
 
 if TYPE_CHECKING:
     from src.worker import ProcessingWorker
@@ -453,9 +454,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         exec_layout.addLayout(progress_row)
 
         # 执行栏水平分割：左=天线参数+按钮 | 右=日志
-        h_splitter = QSplitter(Qt.Horizontal)
-        h_splitter.setHandleWidth(1)
-        h_splitter.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
+        h_splitter = ThinSplitter(Qt.Horizontal)
 
         # 左侧面板：天线参数 + 按钮 (按钮右对齐，不遮挡其他信息)
         left_panel = QWidget()
@@ -484,9 +483,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         exec_layout.addWidget(h_splitter, 1)
 
         # 用 QSplitter 包裹 tabConfig + exec_bar，允许手动调整比例
-        v_splitter = QSplitter(Qt.Vertical)
-        v_splitter.setHandleWidth(1)
-        v_splitter.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
+        v_splitter = ThinSplitter(Qt.Vertical)
         # 把 tabConfig 从 rootVBox 移到 splitter
         idx = self.ui.rootVBox.indexOf(self.ui.tabConfig)
         self.ui.rootVBox.removeWidget(self.ui.tabConfig)

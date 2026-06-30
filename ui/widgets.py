@@ -12,10 +12,24 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QFormLayout, QFrame,
     QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton,
-    QSizePolicy, QSpinBox, QTableWidget, QVBoxLayout, QWidget,
+    QSizePolicy, QSpinBox, QSplitter, QSplitterHandle, QTableWidget,
+    QVBoxLayout, QWidget,
 )
 
 from src.lag_config import LagConfig
+
+
+# ═══════════════════════════════════════════════════════════════
+# ThinSplitter — 1px 分割线
+# ═══════════════════════════════════════════════════════════════
+
+class ThinSplitter(QSplitter):
+    """QSplitter 子类，handle 固定 1px (Fusion 风格原生 handle 太粗)。"""
+    def createHandle(self):
+        h = QSplitterHandle(self.orientation(), self)
+        h.setFixedWidth(1)
+        h.setFixedHeight(1)
+        return h
 
 
 # ═══════════════════════════════════════════════════════════════
