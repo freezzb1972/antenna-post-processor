@@ -103,6 +103,49 @@ def convert_aborted_to_normal(
     return output_path
 
 
+def _find_data_start(block, header_row: int, phi_col: int,
+                     theta_start_col: int, max_scan: int = 10) -> int:
+    """动态扫描找到实际数据起始行。
+
+    从 header_row+1 开始向后扫描，找到第一个"看起来像数据行"的行。
+    数据行特征：phi_col 列为数值，且 theta_start_col 开始至少有 2 个数值。
+
+    可防御格式微调（如多余空行、额外描述行），避免硬编码 +2 偏移。
+    若 max_scan 行内未找到数据行，回退到 header_row+2（兼容旧格式）。
+    """
+    for offset in range(1, max_scan + 1):
+        r = header_row + offset
+        if r >= len(block):
+            break
+        row = block[r]
+        if not row or len(row) <= phi_col:
+            continue
+
+        # 检查 phi 列是否为数值
+        phi_str = row[phi_col].strip() if phi_col < len(row) else ""
+        if not phi_str:
+            continue
+        try:
+            float(phi_str)
+        except ValueError:
+            continue  # 非数值 → 跳过（可能是标题行）
+
+        # 检查是否有足够多的 theta 数值列
+        numeric_count = 0
+        for ti in range(theta_start_col, min(len(row), theta_start_col + 10)):
+            v = row[ti].strip() if ti < len(row) else ""
+            if v:
+                try:
+                    float(v)
+                    numeric_count += 1
+                except ValueError:
+                    pass
+        if numeric_count >= 2:  # 至少 2 个 theta 值 → 确认为数据行
+            return r
+
+    return header_row + 2  # 回退兼容旧格式
+
+
 def _parse_streaming(path: str, section_names: Tuple[str, ...],
                      block_parser: Callable):
     """流式逐 section 解析 CSV，避免全量 Python 字符串加载。
@@ -231,8 +274,8 @@ def _parse_standard_section_block(block):
         freq_seen.add(freq_val)
         frequencies.append(freq_val)
 
-        # phi 数据行从 fr+2 开始（跳过 phi 标题行）
-        data_start = fr + 2
+        # phi 数据行起始: 动态扫描跳过标题行（兼容格式微调/多余空行）
+        data_start = _find_data_start(block, fr, phi_col=2, theta_start_col=3)
         data_end = freq_rows[fi + 1] if fi + 1 < len(freq_rows) else len(block)
 
         for r in range(data_start, data_end):
@@ -347,7 +390,7 @@ def _parse_section_block(block):
             pass
         phi_angles.append(phi)
 
-        data_start = tr + 2
+        data_start = _find_data_start(block, tr, phi_col=1, theta_start_col=freq_col)
         data_end = theta_rows[bi + 1] if bi + 1 < len(theta_rows) else len(block)
 
         for r in range(data_start, data_end):
@@ -375,7 +418,7 @@ def _parse_section_block(block):
     freq_to_idx = {f: i for i, f in enumerate(frequencies)}
 
     for bi, tr in enumerate(theta_rows):
-        data_start = tr + 2
+        data_start = _find_data_start(block, tr, phi_col=1, theta_start_col=freq_col)
         data_end = theta_rows[bi + 1] if bi + 1 < len(theta_rows) else len(block)
         for r in range(data_start, data_end):
             row = block[r]
