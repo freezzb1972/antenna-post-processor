@@ -1664,26 +1664,28 @@ class AntennaParamsPage(QWidget):
         mw._mode_states = [dict(s) for s in self._mode_states]
         mw._test_mode = self._test_mode
 
-        # 同步 Gain 角度 (从 AnglePickerWidget 读取)
-        gain_cfg = self._gain_angle_widget.get_config() if self._gain_angle_widget else LagConfig()
-        if hasattr(mw, '_lag_config'):
-            mw._lag_config.clear()
-            for a in sorted(set(gain_cfg.single_angles)):
-                mw._lag_config.add_single(a)
-            for lo, hi in sorted(set(gain_cfg.ranges)):
-                mw._lag_config.add_range(lo, hi)
-            mw._sync_quick_buttons()
-            mw._update_lag_display()
+        # 同步 Gain 角度 (仅当 widget 存在, 避免覆盖模板自动检测结果)
+        if self._gain_angle_widget is not None:
+            gain_cfg = self._gain_angle_widget.get_config()
+            if hasattr(mw, '_lag_config'):
+                mw._lag_config.clear()
+                for a in sorted(set(gain_cfg.single_angles)):
+                    mw._lag_config.add_single(a)
+                for lo, hi in sorted(set(gain_cfg.ranges)):
+                    mw._lag_config.add_range(lo, hi)
+                mw._sync_quick_buttons()
+                mw._update_lag_display()
 
-        # 同步 AR 角度 (从 AnglePickerWidget 读取)
-        ar_cfg = self._ar_angle_widget.get_config() if self._ar_angle_widget else LagConfig()
-        if not hasattr(mw, '_ar_lag_config'):
-            mw._ar_lag_config = LagConfig()
-        mw._ar_lag_config.clear()
-        for a in sorted(set(ar_cfg.single_angles)):
-            mw._ar_lag_config.add_single(a)
-        for lo, hi in sorted(set(ar_cfg.ranges)):
-            mw._ar_lag_config.add_range(lo, hi)
+        # 同步 AR 角度 (仅当 widget 存在且有值, 避免覆盖模板自动检测结果)
+        if self._ar_angle_widget is not None:
+            ar_cfg = self._ar_angle_widget.get_config()
+            if not hasattr(mw, '_ar_lag_config'):
+                mw._ar_lag_config = LagConfig()
+            mw._ar_lag_config.clear()
+            for a in sorted(set(ar_cfg.single_angles)):
+                mw._ar_lag_config.add_single(a)
+            for lo, hi in sorted(set(ar_cfg.ranges)):
+                mw._ar_lag_config.add_range(lo, hi)
 
         required = set(k for k, cb in self._left_checkboxes.items() if cb.isChecked())
         extra = set(k for k, cb in self._right_checkboxes.items() if cb.isChecked())

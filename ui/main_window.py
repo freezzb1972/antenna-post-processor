@@ -1966,6 +1966,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._log(message)
 
     def _on_finished(self, results, images):
+        self.ui.progressBar.setValue(self.ui.progressBar.maximum())
+        self.ui.lblProgressMsg.setText("✅ 完成")
         self._running = False
         self._worker = None
         self._data_stale = True  # 计算完成，数据变为陈旧
