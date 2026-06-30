@@ -101,6 +101,17 @@ def main():
     print(f"✅ trial_config.json 已生成 → {out_path}")
     print(f"   build_date = {config['build_date']}")
     print(f"   trial_days = {config['trial_days']}")
+
+    # 同时刷新试用许可，防止 license.json 的 issued 日期不变导致试用期缩短
+    from src.license import generate_license_file
+    from datetime import timedelta
+    today = _date.today()
+    trial_expiry = (today + timedelta(days=args.days)).isoformat()
+    lic_path = out_dir / "license.json"
+    generate_license_file(str(lic_path), "Trial User", trial_expiry, ["full"])
+    print(f"✅ license.json 已刷新 → {lic_path}")
+    print(f"   issued = {today.isoformat()}")
+    print(f"   expiry = {trial_expiry}")
     print(f"   公钥长度   = {len(config['public_key_pem'])} 字符")
     print()
     print("   打包后嵌入 EXE: pyinstaller antenna_post_processor.spec")

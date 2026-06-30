@@ -28,17 +28,17 @@
   "window_geometry": "AdnQywADAAAAAAAAAAAAAAAABBkAAAK7AAAAAAAAAAAAAAQZAAACuwAAAAAAAAAAB4AAAAAAAAAAAAAABBkAAAK7",
   "license": {
     "product": "AntennaPostProcessor",
-    "licensee": "",
-    "expiry": "PERMANENT",
+    "licensee": "Trial User",
+    "expiry": "2026-07-21",
     "features": [
       "full"
     ],
-    "issued": "",
+    "issued": "2026-06-21",
     "machine_id": "",
-    "signature": "",
-    "trial_start": "2026-06-21",
-    "trial_days": 30,
-    "trial_hmac": "97c92ee1498d000cb5bb7401defcc449ea9b353058f6ad13ea2ed0b66a89728c"
+    "signature": "MEYCIQDNdqzPdbCSs+0PxyrzJxxPQkxUqUgCaAc815gMncm8eQIhANfxr6s9ZEeKpWJ6r/kmxJ8nVD8oElXfStYhNwHex8ZY",
+    "trial_start": "",
+    "trial_days": 0,
+    "trial_hmac": ""
   },
   "version": 1
 }
