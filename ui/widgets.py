@@ -26,9 +26,13 @@ from src.lag_config import LagConfig
 class ThinSplitter(QSplitter):
     """QSplitter 子类，handle 超薄但可拖拽。"""
     def createHandle(self):
+        from PySide6.QtCore import Qt as _Qt
         h = QSplitterHandle(self.orientation(), self)
-        h.setFixedWidth(3)
-        h.setFixedHeight(3)
+        # 只固定薄边，另一边自动撑满不锁死
+        if self.orientation() == _Qt.Vertical:
+            h.setFixedHeight(3)   # 水平分割条: 高 3px, 宽撑满
+        else:
+            h.setFixedWidth(3)    # 垂直分割条: 宽 3px, 高撑满
         return h
 
 
