@@ -1664,28 +1664,25 @@ class AntennaParamsPage(QWidget):
         mw._mode_states = [dict(s) for s in self._mode_states]
         mw._test_mode = self._test_mode
 
-        # 同步 Gain 角度 (仅当 widget 存在, 避免覆盖模板自动检测结果)
-        if self._gain_angle_widget is not None:
-            gain_cfg = self._gain_angle_widget.get_config()
-            if hasattr(mw, '_lag_config'):
-                mw._lag_config.clear()
-                for a in sorted(set(gain_cfg.single_angles)):
-                    mw._lag_config.add_single(a)
-                for lo, hi in sorted(set(gain_cfg.ranges)):
-                    mw._lag_config.add_range(lo, hi)
+        # 同步 Gain / AR 角度 widget → MainWindow
+        def _sync_widget(widget, cfg_attr, has_ui=False):
+            if widget is None:
+                return
+            if not hasattr(mw, cfg_attr):
+                setattr(mw, cfg_attr, LagConfig())
+            cfg = widget.get_config()
+            dest = getattr(mw, cfg_attr)
+            dest.clear()
+            for a in sorted(set(cfg.single_angles)):
+                dest.add_single(a)
+            for lo, hi in sorted(set(cfg.ranges)):
+                dest.add_range(lo, hi)
+            if has_ui:
                 mw._sync_quick_buttons()
                 mw._update_lag_display()
 
-        # 同步 AR 角度 (仅当 widget 存在且有值, 避免覆盖模板自动检测结果)
-        if self._ar_angle_widget is not None:
-            ar_cfg = self._ar_angle_widget.get_config()
-            if not hasattr(mw, '_ar_lag_config'):
-                mw._ar_lag_config = LagConfig()
-            mw._ar_lag_config.clear()
-            for a in sorted(set(ar_cfg.single_angles)):
-                mw._ar_lag_config.add_single(a)
-            for lo, hi in sorted(set(ar_cfg.ranges)):
-                mw._ar_lag_config.add_range(lo, hi)
+        _sync_widget(self._gain_angle_widget, '_lag_config', has_ui=True)
+        _sync_widget(self._ar_angle_widget, '_ar_lag_config')
 
         required = set(k for k, cb in self._left_checkboxes.items() if cb.isChecked())
         extra = set(k for k, cb in self._right_checkboxes.items() if cb.isChecked())
