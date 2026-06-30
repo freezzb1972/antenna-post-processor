@@ -120,29 +120,34 @@ class FinalSummarySource(DataSource):
                 except (ValueError, TypeError):
                     self._phi.append(float(len(self._phi)))
 
-        # ---- 探测节结构：用已知偏移 + 兜底扫描 ----
+        # ---- 动态探测节结构：扫描标签行定位各 section ----
         self._has_phase = False
         self._theta_phase_start = 0
         self._has_phi_pol = False
         self._phi_pol_start = 0
         self._phi_phase_start = 0
 
-        # 快速扫描: 只读 Theta 振幅段后 20 行, 看是否有 "Phase" 标签
-        after_amp = self._theta_start_row + self._n_phi
-        tail_rows = list(ws0.iter_rows(min_row=after_amp, max_row=after_amp + 20, min_col=1, max_col=1, values_only=True))
-        has_phase_label = any(r[0] and isinstance(r[0], str) and 'phase' in r[0].lower() for r in tail_rows)
+        # 扫描列 A，收集所有节标签行号
+        section_labels = self._scan_section_labels(ws0)
 
-        if has_phase_label:
-            # AFN 格式: Theta amp → Theta phase → Phi amp → Phi phase
+        # Theta Phase: Theta 振幅段后第一个 "Phase" 标签 → 数据从 label+2 开始
+        after_amp = self._theta_start_row + self._n_phi
+        theta_phase_label = section_labels.get('theta_phase_label')
+        if theta_phase_label is not None:
             self._has_phase = True
+            self._theta_phase_start = theta_phase_label + 2
+
+        # Phi Power: "Phi Polarization" 标签 → 数据从 label+3 开始
+        # (label → Power sub-label → Theta/Phi header → data)
+        phi_pol_label = section_labels.get('phi_pol_label')
+        if phi_pol_label is not None:
             self._has_phi_pol = True
-            # 偏移常量 (AFN 标准布局)
-            d_phase = 364    # Theta amp→Theta phase 偏移
-            d_phi_amp = 730  # Theta amp→Phi amp 偏移
-            d_phi_phase = 1094  # Theta amp→Phi phase 偏移
-            self._theta_phase_start = self._theta_start_row + d_phase
-            self._phi_pol_start = self._theta_start_row + d_phi_amp
-            self._phi_phase_start = self._theta_start_row + d_phi_phase
+            self._phi_pol_start = phi_pol_label + 3
+
+        # Phi Phase: Phi 段后第二个 "Phase" 标签 → 数据从 label+2 开始
+        phi_phase_label = section_labels.get('phi_phase_label')
+        if phi_phase_label is not None:
+            self._phi_phase_start = phi_phase_label + 2
 
         # ---- 缓存 (LRU: 最多缓存 512 个频点，覆盖宽频测试场景) ----
         self._cache: _LRUDict = _LRUDict(maxsize=512)
@@ -224,6 +229,58 @@ class FinalSummarySource(DataSource):
 
         return theta_header_row, theta_start_row, int(phi_count), int(theta_col_count), data_type
 
+    def _scan_section_labels(self, ws) -> dict:
+        """动态扫描列 A，定位各 section 标签行号。
+
+        兼容任意行数/列数的 FinalSummary 类文件，不依赖硬编码偏移。
+        探测以下节标签：
+          - theta_phase_label: 第一个 "Phase" (Theta 振幅段之后)
+          - phi_pol_label:     "Phi Polarization"
+          - phi_phase_label:   第二个 "Phase" (Phi 振幅段之后)
+
+        Returns:
+            dict with keys: theta_phase_label, phi_pol_label, phi_phase_label
+            (values 为 int 行号或 None)
+        """
+        result = {
+            'theta_phase_label': None,
+            'phi_pol_label': None,
+            'phi_phase_label': None,
+        }
+        phase_labels_found = []
+
+        after_amp = self._theta_start_row + self._n_phi
+        max_r = ws.max_row or 2000
+
+        for row_idx, row in enumerate(
+            ws.iter_rows(min_row=1, max_row=max_r, min_col=1, max_col=1, values_only=True),
+            start=1
+        ):
+            val = row[0]
+            if val is None or not isinstance(val, str):
+                continue
+            vl = val.strip().lower()
+
+            # "Phase" 标签
+            if vl == 'phase':
+                phase_labels_found.append(row_idx)
+                # 第一个 Theta 振幅段之后的 Phase → theta_phase_label
+                if result['theta_phase_label'] is None and row_idx > after_amp:
+                    result['theta_phase_label'] = row_idx
+
+            # "Phi Polarization" 标签
+            if 'phi' in vl and 'polar' in vl:
+                result['phi_pol_label'] = row_idx
+
+        # Phi phase label: 在 Phi 段之后的第一个 Phase 标签
+        if result['phi_pol_label'] is not None:
+            for pr in phase_labels_found:
+                if pr > result['phi_pol_label']:
+                    result['phi_phase_label'] = pr
+                    break
+
+        return result
+
     @property
     def frequencies(self) -> List[float]:
         return list(self._freqs)
@@ -248,9 +305,10 @@ class FinalSummarySource(DataSource):
 
             ws = self._wb[sn]
             ntheta = self._n_theta
+            nphi = self._n_phi
 
             # 读 Theta Pol 幅度（不做 clipping — CTIA/EMQuest 标准无此要求）
-            tl = _read_matrix(ws, tsr, nphi, ntheta)
+            tl = _read_matrix(ws, self._theta_start_row, nphi, ntheta)
 
             # 读 Theta Pol 相位（如有 Phase 段）
             tp_data = None
