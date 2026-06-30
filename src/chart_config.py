@@ -110,8 +110,8 @@ class ChartConfig:
     chart_trp_freq: bool = False
     chart_trp_nhprp: bool = False
     chart_ar_freq: bool = False
-    chart_lag_vs_phi: bool = True       # LAG vs Phi 散点图 (每频点, 多theta曲线)
-    chart_ar_vs_phi: bool = True        # AR  vs Phi 散点图 (每频点, 多theta曲线)
+    chart_lag_vs_phi: bool = False      # LAG vs Phi 散点图 (待修复: 数据结构需重写)
+    chart_ar_vs_phi: bool = False       # AR  vs Phi 散点图 (待修复: 数据结构需重写)
 
     # B 类子选择: 具体角度/范围 (为空时自动使用模板默认值)
     gain_chart_angles: List[float] = field(default_factory=list)   # PK Gain + 指定 θ 单角度

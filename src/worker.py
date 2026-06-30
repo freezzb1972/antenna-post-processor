@@ -26,7 +26,7 @@ def _find_header_row(rows):
     """扫描全部行查找 header 行（复用 excel_reader 的 Frequency 检测逻辑）。
 
     类比 VBA: ws.Cells(1,1).End(xlDown) 找到第一个含 Frequency 的单元格所在行。
-    校验: 候选行至少需 3 个非空列名，并排除含数字的 metadata 行(如 "Frequency Range: 1-100 GHz")。
+    校验: 候选行 ≥3 非空列名，且数字单元格不超过半数(解雇数据行)。
     不限制扫描行数，确保不漏数据。
     """
     from .excel_reader import is_frequency_column
@@ -34,8 +34,8 @@ def _find_header_row(rows):
         if row is None:
             continue
         has_freq = False
-        has_number = False
         non_empty = 0
+        num_cells = 0
         for cell in row:
             if cell is None or str(cell).strip() == "":
                 continue
@@ -43,10 +43,10 @@ def _find_header_row(rows):
             non_empty += 1
             if is_frequency_column(v):
                 has_freq = True
-            # 含数字的 metadata 行不是 header(如 "Frequency Range: 1-100 GHz")
             if any(c.isdigit() for c in v):
-                has_number = True
-        if has_freq and non_empty >= 3 and not has_number:
+                num_cells += 1
+        # header 行: 有 Frequency + ≥3 非空 + 数字单元格不超过半数
+        if has_freq and non_empty >= 3 and num_cells <= non_empty // 2:
             return ri
     return 0  # 回退到第 0 行
 
