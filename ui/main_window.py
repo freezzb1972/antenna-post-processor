@@ -94,6 +94,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 允许拖拽文件到窗口 (优先级2)
         self.setAcceptDrops(True)
 
+        # 标记用户手动编辑输出文件名
+        self.ui.editOutputName.textEdited.connect(
+            lambda: setattr(self, '_user_set_output_name', True))
+
         # ---- 状态 ----
         self._lag_config = LagConfig(
             single_angles=[60, 70, 80, 90],
@@ -103,6 +107,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._worker: Optional[ProcessingWorker] = None
         self._running = False
         self._data_stale = True  # 数据是否为上次计算遗留 (用于自动清除)
+        self._user_set_output_name = False  # 用户手动编辑输出文件名后置 True
         # 使用统一配置管理器 (antenna_config.json)
         from src.config_manager import get_config_manager
         self._cfg = get_config_manager()
@@ -211,15 +216,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         else:
             self.ui.editOutputDir.setText(str(Path.cwd() / "output"))
 
-        # 输出文件名: 优先模板名+日期+序号
-        if template_path:
-            tpl_name = Path(template_path).stem
+        # 输出文件名: 默认用数据源名+日期，用户编辑后保留自定义
+        if not self._user_set_output_name and template_path:
             from src.template_manager import TemplateManager as TM
             out_dir = self.ui.editOutputDir.text() or str(Path.cwd() / "output")
-            fname = TM.next_available_filename(out_dir, tpl_name)
+            if self._data_file_paths:
+                src_name = Path(self._data_file_paths[0]).stem
+            else:
+                src_name = Path(template_path).stem
+            fname = TM.next_available_filename(out_dir, src_name)
             self.ui.editOutputName.setText(fname)
-        else:
-            self.ui.editOutputName.setText("antenna_report.xlsx")
 
         # 模板预设管理已移至「文件→系统设置」对话框
 
@@ -2237,9 +2243,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         self._params_display.setHtml("<br>".join(lines))
 
-        # ── 按钮行左对齐: 模式 + 频点 ──
+        # ── 按钮行左对齐: 模式 ──
         if hasattr(self, '_mode_freq_label') and self._mode_freq_label:
-            self._mode_freq_label.setText(f"<b>模式:</b> {mode_str} | <b>频点:</b> {freq}")
+            self._mode_freq_label.setText(f"{mode_str}")
     def _update_status(self):
         """更新状态栏 — 显示模式 + Gain/AR 角度配置概要。"""
         mode_names = {0: "📡 无源", 1: "📶 TRP", 2: "📻 TIS"}
