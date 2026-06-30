@@ -2190,15 +2190,26 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         lines = [f"<b>模式:</b> {mode_str}"]
 
+        # 显示具体参数名（非只计数）
         checked = sorted(getattr(self, '_required_params', set()) | getattr(self, '_extra_params', set()))
         if checked:
-            from src.ui_utils import _get_param_labels
+            from src.ui_utils import _get_param_labels  # 已有函数，直接复用
             labels = _get_param_labels()
             param_names = [labels.get(k, k) for k in checked]
             lines.append(f"<b>参数:</b> {', '.join(param_names)}")
         else:
             lines.append("<b>参数:</b> <span style='color:#888;'>(未选择)</span>")
 
+        if gain_s or gain_r:
+            parts = [f"{a}°" for a in gain_s]
+            if gain_r:
+                parts += [f"({lo}–{hi}°)" for lo, hi in gain_r]
+            lines.append(f"<b>Gain:</b> {', '.join(parts)}")
+        if ar_s or ar_r:
+            parts = [f"{a}°" for a in ar_s]
+            if ar_r:
+                parts += [f"({lo}–{hi}°)" for lo, hi in ar_r]
+            lines.append(f"<b>AR:</b> {', '.join(parts)}")
         algo = []
         if extrap: algo.append("外推")
         if robust: algo.append("Robust")
