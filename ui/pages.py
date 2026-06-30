@@ -137,6 +137,7 @@ class FileSettingsPage(QWidget):
         # 左右分栏：左=输入设置 | 右=输出设置
         h_splitter = QSplitter(Qt.Horizontal)
         h_splitter.setHandleWidth(1)
+        h_splitter.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
 
         # === 左侧：输入设置（上下分栏：模版 + 数据文件） ===
         left_widget = QWidget()
@@ -146,6 +147,7 @@ class FileSettingsPage(QWidget):
 
         v_splitter = QSplitter(Qt.Vertical)
         v_splitter.setHandleWidth(1)
+        v_splitter.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
 
         # 报告模版组
         tpl_grp = QGroupBox(self.tr("报告模版"))
@@ -1055,6 +1057,7 @@ class AntennaParamsPage(QWidget):
         # 左右分栏（QSplitter 可手动拖动调整宽度）
         splitter_widget = QSplitter(Qt.Horizontal)
         splitter_widget.setHandleWidth(1)
+        splitter_widget.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
         splitter_widget.setChildrenCollapsible(False)
 
         left_grp = QGroupBox(self.tr("天线参数（模板识别 + full_report）"))
@@ -1287,6 +1290,7 @@ class AntennaParamsPage(QWidget):
         # ── 下半部：添加控件 ──
         splitter = QSplitter(Qt.Vertical)
         splitter.setHandleWidth(1)
+        splitter.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
         bottom = QWidget()
         btm = QVBoxLayout(bottom)
         btm.setContentsMargins(0, 0, 0, 0)
@@ -1627,6 +1631,7 @@ class AntennaParamsPage(QWidget):
 
         splitter = QSplitter(Qt.Vertical)
         splitter.setHandleWidth(1)
+        splitter.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
         splitter.addWidget(_display_grp)
         splitter.addWidget(bottom_ctls)
         splitter.setStretchFactor(0, 1)
@@ -2267,6 +2272,7 @@ class ChartSettingsPage(QWidget):
 
         splitter = QSplitter(Qt.Vertical)
         splitter.setHandleWidth(1)
+        splitter.setStyleSheet("QSplitter::handle { background: transparent; border: none; }")
         bottom_ctls = QWidget()
         bottom_layout = QVBoxLayout(bottom_ctls)
         bottom_layout.setContentsMargins(0, 0, 0, 0)
