@@ -110,6 +110,8 @@ class ChartConfig:
     chart_trp_freq: bool = False
     chart_trp_nhprp: bool = False
     chart_ar_freq: bool = False
+    chart_lag_vs_phi: bool = True       # LAG vs Phi 散点图 (每频点, 多theta曲线)
+    chart_ar_vs_phi: bool = True        # AR  vs Phi 散点图 (每频点, 多theta曲线)
 
     # B 类子选择: 具体角度/范围 (为空时自动使用模板默认值)
     gain_chart_angles: List[float] = field(default_factory=list)   # PK Gain + 指定 θ 单角度
@@ -142,7 +144,8 @@ class ChartConfig:
         return (self.chart_eff_freq or self.chart_gain_freq or
                 self.chart_dir_freq or self.chart_lag_freq or
                 self.chart_trp_freq or self.chart_trp_nhprp or
-                self.chart_ar_freq)
+                self.chart_ar_freq or self.chart_lag_vs_phi or
+                self.chart_ar_vs_phi)
 
     @property
     def has_any_c_class(self) -> bool:
@@ -161,7 +164,7 @@ class ChartConfig:
             "pattern_3d_gain", "pattern_3d_eirp", "pattern_3d_ar",
             "chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
             "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp",
-            "chart_ar_freq", "cut_2d_polar", "cut_2d_rect",
+            "chart_ar_freq", "chart_lag_vs_phi", "chart_ar_vs_phi", "cut_2d_polar", "cut_2d_rect",
         ]
         merged = ChartConfig(
             elev=self.elev, azim=self.azim, dpi=self.dpi,
@@ -278,7 +281,7 @@ class ChartConfig:
             "pattern_3d_gain", "pattern_3d_eirp", "pattern_3d_ar",
             "chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
             "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp",
-            "chart_ar_freq", "cut_2d_polar", "cut_2d_rect",
+            "chart_ar_freq", "chart_lag_vs_phi", "chart_ar_vs_phi", "cut_2d_polar", "cut_2d_rect",
         ]
 
     @classmethod
@@ -301,6 +304,8 @@ class ChartConfig:
             "chart_trp_freq": "TRP vs 频率",
             "chart_trp_nhprp": "TRP+NHPRP vs 频率",
             "chart_ar_freq": "轴比 vs 频率",
+        "chart_lag_vs_phi": "LAG vs Phi 散点图",
+        "chart_ar_vs_phi": "AR vs Phi 散点图",
             "cut_2d_polar": "极坐标切面图",
             "cut_2d_rect": "直角坐标切面图",
         }

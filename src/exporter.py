@@ -279,6 +279,7 @@ def export_results(
 
     # ---- 嵌入图表 ----
     _add_charts(wb, sheet_results, info_map, chart_config, log_callback)
+    _add_phi_charts(wb, sheet_results, chart_config, log_callback)
 
     # ---- 嵌入 A/C 类图形（PNG 图片） ----
     from .chart_config import ChartConfig
@@ -440,6 +441,162 @@ def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
                                          n_rows + 5 + chart_offset, ar_series_cols[0] + 2,
                                          y_label="Axial Ratio (dB)")
                 chart_offset += 18
+
+
+def _add_phi_charts(wb, sheet_results, chart_config, log_callback=None):
+    """为每个数据 sheet 生成 LAG/AR vs Phi 散点图 (每频点一张图)。
+
+    利用 _raw_data 中的原始 2D 数组计算每频点、每 theta 角度的 LAG/AR 值，
+    写入新的 {sheet_name}_chart worksheet，每个频点一行数据 + 一张散点图。
+    """
+    if chart_config is None:
+        return
+    lag_on = getattr(chart_config, 'chart_lag_vs_phi', True)
+    ar_on = getattr(chart_config, 'chart_ar_vs_phi', True)
+    if not lag_on and not ar_on:
+        return
+
+    from openpyxl.chart import ScatterChart, Reference, Series
+    from openpyxl.utils import get_column_letter
+    import numpy as np
+
+    for sheet_name, rows in sheet_results.items():
+        if not rows or sheet_name not in wb.sheetnames:
+            continue
+        if not rows[0].get('_raw_data') or not rows[0].get('_phi_angles'):
+            continue
+
+        phi_angles = rows[0]['_phi_angles']
+        theta_angles = rows[0]['_theta_angles']
+        n_phi = len(phi_angles)
+        n_theta = len(theta_angles)
+
+        # ── 创建 chart worksheet ──
+        chart_name = f"{sheet_name}_chart"
+        if chart_name in wb.sheetnames:
+            continue  # 已存在，跳过
+        cws = wb.create_sheet(title=chart_name)
+
+        # ── 写数据表: Phi | Gain@θ1 | Gain@θ2 | ... | AR@θ1 | AR@θ2 | ... ──
+        col = 1
+        cws.cell(1, col, "Phi (°)")
+        phi_col = col; col += 1
+
+        gain_start_col = col if lag_on else None
+        if lag_on:
+            for ti in range(n_theta):
+                cws.cell(1, col, f"Gain@{theta_angles[ti]:.0f}°")
+                col += 1
+        gain_end_col = col - 1
+
+        ar_start_col = col if ar_on else None
+        if ar_on:
+            for ti in range(n_theta):
+                cws.cell(1, col, f"AR@{theta_angles[ti]:.0f}°")
+                col += 1
+        ar_end_col = col - 1
+
+        data_start_row = 2
+        chart_row_offset = 0
+
+        for freq_idx, row in enumerate(rows):
+            raw = row.get('_raw_data')
+            if not raw:
+                continue
+            er = data_start_row + freq_idx
+
+            # Write Phi angle
+            cws.cell(er, phi_col, phi_angles[freq_idx % n_phi] if freq_idx < len(rows) else None)
+
+            # Compute and write Gain at each theta
+            if lag_on and 'theta_logmag' in raw and 'phi_logmag' in raw:
+                tl = np.asarray(raw['theta_logmag'], dtype=np.float64)
+                pl = np.asarray(raw['phi_logmag'], dtype=np.float64)
+                gain_lin = np.power(10.0, tl / 10.0) + np.power(10.0, pl / 10.0)
+                gc = gain_start_col
+                for ti in range(n_theta):
+                    data = gain_lin[:, ti]  # (n_phi,) — all phi values at this theta
+                    db_vals = 10.0 * np.log10(np.maximum(data, 1e-15))
+                    cws.cell(er, gc, round(float(db_vals[freq_idx % n_phi]), 4))
+                    gc += 1
+
+            # Compute and write AR at each theta
+            if ar_on and 'theta_logmag' in raw and 'phi_logmag' in raw:
+                tl = np.asarray(raw['theta_logmag'], dtype=np.float64)
+                pl = np.asarray(raw['phi_logmag'], dtype=np.float64)
+                tp = np.asarray(raw.get('theta_phase', np.zeros_like(tl)), dtype=np.float64)
+                pp = np.asarray(raw.get('phi_phase', np.zeros_like(pl)), dtype=np.float64)
+                # AR via Stokes method (simplified: linear AR from E-field ratio)
+                e_theta = np.power(10.0, tl / 20.0) * np.exp(1j * np.radians(tp))
+                e_phi = np.power(10.0, pl / 20.0) * np.exp(1j * np.radians(pp))
+                e_rhcp = (e_theta - 1j * e_phi) / np.sqrt(2)
+                e_lhcp = (e_theta + 1j * e_phi) / np.sqrt(2)
+                mag_rhcp = np.abs(e_rhcp)
+                mag_lhcp = np.abs(e_lhcp)
+                ar_lin = (mag_rhcp + mag_lhcp) / np.maximum(np.abs(mag_rhcp - mag_lhcp), 1e-15)
+                ar_db = 20.0 * np.log10(np.maximum(ar_lin, 1.0))
+                ac = ar_start_col
+                for ti in range(n_theta):
+                    val = ar_db[freq_idx % n_phi, ti]
+                    cws.cell(er, ac, round(float(val), 4))
+                    ac += 1
+
+        n_data = len(rows)
+        if n_data < 2:
+            continue
+
+        # ── 创建散点图 (每频点一张) ──
+        chart_anchor_row = n_data + 4
+        for freq_idx in range(n_data):
+            data_row = data_start_row + freq_idx
+            if gain_start_col:
+                chart = ScatterChart()
+                chart.title = f"Gain vs Phi @ {rows[freq_idx].get('frequency', freq_idx)} MHz"
+                chart.style = 2; chart.width = 14; chart.height = 9
+                chart.x_axis.title = "Phi (°)"
+                chart.y_axis.title = "Gain (dBi)"
+                chart.y_axis.numFmt = '0.00'
+                chart.legend.position = 'b'
+
+                x_vals = Reference(cws, min_col=phi_col, min_row=data_row, max_row=data_row)
+                for ti in range(n_theta):
+                    y_vals = Reference(cws, min_col=gain_start_col + ti,
+                                        min_row=data_row, max_row=data_row)
+                    series = Series(y_vals, x_vals,
+                                    title=f"θ={theta_angles[ti]:.0f}°")
+                    series.marker.symbol = 'circle'; series.marker.size = 3
+                    series.smooth = True
+                    chart.series.append(series)
+
+                anchor = f"A{chart_anchor_row}"
+                cws.add_chart(chart, anchor)
+                chart_anchor_row += 16
+
+            if ar_start_col:
+                chart = ScatterChart()
+                chart.title = f"AR vs Phi @ {rows[freq_idx].get('frequency', freq_idx)} MHz"
+                chart.style = 2; chart.width = 14; chart.height = 9
+                chart.x_axis.title = "Phi (°)"
+                chart.y_axis.title = "AR (dB)"
+                chart.y_axis.numFmt = '0.00'
+                chart.legend.position = 'b'
+
+                x_vals = Reference(cws, min_col=phi_col, min_row=data_row, max_row=data_row)
+                for ti in range(n_theta):
+                    y_vals = Reference(cws, min_col=ar_start_col + ti,
+                                        min_row=data_row, max_row=data_row)
+                    series = Series(y_vals, x_vals,
+                                    title=f"θ={theta_angles[ti]:.0f}°")
+                    series.marker.symbol = 'circle'; series.marker.size = 3
+                    series.smooth = True
+                    chart.series.append(series)
+
+                anchor = f"A{chart_anchor_row}"
+                cws.add_chart(chart, anchor)
+                chart_anchor_row += 16
+
+        if log_callback:
+            log_callback(f"  📊 {chart_name}: LAG/AR vs Phi 图表已生成")
 
 
 def _add_multi_line_chart(ws, title, x_col, y_cols, series_names,
