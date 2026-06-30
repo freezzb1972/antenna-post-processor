@@ -417,6 +417,21 @@ def _classify_by_builtin(raw: str, norm: str) -> Optional[str]:
     if is_mismatch_loss_column(raw):    return "mismatch_loss_db"
     if is_pc_theta_column(raw):         return "pc_theta_mm"
     if is_pc_phi_column(raw):           return "pc_phi_mm"
+    # LAG/AR 正则 (非 is_* 函数, 内置检测链必须包含)
+    import re
+    if _RE_LAG_RANGE.search(norm) or _RE_LAG_RANGE_NO_PREFIX.search(norm):
+        return "lag_range"
+    if _RE_LAG_SINGLE.search(norm) or _RE_LAG_SINGLE_NO_PREFIX.search(norm):
+        return "lag_single"
+    if "average" in norm.lower() and "gain" in norm.lower():
+        _avg_range = re.search(r"(\d+)\s*[-–—~]\s*(\d+)\s*deg", norm)
+        return "lag_range" if _avg_range else "gain_avg"
+    if "gain" in norm.lower() and "theta" in norm.lower():
+        _t_range = re.search(r"(\d+)\s*[-–—~]\s*(\d+)", norm)
+        if _t_range:
+            return "lag_range"
+        if re.search(r"theta[= ]*(\d+)", norm, re.IGNORECASE):
+            return "lag_single"
     return None
 
 
@@ -459,111 +474,20 @@ def _parse_sheet(ws) -> Optional[SheetInfo]:
         norm = normalize_header(raw)
         col_letter = openpyxl.utils.get_column_letter(c)
 
-        # 分类 — 内置函数检测优先，JSON 仅做补充覆盖
+        # 分类 — 内置函数优先，JSON 仅补充，最后比率列 + unknown
         builtin_type = _classify_by_builtin(raw, norm)
-        json_type = _classify_by_json_patterns(raw)
-        if json_type is not None:
-            # JSON 覆盖内置 → 检测冲突并警告
-            if builtin_type is not None and json_type != builtin_type:
-                import sys
-                print(f"[WARNING] column_patterns.json '{json_type}' overrides "
-                      f"builtin '{builtin_type}' for header '{raw}' — "
-                      f"fix JSON to match or remove the rule", file=sys.stderr)
-            ctype = json_type
-        elif builtin_type is not None:
+        if builtin_type is not None:
             ctype = builtin_type
-        elif is_frequency_column(raw):
-            ctype = "frequency"
-        elif is_directivity_column(raw):
-            ctype = "directivity"
-        elif is_total_efficiency_column(raw):
-            # 区分 Total Efficiency(%) 和 Total Efficiency(dB)
-            if "%" in norm or "％" in norm or "pct" in norm.lower():
-                ctype = "total_efficiency_pct"
-            elif "db" in norm.lower():
-                ctype = "total_efficiency_db"
-            else:
-                ctype = "total_efficiency_pct"  # 默认当作 %
-        elif is_efficiency_column(raw):
-            # 区分 Efficiency(%) 和 Efficiency(dB)
-            if "%" in norm or "％" in norm or "pct" in norm.lower():
-                ctype = "efficiency_pct"
-            elif "db" in norm.lower():
-                ctype = "efficiency_db"
-            else:
-                ctype = "efficiency_pct"  # 默认当作 %
-        elif is_gain_column(raw):
-            ctype = "gain"
-        elif is_trp_column(raw):
-            ctype = "trp"
-        elif is_nhprp_45_column(raw):
-            ctype = "nhprp_45"
-        elif is_nhprp_30_column(raw):
-            ctype = "nhprp_30"
-        elif is_peak_eirp_column(raw):
-            ctype = "peak_eirp"
-        elif is_ar_single_column(raw):
-            ctype = "ar_single"
-        elif is_ar_range_column(raw):
-            ctype = "ar_range"
-        elif is_nhprp_225_column(raw):
-            ctype = "nhprp_225"
-        elif is_uh_prp_column(raw):
-            ctype = "uh_prp"
-        elif is_lh_prp_column(raw):
-            ctype = "lh_prp"
         else:
-            # 比率列 (NHPRP4 / TRP Ratio → nhprp45_ratio_db 等)
-            ratio_type = detect_ratio_column_type(raw)
-            if ratio_type is not None:
-                ctype = ratio_type
-            elif is_boresight_phi_column(raw):
-                ctype = "boresight_phi"
-            elif is_boresight_theta_column(raw):
-                ctype = "boresight_theta"
-            elif is_max_power_column(raw):
-                ctype = "max_power"
-            elif is_min_power_column(raw):
-                ctype = "min_power"
-            elif is_avg_gain_column(raw):
-                ctype = "avg_gain"
-            elif is_avg_power_column(raw):
-                ctype = "avg_power"
-            elif is_xpi_boresight_column(raw):
-                ctype = "xpi_boresight"
-            elif is_xpi_mean_column(raw):
-                ctype = "xpi_mean"
-            elif is_xpi_min_column(raw):
-                ctype = "xpi_min"
-            elif is_mismatch_loss_column(raw):
-                ctype = "mismatch_loss_db"
-            elif is_pc_theta_column(raw):
-                ctype = "pc_theta_mm"
-            elif is_pc_phi_column(raw):
-                ctype = "pc_phi_mm"
-            elif _RE_LAG_RANGE.search(norm) or _RE_LAG_RANGE_NO_PREFIX.search(norm):
-                ctype = "lag_range"
-            elif _RE_LAG_SINGLE.search(norm) or _RE_LAG_SINGLE_NO_PREFIX.search(norm):
-                ctype = "lag_single"
-            elif "average" in norm.lower() and "gain" in norm.lower():
-                # "Average Gain (dB)" ≈ LAG — 从列头尝试提取角度范围
-                _avg_range = re.search(r"(\d+)\s*[-–—~]\s*(\d+)\s*deg", norm)
-                if _avg_range:
-                    ctype = "lag_range"
-                else:
-                    ctype = "gain_avg"
-            elif "gain" in norm.lower() and "theta" in norm.lower():
-                # "Gain at Theta=0~70 (dB)" → LAG range
-                _t_range = re.search(r"(\d+)\s*[-–—~]\s*(\d+)", norm)
-                if _t_range:
-                    ctype = "lag_range"
-                # "Gain at Theta=30\nLAG" → LAG single angle
-                elif re.search(r"theta[= ]*(\d+)", norm, re.IGNORECASE):
-                    ctype = "lag_single"
+            json_type = _classify_by_json_patterns(raw)
+            if json_type is not None:
+                ctype = json_type
+            else:
+                ratio_type = detect_ratio_column_type(raw)
+                if ratio_type is not None:
+                    ctype = ratio_type
                 else:
                     ctype = "unknown"
-            else:
-                ctype = "unknown"
 
         cinfo = ColumnInfo(
             col_letter=col_letter,
