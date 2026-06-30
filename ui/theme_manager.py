@@ -10,17 +10,7 @@ import sys
 
 from PySide6.QtCore import QSettings
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import (
-    QApplication, QCommonStyle, QProxyStyle, QStyle, QStyleFactory,
-)
-
-
-class _ThinSplitterStyle(QProxyStyle):
-    """Fusion 风格的 QSplitter 分割线强制 1px。"""
-    def pixelMetric(self, metric, option=None, widget=None):
-        if metric == QStyle.PM_SplitterWidth:
-            return 1
-        return super().pixelMetric(metric, option, widget)
+from PySide6.QtWidgets import QApplication, QStyleFactory
 
 
 class ThemeManager:
@@ -58,7 +48,7 @@ class ThemeManager:
         if app is None:
             return
 
-        app.setStyle(_ThinSplitterStyle(QStyleFactory.create("Fusion")))
+        app.setStyle(QStyleFactory.create("Fusion"))
         palette = cls._make_palette(theme_name)
         app.setPalette(palette)
 

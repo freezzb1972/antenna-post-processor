@@ -454,6 +454,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 执行栏水平分割：左=天线参数+按钮 | 右=日志
         h_splitter = QSplitter(Qt.Horizontal)
+        h_splitter.setHandleWidth(1)
 
         # 左侧面板：天线参数 + 按钮 (按钮右对齐，不遮挡其他信息)
         left_panel = QWidget()
@@ -483,6 +484,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 用 QSplitter 包裹 tabConfig + exec_bar，允许手动调整比例
         v_splitter = QSplitter(Qt.Vertical)
+        v_splitter.setHandleWidth(1)
         # 把 tabConfig 从 rootVBox 移到 splitter
         idx = self.ui.rootVBox.indexOf(self.ui.tabConfig)
         self.ui.rootVBox.removeWidget(self.ui.tabConfig)
