@@ -2190,8 +2190,23 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         lines = [f"<b>模式:</b> {mode_str}"]
 
-        # 显示具体参数名（非只计数）
-        checked = sorted(getattr(self, '_required_params', set()) | getattr(self, '_extra_params', set()))
+        # 显示具体参数名（按当前测试模式过滤）
+        all_params = getattr(self, '_required_params', set()) | getattr(self, '_extra_params', set())
+        # 模式过滤: 无源不显示 TRP/TIS 专有参数
+        passive_only = {"gain", "lag_single", "lag_range", "directivity", "efficiency_pct",
+                        "efficiency_db", "total_efficiency_pct", "mismatch_loss_db",
+                        "ar_single", "ar_range", "boresight_theta", "boresight_phi",
+                        "max_power", "min_power", "avg_gain", "avg_power",
+                        "xpi_boresight", "xpi_mean", "xpi_min",
+                        "pc_theta_mm", "pc_phi_mm", "peak_eirp"}
+        trp_only = {"trp", "nhprp_45", "nhprp_30", "nhprp_225", "uh_prp", "lh_prp"}
+        tis_only = {"tis"}
+        mode_filter = passive_only
+        if self._test_mode == 1:
+            mode_filter = passive_only | trp_only
+        elif self._test_mode == 2:
+            mode_filter = passive_only | tis_only | trp_only  # TIS 含 TRP 参照
+        checked = sorted(k for k in all_params if k in mode_filter)
         if checked:
             from src.ui_utils import _get_param_labels  # 已有函数，直接复用
             labels = _get_param_labels()

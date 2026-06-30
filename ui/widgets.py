@@ -24,11 +24,14 @@ from src.lag_config import LagConfig
 # ═══════════════════════════════════════════════════════════════
 
 class ThinSplitter(QSplitter):
-    """QSplitter 子类，handle 固定 1px (Fusion 风格原生 handle 太粗)。"""
+    """QSplitter 子类，handle 超薄但可拖拽。"""
     def createHandle(self):
+        from PySide6.QtCore import Qt as _Qt
         h = QSplitterHandle(self.orientation(), self)
-        h.setFixedWidth(1)
-        h.setFixedHeight(1)
+        if self.orientation() == _Qt.Vertical:
+            h.setFixedHeight(3)   # 水平分割条，3px 可抓取
+        else:
+            h.setFixedWidth(1)    # 垂直分割条，1px 宽度够用
         return h
 
 
