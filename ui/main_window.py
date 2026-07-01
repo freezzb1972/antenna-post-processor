@@ -1737,12 +1737,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.btnStop.setEnabled(running)
 
     def _enter_previewing(self):
-        self._running = True
         self._set_preview_state(self._PREVIEWING)
         self.ui.btnStart.setText(self.tr("⏳ 预览中..."))
 
     def _enter_exporting(self):
-        self._running = True
         self._set_preview_state(self._EXPORTING)
         self._btn_export.setText(self.tr("⏳ 报告中..."))
 
