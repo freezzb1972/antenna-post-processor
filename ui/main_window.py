@@ -1729,7 +1729,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         idle = state == self._PREVIEW_IDLE
         running = state == self._PREVIEWING or state == self._EXPORTING
         ready = state == self._READY
-        self.ui.btnStart.setEnabled(idle or ready)
+        self.ui.btnStart.setEnabled(idle)  # 仅 IDLE 可预览, READY 时禁用以防误点
         self._btn_export.setEnabled(ready)
         self.ui.btnStop.setEnabled(running)
 
@@ -1897,17 +1897,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 在大量文件(>200)时每文件都调用会导致 UI 卡死. 每 20 个文件刷新一次
         # 在响应性和性能之间取得了平衡.
         file_page = getattr(self, '_file_settings_page', None)
-        # 复用预览已加载的数据源（跳过重新打开 workbook）
         if reuse_datasource and getattr(self, '_cached_datasource_map', None):
             datasource_map = self._cached_datasource_map
-            self.ui.progressBar.setMaximum(1)
-            self.ui.progressBar.setValue(1)
+            self.ui.progressBar.setMaximum(1); self.ui.progressBar.setValue(1)
             self.ui.lblProgressMsg.setText(self.tr("✅ 复用已加载数据"))
         else:
-            match_table = file_page._match_table if file_page else getattr(self, '_match_table', None)
-            total_files = max(match_table.rowCount() if match_table else 0, 1)
-            self.ui.progressBar.setMaximum(total_files)
-            self.ui.progressBar.setValue(0)
+            # 不确定进度模式 (0-0) — 避免打开大文件时显示 100% 假象
+            self.ui.progressBar.setRange(0, 0)
             self.ui.lblProgressMsg.setText(self.tr("正在加载数据文件..."))
             if file_page:
                 datasource_map = file_page.build_datasource_map(
