@@ -239,6 +239,12 @@ def check_g1_widget_tree(window) -> List[str]:
         if w is not None and not w.isHidden():
             errors.append(f"VISIBLE: ui.{attr} should be hidden")
 
+    # G1x: 程序化 widget 必须有 parent（否则变成独立顶层窗口）
+    for attr in DYNAMIC_WIDGETS_REQUIRED:
+        w = getattr(window, attr, None)
+        if w is not None and w.parent() is None:
+            errors.append(f"ORPHAN: window.{attr} has no parent — must pass parent to constructor")
+
     for attr, min_w, min_h in MIN_SIZE_REQUIREMENTS:
         w = getattr(window.ui, attr, None)
         if w is None:
