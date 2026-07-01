@@ -820,3 +820,104 @@ antenna-post-processor/
   <li>验证包括：必需列检查、值范围检查、类型检查</li>
   <li>验证警告不阻止报告生成，仅在日志中提示</li>
 </ul>
+
+<!-- ============================================================ -->
+<h2 id="preview-export">24. 预览-出报告 两阶段流程</h2>
+
+<p>从 v2.x 起，处理分为两个阶段：</p>
+
+<ol>
+  <li><strong>👁 预览：</strong>快速计算所有天线参数（3-5秒），不生成 Excel/图表/报告。结果在查看器中交互确认。</li>
+  <li><strong>📄 出报告：</strong>基于确认的参数，全套导出（Excel 模板填充 + 3D 方向图 + 频点曲线 + 完整报告 + Word 图表报告）。</li>
+</ol>
+
+<p><strong>按钮状态机：</strong></p>
+<table border="1" cellpadding="4" cellspacing="0">
+  <tr><th>状态</th><th>预览</th><th>出报告</th><th>停止</th></tr>
+  <tr><td>IDLE</td><td>可用</td><td>禁用</td><td>禁用</td></tr>
+  <tr><td>PREVIEWING</td><td>禁用</td><td>禁用</td><td>可用</td></tr>
+  <tr><td>READY</td><td>可用</td><td>可用</td><td>禁用</td></tr>
+  <tr><td>EXPORTING</td><td>禁用</td><td>禁用</td><td>可用</td></tr>
+</table>
+
+<p><strong>数据陈旧检测：</strong></p>
+<ul>
+  <li>天线参数页：LAG 角度 / 算法选项 / 参数勾选变更 → READY 自动回到 IDLE，强制重新预览</li>
+  <li>图表配置页：输出路径 / 图表类型 / 视角参数变更 → 不影响预览状态（仅影响导出）</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="word-template">25. Word 模板报告</h2>
+
+<p>支持将计算结果和图表填入 Word 模板 (<code>.docx</code>)，定位方式四种（优先级排序）：</p>
+
+<h3>25.1 内容控件 (Content Control / SDT) — 优先级 1</h3>
+<p>在 Word 中插入"格式文本内容控件"，设置<strong>标记 (Tag)</strong> 为变量名（如 <code>gain</code>、<code>efficiency_pct</code>），程序按 tag 匹配填充值。</p>
+
+<h3>25.2 书签 (Bookmark) — 优先级 2</h3>
+<p>用于插入图表 PNG。在 Word 中插入书签，程序在书签位置后插入图片。</p>
+<ul>
+  <li>书签名 = 图表组名（如 <code>3D Gain Pattern</code>、<code>2D Polar Cut (φ=0°)</code>）</li>
+  <li>完整图表 key 列表见 <a href="#chart-keys">25.4 节</a></li>
+</ul>
+
+<h3>25.3 表格 (Table) — 优先级 3</h3>
+<p>Word 表格列头自动识别，复用 <code>column_patterns.json</code> 的分类规则。程序自动匹配列类型并填入对应数据。表格行数不足时自动扩展。</p>
+
+<h3>25.4 占位符 {{变量}} — 优先级 4</h3>
+<p>在 Word 段落中用 <code>{{变量名}}</code> 语法，程序搜索替换。支持任意位置（段落内、表格内、页眉页脚）。</p>
+
+<h3 id="chart-keys">25.5 图表 key 完整列表</h3>
+<table border="1" cellpadding="3" cellspacing="0">
+  <tr><th>Key</th><th>类别</th><th>说明</th></tr>
+  <tr><td>3d_gain</td><td>A 类</td><td>3D 增益方向图</td></tr>
+  <tr><td>3d_eirp</td><td>A 类</td><td>3D EIRP 方向图</td></tr>
+  <tr><td>3d_ar</td><td>A 类</td><td>3D 轴比方向图</td></tr>
+  <tr><td>3d_etheta</td><td>A 类</td><td>3D E_θ 分量方向图</td></tr>
+  <tr><td>3d_ephi</td><td>A 类</td><td>3D E_φ 分量方向图</td></tr>
+  <tr><td>2d_polar_phi{N}</td><td>C 类</td><td>极坐标切面 φ=N°</td></tr>
+  <tr><td>2d_rect_phi{N}</td><td>C 类</td><td>直角坐标切面 φ=N°</td></tr>
+  <tr><td>azimuth_polar</td><td>方位面</td><td>增益方位面极坐标图</td></tr>
+  <tr><td>azimuth_polar_ar</td><td>方位面</td><td>AR 方位面极坐标图</td></tr>
+  <tr><td>B: {参数名} vs Freq</td><td>B 类</td><td>频点曲线 PNG（如 "B: Efficiency vs Freq"）</td></tr>
+</table>
+
+<h3>25.6 循环域 {{loop_start_<key>}} / {{loop_end_<key>}}</h3>
+<p>在 Word 中插入两个段落标记循环域的开始和结束。程序识别配对，对每个频点 OXML 深拷贝展开组内段落。</p>
+
+<p>示例：</p>
+<pre>
+{{loop_start_freq}}
+Frequency: {{frequency}} MHz
+Gain: {{gain}} dBi
+Efficiency: {{efficiency_pct}}%
+{{loop_end_freq}}
+</pre>
+
+<h3>25.7 生成示例模板</h3>
+<p>运行以下 Python 代码可在 <code>output/word_template_example.docx</code> 生成示例模板（含封面 SDT + 书签 + 循环域）：</p>
+<pre>
+from docx import Document
+from docx.oxml.ns import qn
+doc = Document()
+doc.add_heading("天线测试报告", 0)
+# 封面内容控件
+p = doc.add_paragraph()
+run = p.add_run("增益: ")
+sdt = doc.element.body.makeelement(qn('w:sdt'), {})
+sdtPr = sdt.makeelement(qn('w:sdtPr'), {})
+tag = sdtPr.makeelement(qn('w:tag'), {qn('w:val'): 'gain'})
+sdtPr.append(tag); sdt.append(sdtPr)
+sdtContent = sdt.makeelement(qn('w:sdtContent'), {})
+sdtContent.append(p._element)
+sdt.append(sdtContent)
+p._element.getparent().replace(p._element, sdt)
+# 循环域段落
+doc.add_paragraph("{{loop_start_freq}}")
+doc.add_paragraph("Frequency: {{frequency}} MHz, Gain: {{gain}} dBi")
+doc.add_paragraph("{{loop_end_freq}}")
+doc.save("output/word_template_example.docx")
+</pre>
+
+</body>
+</html>
