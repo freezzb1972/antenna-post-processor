@@ -69,6 +69,7 @@
   <li><a href="#i18n">22. 国际化支持 (中/英)</a></li>
   <li><a href="#report-config">23. 报告列配置</a></li>
   <li><a href="#azimuth-polar">24. 方位面极坐标切面图 (Gain/AR)</a></li>
+  <li><a href="#word-template">25. Word 模板报告 (书签/循环/SDT)</a></li>
 </ol>
 </div>
 
@@ -652,6 +653,92 @@ antenna-post-processor/
 
 <div class="note">
   <strong>注意：</strong> 方位面切面图需要 Phase 数据（Thera/Phi Phase）。如果数据源不含相位信息（如某些 FinalSummary），AR 方位面图无法生成。
+</div>
+
+<!-- ============================================================ -->
+<h2 id="word-template">25. Word 模板报告 (书签/循环/SDT)</h2>
+
+<p>除了自动生成 Word 图表报告外，软件还支持用 Word 模板精确定制报告布局。用户做一个 .docx 模板，在需要的位置插入书签、循环域和内容控件，程序处理时自动填充数据。</p>
+
+<h3>25.1 图表 Key 定义</h3>
+<div class="card">
+<table>
+  <tr><th>Key</th><th>图表类型</th><th>类别</th></tr>
+  <tr><td><code>gain_3d</code></td><td>3D 增益球面方向图</td><td>A 类</td></tr>
+  <tr><td><code>etheta_3d</code></td><td>3D E_θ 分量方向图</td><td>A 类</td></tr>
+  <tr><td><code>ephi_3d</code></td><td>3D E_φ 分量方向图</td><td>A 类</td></tr>
+  <tr><td><code>ar_3d</code></td><td>3D 轴比方向图</td><td>A 类</td></tr>
+  <tr><td><code>eirp_3d</code></td><td>3D EIRP 方向图</td><td>A 类</td></tr>
+  <tr><td><code>elevation_polar</code></td><td>极坐标俯仰面切面</td><td>C 类</td></tr>
+  <tr><td><code>elevation_rect</code></td><td>直角坐标俯仰面切面</td><td>C 类</td></tr>
+  <tr><td><code>azimuth_gain</code></td><td>方位面极坐标 Gain</td><td>Azimuth</td></tr>
+  <tr><td><code>azimuth_ar</code></td><td>方位面极坐标 AR</td><td>Azimuth</td></tr>
+  <tr><td><code>freq_eff</code></td><td>Efficiency vs Freq</td><td>B 类</td></tr>
+  <tr><td><code>freq_gain</code></td><td>Peak Gain vs Freq</td><td>B 类</td></tr>
+  <tr><td><code>freq_dir</code></td><td>Directivity vs Freq</td><td>B 类</td></tr>
+  <tr><td><code>freq_trp</code></td><td>TRP vs Freq</td><td>B 类</td></tr>
+  <tr><td><code>freq_nhprp45</code></td><td>NHPRP ±45° vs Freq</td><td>B 类</td></tr>
+  <tr><td><code>freq_ar</code></td><td>AR vs Freq</td><td>B 类</td></tr>
+  <tr><td><code>freq_lag</code></td><td>LAG @θ vs Freq</td><td>B 类</td></tr>
+  <tr><td><code>freq_avggain</code></td><td>Average Gain vs Freq</td><td>B 类</td></tr>
+</table>
+</div>
+
+<h3>25.2 书签定位</h3>
+
+<p>图表用书签定位。<strong>单图模式：</strong>书签名直接使用图表 Key，如 <code>gain_3d</code>。每个频点单独插入。</p>
+
+<p><strong>循环模式：</strong>用 <code>loop_start_&lt;key&gt;</code> 和 <code>loop_end_&lt;key&gt;</code> 包围要重复的区域，程序自动为每个频点复制一份。循环区域内可以用 <code>&lt;key&gt;</code> 定位当前频点的图。</p>
+
+<div class="card">
+<p><strong>模板中这样写：</strong></p>
+<div class="formula">
+📑 loop_start_azimuth_gain        ← 循环开始书签
+  频率: [📋 freq]                  ← SDT 内容控件, 自动填频点值
+  [📑 azimuth_gain]               ← 图片书签, 每循环换当前频点图
+📑 loop_end_azimuth_gain          ← 循环结束书签
+</div>
+<p><strong>处理后变成：</strong></p>
+<div class="formula">
+频率: 1154 MHz
+[Gain 方位面极坐标图]
+─────────────────────
+频率: 1155 MHz
+[Gain 方位面极坐标图]
+─────────────────────
+... (共 139 组)
+</div>
+</div>
+
+<h3>25.3 内容控件 (SDT) — 自动填充元数据</h3>
+
+<p>在 Word 中使用"开发工具 → 纯文本内容控件"，设置标签 (tag) 为以下值，程序自动填充：</p>
+
+<table>
+  <tr><th>标签名</th><th>自动填充值</th></tr>
+  <tr><td><code>antenna_model</code></td><td>天线型号</td></tr>
+  <tr><td><code>customer_name</code></td><td>客户名称</td></tr>
+  <tr><td><code>test_date</code></td><td>测试日期</td></tr>
+  <tr><td><code>freq_range</code></td><td>频率范围</td></tr>
+  <tr><td><code>theta_range</code></td><td>Theta 角度范围</td></tr>
+  <tr><td><code>operator</code></td><td>操作员</td></tr>
+</table>
+
+<h3>25.4 完整模板示例</h3>
+
+<div class="card">
+<p>软件自带示例模板 <code>output/word_template_example.docx</code>，包含：</p>
+<ul>
+  <li>封面 — SDT 内容控件 (天线型号/客户/日期/频段)</li>
+  <li>3D 增益方向图 — 书签 <code>gain_3d</code></li>
+  <li>方位面切面循环 — 书签 <code>loop_start_azimuth_gain</code> / <code>loop_end_azimuth_gain</code></li>
+  <li>参数表 — 列头自动识别填入</li>
+</ul>
+<p>用户可直接修改此模板，调整布局、字体、颜色后保存为自己的客户模板。</p>
+</div>
+
+<div class="note">
+  <strong>提示：</strong>在 Word 中插入书签: <strong>插入 → 书签</strong>。插内容控件: <strong>开发工具 → 纯文本内容控件 → 属性 → 标签</strong>。如果看不到"开发工具"选项卡，需在 Word 选项中启用。
 </div>
 
 <hr style="margin:36px 0 16px; border:none; border-top:1px solid var(--border);">
