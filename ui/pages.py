@@ -491,7 +491,7 @@ class FileSettingsPage(QWidget):
             az.data_ar_output_filename = self._edit_az_ar_fn.text().strip()
 
     def _sync_azimuth_cut_switch(self):
-        """勾选 Word 或数据输出时自动开启方位面开关。"""
+        """勾选 Word 或数据输出时自动开启/关闭方位面开关。"""
         if not self._mw:
             return
         az = getattr(self._mw, '_azimuth_config', None)
@@ -502,8 +502,7 @@ class FileSettingsPage(QWidget):
         ) or (
             getattr(self, '_check_out_data', None) is not None and self._check_out_data.isChecked()
         )
-        if need_azimuth:
-            az.cut_azimuth_polar = True
+        az.cut_azimuth_polar = need_azimuth
 
     def get_output_flags(self):
         """返回输出开关: (excel, word, data)。"""

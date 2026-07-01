@@ -273,8 +273,8 @@ def _write_data_table(ws, rows: List[Dict[str, Any]], start_row: int):
             # 跳过内部数据键和非标量值 (numpy array / dict / BytesIO)
             if key.startswith("_") or isinstance(val, (list, dict, io.BytesIO)):
                 val = ""
-            # 跳过 numpy array
-            if hasattr(val, 'shape') or hasattr(val, 'dtype'):
+            # 只跳过多维 array (ndim>0), 保留标量 np.float64 等 (openpyxl 可接受)
+            if hasattr(val, 'ndim') and val.ndim > 0:
                 val = ""
             cell.value = val
             cell.font = DATA_FONT
