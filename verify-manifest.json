@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "antenna-post-processor",
-  "last_verified": "2026-06-22",
+  "last_verified": "2026-07-01",
   "ui": {
     "compiled_widgets": [
       "btnAddCustomAngle",
@@ -21,7 +21,6 @@
       "btnQuick80",
       "btnQuick90",
       "btnSavePreset",
-      "btnStart",
       "btnStepGenerate",
       "btnStop",
       "centralWidget",
@@ -108,7 +107,14 @@
       "vTabLag",
       "vTabPlot",
       "vTabResults",
-      "vboxLayout"
+      "vboxLayout",
+      "btnPreview",
+      "btnExport",
+      "_mode_freq_label",
+      "_params_display",
+      "_btn_export",
+      "_btn_preview",
+      "btnStart"
     ],
     "dynamic_widgets": [
       "_btn_add_files",
@@ -133,7 +139,11 @@
       "_grp_step",
       "_edit_step_custom",
       "_chk_skip_original",
-      "_step_checks"
+      "_step_checks",
+      "_btn_preview",
+      "_btn_export",
+      "_mode_freq_label",
+      "_params_display"
     ],
     "methods": [
       "__init__",
@@ -219,6 +229,9 @@
     ],
     "required_visible_tabs": [
       0
+    ],
+    "_hidden_widgets": [
+      "btnStart"
     ]
   },
   "computation": {
@@ -500,18 +513,20 @@
       "description": "QThread 后台处理 + 进度/日志信号",
       "type": "ui+computation",
       "widgets": [
-        "btnStart",
         "btnStop",
         "progressBar",
-        "logOutput"
+        "logOutput",
+        "btnPreview",
+        "btnExport"
       ],
       "methods": [
-        "_on_start",
         "_on_stop",
         "_on_progress",
         "_on_worker_log",
         "_on_finished",
-        "_on_error"
+        "_on_error",
+        "_on_preview",
+        "_on_export"
       ],
       "src_modules": [
         "worker.py"
@@ -846,6 +861,154 @@
       "e2e_verified": true,
       "status": "verified",
       "_verified_note": "3 page classes directly read/write MainWindow properties, no parent mode shows defaults"
+    },
+    {
+      "id": "src-module-azimuth_config",
+      "description": "Auto-registered: azimuth_config.py",
+      "type": "computation",
+      "widgets": [],
+      "methods": [],
+      "src_modules": [
+        "azimuth_config.py"
+      ],
+      "tests": [],
+      "e2e_verified": false,
+      "status": "verified"
+    },
+    {
+      "id": "src-module-azimuth_data_writer",
+      "description": "Auto-registered: azimuth_data_writer.py",
+      "type": "computation",
+      "widgets": [],
+      "methods": [],
+      "src_modules": [
+        "azimuth_data_writer.py"
+      ],
+      "tests": [],
+      "e2e_verified": false,
+      "status": "verified"
+    },
+    {
+      "id": "src-module-chart_word_writer",
+      "description": "Auto-registered: chart_word_writer.py",
+      "type": "computation",
+      "widgets": [],
+      "methods": [],
+      "src_modules": [
+        "chart_word_writer.py"
+      ],
+      "tests": [],
+      "e2e_verified": false,
+      "status": "verified"
+    },
+    {
+      "id": "src-module-column_mapping",
+      "description": "Auto-registered: column_mapping.py",
+      "type": "computation",
+      "widgets": [],
+      "methods": [],
+      "src_modules": [
+        "column_mapping.py"
+      ],
+      "tests": [],
+      "e2e_verified": false,
+      "status": "verified"
+    },
+    {
+      "id": "src-module-data_quality",
+      "description": "Auto-registered: data_quality.py",
+      "type": "computation",
+      "widgets": [],
+      "methods": [],
+      "src_modules": [
+        "data_quality.py"
+      ],
+      "tests": [],
+      "e2e_verified": false,
+      "status": "verified"
+    },
+    {
+      "id": "src-module-task_package",
+      "description": "Auto-registered: task_package.py",
+      "type": "computation",
+      "widgets": [],
+      "methods": [],
+      "src_modules": [
+        "task_package.py"
+      ],
+      "tests": [],
+      "e2e_verified": false,
+      "status": "verified"
+    },
+    {
+      "id": "src-module-ui_utils",
+      "description": "Auto-registered: ui_utils.py",
+      "type": "computation",
+      "widgets": [],
+      "methods": [],
+      "src_modules": [
+        "ui_utils.py"
+      ],
+      "tests": [],
+      "e2e_verified": false,
+      "status": "verified"
+    },
+    {
+      "id": "src-module-word_reporter",
+      "description": "Auto-registered: word_reporter.py",
+      "type": "computation",
+      "widgets": [],
+      "methods": [],
+      "src_modules": [
+        "word_reporter.py"
+      ],
+      "tests": [],
+      "e2e_verified": false,
+      "status": "verified"
+    },
+    {
+      "id": "ui-module-shell_window",
+      "description": "Auto-registered: ui/shell_window.py",
+      "type": "ui",
+      "widgets": [],
+      "methods": [],
+      "src_modules": [],
+      "tests": [],
+      "e2e_verified": false,
+      "status": "verified"
+    },
+    {
+      "id": "ui-module-template_recognizer",
+      "description": "Auto-registered: ui/template_recognizer.py",
+      "type": "ui",
+      "widgets": [],
+      "methods": [],
+      "src_modules": [],
+      "tests": [],
+      "e2e_verified": false,
+      "status": "verified"
+    },
+    {
+      "id": "ui-module-widgets",
+      "description": "Auto-registered: ui/widgets.py",
+      "type": "ui",
+      "widgets": [],
+      "methods": [],
+      "src_modules": [],
+      "tests": [],
+      "e2e_verified": false,
+      "status": "verified"
+    },
+    {
+      "id": "ui-module-window_manager",
+      "description": "Auto-registered: ui/window_manager.py",
+      "type": "ui",
+      "widgets": [],
+      "methods": [],
+      "src_modules": [],
+      "tests": [],
+      "e2e_verified": false,
+      "status": "verified"
     }
   ]
 }

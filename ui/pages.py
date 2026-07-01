@@ -592,6 +592,7 @@ class FileSettingsPage(QWidget):
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("模板列预览"))
         dlg.setMinimumSize(800, 400)
+        dlg.setWindowFlags(dlg.windowFlags() | Qt.WindowMaximizeButtonHint)
         layout = QVBoxLayout(dlg)
 
         # 转置表: 每列=模版一列, 行=属性

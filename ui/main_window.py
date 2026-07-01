@@ -638,6 +638,18 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         tc.setTabText(1, self.tr("📊 计算结果"))
         tc.setTabText(2, self.tr("📈 图表查看"))
 
+        # 包裹 QScrollArea 防止内容溢出被压缩 (G4 门禁)
+        for idx in [0, 2]:
+            w = tc.widget(idx)
+            if w is not None and not isinstance(w, QScrollArea):
+                scroll = QScrollArea()
+                scroll.setWidgetResizable(True)
+                scroll.setFrameShape(QScrollArea.NoFrame)
+                title = tc.tabText(idx)
+                tc.removeTab(idx)
+                scroll.setWidget(w)
+                tc.insertTab(idx, scroll, title)
+
     def _show_system_settings(self):
         from ui.dialogs import SystemSettingsDialog
         SystemSettingsDialog(self).exec()

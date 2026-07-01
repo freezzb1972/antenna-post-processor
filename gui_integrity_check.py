@@ -27,12 +27,13 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # G1: 必须存在且可见的 widget
 REQUIRED_VISIBLE = [
     "editOutputName", "editOutputDir", "editTemplatePath",
-    "btnStart", "btnStop", "progressBar", "logOutput",
+    "btnPreview", "btnExport", "btnStop", "progressBar", "logOutput",
 ]
 
 # G1: 必须隐藏的 widget
 REQUIRED_HIDDEN = [
     "editCsvPath", "btnBrowseCsv", "lblCsv",
+    "btnStart",  # Phase 3: 替换为 btnPreview + btnExport, 原按钮隐藏
 ]
 
 # G1: 最小尺寸要求 (widget_attr, min_w, min_h)
@@ -299,9 +300,9 @@ def check_g3_signal_chain() -> List[str]:
     src = _read_source(main_win)
     errors = []
 
-    # 1. btnStart → _on_start
-    if "self.ui.btnStart.clicked.connect(self._on_start)" not in src:
-        errors.append("SIGNAL: btnStart.clicked not connected to _on_start")
+    # 1. btnPreview → _on_preview, btnExport → _on_export
+    if "self.ui.btnPreview.clicked.connect(self._on_preview)" not in src:
+        errors.append("SIGNAL: btnPreview.clicked not connected to _on_preview")
 
     # 2. _on_start 内必须包含线程启动协议的所有步骤
     for required in THREAD_START_REQUIRED:

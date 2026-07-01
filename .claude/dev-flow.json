@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "currentPhase": "develop",
+  "currentPhase": "commit",
   "phases": {
     "design": { "status": "completed", "skills": ["brainstorming", "architect", "architecture-decision-records"] },
     "plan": { "status": "completed", "skills": ["writing-plans", "search-first"] },
     "plan_review": { "status": "completed", "skills": ["codex-review"], "fallback": "architect", "plan_review_passed": true },
-    "develop": { "status": "active", "skills": ["python-patterns", "test-driven-development", "error-handling", "e2e-testing"] },
-    "verify": { "status": "pending", "skills": ["verification-before-completion", "gui-check", "size-gate", "verify-py"] },
-    "commit": { "status": "pending", "skills": ["checkpoint-commit", "finishing-a-development-branch"] },
+    "develop": { "status": "completed", "skills": ["python-patterns", "test-driven-development", "error-handling", "e2e-testing"] },
+    "verify": { "status": "completed", "skills": ["verification-before-completion", "gui-check", "size-gate", "verify-py"] },
+    "commit": { "status": "active", "skills": ["checkpoint-commit", "finishing-a-development-branch"] },
     "manage": { "status": "pending", "skills": ["distill-session", "strategic-compact"] }
   },
   "qualityGates": {
