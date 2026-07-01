@@ -441,91 +441,71 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.vTabFile.addWidget(container)
 
     def _extract_execution_bar(self):
-        """将执行栏从 tabFile 移动到 rootVBox（跨标签页共享）。"""
+        """提取执行栏 (进度+按钮+日志) 到 tab 区下方，跨标签页共享。"""
         vtab = self.ui.vTabFile
 
-        # 找到并移除执行栏相关布局项
+        # 找到并移除进度/按钮/日志
+        progress_lyt = None
+        btns_widget = None
         for i in reversed(range(vtab.count())):
             item = vtab.itemAt(i)
-            if item is None:
-                continue
-            lyt = item.layout()
-            w = item.widget()
-            if lyt is self.ui.hProgress or lyt is self.ui.hButtons:
+            if item is None: continue
+            if item.widget() is self.ui.logOutput:
                 vtab.takeAt(i)
-            elif w is self.ui.logOutput:
-                vtab.takeAt(i)
+            elif item.layout() is self.ui.hProgress:
+                progress_lyt = vtab.takeAt(i)
+            elif item.layout() is self.ui.hButtons:
+                # hButtons 是 QHBoxLayout，包进 QWidget 才能 reparent
+                btns_widget = QWidget()
+                btns_widget.setLayout(vtab.takeAt(i))
 
-        # 创建执行栏容器
+        # 创建执行栏
         exec_bar = QWidget()
         exec_layout = QVBoxLayout(exec_bar)
         exec_layout.setContentsMargins(0, 0, 0, 0)
-        exec_layout.setSpacing(4)
+        exec_layout.setSpacing(2)
 
-        # 进度行
-        progress_row = QHBoxLayout()
-        progress_row.addWidget(self.ui.progressBar)
-        progress_row.addWidget(self.ui.lblProgressMsg)
-        exec_layout.addLayout(progress_row)
+        if progress_lyt:
+            exec_layout.addLayout(progress_lyt)
 
-        # 执行栏水平分割：左=天线参数+按钮 | 右=日志
-        h_splitter = ThinSplitter(Qt.Horizontal)
+        if btns_widget:
+            exec_layout.addWidget(btns_widget)
 
-        # 左侧面板：天线参数 + 按钮
-        left_panel = QWidget()
-        left_layout = QVBoxLayout()
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        self.ui.logOutput.setParent(exec_bar)
+        exec_layout.addWidget(self.ui.logOutput)
 
-        # 参数显示 — 按钮上方
-        self._params_display = QTextEdit(left_panel)
+        # 参数面板
+        self._params_display = QTextEdit()
         self._params_display.setReadOnly(True)
         self._params_display.setStyleSheet(
             "background: rgba(0,0,0,0.03); border: none; padding: 4px; font-size: 12px;")
-        self._params_display.setMinimumWidth(250)
-        left_layout.addWidget(self._params_display, 1)
+        self._params_display.setMaximumHeight(60)
+        exec_layout.addWidget(self._params_display)
 
-        # 按钮行: 模式+频点在左, 按钮在右
-        btn_row = QHBoxLayout()
-        self._mode_freq_label = QLabel(left_panel)
+        self._mode_freq_label = QLabel()
         self._mode_freq_label.setTextFormat(Qt.RichText)
         self._mode_freq_label.setStyleSheet("padding: 2px 4px; font-size: 12px;")
-        btn_row.addWidget(self._mode_freq_label)
-        btn_row.addStretch()
-        # 复用编译 UI 的 btnStart/btnStop — 不创建新 widget, 避免 parent/layout 问题
+        exec_layout.addWidget(self._mode_freq_label)
+
+        # 重命名按钮 + 重连信号（在 hButtons 提取之后操作）
         self.ui.btnStart.setText(self.tr("👁 预览"))
-        try:
-            self.ui.btnStart.clicked.disconnect()
-        except RuntimeError:
-            pass  # 首次运行无旧连接, disconnect 抛异常忽略
+        try: self.ui.btnStart.clicked.disconnect()
+        except RuntimeError: pass
         self.ui.btnStart.clicked.connect(self._on_preview)
-        btn_row.addWidget(self.ui.btnStart)
-        self._btn_export = QPushButton(self.tr("📄 出报告"), left_panel)
+        self._btn_export = QPushButton(self.tr("📄 出报告"))
         self._btn_export.setMinimumSize(110, 32)
         self._btn_export.clicked.connect(self._on_export)
         self._btn_export.setEnabled(False)
-        btn_row.addWidget(self._btn_export)
-        self._btn_export.show()
-        btn_row.addWidget(self.ui.btnStop)
+        btns_widget.layout().addWidget(self._btn_export)
 
-        left_panel.setLayout(left_layout)
-        h_splitter.addWidget(left_panel)
-
-        # 右侧日志
-        self.ui.logOutput.setParent(exec_bar)
-        h_splitter.addWidget(self.ui.logOutput)
-
-        h_splitter.setSizes([300, 500])
-        exec_layout.addWidget(h_splitter, 1)
-
-        # 用 QSplitter 包裹 tabConfig + exec_bar，允许手动调整比例
+        # tabConfig + exec_bar 分屏
         v_splitter = ThinSplitter(Qt.Vertical)
-        # 把 tabConfig 从 rootVBox 移到 splitter
         idx = self.ui.rootVBox.indexOf(self.ui.tabConfig)
         self.ui.rootVBox.removeWidget(self.ui.tabConfig)
         v_splitter.addWidget(self.ui.tabConfig)
         v_splitter.addWidget(exec_bar)
-        v_splitter.setStretchFactor(0, 3)  # 设置区占 3/4
-        v_splitter.setStretchFactor(1, 1)  # 执行栏占 1/4
+        v_splitter.setStretchFactor(0, 3)
+        v_splitter.setStretchFactor(1, 1)
         self.ui.rootVBox.insertWidget(idx, v_splitter)
         self._execution_bar = exec_bar
 
