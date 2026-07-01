@@ -1072,17 +1072,18 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             try:
                 import openpyxl, csv, numpy as np, time
                 t0 = time.time()
+                from src.raw_converter import _write_normal_csv
                 wb = openpyxl.load_workbook(src, data_only=True, read_only=False)
                 freqs = []
                 for sn in wb.sheetnames:
                     try: freqs.append(float(sn))
                     except ValueError: pass
-                freqs.sort()
+                freqs.sort(); n_freqs = len(freqs)
 
-                # 探测结构
+                # 探测结构 (从第一个频点 sheet)
                 sn0 = str(int(freqs[0])) if freqs[0] == int(freqs[0]) else str(freqs[0])
                 ws0 = wb[sn0]
-                theta_vals = []; theta_start = 0; n_phi = 0
+                theta_vals = []; theta_start = 0; n_phi = 0; n_theta = 0
                 for r_idx, row in enumerate(ws0.iter_rows(min_row=1, max_row=20, values_only=True), 1):
                     vals = [v for v in row if v is not None]
                     if vals and isinstance(vals[0], (int, float)):
@@ -1096,8 +1097,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                             if v is None: break
                             try: float(v); n_phi += 1
                             except (ValueError, TypeError): break
-                        break
-                n_theta = len(theta_vals)
+                        n_theta = len(theta_vals); break
 
                 # 扫描 section 标签
                 tp_start = pp_start = pp_phase_start = 0
@@ -1107,38 +1107,43 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     if 'Phi Polarization' in v: pp_start = r_idx + 3
                     if 'Phase' in v and pp_start > 0 and r_idx > pp_start: pp_phase_start = r_idx + 2; break
 
-                def read_mat(ws, sr, nr, nc):
-                    d = np.full((nr, nc), -999.0, dtype=np.float64)
-                    for pi, row in enumerate(ws.iter_rows(min_row=sr, max_row=sr+nr-1, min_col=2, max_col=1+nc, values_only=True)):
-                        if pi >= nr: break
-                        for ti, v in enumerate(row):
-                            if ti >= nc: break
-                            if v is not None:
-                                try: d[pi, ti] = float(v)
-                                except (ValueError, TypeError): pass
-                    return d
+                def read_section(sec_start):
+                    if sec_start <= 0: return None
+                    data = np.full((n_freqs, n_phi, n_theta), np.nan, dtype=np.float64)
+                    for fi, freq in enumerate(freqs):
+                        sn = str(int(freq)) if freq == int(freq) else str(freq)
+                        ws = wb[sn]
+                        for pi, row in enumerate(ws.iter_rows(min_row=sec_start, max_row=sec_start+n_phi-1, min_col=2, max_col=1+n_theta, values_only=True)):
+                            if pi >= n_phi: break
+                            for ti, v in enumerate(row):
+                                if ti >= n_theta: break
+                                if v is not None:
+                                    try: data[fi, pi, ti] = float(v)
+                                    except (ValueError, TypeError): pass
+                        prog.setValue(fi + 1)
+                    return data
 
-                prog.setMaximum(len(freqs) * 4)
-                prog.setValue(0)
+                phi_vals = [float(i) for i in range(n_phi)]
 
-                with open(out_path, 'w', newline='', encoding='utf-8') as f:
-                    w = csv.writer(f)
-                    w.writerow([f"File Name: {os.path.basename(src)} (converted from FinalSummary)"])
-                    w.writerow([])
-                    for sec_label, sec_start in [("Theta LogMag", theta_start),
-                          ("Theta Phase", tp_start), ("Phi LogMag", pp_start), ("Phi Phase", pp_phase_start)]:
-                        if sec_start <= 0: continue
-                        w.writerow([]); w.writerow([sec_label])
-                        w.writerow(["Theta/Phi"] + [f"{t:.1f}" for t in theta_vals])
-                        for fi, freq in enumerate(freqs):
-                            sn = str(int(freq)) if freq == int(freq) else str(freq)
-                            data = read_mat(wb[sn], sec_start, n_phi, n_theta)
-                            for pi in range(n_phi):
-                                row = [pi] + [f"{data[pi,ti]:.6f}" if data[pi,ti]>-900 else "NaN" for ti in range(n_theta)]
-                                w.writerow(row)
-                            prog.setValue(len(freqs) * ["Theta LogMag","Theta Phase","Phi LogMag","Phi Phase"].index(sec_label) + fi + 1)
+                # 读 4 个 section
+                prog.setMaximum(n_freqs + 3)
+                status_lbl.setText(self.tr("读取 Theta LogMag..."))
+                tl = read_section(theta_start)
+                status_lbl.setText(self.tr("读取 Theta Phase..."))
+                tp = read_section(tp_start) if tp_start > 0 else None
+                status_lbl.setText(self.tr("读取 Phi LogMag..."))
+                pl = read_section(pp_start) if pp_start > 0 else None
+                status_lbl.setText(self.tr("读取 Phi Phase..."))
+                pp = read_section(pp_phase_start) if pp_phase_start > 0 else None
 
                 wb.close()
+                prog.setValue(n_freqs + 1)
+
+                # 写出标准 merged CSV
+                _write_normal_csv(out_path,
+                    f"File Name: {os.path.basename(src)} (converted from FinalSummary)",
+                    freqs, theta_vals, phi_vals, tl, tp, pl, pp, None)
+
                 sz = os.path.getsize(out_path)/1024/1024
                 elapsed = time.time() - t0
                 status_lbl.setText(self.tr(f"✅ 完成: {out_path} ({sz:.0f} MB, {elapsed:.0f}s)"))
