@@ -226,6 +226,7 @@ class GraphViewer(QWidget):
         self._slider_2d_phi.setRange(0, 355)
         self._slider_2d_phi.setSuffix("°")
         self._slider_2d_phi.setSingleStep(5)
+        self._slider_2d_phi.setRange(0, 360)  # 0° ≡ 360°, 但360°与0°闭合更方便
         self._slider_2d_phi.valueChanged.connect(self._on_2d_cuts_update)
         lay.addWidget(self._slider_2d_phi)
 

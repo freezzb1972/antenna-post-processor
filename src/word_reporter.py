@@ -335,6 +335,10 @@ class WordReporter:
             for row in table.rows:
                 for cell in row.cells:
                     _scan_paragraphs(cell.paragraphs)
+        # 警告未闭合/未匹配标记
+        for key in list(open_entry.keys()):
+            import warnings
+            warnings.warn(f"loop_start_{key} 缺少对应的 loop_end_{key}")
         return dict(self._loop_groups)
 
     def fill_metadata(self, metadata: Dict[str, Any]) -> int:

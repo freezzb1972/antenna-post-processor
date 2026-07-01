@@ -435,7 +435,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 天线参数变更 → 实时更新执行栏参数面板
         self._antenna_params_page.params_changed.connect(self._update_params_display)
-        self._antenna_params_page.params_changed.connect(lambda: self._staleness_check())
+        self._antenna_params_page.params_changed.connect(self._staleness_check)
 
         # 添加到 tabFile
         self.ui.vTabFile.addWidget(container)
