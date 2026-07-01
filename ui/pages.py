@@ -882,7 +882,8 @@ class FileSettingsPage(QWidget):
         path = QFileDialog.getExistingDirectory(self, self.tr("选择输出目录"), start_dir)
         if path:
             self._output_dir = path
-            self._output_group.set_directory(path)
+            if hasattr(self, '_edit_out_dir'): self._edit_out_dir.setText(path)
+            if self._mw and hasattr(self._mw, 'ui'): self._mw.ui.editOutputDir.setText(path)
             if self._cfg:
                 self._cfg.config.last_output_dir = path
                 self._cfg._dirty = True

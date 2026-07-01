@@ -1902,9 +1902,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self.ui.progressBar.setMaximum(1); self.ui.progressBar.setValue(1)
             self.ui.lblProgressMsg.setText(self.tr("✅ 复用已加载数据"))
         else:
-            # 不确定进度模式 (0-0) — 避免打开大文件时显示 100% 假象
-            self.ui.progressBar.setRange(0, 0)
-            self.ui.lblProgressMsg.setText(self.tr("正在加载数据文件..."))
+            self.ui.progressBar.setRange(0, 100)
+            self.ui.progressBar.setValue(5)
+            self.ui.lblProgressMsg.setText(self.tr("正在打开数据文件..."))
             if file_page:
                 datasource_map = file_page.build_datasource_map(
                     progress_callback=lambda c, t, m: (
