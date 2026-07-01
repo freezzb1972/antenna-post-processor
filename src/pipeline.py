@@ -1016,7 +1016,7 @@ def _export_azimuth(
         "peak_eirp": "Peak EIRP (dBm)", "avg_gain": "Average Gain (dB)",
         "nhprp_45": "NHPRP ±45°", "nhprp_30": "NHPRP ±30°",
     }
-    from .renderer import _renderer as _freq_renderer
+    from .plotter import _renderer as _freq_renderer
     for sheet_name, rows in sheet_results.items():
         for param_key, param_label in _B_PARAM_MAP.items():
             freqs = []; values = []

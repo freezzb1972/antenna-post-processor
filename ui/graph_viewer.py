@@ -336,6 +336,9 @@ class GraphViewer(QWidget):
 
         # 子图类型控件
         self._plot_type_combos: List[QComboBox] = []
+        self._plot_type_layout = QHBoxLayout()  # 确保属性存在(后续 _rebuild 使用)
+        if not hasattr(self, '_lbl_info') or self._lbl_info is None:
+            self._lbl_info = QLabel("")
 
         # 剖切
         self._cut_checks: Dict[str, QCheckBox] = {}
