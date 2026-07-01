@@ -305,82 +305,27 @@ class WordReporter:
 
         self._filled_count += count
         return count
-        svg_ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image'
-        from lxml import etree
 
-        for name, para_idx in bookmarks.items():
-            png_bytes = bookmark_images[name]
-            from docx.shared import Inches
-            import docx.opc.constants
+    # ── 循环域 + 元数据 ──────────────────────────────────
 
-            # 在书签段落后面插入新段落+图片
-            para = self._doc.paragraphs[para_idx]
+    def _expand_loops(self) -> Dict[str, tuple]:
+        """扫描段落中的 {{loop_start_<key>}} / {{loop_end_<key>}} 配对。"""
+        self._loop_groups = {}
+        open_entry: Dict[str, int] = {}
+        for i, para in enumerate(self._doc.paragraphs):
+            text = para.text.strip()
+            if text.startswith("{{loop_start_"):
+                key = text[13:-2]
+                open_entry[key] = i
+            elif text.startswith("{{loop_end_"):
+                key = text[11:-2]
+                if key in open_entry:
+                    self._loop_groups[key] = (open_entry.pop(key), i)
+        return dict(self._loop_groups)
 
-            # 用 PIL 获取图片尺寸
-            from PIL import Image as PILImage
-            import io as _io
-            img_stream = _io.BytesIO(png_bytes)
-            pil_img = PILImage.open(img_stream)
-            img_width, img_height = pil_img.size
-            aspect = img_height / img_width
-
-            # 计算 EMU 尺寸
-            width_emu = int(max_width_inches * 914400)
-            height_emu = int(width_emu * aspect)
-
-            # 添加图片部件并获取 rId
-            image_part = self._doc.part.get_or_add_image(
-                _io.BytesIO(png_bytes))
-
-            # 构建 inline 图片 XML
-            nsmap = {
-                'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing',
-                'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
-                'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
-                'pic': 'http://schemas.openxmlformats.org/drawingml/2006/picture',
-            }
-
-            inline = etree.SubElement(etree.Element('dummy'), '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}inline')
-            extent = etree.SubElement(inline, '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}extent')
-            extent.set('cx', str(width_emu))
-            extent.set('cy', str(height_emu))
-
-            graphic = etree.SubElement(inline, '{http://schemas.openxmlformats.org/drawingml/2006/main}graphic')
-            graphic_data = etree.SubElement(graphic, '{http://schemas.openxmlformats.org/drawingml/2006/main}graphicData')
-            graphic_data.set('uri', 'http://schemas.openxmlformats.org/drawingml/2006/picture')
-
-            pic = etree.SubElement(graphic_data, '{http://schemas.openxmlformats.org/drawingml/2006/picture}pic')
-            nvPicPr = etree.SubElement(pic, '{http://schemas.openxmlformats.org/drawingml/2006/picture}nvPicPr')
-            cNvPr = etree.SubElement(nvPicPr, '{http://schemas.openxmlformats.org/drawingml/2006/picture}cNvPr')
-            cNvPr.set('id', '0')
-            cNvPr.set('name', f'{name}.png')
-
-            blipFill = etree.SubElement(pic, '{http://schemas.openxmlformats.org/drawingml/2006/picture}blipFill')
-            blip = etree.SubElement(blipFill, '{http://schemas.openxmlformats.org/drawingml/2006/main}blip')
-            blip.set('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed', rId)
-
-            spPr = etree.SubElement(pic, '{http://schemas.openxmlformats.org/drawingml/2006/picture}spPr')
-            xfrm = etree.SubElement(spPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm')
-            off = etree.SubElement(xfrm, '{http://schemas.openxmlformats.org/drawingml/2006/main}off')
-            off.set('x', '0')
-            off.set('y', '0')
-            ext = etree.SubElement(xfrm, '{http://schemas.openxmlformats.org/drawingml/2006/main}ext')
-            ext.set('cx', str(width_emu))
-            ext.set('cy', str(height_emu))
-            prstGeom = etree.SubElement(spPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}prstGeom')
-            prstGeom.set('prst', 'rect')
-
-            # 插入到书签段落后面
-            from docx.oxml import parse_xml
-            new_para = parse_xml(
-                f'<w:p {nsdecls("w")}><w:r><w:drawing>'
-                f'{etree.tostring(inline, encoding="unicode")}'
-                f'</w:drawing></w:r></w:p>')
-            para._element.addnext(new_para)
-            count += 1
-
-        self._filled_count += count
-        return count
+    def fill_metadata(self, metadata: Dict[str, Any]) -> int:
+        """填充元数据: 内容控件 + 占位符，统一入口。"""
+        return self.fill_content_controls(metadata) + self.fill_placeholders(metadata)
 
     # ── 通用填充 ──────────────────────────────────────────
 
