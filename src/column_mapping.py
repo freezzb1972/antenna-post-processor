@@ -282,12 +282,7 @@ def classify_header(raw_header: str) -> str:
     if is_pc_theta_column(raw_header):           return "pc_theta_mm"
     if is_pc_phi_column(raw_header):             return "pc_phi_mm"
 
-    # Regex fallback (LAG) — 用原始列头而非 _norm，因 _normalize_key 会去掉 = 号
-    if _RE_LAG_RANGE.search(raw_header) or _RE_LAG_RANGE_NO_PREFIX.search(raw_header):
-        return "lag_range"
-    if _RE_LAG_SINGLE.search(raw_header) or _RE_LAG_SINGLE_NO_PREFIX.search(raw_header):
-        return "lag_single"
-    # RHCP/LHCP/CP-XPI regex fallback
+    # RHCP/LHCP/CP-XPI 检测 (在 LAG 之前, 避免 "RHCP Gain at Theta=" 被 LAG 误匹配)
     _RE_RHCP = re.compile(r"RHCP\s*(?:Gain)?", re.IGNORECASE)
     _RE_CP_XPI = re.compile(r"CP[\s-]*XPI", re.IGNORECASE)
     if _RE_RHCP.search(raw_header) or _RE_CP_XPI.search(raw_header):
@@ -295,6 +290,11 @@ def classify_header(raw_header: str) -> str:
         if "range" in normalized.lower() or re.search(r"\d+.*[-–].*\d+", raw_header):
             return "rhcp_range" if _RE_RHCP.search(raw_header) else "cp_xpi_range"
         return "rhcp_single" if _RE_RHCP.search(raw_header) else "cp_xpi_single"
+    # Regex fallback (LAG) — 用原始列头而非 _norm，因 _normalize_key 会去掉 = 号
+    if _RE_LAG_RANGE.search(raw_header) or _RE_LAG_RANGE_NO_PREFIX.search(raw_header):
+        return "lag_range"
+    if _RE_LAG_SINGLE.search(raw_header) or _RE_LAG_SINGLE_NO_PREFIX.search(raw_header):
+        return "lag_single"
     return "unknown"
 
 
