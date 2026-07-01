@@ -1322,8 +1322,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.btnBrowseOutput.clicked.connect(self._on_browse_output)
         self.ui.btnBrowseFullReport.clicked.connect(self._on_browse_full_report)
 
-        # 运行
-        self.ui.btnStart.clicked.connect(self._on_start)
         self.ui.btnStop.clicked.connect(self._on_stop)
 
     # ==================================================================
