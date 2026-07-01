@@ -591,6 +591,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         tm.addAction(self.tr("模板预设管理..."), self._on_tool_template_recognizer)
         tm.addAction(self.tr("校准预设管理..."), self._on_show_rsp_presets)
         tm.addAction(self.tr("EMQuest 数据导出..."), self._on_tool_emq_export)
+        tm.addAction(self.tr("FinalSummary 转 CSV..."), self._on_tool_xlsx_to_csv)
 
         # ── 帮助 ──
         hm = menubar.addMenu(self.tr("&帮助"))
@@ -990,6 +991,166 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             QMessageBox.critical(self, self.tr("错误"), str(e))
         finally:
             self._exit_busy()
+
+    def _on_tool_xlsx_to_csv(self):
+        """FinalSummary .xlsx → merged CSV 转换。一次转换，之后秒读。"""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QLineEdit
+        from PySide6.QtWidgets import QFileDialog as FD, QGroupBox, QProgressBar
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("FinalSummary 转 CSV"))
+        dlg.setMinimumWidth(500)
+        layout = QVBoxLayout(dlg)
+
+        # 源文件
+        src_grp = QGroupBox(self.tr("源文件"))
+        src_layout = QHBoxLayout(src_grp)
+        src_edit = QLineEdit()
+        src_edit.setReadOnly(True)
+        src_edit.setPlaceholderText(self.tr("选择 FinalSummary .xlsx 文件"))
+        src_btn = QPushButton(self.tr("浏览..."))
+        src_layout.addWidget(src_edit)
+        src_layout.addWidget(src_btn)
+        layout.addWidget(src_grp)
+
+        # 输出目录
+        out_grp = QGroupBox(self.tr("输出"))
+        out_layout = QHBoxLayout(out_grp)
+        out_edit = QLineEdit()
+        out_edit.setReadOnly(True)
+        out_btn = QPushButton(self.tr("浏览..."))
+        out_layout.addWidget(QLabel(self.tr("输出到:")))
+        out_layout.addWidget(out_edit)
+        out_layout.addWidget(out_btn)
+        layout.addWidget(out_grp)
+
+        # 进度
+        prog = QProgressBar()
+        prog.setVisible(False)
+        layout.addWidget(prog)
+        status_lbl = QLabel("")
+        layout.addWidget(status_lbl)
+
+        # 按钮
+        btn_layout = QHBoxLayout()
+        ok_btn = QPushButton(self.tr("开始转换"))
+        cancel_btn = QPushButton(self.tr("取消"))
+        btn_layout.addStretch()
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+        def on_src():
+            f, _ = FD.getOpenFileName(dlg, self.tr("选择 FinalSummary .xlsx"), "",
+                                       self.tr("Excel (*.xlsx *.xls)"))
+            if f:
+                src_edit.setText(f)
+                if not out_edit.text():
+                    out_edit.setText(str(Path(f).parent))
+
+        def on_out():
+            d = FD.getExistingDirectory(dlg, self.tr("选择输出目录"))
+            if d: out_edit.setText(d)
+
+        src_btn.clicked.connect(on_src)
+        out_btn.clicked.connect(on_out)
+
+        def do_convert():
+            src = src_edit.text().strip()
+            out_dir = out_edit.text().strip()
+            if not src or not out_dir:
+                status_lbl.setText(self.tr("请选择源文件和输出目录"))
+                return
+            stem = Path(src).stem
+            out_path = str(Path(out_dir) / f"{stem}_merged.csv")
+            ok_btn.setEnabled(False)
+            prog.setVisible(True)
+            prog.setMaximum(0)  # indeterminate
+            status_lbl.setText(self.tr("转换中..."))
+            QApplication.processEvents()
+
+            try:
+                import openpyxl, csv, numpy as np, time
+                t0 = time.time()
+                wb = openpyxl.load_workbook(src, data_only=True, read_only=False)
+                freqs = []
+                for sn in wb.sheetnames:
+                    try: freqs.append(float(sn))
+                    except ValueError: pass
+                freqs.sort()
+
+                # 探测结构
+                sn0 = str(int(freqs[0])) if freqs[0] == int(freqs[0]) else str(freqs[0])
+                ws0 = wb[sn0]
+                theta_vals = []; theta_start = 0; n_phi = 0
+                for r_idx, row in enumerate(ws0.iter_rows(min_row=1, max_row=20, values_only=True), 1):
+                    vals = [v for v in row if v is not None]
+                    if vals and isinstance(vals[0], (int, float)):
+                        theta_start = r_idx
+                        for v in list(ws0.iter_rows(min_row=r_idx-1, max_row=r_idx-1, values_only=True))[0][1:]:
+                            if v is not None:
+                                try: theta_vals.append(float(v))
+                                except (ValueError, TypeError): pass
+                        for r2 in ws0.iter_rows(min_row=theta_start, max_row=theta_start+400, min_col=1, max_col=1, values_only=True):
+                            v = r2[0]
+                            if v is None: break
+                            try: float(v); n_phi += 1
+                            except (ValueError, TypeError): break
+                        break
+                n_theta = len(theta_vals)
+
+                # 扫描 section 标签
+                tp_start = pp_start = pp_phase_start = 0
+                for r_idx, row in enumerate(ws0.iter_rows(min_row=theta_start+n_phi, max_row=ws0.max_row, max_col=3, values_only=True), theta_start+n_phi):
+                    v = str(row[0]) if row[0] else ""
+                    if 'Phase' in v and 'Phi' not in v and tp_start == 0: tp_start = r_idx + 2
+                    if 'Phi Polarization' in v: pp_start = r_idx + 3
+                    if 'Phase' in v and pp_start > 0 and r_idx > pp_start: pp_phase_start = r_idx + 2; break
+
+                def read_mat(ws, sr, nr, nc):
+                    d = np.full((nr, nc), -999.0, dtype=np.float64)
+                    for pi, row in enumerate(ws.iter_rows(min_row=sr, max_row=sr+nr-1, min_col=2, max_col=1+nc, values_only=True)):
+                        if pi >= nr: break
+                        for ti, v in enumerate(row):
+                            if ti >= nc: break
+                            if v is not None:
+                                try: d[pi, ti] = float(v)
+                                except (ValueError, TypeError): pass
+                    return d
+
+                prog.setMaximum(len(freqs) * 4)
+                prog.setValue(0)
+
+                with open(out_path, 'w', newline='', encoding='utf-8') as f:
+                    w = csv.writer(f)
+                    w.writerow([f"File Name: {os.path.basename(src)} (converted from FinalSummary)"])
+                    w.writerow([])
+                    for sec_label, sec_start in [("Theta LogMag", theta_start),
+                          ("Theta Phase", tp_start), ("Phi LogMag", pp_start), ("Phi Phase", pp_phase_start)]:
+                        if sec_start <= 0: continue
+                        w.writerow([]); w.writerow([sec_label])
+                        w.writerow(["Theta/Phi"] + [f"{t:.1f}" for t in theta_vals])
+                        for fi, freq in enumerate(freqs):
+                            sn = str(int(freq)) if freq == int(freq) else str(freq)
+                            data = read_mat(wb[sn], sec_start, n_phi, n_theta)
+                            for pi in range(n_phi):
+                                row = [pi] + [f"{data[pi,ti]:.6f}" if data[pi,ti]>-900 else "NaN" for ti in range(n_theta)]
+                                w.writerow(row)
+                            prog.setValue(len(freqs) * ["Theta LogMag","Theta Phase","Phi LogMag","Phi Phase"].index(sec_label) + fi + 1)
+
+                wb.close()
+                sz = os.path.getsize(out_path)/1024/1024
+                elapsed = time.time() - t0
+                status_lbl.setText(self.tr(f"✅ 完成: {out_path} ({sz:.0f} MB, {elapsed:.0f}s)"))
+                prog.setValue(prog.maximum())
+            except Exception as e:
+                status_lbl.setText(self.tr(f"❌ 失败: {e}"))
+            finally:
+                ok_btn.setEnabled(True)
+
+        ok_btn.clicked.connect(do_convert)
+        cancel_btn.clicked.connect(dlg.reject)
+        dlg.exec()
 
     def _on_license(self):
         from src.license import LicenseManager, get_machine_id
