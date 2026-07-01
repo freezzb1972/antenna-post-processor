@@ -128,6 +128,17 @@ def convert_fs_to_csv(
             _report(fi + 1, n_freqs + 1, f"读取中... ({fi + 1}/{n_freqs})")
         return data
 
+    # 检查并去掉 phi=360° 重复行（与 phi=0° 重合，保留 0-359）
+    phi_col_a = []
+    for r2 in ws0.iter_rows(min_row=theta_start, max_row=theta_start + n_phi,
+                            min_col=1, max_col=1, values_only=True):
+        v = r2[0]
+        if v is None: break
+        try: phi_col_a.append(float(v))
+        except (ValueError, TypeError): break
+    if phi_col_a and phi_col_a[-1] == 360.0:
+        n_phi -= 1  # 去掉最后一个 phi=360°
+
     # 读 4 个 section
     _report(0, n_freqs, "读取 Theta LogMag...")
     tl = _read_section(theta_start)
