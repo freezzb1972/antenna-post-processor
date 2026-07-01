@@ -110,6 +110,7 @@ class ProcessingWorker(QObject):
         out_excel: bool = True,
         out_word: bool = False,
         out_data: bool = False,
+        word_template_path: Optional[str] = None,
         nh_custom_angles: Optional[List[float]] = None,
         ar_output_db: bool = True,
         worksheet_naming_mode: int = 0,
@@ -142,6 +143,7 @@ class ProcessingWorker(QObject):
         self.out_excel = out_excel
         self.out_word = out_word
         self.out_data = out_data
+        self.word_template_path = word_template_path
         self.nh_custom_angles = nh_custom_angles
         self.ar_output_db = ar_output_db
         self.worksheet_naming_mode = worksheet_naming_mode
@@ -181,6 +183,7 @@ class ProcessingWorker(QObject):
                 out_excel=self.out_excel,
                 out_word=self.out_word,
                 out_data=self.out_data,
+                word_template_path=self.word_template_path,
                 robust_peak=self.robust_peak,
                 extra_params=self.extra_params,
                 nh_custom_angles=self.nh_custom_angles,

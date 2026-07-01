@@ -796,6 +796,7 @@ def run_pipeline(
     out_excel: bool = True,
     out_word: bool = False,
     out_data: bool = False,
+    word_template_path: Optional[str] = None,  # Word 模板路径 (为空则自动生成)
     robust_peak: bool = False,
     extra_params: Optional[set] = None,
     nh_custom_angles: Optional[List[float]] = None,
@@ -935,15 +936,20 @@ def run_pipeline(
     # ---- 4. 完整报告 (可选) ----
     if full_report_path:
         _log(log_callback, f"生成完整报告: {full_report_path}")
+        imgs_3d, imgs_2d_polar, imgs_2d_rect = _collect_report_images(sheet_results)
         export_full_report(
             output_path=full_report_path,
             sheet_results=sheet_results,
+            pattern_images_3d=imgs_3d if imgs_3d else None,
+            pattern_images_2d_polar=imgs_2d_polar if imgs_2d_polar else None,
+            pattern_images_2d_rect=imgs_2d_rect if imgs_2d_rect else None,
         )
 
     # ---- 5. 方位面报告 (可选) ----
     if out_word or out_data:
         _export_azimuth(sheet_results, azimuth_config, log_callback,
-                        out_word=out_word, out_data=out_data)
+                        out_word=out_word, out_data=out_data,
+                        word_template_path=word_template_path)
 
     elapsed = time.time() - t0
     total_rows = sum(len(v) for v in sheet_results.values())
@@ -951,6 +957,51 @@ def run_pipeline(
     _report(progress_callback, progress_max, progress_max, "✅ 完成")
 
     return sheet_results
+
+# ---------------------------------------------------------------------------
+# 报告图片收集
+# ---------------------------------------------------------------------------
+
+def _collect_report_images(
+    sheet_results: Dict[str, List[Dict[str, Any]]],
+) -> tuple:
+    """从处理结果收集图片，按 3D/2D Polar/2D Rect 分类。
+
+    图片在 _process_one_frequency 中已渲染为 PNG BytesIO，
+    存入 row["_images"]。此函数按 report_exporter 期望的格式重组。
+
+    Returns:
+        (images_3d, images_2d_polar, images_2d_rect)
+        - images_3d:        {sheet_name: {freq: BytesIO}}
+        - images_2d_polar:  {sheet_name: {freq: {cut_label: BytesIO}}}
+        - images_2d_rect:   {sheet_name: {freq: {cut_label: BytesIO}}}
+    """
+    images_3d: Dict[str, Dict[float, io.BytesIO]] = {}
+    images_2d_polar: Dict[str, Dict[float, Dict[str, io.BytesIO]]] = {}
+    images_2d_rect: Dict[str, Dict[float, Dict[str, io.BytesIO]]] = {}
+
+    for sheet_name, rows in sheet_results.items():
+        for row in rows:
+            freq = row.get("frequency")
+            if freq is None:
+                continue
+            imgs = row.get("_images", {})
+            if not imgs:
+                continue
+            for img_key, buf in imgs.items():
+                if buf is None:
+                    continue
+                if img_key.startswith("3d_"):
+                    images_3d.setdefault(sheet_name, {})[freq] = buf
+                elif img_key.startswith("2d_polar_"):
+                    cut_label = img_key[len("2d_polar_"):]
+                    images_2d_polar.setdefault(sheet_name, {}).setdefault(freq, {})[cut_label] = buf
+                elif img_key.startswith("2d_rect_"):
+                    cut_label = img_key[len("2d_rect_"):]
+                    images_2d_rect.setdefault(sheet_name, {}).setdefault(freq, {})[cut_label] = buf
+
+    return images_3d, images_2d_polar, images_2d_rect
+
 
 # ---------------------------------------------------------------------------
 # 方位面报告导出
@@ -962,8 +1013,13 @@ def _export_azimuth(
     log_callback=None,
     out_word: bool = True,
     out_data: bool = True,
+    word_template_path: Optional[str] = None,
 ):
-    """从处理结果中收集方位面图片和中间数据，写入 Word 和 Excel。"""
+    """从处理结果中收集方位面图片和中间数据，写入 Word 和 Excel。
+
+    当 word_template_path 不为空时，使用 WordReporter 填充模板；
+    否则使用 chart_word_writer 自动生成 Word 报告。
+    """
     from .chart_word_writer import write_chart_word_report
     from .azimuth_data_writer import write_azimuth_data
 
@@ -1066,10 +1122,33 @@ def _export_azimuth(
     if out_word and image_groups:
         az = azimuth_config or None
         word_path = az.chart_output_path if az else ""
-        if not word_path and az is None:
-            # 无 azimuth_config 时用默认路径
-            pass  # 跳过 — image_groups 可能是 B 类频点图, 暂无独立 Word 路径
-        if word_path:
+        if not word_path:
+            _log(log_callback, "  ⚠ 未设置 Word 输出路径, 跳过图表报告")
+        elif word_template_path and os.path.exists(word_template_path):
+            # ── 模板模式: 用 WordReporter 填充模板 ──
+            _log(log_callback, f"生成图表报告 (模板): {word_path}")
+            try:
+                from .word_reporter import WordReporter
+                reporter = WordReporter(word_template_path)
+                reporter.scan()
+                # 收集 bookmark_images: 每组图片取第一张
+                bookmark_images = {}
+                for group_name, freq_imgs in image_groups.items():
+                    first_img = next(iter(freq_imgs.values()), None)
+                    if first_img:
+                        bookmark_images[group_name] = first_img.getvalue()
+                reporter.fill_all(
+                    sheet_results,
+                    bookmark_images=bookmark_images,
+                )
+                reporter.save(word_path)
+                total_imgs = sum(len(v) for v in image_groups.values())
+                _log(log_callback, f"  ✓ Word 模板报告已保存 ({len(image_groups)} 组, {total_imgs} 张图)")
+            except Exception as e:
+                _log(log_callback, f"  ✗ Word 模板报告生成失败: {e}")
+                import traceback; traceback.print_exc()
+        else:
+            # ── 自动模式: 用 chart_word_writer 生成 ──
             _log(log_callback, f"生成图表报告: {word_path}")
             try:
                 angles_str = ", ".join(
