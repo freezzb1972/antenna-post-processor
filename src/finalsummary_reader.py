@@ -76,7 +76,7 @@ class FinalSummarySource(DataSource):
 
     def __init__(self, path: str):
         self._path = path
-        self._wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+        self._wb = openpyxl.load_workbook(path, data_only=True, read_only=False)
 
         # ---- 频点列表（数字命名的 sheet，排除 Cplx/AxR/Original 等汇总 sheet） ----
         self._freqs: List[float] = []
