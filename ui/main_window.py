@@ -2070,7 +2070,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _enter_busy(self, text="⏳ 处理中..."):
         """进入忙碌状态：锁定预览按钮，防止主计算与工具操作并发。"""
         self._running = True
-        self.ui.btnStart.setText(self.tr(text))
         self.ui.btnStart.setEnabled(False)
         self._btn_export.setEnabled(False)
         self.ui.btnStop.setEnabled(True)
