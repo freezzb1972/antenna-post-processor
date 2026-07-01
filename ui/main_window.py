@@ -499,6 +499,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._btn_export.clicked.connect(self._on_export)
         self._btn_export.setEnabled(False)
         btns_widget.layout().addWidget(self._btn_export)
+        btns_widget.layout().addStretch()  # 右侧 spacer → 按钮居中
 
         # tabConfig + exec_bar 分屏
         v_splitter = ThinSplitter(Qt.Vertical)
