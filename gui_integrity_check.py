@@ -49,8 +49,8 @@ DYNAMIC_WIDGETS_REQUIRED = [
     "_btn_export",  # Phase 3: 出报告按钮
 ]
 
-# G3 信号检查: btnStart → _on_start (原始单按钮流程)
-PREVIEW_SIGNAL = "self.ui.btnStart.clicked.connect(self._on_start)"
+# G3 信号检查: btnStart → _on_preview, _btn_export → _on_export
+PREVIEW_SIGNAL = "self.ui.btnStart.clicked.connect(self._on_preview)"
 EXPORT_SIGNAL = "self._btn_export.clicked.connect(self._on_export)"
 
 # G7: 动态 widget 必须正确添加到布局中(在父容器内可见)

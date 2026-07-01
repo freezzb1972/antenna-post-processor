@@ -462,7 +462,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         h_splitter = ThinSplitter(Qt.Horizontal)
         left_panel = QWidget()
-        left_layout = QVBoxLayout()
+        left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
         self._params_display = QTextEdit()
@@ -471,27 +471,33 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._params_display.setMinimumWidth(250)
         left_layout.addWidget(self._params_display, 1)
 
-        btn_row = QHBoxLayout()
+        # 按钮行: hButtons 提取为 layout item, 在此重建
         self._mode_freq_label = QLabel()
         self._mode_freq_label.setTextFormat(Qt.RichText)
         self._mode_freq_label.setStyleSheet("padding: 2px 4px; font-size: 12px;")
-        btn_row.addWidget(self._mode_freq_label)
-        btn_row.addStretch()
-        btn_row.addWidget(self.ui.btnStart)
+        left_layout.addWidget(self._mode_freq_label)
+        # hButtons (含 spBtnLeft → btnStart → btnStop) 直接包进 QWidget 保持原对齐
+        btn_wrap = QWidget()
+        btn_wrap.setLayout(self.ui.hButtons)
+        # 额外加出报告按钮
         self._btn_export = QPushButton(self.tr("📄 出报告"))
         self._btn_export.setMinimumSize(110, 32)
+        self._btn_export.clicked.connect(self._on_export)
         self._btn_export.setEnabled(False)
-        self._btn_export.hide()  # 暂隐藏, 后续启用
-        btn_row.addWidget(self._btn_export)
-        btn_row.addWidget(self.ui.btnStop)
-        left_layout.addLayout(btn_row)
-        left_panel.setLayout(left_layout)
-        h_splitter.addWidget(left_panel)
+        self.ui.hButtons.addWidget(self._btn_export)
+        left_layout.addWidget(btn_wrap)
 
+        h_splitter.addWidget(left_panel)
         self.ui.logOutput.setParent(exec_bar)
         h_splitter.addWidget(self.ui.logOutput)
         h_splitter.setSizes([300, 500])
         exec_layout.addWidget(h_splitter, 1)
+
+        # 重命名按钮
+        self.ui.btnStart.setText(self.tr("👁 预览"))
+        try: self.ui.btnStart.clicked.disconnect()
+        except (RuntimeError, TypeError): pass
+        self.ui.btnStart.clicked.connect(self._on_preview)
 
         v_splitter = ThinSplitter(Qt.Vertical)
         idx = self.ui.rootVBox.indexOf(self.ui.tabConfig)
@@ -1312,8 +1318,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.btnBrowseOutput.clicked.connect(self._on_browse_output)
         self.ui.btnBrowseFullReport.clicked.connect(self._on_browse_full_report)
 
-        self.ui.btnStart.clicked.connect(self._on_start)
         self.ui.btnStop.clicked.connect(self._on_stop)
+        # btnStart 已在 _extract_execution_bar 中连接到 _on_preview
 
     # ==================================================================
     # 文件浏览
