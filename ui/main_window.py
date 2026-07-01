@@ -1762,23 +1762,24 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """预览: compute_only=True，快速计算不导出。"""
         if self._preview_state == self._PREVIEWING or self._preview_state == self._EXPORTING:
             return
+        self._cached_datasource_map = None  # 清除旧缓存
         self._enter_previewing()
         self._do_run(compute_only=True)
 
     def _on_export(self):
-        """出报告: compute_only=False，全套导出。"""
+        """出报告: compute_only=False，复用预览的 datasource_map 避免重新加载。"""
         if self._preview_state != self._READY:
             QMessageBox.warning(self, self.tr("请先预览"),
                 self.tr("请先点击「预览」确认计算结果，再出报告。"))
             return
         self._enter_exporting()
-        self._do_run(compute_only=False)
+        self._do_run(compute_only=False, reuse_datasource=True)
 
-    def _do_run(self, compute_only: bool = False):
+    def _do_run(self, compute_only: bool = False, reuse_datasource: bool = False):
         """统一执行入口（预览/出报告共用）。"""
-        self._on_start(compute_only=compute_only)
+        self._on_start(compute_only=compute_only, reuse_datasource=reuse_datasource)
 
-    def _on_start(self, compute_only: bool = False):
+    def _on_start(self, compute_only: bool = False, reuse_datasource: bool = False):
         """启动后台处理。支持单文件或多文件模式。"""
         # 懒导入：处理链模块较重，仅在首次点击处理时加载
         from src.chart_config import ChartConfig
@@ -1894,27 +1895,35 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 在大量文件(>200)时每文件都调用会导致 UI 卡死. 每 20 个文件刷新一次
         # 在响应性和性能之间取得了平衡.
         file_page = getattr(self, '_file_settings_page', None)
-        match_table = file_page._match_table if file_page else getattr(self, '_match_table', None)
-        total_files = max(match_table.rowCount() if match_table else 0, 1)
-        self.ui.progressBar.setMaximum(total_files)
-        self.ui.progressBar.setValue(0)
-        self.ui.lblProgressMsg.setText(self.tr("正在加载数据文件..."))
-        if file_page:
-            datasource_map = file_page.build_datasource_map(
-                progress_callback=lambda c, t, m: (
-                    self.ui.progressBar.setValue(c),
-                    self.ui.lblProgressMsg.setText(m),
-                    QApplication.processEvents() if c % 20 == 0 else None
-                )
-            )
+        # 复用预览已加载的数据源（跳过重新打开 workbook）
+        if reuse_datasource and getattr(self, '_cached_datasource_map', None):
+            datasource_map = self._cached_datasource_map
+            self.ui.progressBar.setMaximum(1)
+            self.ui.progressBar.setValue(1)
+            self.ui.lblProgressMsg.setText(self.tr("✅ 复用已加载数据"))
         else:
-            datasource_map = self._build_datasource_map(
-                progress_callback=lambda c, t, m: (
-                    self.ui.progressBar.setValue(c),
-                    self.ui.lblProgressMsg.setText(m),
-                    QApplication.processEvents() if c % 20 == 0 else None
+            match_table = file_page._match_table if file_page else getattr(self, '_match_table', None)
+            total_files = max(match_table.rowCount() if match_table else 0, 1)
+            self.ui.progressBar.setMaximum(total_files)
+            self.ui.progressBar.setValue(0)
+            self.ui.lblProgressMsg.setText(self.tr("正在加载数据文件..."))
+            if file_page:
+                datasource_map = file_page.build_datasource_map(
+                    progress_callback=lambda c, t, m: (
+                        self.ui.progressBar.setValue(c),
+                        self.ui.lblProgressMsg.setText(m),
+                        QApplication.processEvents() if c % 20 == 0 else None
+                    )
                 )
-            )
+            else:
+                datasource_map = self._build_datasource_map(
+                    progress_callback=lambda c, t, m: (
+                        self.ui.progressBar.setValue(c),
+                        self.ui.lblProgressMsg.setText(m),
+                        QApplication.processEvents() if c % 20 == 0 else None
+                    )
+                )
+            self._cached_datasource_map = datasource_map  # 缓存供导出复用
         if not datasource_map:
             QMessageBox.warning(self, self.tr("警告"),
                 self.tr("没有有效的工作表↔文件匹配，请先执行自动匹配。"))
