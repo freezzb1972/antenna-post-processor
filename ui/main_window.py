@@ -497,8 +497,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 重命名按钮
         self.ui.btnStart.setText(self.tr("👁 预览"))
-        try: self.ui.btnStart.clicked.disconnect()
-        except (RuntimeError, TypeError): pass
+        # 断开旧连接(编译 UI 已连接 _on_start), 重新连接到 _on_preview
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            try: self.ui.btnStart.clicked.disconnect()
+            except (RuntimeError, TypeError): pass
         self.ui.btnStart.clicked.connect(self._on_preview)
 
         v_splitter = ThinSplitter(Qt.Vertical)
