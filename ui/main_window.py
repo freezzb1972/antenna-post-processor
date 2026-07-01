@@ -471,16 +471,18 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if btns_widget:
             exec_layout.addWidget(btns_widget)
 
-        self.ui.logOutput.setParent(exec_bar)
-        exec_layout.addWidget(self.ui.logOutput)
-
-        # 参数面板
+        # 水平分割: 左=参数面板 | 右=日志
+        h_splitter = ThinSplitter(Qt.Horizontal)
         self._params_display = QTextEdit()
         self._params_display.setReadOnly(True)
         self._params_display.setStyleSheet(
             "background: rgba(0,0,0,0.03); border: none; padding: 4px; font-size: 12px;")
-        self._params_display.setMaximumHeight(60)
-        exec_layout.addWidget(self._params_display)
+        self._params_display.setMinimumWidth(250)
+        h_splitter.addWidget(self._params_display)
+        self.ui.logOutput.setParent(exec_bar)
+        h_splitter.addWidget(self.ui.logOutput)
+        h_splitter.setSizes([300, 500])
+        exec_layout.addWidget(h_splitter, 1)
 
         self._mode_freq_label = QLabel()
         self._mode_freq_label.setTextFormat(Qt.RichText)
