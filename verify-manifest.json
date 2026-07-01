@@ -276,7 +276,8 @@
       "data_quality.py",
       "task_package.py",
       "ui_utils.py",
-      "word_reporter.py"
+      "word_reporter.py",
+      "fs_to_csv.py"
     ]
   },
   "tests": {
