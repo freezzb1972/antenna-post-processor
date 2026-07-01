@@ -107,6 +107,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._worker: Optional[ProcessingWorker] = None
         self._running = False
         self._data_stale = True  # 数据是否为上次计算遗留 (用于自动清除)
+        # 预览 → 出报告 状态机
+        self._PREVIEW_IDLE = 0; self._PREVIEWING = 1; self._READY = 2; self._EXPORTING = 3
+        self._preview_state = self._PREVIEW_IDLE
         self._user_set_output_name = False  # 用户手动编辑输出文件名后置 True
         # 使用统一配置管理器 (antenna_config.json)
         from src.config_manager import get_config_manager
@@ -429,6 +432,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 天线参数变更 → 实时更新执行栏参数面板
         self._antenna_params_page.params_changed.connect(self._update_params_display)
+        self._antenna_params_page.params_changed.connect(lambda: self._staleness_check())
 
         # 添加到 tabFile
         self.ui.vTabFile.addWidget(container)
@@ -484,9 +488,18 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._mode_freq_label.setStyleSheet("padding: 2px 4px; font-size: 12px;")
         btn_row.addWidget(self._mode_freq_label)
         btn_row.addStretch()
-        btn_row.addWidget(self.ui.btnStart)
+        # 三按钮: 预览/出报告/停止 (btnStart 降级为隐藏)
+        self._btn_preview = QPushButton(self.tr("👁 预览"))
+        self._btn_preview.setMinimumSize(100, 32)
+        self._btn_preview.clicked.connect(self._on_preview)
+        btn_row.addWidget(self._btn_preview)
+        self._btn_export = QPushButton(self.tr("📄 出报告"))
+        self._btn_export.setMinimumSize(110, 32)
+        self._btn_export.clicked.connect(self._on_export)
+        self._btn_export.setEnabled(False)
+        btn_row.addWidget(self._btn_export)
         btn_row.addWidget(self.ui.btnStop)
-        left_layout.addLayout(btn_row)
+        self.ui.btnStart.hide()  # 不再使用，保留在编译 UI 中避免引用错误
 
         left_panel.setLayout(left_layout)
         h_splitter.addWidget(left_panel)
@@ -1709,10 +1722,67 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._update_lag_display()
 
     # ==================================================================
-    # 运行控制
+    # 运行控制 — 预览 / 出报告 / 停止 状态机
     # ==================================================================
 
-    def _on_start(self):
+    def _set_preview_state(self, state: int):
+        """更新预览状态机并刷新按钮互锁。"""
+        self._preview_state = state
+        idle = state == self._PREVIEW_IDLE
+        running = state == self._PREVIEWING or state == self._EXPORTING
+        ready = state == self._READY
+        self._btn_preview.setEnabled(idle or ready)
+        self._btn_export.setEnabled(ready)
+        self.ui.btnStop.setEnabled(running)
+
+    def _enter_previewing(self):
+        self._running = True
+        self._set_preview_state(self._PREVIEWING)
+        self._btn_preview.setText(self.tr("⏳ 预览中..."))
+
+    def _enter_exporting(self):
+        self._running = True
+        self._set_preview_state(self._EXPORTING)
+        self._btn_export.setText(self.tr("⏳ 报告中..."))
+
+    def _enter_ready(self):
+        self._running = False
+        self._set_preview_state(self._READY)
+        self._btn_preview.setText(self.tr("👁 预览"))
+
+    def _enter_idle(self):
+        self._running = False
+        self._set_preview_state(self._PREVIEW_IDLE)
+        self._btn_preview.setText(self.tr("👁 预览"))
+        self._btn_export.setText(self.tr("📄 出报告"))
+
+    def _staleness_check(self):
+        """天线参数/LAG角度变更 → 强制重新预览。"""
+        if self._preview_state == self._READY:
+            self._enter_idle()
+            self._log("📡 参数已变更，请重新预览")
+
+    def _on_preview(self):
+        """预览: compute_only=True，快速计算不导出。"""
+        if self._preview_state == self._PREVIEWING or self._preview_state == self._EXPORTING:
+            return
+        self._enter_previewing()
+        self._do_run(compute_only=True)
+
+    def _on_export(self):
+        """出报告: compute_only=False，全套导出。"""
+        if self._preview_state != self._READY:
+            QMessageBox.warning(self, self.tr("请先预览"),
+                self.tr("请先点击「预览」确认计算结果，再出报告。"))
+            return
+        self._enter_exporting()
+        self._do_run(compute_only=False)
+
+    def _do_run(self, compute_only: bool = False):
+        """统一执行入口（预览/出报告共用）。"""
+        self._on_start(compute_only=compute_only)
+
+    def _on_start(self, compute_only: bool = False):
         """启动后台处理。支持单文件或多文件模式。"""
         # 懒导入：处理链模块较重，仅在首次点击处理时加载
         from src.chart_config import ChartConfig
@@ -1950,6 +2020,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             out_excel=out_excel,
             out_word=out_word,
             out_data=out_data,
+            compute_only=compute_only,
             # 多步进参数
             step_values=step_values,
             skip_original=skip_original,
@@ -1990,23 +2061,24 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.btnStop.setEnabled(False)
 
     def _restore_start_button(self):
-        """恢复开始按钮到空闲状态。"""
-        self._running = False
-        self.ui.btnStart.setText(self.tr("▶ 开始处理"))
-        self.ui.btnStart.setEnabled(True)
-        self.ui.btnStop.setEnabled(False)
+        """恢复按钮到空闲状态（向后兼容，内部委托 _enter_idle）。"""
+        self._enter_idle()
 
     def _enter_busy(self, text="⏳ 处理中..."):
-        """进入忙碌状态：锁定开始按钮，防止主计算与工具操作并发。"""
+        """进入忙碌状态：锁定预览按钮，防止主计算与工具操作并发。"""
         self._running = True
-        self.ui.btnStart.setText(self.tr(text))
-        self.ui.btnStart.setEnabled(False)
+        self._btn_preview.setText(self.tr(text))
+        self._btn_preview.setEnabled(False)
+        self._btn_export.setEnabled(False)
+        self.ui.btnStop.setEnabled(True)
 
     def _exit_busy(self):
-        """退出忙碌状态：恢复开始按钮。"""
+        """退出忙碌状态：恢复预览按钮。"""
         self._running = False
-        self.ui.btnStart.setText(self.tr("▶ 开始处理"))
-        self.ui.btnStart.setEnabled(True)
+        self._btn_preview.setText(self.tr("👁 预览"))
+        self._btn_preview.setEnabled(True)
+        self._btn_export.setEnabled(False)
+        self.ui.btnStop.setEnabled(False)
 
     def _on_progress(self, current: int, total: int, message: str):
         self.ui.progressBar.setMaximum(total)
@@ -2067,8 +2139,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             except Exception as e:
                 self._log(f"⚠ 任务包保存失败: {e}")
 
-        self._restore_start_button()
-        self.ui.btnStop.setEnabled(False)
+        # 状态机: 预览完成→READY, 出报告完成→IDLE
+        if self._preview_state == self._PREVIEWING:
+            self._enter_ready()
+        else:
+            self._enter_idle()
         self.ui.progressBar.setValue(100)
         self.ui.lblProgressMsg.setText(self.tr("✓ 处理完成"))
         self._update_status()
