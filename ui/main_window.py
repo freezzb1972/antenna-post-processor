@@ -492,7 +492,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 重命名按钮 + 重连信号（在 hButtons 提取之后操作）
         self.ui.btnStart.setText(self.tr("👁 预览"))
         try: self.ui.btnStart.clicked.disconnect()
-        except RuntimeError: pass
+        except (RuntimeError, TypeError): pass
         self.ui.btnStart.clicked.connect(self._on_preview)
         self._btn_export = QPushButton(self.tr("📄 出报告"))
         self._btn_export.setMinimumSize(110, 32)
