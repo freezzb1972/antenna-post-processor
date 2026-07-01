@@ -690,7 +690,7 @@ def _load_and_compute(
     if sheet_ar_configs is None:
         sheet_ar_configs = {}
 
-    progress_max = total * 2 + 5
+    progress_max = total * 2 + 50  # 加载+计算=2×total, 导出留 50 步
 
     # 阶段 A: 加载数据
     _log(log_callback, f"读取 {total} 个频点数据...")
@@ -912,7 +912,7 @@ def run_pipeline(
 
     # ---- 3. 写入 Excel (可选) ----
     total = len(tasks)
-    progress_max = total * 2 + 5
+    progress_max = total * 2 + 50  # 加载+计算=2×total, 导出留 50 步
     if out_excel and output_path:
         _log(log_callback, f"写入输出: {output_path}")
         _report(progress_callback, progress_max - 3, progress_max, "💾 写入 Excel...")
