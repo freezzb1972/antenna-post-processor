@@ -131,6 +131,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._ar_output_db: bool = True     # AR 默认输出 dB
         self._chart_config_required = None   # ChartConfig: 报告需要
         self._chart_config_extra = None      # ChartConfig: 额外(full_report)
+        from src.azimuth_config import AzimuthReportConfig
+        self._azimuth_config = AzimuthReportConfig()  # 方位面报告配置
         self._graph_viewer = None            # GraphViewer: 启动时创建，处理完后填充数据
         self._cached_template_path: Optional[str] = None  # 模板路径缓存
         self._cached_template_mtime: float = 0           # 模板文件 mtime 缓存
@@ -1759,36 +1761,51 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # LLM 辅助: 自动匹配后仍有未匹配文件时尝试 LLM 建议
         self._retry_unmatched_files()
 
+        # ── 输出选项 ──
+        file_page = getattr(self, '_file_settings_page', None)
+        out_excel = True
+        out_word = False
+        out_data = False
+        if file_page and hasattr(file_page, 'get_output_flags'):
+            out_excel, out_word, out_data = file_page.get_output_flags()
+
+        if not out_excel and not out_word and not out_data:
+            self._restore_start_button()
+            QMessageBox.warning(self, self.tr("警告"),
+                self.tr("请至少选择一种输出类型 (天线参数/图表/中间数据)。"))
+            return
+
         template_path = self.ui.editTemplatePath.text().strip()
         output_dir = self.ui.editOutputDir.text().strip() or str(Path.cwd() / "output")
         output_name = self.ui.editOutputName.text().strip() or "antenna_report.xlsx"
         output_name = output_name.replace("\\", "").replace("/", "")
 
-        if not template_path:
+        if out_excel and not template_path:
             self._restore_start_button()
             QMessageBox.warning(self, self.tr("警告"),
                 self.tr("请选择模板 Excel 文件。"))
             return
-        if not Path(template_path).exists():
+        if out_excel and not Path(template_path).exists():
             self._restore_start_button()
             QMessageBox.warning(self, self.tr("警告"),
                 self.tr("模板文件不存在"))
             return
-        template_ext = Path(template_path).suffix.lower()
-        if template_ext not in (".xlsx", ".xls", ".csv", ".docx"):
-            self._restore_start_button()
-            QMessageBox.warning(self, self.tr("警告"),
-                self.tr("不支持的模板文件格式。支持: .xlsx .xls .csv .docx"))
-            return
-        if template_ext in (".csv", ".docx"):
-            self._restore_start_button()
-            QMessageBox.warning(self, self.tr("不支持的模板格式"),
-                self.tr(f"{template_ext} 模板格式当前仅支持存储预设，处理功能尚未实现。\n\n请使用 .xlsx 或 .xls 格式的模板文件。"))
-            return
+        if out_excel:
+            template_ext = Path(template_path).suffix.lower()
+            if template_ext not in (".xlsx", ".xls", ".csv", ".docx"):
+                self._restore_start_button()
+                QMessageBox.warning(self, self.tr("警告"),
+                    self.tr("不支持的模板文件格式。支持: .xlsx .xls .csv .docx"))
+                return
+            if template_ext in (".csv", ".docx"):
+                self._restore_start_button()
+                QMessageBox.warning(self, self.tr("不支持的模板格式"),
+                    self.tr(f"{template_ext} 模板格式当前仅支持存储预设，处理功能尚未实现。\n\n请使用 .xlsx 或 .xls 格式的模板文件。"))
+                return
 
         os.makedirs(output_dir, exist_ok=True)
-        output_path = str(Path(output_dir) / output_name)
-        output_path = self._auto_rename_if_exists(output_path)
+        output_path = str(Path(output_dir) / output_name) if out_excel else ""
+        output_path = self._auto_rename_if_exists(output_path) if output_path else ""
 
         full_report_path: Optional[str] = None
         if self.ui.checkFullReport.isChecked():
@@ -1867,6 +1884,36 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         png_dir = plot_config.save_png_folder
         full_chart_config.save_png_folder = png_dir
 
+        # ── 方位面配置：默认路径 + 角度自动加载 ──
+        if hasattr(self, '_azimuth_config') and self._azimuth_config is not None:
+            az = self._azimuth_config
+            if az.has_any_azimuth:
+                # 默认路径：从第一个源文件推导
+                first_path = self._data_file_paths[0] if self._data_file_paths else ""
+                if first_path:
+                    p = Path(first_path)
+                    src_dir = str(p.parent)
+                    src_stem = p.stem
+                    if not az.chart_output_dir:
+                        az.chart_output_dir = src_dir
+                    if not az.chart_output_filename:
+                        az.chart_output_filename = f"{src_stem}图表报告.docx"
+                    if not az.data_gain_output_dir:
+                        az.data_gain_output_dir = src_dir
+                    if not az.data_gain_output_filename:
+                        az.data_gain_output_filename = f"{src_stem}Gain.xlsx"
+                    if not az.data_ar_output_dir:
+                        az.data_ar_output_dir = src_dir
+                    if not az.data_ar_output_filename:
+                        az.data_ar_output_filename = f"{src_stem}AR.xlsx"
+                # 角度自动加载 (仅首次，之后用户手动管理)
+                if not az._angles_initialized:
+                    if not az.azimuth_cut_angles:
+                        az.azimuth_cut_angles = list(self._lag_config.singles_sorted)
+                    if not az.azimuth_cut_angles_ar:
+                        az.azimuth_cut_angles_ar = list(self._lag_config.singles_sorted)
+                    az._angles_initialized = True
+
         # 从 MainWindow widget 读取（天线参数 dialog 通过 _sync_to_mw 写入此处）
         extrapolate_theta = self._check_extrapolate.isChecked()
         freq_source = self._cmb_freq_source.currentData() or "datasource"
@@ -1899,6 +1946,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             chart_config_obj=full_chart_config,
             ar_lag_config=self._ar_lag_config if hasattr(self, '_ar_lag_config') and not self._ar_lag_config.is_empty() else None,
             ar_output_db=self._ar_output_db,
+            azimuth_config=self._azimuth_config if hasattr(self, '_azimuth_config') and self._azimuth_config.has_any_azimuth else None,
+            out_excel=out_excel,
+            out_word=out_word,
+            out_data=out_data,
             # 多步进参数
             step_values=step_values,
             skip_original=skip_original,

@@ -106,6 +106,10 @@ class ProcessingWorker(QObject):
         extra_params: Optional[set] = None,
         chart_config_obj: Optional[ChartConfig] = None,
         ar_lag_config: Optional[LagConfig] = None,
+        azimuth_config: Optional["AzimuthReportConfig"] = None,
+        out_excel: bool = True,
+        out_word: bool = False,
+        out_data: bool = False,
         nh_custom_angles: Optional[List[float]] = None,
         ar_output_db: bool = True,
         worksheet_naming_mode: int = 0,
@@ -133,6 +137,10 @@ class ProcessingWorker(QObject):
         self.robust_peak = robust_peak
         self.extra_params = extra_params
         self.chart_config_obj = chart_config_obj
+        self.azimuth_config = azimuth_config
+        self.out_excel = out_excel
+        self.out_word = out_word
+        self.out_data = out_data
         self.nh_custom_angles = nh_custom_angles
         self.ar_output_db = ar_output_db
         self.worksheet_naming_mode = worksheet_naming_mode
@@ -167,6 +175,10 @@ class ProcessingWorker(QObject):
                 trim_start=self.trim_start,
                 trim_end=self.trim_end,
                 chart_config_obj=self.chart_config_obj,
+                azimuth_config=self.azimuth_config,
+                out_excel=self.out_excel,
+                out_word=self.out_word,
+                out_data=self.out_data,
                 robust_peak=self.robust_peak,
                 extra_params=self.extra_params,
                 nh_custom_angles=self.nh_custom_angles,

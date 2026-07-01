@@ -61,14 +61,14 @@ _CHART_PATTERNS: Dict[str, List[str]] = {
         r"(AR|Axial)((?!3D).)*(vs|over|Frequency|频率)",
         r"(轴比|AR)((?!3D).)*(vs|频率)",
     ],
-    # C 类: 2D 切面
+    # C 类: 俯仰面切面
     "cut_2d_polar": [
-        r"Polar.*(Cut|Plot|切面|图)",
-        r"极坐标.*(切面|图)",
+        r"Polar.*(Cut|Plot|切面|图|Elevation)",
+        r"极坐标.*(切面|图|俯仰)",
     ],
     "cut_2d_rect": [
-        r"(Rect|Cartesian).*(Cut|Plot|切面|图)",
-        r"直角坐标.*(切面|图)",
+        r"(Rect|Cartesian).*(Cut|Plot|切面|图|Elevation)",
+        r"直角坐标.*(切面|图|俯仰)",
     ],
 }
 
@@ -94,13 +94,15 @@ class ChartConfig:
     所有图表分为三类:
       - A 类: 3D 球面方向图（每频点 1 张 PNG）
       - B 类: 频点-参数曲线（openpyxl 原生图表嵌入 Excel）
-      - C 类: 2D 切面图（每频点 PNG）
+      - C 类: 俯仰面切面图（每频点 PNG）
     """
 
     # A 类: 3D 方向图
     pattern_3d_gain: bool = False
     pattern_3d_eirp: bool = False
     pattern_3d_ar: bool = False
+    pattern_3d_etheta: bool = False    # E_θ 分量 3D 方向图
+    pattern_3d_ephi: bool = False      # E_φ 分量 3D 方向图
 
     # B 类: 频点曲线
     chart_eff_freq: bool = False
@@ -119,13 +121,15 @@ class ChartConfig:
     ar_chart_angles: List[float] = field(default_factory=list)     # AR 指定 θ 单角度
     ar_chart_ranges: List[tuple] = field(default_factory=list)     # AR 指定 θ 范围
 
-    # C 类: 2D 切面
+    # C 类: 俯仰面切面
     cut_2d_polar: bool = False
     cut_2d_rect: bool = False
+    cut_2d_phi_angles: List[float] = field(default_factory=list)  # 选定 Phi 切面角度 (°)
 
     # 视角参数
     elev: float = 30.0
     azim: float = -60.0
+    view_angle_pairs: List[Tuple[float, float]] = field(default_factory=list)  # [(elev, azim), ...]
     dpi: int = 150
     step_deg: float = 5.0          # 3D 图形采样精度 (°)
 
@@ -162,6 +166,7 @@ class ChartConfig:
         """合并两个配置（OR 逻辑），视角参数取 self 的值。"""
         fields = [
             "pattern_3d_gain", "pattern_3d_eirp", "pattern_3d_ar",
+            "pattern_3d_etheta", "pattern_3d_ephi",
             "chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
             "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp",
             "chart_ar_freq", "chart_lag_vs_phi", "chart_ar_vs_phi", "cut_2d_polar", "cut_2d_rect",
@@ -175,6 +180,7 @@ class ChartConfig:
             gain_chart_ranges=list(set(self.gain_chart_ranges + other.gain_chart_ranges)),
             ar_chart_angles=list(set(self.ar_chart_angles + other.ar_chart_angles)),
             ar_chart_ranges=list(set(self.ar_chart_ranges + other.ar_chart_ranges)),
+            cut_2d_phi_angles=list(set(self.cut_2d_phi_angles + other.cut_2d_phi_angles)),
         )
         for f in fields:
             setattr(merged, f, getattr(self, f) or getattr(other, f))
@@ -279,6 +285,7 @@ class ChartConfig:
         """返回所有图形 flag 的 key 列表（不含视角参数和角度列表）。"""
         return [
             "pattern_3d_gain", "pattern_3d_eirp", "pattern_3d_ar",
+            "pattern_3d_etheta", "pattern_3d_ephi",
             "chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
             "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp",
             "chart_ar_freq", "chart_lag_vs_phi", "chart_ar_vs_phi", "cut_2d_polar", "cut_2d_rect",
@@ -288,7 +295,8 @@ class ChartConfig:
     def all_sub_angle_keys(cls) -> List[str]:
         """返回所有子角度列表的 key。"""
         return ["gain_chart_angles", "gain_chart_ranges",
-                "ar_chart_angles", "ar_chart_ranges"]
+                "ar_chart_angles", "ar_chart_ranges",
+                "cut_2d_phi_angles"]
 
     @classmethod
     def chart_labels(cls) -> Dict[str, str]:
@@ -297,6 +305,8 @@ class ChartConfig:
             "pattern_3d_gain": "3D 增益方向图",
             "pattern_3d_eirp": "3D EIRP 方向图",
             "pattern_3d_ar": "3D 轴比方向图",
+            "pattern_3d_etheta": "3D E_θ 分量方向图",
+            "pattern_3d_ephi": "3D E_φ 分量方向图",
             "chart_eff_freq": "效率 vs 频率",
             "chart_gain_freq": "峰值增益 vs 频率",
             "chart_dir_freq": "方向性 vs 频率",
@@ -306,8 +316,8 @@ class ChartConfig:
             "chart_ar_freq": "轴比 vs 频率",
         "chart_lag_vs_phi": "LAG vs Phi 散点图",
         "chart_ar_vs_phi": "AR vs Phi 散点图",
-            "cut_2d_polar": "极坐标切面图",
-            "cut_2d_rect": "直角坐标切面图",
+            "cut_2d_polar": "极坐标俯仰面切面图",
+            "cut_2d_rect": "直角坐标俯仰面切面图",
         }
 
     @classmethod
@@ -316,13 +326,14 @@ class ChartConfig:
         return {
             "A 类: 3D 方向图": [
                 "pattern_3d_gain", "pattern_3d_eirp", "pattern_3d_ar",
+                "pattern_3d_etheta", "pattern_3d_ephi",
             ],
             "B 类: 频点曲线": [
                 "chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
                 "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp",
                 "chart_ar_freq",
             ],
-            "C 类: 2D 切面图": [
+            "C 类: 俯仰面切面图": [
                 "cut_2d_polar", "cut_2d_rect",
             ],
         }

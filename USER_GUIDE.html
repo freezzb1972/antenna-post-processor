@@ -68,6 +68,7 @@
   <li><a href="#graph-viewer-v2">21. 图形查看器 (v2)</a></li>
   <li><a href="#i18n">22. 国际化支持 (中/英)</a></li>
   <li><a href="#report-config">23. 报告列配置</a></li>
+  <li><a href="#azimuth-polar">24. 方位面极坐标切面图 (Gain/AR)</a></li>
 </ol>
 </div>
 
@@ -591,10 +592,72 @@ antenna-post-processor/
 └── tests/               # 单元测试
 </div>
 
+<!-- ============================================================ -->
+<h2 id="azimuth-polar">24. 方位面极坐标切面图 (Gain / AR)</h2>
+
+<p>在选定俯仰角 (Theta) 上沿方位角 (Phi) 0–360° 绘制增益或轴比的极坐标切面图。输出为 Word 文档 (.docx)，每个频点一张图，多条 Theta 曲线叠加在同一张图上。</p>
+
+<h3>24.1 启用方式</h3>
+<div class="card">
+  <p><strong>图表设置</strong> → C 类: 俯仰面切面图 → 勾选：</p>
+  <ul>
+    <li>☑ <strong>Gain 方位面极坐标</strong> — 增益方位面切面图</li>
+    <li>☑ <strong>AR 方位面极坐标</strong> — 轴比方位面切面图</li>
+  </ul>
+  <p>Gain 和 AR 各有独立的 ⚙ 角度… 按钮，可选择不同的 Theta 角度。</p>
+</div>
+
+<h3>24.2 角度设置</h3>
+<p>点击 <strong>⚙ 角度…</strong> 打开角度选择窗口：</p>
+<ul>
+  <li><strong>自定义添加</strong> — 输入角度值（0–180°），点击"+ 添加"</li>
+  <li><strong>步进批量生成</strong> — 设置起始/结束/步进，一键生成多个角度</li>
+  <li><strong>已选角度显示区</strong> — 流式标签显示，点击 ✕ 可删除单个角度</li>
+  <li><strong>自动加载</strong> — 首次打开时自动从 LAG 配置加载角度（单向绑定，后续修改不影响 LAG）</li>
+</ul>
+
+<h3>24.3 图表参数</h3>
+<div class="card">
+<table>
+  <tr><th>参数</th><th>位置</th><th>说明</th></tr>
+  <tr><td>天线名</td><td>图表设置 → 方位面区</td><td>可选，显示在图表标题中</td></tr>
+  <tr><td>Word 布局</td><td>图表设置 → 输出方式</td><td>并排 (Gain 左 AR 右) / 先后 (全部 Gain → 全部 AR)</td></tr>
+  <tr><td>DPI</td><td>图表设置 → 输出方式</td><td>150–1000，值越大图片越清晰、文件越大</td></tr>
+  <tr><td>列数</td><td>图表设置 → 输出方式</td><td>单列 / 双列（Word 页面布局）</td></tr>
+  <tr><td>图片宽</td><td>图表设置 → 输出方式</td><td>10%–100%，图片占列宽的百分比</td></tr>
+</table>
+</div>
+
+<h3>24.4 输出设置</h3>
+<p><strong>输入输出</strong> 页面 → 输出设置区：</p>
+<div class="card">
+<table>
+  <tr><th>输出类型</th><th>说明</th></tr>
+  <tr><td>☑ 天线参数报告 (.xlsx)</td><td>传统天线参数填入 Excel 模板</td></tr>
+  <tr><td>☐ 图表报告 (.docx)</td><td>方位面极坐标图 Word 文档</td></tr>
+  <tr><td>☐ 中间数据文件 (.xlsx)</td><td>每频点增益/轴比原始数据，worksheet = 频率，列 = Theta，行 = Phi</td></tr>
+</table>
+<p>三种输出可任意组合，至少勾选一项才能启动。默认路径均为源文件目录，文件名自动生成为 <code>源文件名+图表报告.docx</code>、<code>源文件名+Gain.xlsx</code>、<code>源文件名+AR.xlsx</code>。</p>
+</div>
+
+<h3>24.5 图片说明</h3>
+<ul>
+  <li><strong>角度轴</strong> — Phi 0–360°（北 = 0°，顺时针）</li>
+  <li><strong>径向轴</strong> — Gain (dBi) 或 AR (dB)</li>
+  <li><strong>网格</strong> — 每 30° 标注角度刻度</li>
+  <li><strong>曲线</strong> — 每条代表一个 Theta 角度，颜色 + 线型区分（最多 32 种组合）</li>
+  <li><strong>图例</strong> — θ=XX°，在图外右侧</li>
+  <li><strong>标题</strong> — <code>天线名 — XX MHz — Gain/AR Azimuth Cut</code></li>
+</ul>
+
+<div class="note">
+  <strong>注意：</strong> 方位面切面图需要 Phase 数据（Thera/Phi Phase）。如果数据源不含相位信息（如某些 FinalSummary），AR 方位面图无法生成。
+</div>
+
 <hr style="margin:36px 0 16px; border:none; border-top:1px solid var(--border);">
 <p style="color:var(--muted); font-size:0.85em;">
   Antenna Post-Processor · 天线参数后处理程序<br>
-  2026-06 · 最后更新: 2026-06-16 · <a href="https://github.com/freezzb1972/antenna-post-processor">GitHub</a>
+  2026-07 · 最后更新: 2026-07-01 · <a href="https://github.com/freezzb1972/antenna-post-processor">GitHub</a>
 </p>
 
 </body>

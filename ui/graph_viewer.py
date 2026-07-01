@@ -46,12 +46,21 @@ PLOT_TYPES = ["Spherical 3D", "Polar 2D", "Cartesian 3D"]
 
 # Frequency curve definitions: (display_label, result_key_prefix, match_mode)
 # match_mode "exact" requires exact key match, "prefix" matches key.startswith(prefix)
+# 查看器频点曲线定义 — 对应 ChartConfig 的 B 类图表
+# (display_label, result_key, match_mode)
+# match_mode "exact": 精确匹配 row key
+#          "prefix": 匹配 row key 前缀 (如 lag_range_0_90)
 FREQ_CURVE_DEFS = [
-    ("Efficiency vs Freq", "efficiency_pct", "exact"),
-    ("Peak Gain vs Freq", "gain", "exact"),
-    ("Directivity vs Freq", "directivity", "exact"),
-    ("AR vs Freq", "ar_single", "exact"),
-    ("Gain @θ vs Freq", "lag_range", "prefix"),
+    ("Efficiency vs Freq",        "efficiency_pct", "exact"),
+    ("Peak Gain vs Freq",         "gain",           "exact"),
+    ("Directivity vs Freq",       "directivity",    "exact"),
+    ("TRP vs Freq",               "trp",            "exact"),
+    ("NHPRP ±45° vs Freq",        "nhprp_45",       "exact"),
+    ("NHPRP ±30° vs Freq",        "nhprp_30",       "exact"),
+    ("Peak EIRP vs Freq",         "peak_eirp",      "exact"),
+    ("AR vs Freq",                "ar_single",      "exact"),
+    ("Gain @θ vs Freq",           "lag_range",      "prefix"),
+    ("Average Gain vs Freq",      "avg_gain",       "exact"),
 ]
 
 

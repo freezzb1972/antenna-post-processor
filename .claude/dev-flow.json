@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "currentPhase": "develop",
+  "phases": {
+    "design": { "status": "completed", "skills": ["brainstorming", "architect", "architecture-decision-records"] },
+    "plan": { "status": "completed", "skills": ["writing-plans", "search-first"] },
+    "plan_review": { "status": "completed", "skills": ["codex-review"], "fallback": "architect", "plan_review_passed": true },
+    "develop": { "status": "active", "skills": ["python-patterns", "test-driven-development", "error-handling", "e2e-testing"] },
+    "verify": { "status": "pending", "skills": ["verification-before-completion", "gui-check", "size-gate", "verify-py"] },
+    "commit": { "status": "pending", "skills": ["checkpoint-commit", "finishing-a-development-branch"] },
+    "manage": { "status": "pending", "skills": ["distill-session", "strategic-compact"] }
+  },
+  "qualityGates": {
+    "gui-check": { "command": "python3 gui_integrity_check.py", "trigger": "ui/*.py changed" },
+    "size-gate": { "command": "python3 build_size_gate.py --spec-only", "trigger": "*.spec changed" },
+    "verify-py": { "command": "python3 -m pytest tests/ -q", "trigger": "any .py changed" }
+  },
+  "stats": {
+    "filesModified": 0,
+    "testsRun": 71,
+    "checkpointsCreated": 2
+  },
+  "lastStarted": "2026-07-01"
+}

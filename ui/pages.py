@@ -50,6 +50,7 @@ from PySide6.QtWidgets import (
 
 from src.file_entry import FileEntry, mode_name, infer_mode_from_sheet
 from src.lag_config import LagConfig
+from src.azimuth_config import AzimuthReportConfig
 from src.sheet_file_matcher import extract_key, sanitize_sheet_name
 from ui.layout_utils import FlowLayout, auto_size_dialog
 from ui.widgets import (AnglePickerWidget, DataFileSelector, OutputSettingsGroup,
@@ -62,6 +63,13 @@ if TYPE_CHECKING:
 # ═══════════════════════════════════════════════════════════════
 # FileSettingsPage — 输入输出
 # ═══════════════════════════════════════════════════════════════
+
+def _make_hsep() -> QFrame:
+    f = QFrame()
+    f.setFrameShape(QFrame.HLine)
+    f.setFrameShadow(QFrame.Sunken)
+    return f
+
 
 class FileSettingsPage(QWidget):
     """文件设置：模板 + 数据 + 输出 集中管理。
@@ -211,17 +219,115 @@ class FileSettingsPage(QWidget):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(4)
 
-        self._output_group = OutputSettingsGroup(
-            output_dir="",
-            output_name="antenna_report.xlsx",
-            on_browse_output=self._on_browse_output,
-            on_browse_full_report=self._on_browse_full_report,
-        )
-        right_layout.addWidget(self._output_group)
+        # ── 输出选项 ──
+        out_grp = QGroupBox(self.tr("输出设置"))
+        out_layout = QVBoxLayout(out_grp)
+        out_layout.setSpacing(6)
+
+        # 1) 天线参数报告 (.xlsx)
+        self._check_out_excel = QCheckBox(self.tr("天线参数报告 (.xlsx)"))
+        self._check_out_excel.setChecked(True)
+        out_layout.addWidget(self._check_out_excel)
+
+        row_xl_dir = QHBoxLayout()
+        self._edit_out_dir = QLineEdit()
+        self._edit_out_dir.setPlaceholderText(self.tr("默认: ./output"))
+        row_xl_dir.addWidget(self._edit_out_dir, 1)
+        btn_xl_browse = QPushButton(self.tr("浏览..."))
+        btn_xl_browse.clicked.connect(self._on_browse_output)
+        row_xl_dir.addWidget(btn_xl_browse)
+        out_layout.addLayout(row_xl_dir)
+
+        row_xl_fn = QHBoxLayout()
+        row_xl_fn.addWidget(QLabel(self.tr("文件名:")))
+        self._edit_out_name = QLineEdit("antenna_report.xlsx")
+        row_xl_fn.addWidget(self._edit_out_name, 1)
+        out_layout.addLayout(row_xl_fn)
+
+        self._check_out_excel.toggled.connect(lambda c: (
+            self._edit_out_dir.setEnabled(c),
+            self._edit_out_name.setEnabled(c),
+        ))
+
+        out_layout.addWidget(_make_hsep())
+
+        # 2) 图表报告 (.docx)
+        self._check_out_word = QCheckBox(self.tr("图表报告 (.docx)"))
+        out_layout.addWidget(self._check_out_word)
+
+        row_word_dir = QHBoxLayout()
+        self._edit_az_chart_dir = QLineEdit()
+        self._edit_az_chart_dir.setPlaceholderText(self.tr("默认: 源文件目录"))
+        row_word_dir.addWidget(self._edit_az_chart_dir, 1)
+        btn_word_browse = QPushButton(self.tr("浏览..."))
+        btn_word_browse.clicked.connect(self._on_browse_az_chart_dir)
+        row_word_dir.addWidget(btn_word_browse)
+        out_layout.addLayout(row_word_dir)
+
+        row_word_fn = QHBoxLayout()
+        row_word_fn.addWidget(QLabel(self.tr("文件名:")))
+        self._edit_az_chart_fn = QLineEdit()
+        self._edit_az_chart_fn.setPlaceholderText(self.tr("默认: 源文件名图表报告.docx"))
+        row_word_fn.addWidget(self._edit_az_chart_fn, 1)
+        out_layout.addLayout(row_word_fn)
+
+        self._check_out_word.toggled.connect(lambda c: (
+            self._edit_az_chart_dir.setEnabled(c),
+            self._edit_az_chart_fn.setEnabled(c),
+        ))
+
+        out_layout.addWidget(_make_hsep())
+
+        # 3) 中间数据文件 (.xlsx)
+        self._check_out_data = QCheckBox(self.tr("中间数据文件 (.xlsx)"))
+        out_layout.addWidget(self._check_out_data)
+
+        # Gain
+        row_gain_dir = QHBoxLayout()
+        self._edit_az_gain_dir = QLineEdit()
+        self._edit_az_gain_dir.setPlaceholderText(self.tr("默认: 源文件目录"))
+        row_gain_dir.addWidget(self._edit_az_gain_dir, 1)
+        btn_gain_browse = QPushButton(self.tr("浏览..."))
+        btn_gain_browse.clicked.connect(self._on_browse_az_gain_dir)
+        row_gain_dir.addWidget(btn_gain_browse)
+        out_layout.addLayout(row_gain_dir)
+
+        row_gain_fn = QHBoxLayout()
+        row_gain_fn.addWidget(QLabel(self.tr("Gain 文件名:")))
+        self._edit_az_gain_fn = QLineEdit()
+        self._edit_az_gain_fn.setPlaceholderText(self.tr("默认: 源文件名Gain.xlsx"))
+        row_gain_fn.addWidget(self._edit_az_gain_fn, 1)
+        out_layout.addLayout(row_gain_fn)
+
+        # AR
+        row_ar_dir = QHBoxLayout()
+        self._edit_az_ar_dir = QLineEdit()
+        self._edit_az_ar_dir.setPlaceholderText(self.tr("默认: 源文件目录"))
+        row_ar_dir.addWidget(self._edit_az_ar_dir, 1)
+        btn_ar_browse = QPushButton(self.tr("浏览..."))
+        btn_ar_browse.clicked.connect(self._on_browse_az_ar_dir)
+        row_ar_dir.addWidget(btn_ar_browse)
+        out_layout.addLayout(row_ar_dir)
+
+        row_ar_fn = QHBoxLayout()
+        row_ar_fn.addWidget(QLabel(self.tr("AR 文件名:")))
+        self._edit_az_ar_fn = QLineEdit()
+        self._edit_az_ar_fn.setPlaceholderText(self.tr("默认: 源文件名AR.xlsx"))
+        row_ar_fn.addWidget(self._edit_az_ar_fn, 1)
+        out_layout.addLayout(row_ar_fn)
+
+        self._check_out_data.toggled.connect(lambda c: (
+            self._edit_az_gain_dir.setEnabled(c),
+            self._edit_az_gain_fn.setEnabled(c),
+            self._edit_az_ar_dir.setEnabled(c),
+            self._edit_az_ar_fn.setEnabled(c),
+        ))
+
+        right_layout.addWidget(out_grp)
 
         self._check_save_task = QCheckBox(
             self.tr("保存任务包 (.ant) — 下次双击秒开，不重算"))
-        self._check_save_task.setChecked(True)
+        self._check_save_task.setChecked(False)
         self._check_save_task.setToolTip(
             self.tr("保存为 .ant 任务包后，下次双击即可直接查看结果，无需重新计算。"))
         right_layout.addWidget(self._check_save_task)
@@ -241,6 +347,92 @@ class FileSettingsPage(QWidget):
         self._file_entries: List[FileEntry] = []
         self._worksheet_naming_mode: int = 0
         self._cfg = None
+        self._load_azimuth_state()
+
+    def _load_azimuth_state(self):
+        """从 MainWindow 加载输出设置。"""
+        if not self._mw:
+            return
+        # Excel output dir/name
+        if hasattr(self._mw, 'ui'):
+            if hasattr(self, '_edit_out_dir'):
+                self._edit_out_dir.setText(self._mw.ui.editOutputDir.text().strip())
+            if hasattr(self, '_edit_out_name'):
+                self._edit_out_name.setText(self._mw.ui.editOutputName.text().strip())
+        # Azimuth config
+        az = getattr(self._mw, '_azimuth_config', None)
+        if az is None:
+            return
+        if hasattr(self, '_edit_az_chart_dir'):
+            self._edit_az_chart_dir.setText(az.chart_output_dir)
+        if hasattr(self, '_edit_az_chart_fn'):
+            self._edit_az_chart_fn.setText(az.chart_output_filename)
+        if hasattr(self, '_edit_az_gain_dir'):
+            self._edit_az_gain_dir.setText(az.data_gain_output_dir)
+        if hasattr(self, '_edit_az_gain_fn'):
+            self._edit_az_gain_fn.setText(az.data_gain_output_filename)
+        if hasattr(self, '_edit_az_ar_dir'):
+            self._edit_az_ar_dir.setText(az.data_ar_output_dir)
+        if hasattr(self, '_edit_az_ar_fn'):
+            self._edit_az_ar_fn.setText(az.data_ar_output_filename)
+
+    def _sync_azimuth_state(self):
+        """将输出设置写回 MainWindow。"""
+        if not self._mw:
+            return
+        # Excel output
+        if hasattr(self._mw, 'ui'):
+            if hasattr(self, '_edit_out_dir'):
+                self._mw.ui.editOutputDir.setText(self._edit_out_dir.text().strip())
+            if hasattr(self, '_edit_out_name'):
+                self._mw.ui.editOutputName.setText(self._edit_out_name.text().strip())
+        # Azimuth config
+        az = getattr(self._mw, '_azimuth_config', None)
+        if az is None:
+            return
+        if hasattr(self, '_edit_az_chart_dir'):
+            az.chart_output_dir = self._edit_az_chart_dir.text().strip()
+        if hasattr(self, '_edit_az_chart_fn'):
+            az.chart_output_filename = self._edit_az_chart_fn.text().strip()
+        if hasattr(self, '_edit_az_gain_dir'):
+            az.data_gain_output_dir = self._edit_az_gain_dir.text().strip()
+        if hasattr(self, '_edit_az_gain_fn'):
+            az.data_gain_output_filename = self._edit_az_gain_fn.text().strip()
+        if hasattr(self, '_edit_az_ar_dir'):
+            az.data_ar_output_dir = self._edit_az_ar_dir.text().strip()
+        if hasattr(self, '_edit_az_ar_fn'):
+            az.data_ar_output_filename = self._edit_az_ar_fn.text().strip()
+
+    def get_output_flags(self):
+        """返回输出开关: (excel, word, data)。"""
+        return (
+            self._check_out_excel.isChecked() if hasattr(self, '_check_out_excel') else True,
+            self._check_out_word.isChecked() if hasattr(self, '_check_out_word') else False,
+            self._check_out_data.isChecked() if hasattr(self, '_check_out_data') else False,
+        )
+
+    # ── 方位面输出目录浏览 ──
+
+    def _on_browse_az_chart_dir(self):
+        from PySide6.QtWidgets import QFileDialog
+        d = QFileDialog.getExistingDirectory(self, self.tr("选择图表输出目录 (Word)"))
+        if d and hasattr(self, '_edit_az_chart_dir'):
+            self._edit_az_chart_dir.setText(d)
+            self._sync_azimuth_state()
+
+    def _on_browse_az_gain_dir(self):
+        from PySide6.QtWidgets import QFileDialog
+        d = QFileDialog.getExistingDirectory(self, self.tr("选择 Gain 数据输出目录"))
+        if d and hasattr(self, '_edit_az_gain_dir'):
+            self._edit_az_gain_dir.setText(d)
+            self._sync_azimuth_state()
+
+    def _on_browse_az_ar_dir(self):
+        from PySide6.QtWidgets import QFileDialog
+        d = QFileDialog.getExistingDirectory(self, self.tr("选择 AR 数据输出目录"))
+        if d and hasattr(self, '_edit_az_ar_dir'):
+            self._edit_az_ar_dir.setText(d)
+            self._sync_azimuth_state()
         if self._mw:
             from src.config_manager import get_config_manager
             self._cfg = get_config_manager()
@@ -1891,6 +2083,18 @@ class ChartSettingsPage(QWidget):
         self._ar_angles_x: List[float] = []
         self._ar_ranges_x: List[tuple] = []
 
+        # 方位面极坐标切面
+        self._azimuth_angles: List[float] = []
+        self._azimuth_angles_ar: List[float] = []
+        self._antenna_name: str = ""
+        self._word_layout_mode: str = "side_by_side"
+        self._chart_output_dir: str = ""
+        self._chart_output_filename: str = ""
+        self._data_gain_output_dir: str = ""
+        self._data_gain_output_filename: str = ""
+        self._data_ar_output_dir: str = ""
+        self._data_ar_output_filename: str = ""
+
         self._setup_ui()
         self._load_state()
 
@@ -1907,6 +2111,68 @@ class ChartSettingsPage(QWidget):
         self._gain_ranges_x = []
         self._ar_angles_x = []
         self._ar_ranges_x = []
+
+        self._azimuth_angles = []
+        self._azimuth_angles_ar = []
+        self._cut_2d_phi_angles: List[float] = []
+        self._view_angle_pairs: List[Tuple[float, float]] = []
+        self._antenna_name = ""
+        self._word_layout_mode = "side_by_side"
+        self._chart_output_dir = ""
+        self._chart_output_filename = ""
+        self._data_gain_output_dir = ""
+        self._data_gain_output_filename = ""
+        self._data_ar_output_dir = ""
+        self._data_ar_output_filename = ""
+
+        # 视角参数
+        view_grp = QGroupBox(self.tr("视角参数"))
+        view_layout = QHBoxLayout(view_grp)
+        view_layout.addWidget(QLabel(self.tr("仰角:")))
+        self._spin_elev = QDoubleSpinBox()
+        self._spin_elev.setRange(-90, 90)
+        self._spin_elev.setValue(30)
+        self._spin_elev.setSuffix("°")
+        self._spin_elev.setFixedWidth(80)
+        self._spin_elev.valueChanged.connect(lambda: self._sync_to_mw())
+        view_layout.addWidget(self._spin_elev)
+        view_layout.addWidget(QLabel(self.tr("方位角:")))
+        self._spin_azim = QDoubleSpinBox()
+        self._spin_azim.setRange(-180, 180)
+        self._spin_azim.setValue(-60)
+        self._spin_azim.setSuffix("°")
+        self._spin_azim.setFixedWidth(80)
+        self._spin_azim.valueChanged.connect(lambda: self._sync_to_mw())
+        view_layout.addWidget(self._spin_azim)
+        view_layout.addWidget(QLabel("DPI:"))
+        self._spin_dpi = QSpinBox()
+        self._spin_dpi.setRange(72, 300)
+        self._spin_dpi.setValue(150)
+        self._spin_dpi.setFixedWidth(70)
+        self._spin_dpi.valueChanged.connect(lambda: self._sync_to_mw())
+        view_layout.addWidget(self._spin_dpi)
+        view_layout.addWidget(QLabel(self.tr("采样精度:")))
+        self._spin_step = QSpinBox()
+        self._spin_step.setRange(1, 30)
+        self._spin_step.setValue(5)
+        self._spin_step.setSuffix("°")
+        self._spin_step.setFixedWidth(70)
+        self._spin_step.setToolTip(self.tr(
+            "3D 图形采样步进 (1°–30°):\n"
+            "  1°=最精细(~40K点/频点,慢)\n"
+            "  5°=标准(~1.7K点/频点)\n"
+            "  30°=最快(~150点/频点)\n"
+            "值越小图形越精细但计算越慢。"
+        ))
+        self._spin_step.valueChanged.connect(lambda: self._sync_to_mw())
+        view_layout.addWidget(self._spin_step)
+
+        btn_multi_view = QPushButton(self.tr("多视角..."))
+        btn_multi_view.setFixedWidth(80)
+        btn_multi_view.clicked.connect(self._show_view_angle_popup)
+        view_layout.addWidget(btn_multi_view)
+
+        view_layout.addStretch()
 
         grp_list: list = []
 
@@ -1956,8 +2222,66 @@ class ChartSettingsPage(QWidget):
                     btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked: self._show_chart_angle_popup("chart_lag_freq", is_left=True))
                     row.addWidget(btn)
+                elif key in ("cut_2d_polar", "cut_2d_rect"):
+                    btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
+                    btn.setFixedWidth(85)
+                    btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
+                    row.addWidget(btn)
                 row.addStretch()
                 left_layout.addLayout(row)
+            # ── 方位面极坐标切面 (Gain + AR) ──
+            if "C 类" in cat_name:
+                sep = QFrame()
+                sep.setFrameShape(QFrame.HLine)
+                sep.setFrameShadow(QFrame.Sunken)
+                left_layout.addWidget(sep)
+
+                left_layout.addWidget(QLabel(self.tr("方位面极坐标切面:")))
+
+                # Gain azimuth
+                row_az_g = QHBoxLayout()
+                cb_az_g = QCheckBox(self.tr("Gain 方位面极坐标"))
+                cb_az_g.toggled.connect(lambda: self._sync_to_mw())
+                row_az_g.addWidget(cb_az_g)
+                self._chart_required["cut_azimuth_polar"] = cb_az_g
+
+                btn_az = QPushButton("⚙ " + self.tr("角度..."))
+                btn_az.setFixedWidth(80)
+                btn_az.clicked.connect(lambda checked: self._show_azimuth_angle_popup("gain"))
+                row_az_g.addWidget(btn_az)
+                row_az_g.addStretch()
+                left_layout.addLayout(row_az_g)
+
+                # AR azimuth
+                row_az_ar = QHBoxLayout()
+                cb_az_ar = QCheckBox(self.tr("AR 方位面极坐标"))
+                cb_az_ar.toggled.connect(lambda: self._sync_to_mw())
+                row_az_ar.addWidget(cb_az_ar)
+                self._chart_required["cut_azimuth_polar_ar"] = cb_az_ar
+
+                btn_az_ar = QPushButton("⚙ " + self.tr("角度..."))
+                btn_az_ar.setFixedWidth(80)
+                btn_az_ar.clicked.connect(lambda checked: self._show_azimuth_angle_popup("ar"))
+                row_az_ar.addWidget(btn_az_ar)
+                row_az_ar.addStretch()
+                left_layout.addLayout(row_az_ar)
+
+                # ── 方位面图表参数 ──
+                sep_az = QFrame()
+                sep_az.setFrameShape(QFrame.HLine)
+                sep_az.setFrameShadow(QFrame.Sunken)
+                left_layout.addWidget(sep_az)
+
+                row_ant = QHBoxLayout()
+                row_ant.addWidget(QLabel(self.tr("天线名:")))
+                self._edit_antenna_name = QLineEdit()
+                self._edit_antenna_name.setPlaceholderText(self.tr("可选，用于图表标题"))
+                self._edit_antenna_name.setMaximumWidth(160)
+                self._edit_antenna_name.textChanged.connect(lambda: self._sync_to_mw())
+                row_ant.addWidget(self._edit_antenna_name)
+                row_ant.addStretch()
+                left_layout.addLayout(row_ant)
+
             left_layout.addStretch()
             row_layout.addWidget(left_box, 1)
 
@@ -1985,6 +2309,11 @@ class ChartSettingsPage(QWidget):
                     btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked: self._show_chart_angle_popup("chart_lag_freq", is_left=False))
                     row.addWidget(btn)
+                elif key in ("cut_2d_polar", "cut_2d_rect"):
+                    btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
+                    btn.setFixedWidth(85)
+                    btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
+                    row.addWidget(btn)
                 row.addStretch()
                 right_layout.addLayout(row)
             right_layout.addStretch()
@@ -1993,6 +2322,10 @@ class ChartSettingsPage(QWidget):
             content_layout.addLayout(row_layout)
             grp_list.append(grp)
 
+            # 视角参数紧跟 A 类 3D 图
+            if "A 类" in cat_name:
+                grp_list.append(view_grp)
+
             def make_toggle(g=grp, cw=content_widget, name=cat_name):
                 def toggle(checked):
                     cw.setVisible(checked)
@@ -2000,61 +2333,63 @@ class ChartSettingsPage(QWidget):
                 return toggle
             grp.toggled.connect(make_toggle(grp, content_widget, cat_name))
 
-        # 视角参数
-        view_grp = QGroupBox(self.tr("视角参数"))
-        view_layout = QHBoxLayout(view_grp)
-        view_layout.addWidget(QLabel(self.tr("仰角:")))
-        self._spin_elev = QDoubleSpinBox()
-        self._spin_elev.setRange(-90, 90)
-        self._spin_elev.setValue(30)
-        self._spin_elev.setSuffix("°")
-        self._spin_elev.setFixedWidth(80)
-        self._spin_elev.valueChanged.connect(lambda: self._sync_to_mw())
-        view_layout.addWidget(self._spin_elev)
-        view_layout.addWidget(QLabel(self.tr("方位角:")))
-        self._spin_azim = QDoubleSpinBox()
-        self._spin_azim.setRange(-180, 180)
-        self._spin_azim.setValue(-60)
-        self._spin_azim.setSuffix("°")
-        self._spin_azim.setFixedWidth(80)
-        self._spin_azim.valueChanged.connect(lambda: self._sync_to_mw())
-        view_layout.addWidget(self._spin_azim)
-        view_layout.addWidget(QLabel("DPI:"))
-        self._spin_dpi = QSpinBox()
-        self._spin_dpi.setRange(72, 300)
-        self._spin_dpi.setValue(150)
-        self._spin_dpi.setFixedWidth(70)
-        self._spin_dpi.valueChanged.connect(lambda: self._sync_to_mw())
-        view_layout.addWidget(self._spin_dpi)
-        view_layout.addWidget(QLabel(self.tr("采样精度:")))
-        self._spin_step = QSpinBox()
-        self._spin_step.setRange(1, 30)
-        self._spin_step.setValue(5)
-        self._spin_step.setSuffix("°")
-        self._spin_step.setFixedWidth(70)
-        self._spin_step.setToolTip(self.tr(
-            "3D 图形采样步进 (1°–30°):\n"
-            "  1°=最精细(~40K点/频点,慢)\n"
-            "  5°=标准(~1.7K点/频点)\n"
-            "  30°=最快(~150点/频点)\n"
-            "值越小图形越精细但计算越慢。"
-        ))
-        self._spin_step.valueChanged.connect(lambda: self._sync_to_mw())
-        view_layout.addWidget(self._spin_step)
-        view_layout.addStretch()
-        grp_list.append(view_grp)
-
         # 输出方式
         out_grp = QGroupBox(self.tr("输出方式"))
-        out_layout = QHBoxLayout(out_grp)
+        out_layout = QVBoxLayout(out_grp)
+
+        # ── Word 布局 ──
+        row_wl = QHBoxLayout()
+        row_wl.addWidget(QLabel(self.tr("Word 布局:")))
+        self._combo_word_layout = QComboBox()
+        self._combo_word_layout.addItem(self.tr("并排(Gain左AR右)"), "side_by_side")
+        self._combo_word_layout.addItem(self.tr("先后(Gain全部→AR全部)"), "sequential")
+        self._combo_word_layout.currentIndexChanged.connect(lambda: self._sync_to_mw())
+        row_wl.addWidget(self._combo_word_layout)
+        row_wl.addStretch()
+        out_layout.addLayout(row_wl)
+
+        # ── 方位面 DPI / 列数 / 图片宽 ──
+        row_img = QHBoxLayout()
+        row_img.addWidget(QLabel(self.tr("方位图 DPI:")))
+        self._spin_azimuth_dpi = QSpinBox()
+        self._spin_azimuth_dpi.setRange(150, 1000)
+        self._spin_azimuth_dpi.setValue(150)
+        self._spin_azimuth_dpi.setSingleStep(50)
+        self._spin_azimuth_dpi.setFixedWidth(70)
+        self._spin_azimuth_dpi.valueChanged.connect(lambda: self._sync_to_mw())
+        row_img.addWidget(self._spin_azimuth_dpi)
+
+        row_img.addWidget(QLabel(self.tr(" 列数:")))
+        self._combo_az_columns = QComboBox()
+        self._combo_az_columns.addItem(self.tr("单列"), 1)
+        self._combo_az_columns.addItem(self.tr("双列"), 2)
+        self._combo_az_columns.setCurrentIndex(1)
+        self._combo_az_columns.currentIndexChanged.connect(lambda: self._sync_to_mw())
+        row_img.addWidget(self._combo_az_columns)
+
+        row_img.addWidget(QLabel(self.tr(" 宽:")))
+        self._spin_az_img_pct = QSpinBox()
+        self._spin_az_img_pct.setRange(10, 100)
+        self._spin_az_img_pct.setValue(90)
+        self._spin_az_img_pct.setSuffix("%")
+        self._spin_az_img_pct.setFixedWidth(65)
+        self._spin_az_img_pct.valueChanged.connect(lambda: self._sync_to_mw())
+        row_img.addWidget(self._spin_az_img_pct)
+        row_img.addStretch()
+        out_layout.addLayout(row_img)
+
+        # 嵌入/PNG 放在最下方
+        row_bottom = QHBoxLayout()
         self._check_embed = QCheckBox(self.tr("嵌入 Excel"))
-        self._check_embed.setChecked(True)
+        self._check_embed.setChecked(False)
         self._check_embed.toggled.connect(lambda: self._sync_to_mw())
         self._check_png = QCheckBox(self.tr("保存 PNG 文件夹"))
         self._check_png.toggled.connect(lambda: self._sync_to_mw())
-        out_layout.addWidget(self._check_embed)
-        out_layout.addWidget(self._check_png)
-        out_layout.addStretch()
+        row_bottom.addWidget(self._check_embed)
+        row_bottom.addWidget(self._check_png)
+        row_bottom.addStretch()
+        out_layout.addLayout(row_bottom)
+
         grp_list.append(out_grp)
 
         # 包装进滚动
@@ -2101,6 +2436,8 @@ class ChartSettingsPage(QWidget):
             self._gain_ranges = list(req.gain_chart_ranges)
             self._ar_angles = list(req.ar_chart_angles)
             self._ar_ranges = list(req.ar_chart_ranges)
+            self._cut_2d_phi_angles = list(req.cut_2d_phi_angles)
+            self._view_angle_pairs = list(req.view_angle_pairs)
         if hasattr(mw, '_chart_config_extra') and mw._chart_config_extra is not None:
             xtr = mw._chart_config_extra
             for key, cb in self._chart_extra.items():
@@ -2110,6 +2447,40 @@ class ChartSettingsPage(QWidget):
             self._gain_ranges_x = list(xtr.gain_chart_ranges)
             self._ar_angles_x = list(xtr.ar_chart_angles)
             self._ar_ranges_x = list(xtr.ar_chart_ranges)
+
+        # ── 方位面配置 ──
+        if hasattr(mw, '_azimuth_config') and mw._azimuth_config is not None:
+            az = mw._azimuth_config
+            if "cut_azimuth_polar" in self._chart_required:
+                self._chart_required["cut_azimuth_polar"].setChecked(az.cut_azimuth_polar)
+            if "cut_azimuth_polar_ar" in self._chart_required:
+                self._chart_required["cut_azimuth_polar_ar"].setChecked(az.cut_azimuth_polar_ar)
+
+            self._azimuth_angles = list(az.azimuth_cut_angles)
+            self._azimuth_angles_ar = list(az.azimuth_cut_angles_ar)
+            self._antenna_name = az.antenna_name
+            self._word_layout_mode = az.word_layout_mode
+            self._chart_output_dir = az.chart_output_dir
+            self._chart_output_filename = az.chart_output_filename
+            self._data_gain_output_dir = az.data_gain_output_dir
+            self._data_gain_output_filename = az.data_gain_output_filename
+            self._data_ar_output_dir = az.data_ar_output_dir
+            self._data_ar_output_filename = az.data_ar_output_filename
+
+            if hasattr(self, '_edit_antenna_name'):
+                self._edit_antenna_name.setText(az.antenna_name)
+            if hasattr(self, '_combo_word_layout'):
+                idx = self._combo_word_layout.findData(az.word_layout_mode)
+                if idx >= 0:
+                    self._combo_word_layout.setCurrentIndex(idx)
+            if hasattr(self, '_spin_azimuth_dpi'):
+                self._spin_azimuth_dpi.setValue(az.dpi if az.dpi >= 150 else 150)
+            if hasattr(self, '_combo_az_columns'):
+                idx2 = self._combo_az_columns.findData(az.word_columns if az.word_columns in (1, 2) else 2)
+                if idx2 >= 0:
+                    self._combo_az_columns.setCurrentIndex(idx2)
+            if hasattr(self, '_spin_az_img_pct'):
+                self._spin_az_img_pct.setValue(az.word_image_width_pct if 10 <= az.word_image_width_pct <= 100 else 90)
 
     def _add_select_all_row(self, target_dict, keys, parent_layout):
         """添加全选/取消全选按钮行到指定布局。"""
@@ -2173,11 +2544,28 @@ class ChartSettingsPage(QWidget):
         required.gain_chart_ranges = list(self._gain_ranges)
         required.ar_chart_angles = list(self._ar_angles)
         required.ar_chart_ranges = list(self._ar_ranges)
+        required.cut_2d_phi_angles = list(self._cut_2d_phi_angles)
+        required.view_angle_pairs = list(self._view_angle_pairs)
         extra.gain_chart_angles = list(self._gain_angles_x)
         extra.gain_chart_ranges = list(self._gain_ranges_x)
         extra.ar_chart_angles = list(self._ar_angles_x)
         extra.ar_chart_ranges = list(self._ar_ranges_x)
 
+        # ── 方位面配置 ──
+        from src.azimuth_config import AzimuthReportConfig
+        existing = getattr(mw, '_azimuth_config', None)
+        azimuth = existing if existing is not None else AzimuthReportConfig()
+        azimuth.cut_azimuth_polar = self._chart_required.get("cut_azimuth_polar", QCheckBox()).isChecked()
+        azimuth.cut_azimuth_polar_ar = self._chart_required.get("cut_azimuth_polar_ar", QCheckBox()).isChecked()
+        azimuth.azimuth_cut_angles = list(self._azimuth_angles)
+        azimuth.azimuth_cut_angles_ar = list(self._azimuth_angles_ar)
+        azimuth.antenna_name = self._edit_antenna_name.text().strip() if hasattr(self, '_edit_antenna_name') else ""
+        azimuth.word_layout_mode = self._combo_word_layout.currentData() if hasattr(self, '_combo_word_layout') else "side_by_side"
+        azimuth.dpi = self._spin_azimuth_dpi.value() if hasattr(self, '_spin_azimuth_dpi') else 150
+        azimuth.word_columns = self._combo_az_columns.currentData() if hasattr(self, '_combo_az_columns') else 2
+        azimuth.word_image_width_pct = self._spin_az_img_pct.value() if hasattr(self, '_spin_az_img_pct') else 90
+
+        mw._azimuth_config = azimuth
         mw._chart_config_required = required
         mw._chart_config_extra = extra
 
@@ -2364,6 +2752,431 @@ class ChartSettingsPage(QWidget):
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 0)
 
+        layout.addWidget(splitter)
+        dlg.exec()
+        self._sync_to_mw()
+
+    # ── 方位面角度弹窗 ──
+
+    def _show_azimuth_angle_popup(self, chart_type: str = "gain"):
+        """弹出方位面切图 Theta 角度选择窗口。
+
+        Args:
+            chart_type: "gain" 或 "ar"，决定编辑哪个角度列表。
+        """
+        is_ar = (chart_type == "ar")
+        label_text = "AR" if is_ar else "Gain"
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("选择方位面切图角度 — {}").format(label_text))
+        dlg.setMinimumSize(480, 400)
+
+        import copy
+        src_angles = self._azimuth_angles_ar if is_ar else self._azimuth_angles
+        _target = src_angles  # 直接引用，OK 时写回
+        _singles: List[float] = copy.deepcopy(_target)
+
+        # 空列表 → 自动加载 LAG
+        if not _singles and hasattr(self._mw, '_lag_config'):
+            _singles = list(self._mw._lag_config.singles_sorted)
+
+        layout = QVBoxLayout(dlg)
+
+        # 已选角度显示区
+        display_grp = QGroupBox(self.tr("已选角度"))
+        _display_layout = QVBoxLayout(display_grp)
+
+        def _refresh_display():
+            while _display_layout.count():
+                item = _display_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+            if _singles:
+                scroll = QScrollArea()
+                scroll.setWidgetResizable(True)
+                scroll.setFrameShape(QScrollArea.NoFrame)
+                scroll.setMaximumHeight(120)
+                tags = QWidget()
+                tag_layout = FlowLayout(tags)
+                for a in sorted(set(_singles)):
+                    row_w = QWidget()
+                    row_h = QHBoxLayout(row_w)
+                    row_h.setContentsMargins(2, 1, 2, 1)
+                    row_h.setSpacing(2)
+                    row_h.addWidget(QLabel(f"{a:.0f}°"))
+                    btn_del = QPushButton("✕")
+                    btn_del.setFixedSize(20, 20)
+                    btn_del.clicked.connect(lambda checked, angle=a: (
+                        _singles.remove(angle),
+                        _refresh_display()
+                    ))
+                    row_h.addWidget(btn_del)
+                    tag_layout.addWidget(row_w)
+                scroll.setWidget(tags)
+                _display_layout.addWidget(scroll)
+                btn_clear_all = QPushButton(self.tr("清空全部"))
+                btn_clear_all.clicked.connect(lambda: (_singles.clear(), _refresh_display()))
+                _display_layout.addWidget(btn_clear_all)
+            else:
+                _display_layout.addWidget(QLabel(self.tr("  (未选择任何角度)")))
+
+        _refresh_display()
+        layout.addWidget(display_grp)
+
+        # 分割线 + 控制区
+        splitter = QSplitter(Qt.Vertical)
+        bottom = QWidget()
+        bottom_layout = QVBoxLayout(bottom)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+
+        # 自定义单角度
+        cust_grp = QGroupBox(self.tr("自定义"))
+        cust_layout = QHBoxLayout(cust_grp)
+        spin_custom = QDoubleSpinBox()
+        spin_custom.setRange(0, 180)
+        spin_custom.setDecimals(1)
+        spin_custom.setValue(60)
+        spin_custom.setSuffix("°")
+        cust_layout.addWidget(QLabel(self.tr("角度:")))
+        cust_layout.addWidget(spin_custom)
+        btn_add = QPushButton("+ " + self.tr("添加"))
+        btn_add.clicked.connect(lambda: (
+            _singles.append(spin_custom.value()) if spin_custom.value() not in _singles else None,
+            _refresh_display()
+        ))
+        cust_layout.addWidget(btn_add)
+        cust_layout.addStretch()
+        bottom_layout.addWidget(cust_grp)
+
+        # 步进批量生成
+        step_grp = QGroupBox(self.tr("步进批量生成"))
+        step_layout = QHBoxLayout(step_grp)
+        step_layout.addWidget(QLabel(self.tr("起始:")))
+        spin_start = QDoubleSpinBox()
+        spin_start.setRange(0, 180)
+        spin_start.setDecimals(1)
+        spin_start.setValue(0)
+        spin_start.setSuffix("°")
+        step_layout.addWidget(spin_start)
+        step_layout.addWidget(QLabel(self.tr("结束:")))
+        spin_end = QDoubleSpinBox()
+        spin_end.setRange(0, 180)
+        spin_end.setDecimals(1)
+        spin_end.setValue(90)
+        spin_end.setSuffix("°")
+        step_layout.addWidget(spin_end)
+        step_layout.addWidget(QLabel(self.tr("步进:")))
+        spin_step = QDoubleSpinBox()
+        spin_step.setRange(1, 90)
+        spin_step.setDecimals(1)
+        spin_step.setValue(10)
+        spin_step.setSuffix("°")
+        step_layout.addWidget(spin_step)
+        btn_gen = QPushButton(self.tr("生成"))
+        btn_gen.clicked.connect(lambda: (
+            [_singles.append(float(a)) for a in
+             np.linspace(spin_start.value(), spin_end.value(),
+                         max(1, int((spin_end.value() - spin_start.value()) /
+                                    max(1, spin_step.value())) + 1))
+             if float(a) not in _singles],
+            _refresh_display()
+        ))
+        step_layout.addWidget(btn_gen)
+        step_layout.addStretch()
+        bottom_layout.addWidget(step_grp)
+
+        # OK / Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            _target.clear(),
+            _target.extend(sorted(set(_singles))),
+            dlg.accept()
+        ))
+        btns.rejected.connect(dlg.reject)
+        bottom_layout.addWidget(btns)
+
+        splitter.addWidget(display_grp)
+        splitter.addWidget(bottom)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 0)
+
+        layout.addWidget(splitter)
+        dlg.exec()
+        self._sync_to_mw()
+
+    # ── 中间文件设置子对话框 ──
+
+    def _show_intermediate_file_settings(self):
+        """打开中间文件输出设置子对话框。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("中间文件输出设置"))
+        dlg.setMinimumSize(580, 320)
+
+        layout = QVBoxLayout(dlg)
+
+        # Gain 数据
+        gain_grp = QGroupBox(self.tr("Gain 中间数据"))
+        gain_layout = QVBoxLayout(gain_grp)
+        row_gd = QHBoxLayout()
+        row_gd.addWidget(QLabel(self.tr("输出目录:")))
+        edit_gain_dir = QLineEdit(self._data_gain_output_dir)
+        edit_gain_dir.setPlaceholderText(self.tr("默认: 源文件目录"))
+        edit_gain_dir.setMinimumWidth(220)
+        row_gd.addWidget(edit_gain_dir)
+        btn_gain_browse = QPushButton(self.tr("浏览..."))
+        row_gd.addWidget(btn_gain_browse)
+        row_gd.addStretch()
+        gain_layout.addLayout(row_gd)
+
+        row_gf = QHBoxLayout()
+        row_gf.addWidget(QLabel(self.tr("文件名:")))
+        edit_gain_fn = QLineEdit(self._data_gain_output_filename)
+        edit_gain_fn.setPlaceholderText(self.tr("默认: 源文件名Gain.xlsx"))
+        edit_gain_fn.setMinimumWidth(220)
+        row_gf.addWidget(edit_gain_fn)
+        row_gf.addStretch()
+        gain_layout.addLayout(row_gf)
+
+        layout.addWidget(gain_grp)
+
+        # AR 数据
+        ar_grp = QGroupBox(self.tr("AR 中间数据"))
+        ar_layout = QVBoxLayout(ar_grp)
+        row_ad = QHBoxLayout()
+        row_ad.addWidget(QLabel(self.tr("输出目录:")))
+        edit_ar_dir = QLineEdit(self._data_ar_output_dir)
+        edit_ar_dir.setPlaceholderText(self.tr("默认: 源文件目录"))
+        edit_ar_dir.setMinimumWidth(220)
+        row_ad.addWidget(edit_ar_dir)
+        btn_ar_browse = QPushButton(self.tr("浏览..."))
+        row_ad.addWidget(btn_ar_browse)
+        row_ad.addStretch()
+        ar_layout.addLayout(row_ad)
+
+        row_af = QHBoxLayout()
+        row_af.addWidget(QLabel(self.tr("文件名:")))
+        edit_ar_fn = QLineEdit(self._data_ar_output_filename)
+        edit_ar_fn.setPlaceholderText(self.tr("默认: 源文件名AR.xlsx"))
+        edit_ar_fn.setMinimumWidth(220)
+        row_af.addWidget(edit_ar_fn)
+        row_af.addStretch()
+        ar_layout.addLayout(row_af)
+
+        layout.addWidget(ar_grp)
+
+        layout.addStretch()
+
+        # Browse buttons
+        btn_gain_browse.clicked.connect(lambda: _pick_dir(edit_gain_dir, "Gain"))
+        btn_ar_browse.clicked.connect(lambda: _pick_dir(edit_ar_dir, "AR"))
+
+        def _pick_dir(target_edit, label):
+            from PySide6.QtWidgets import QFileDialog
+            d = QFileDialog.getExistingDirectory(
+                dlg, self.tr("选择 {} 数据输出目录").format(label))
+            if d:
+                target_edit.setText(d)
+
+        # OK / Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            setattr(self, '_data_gain_output_dir', edit_gain_dir.text().strip()),
+            setattr(self, '_data_gain_output_filename', edit_gain_fn.text().strip()),
+            setattr(self, '_data_ar_output_dir', edit_ar_dir.text().strip()),
+            setattr(self, '_data_ar_output_filename', edit_ar_fn.text().strip()),
+            dlg.accept(),
+            self._sync_to_mw(),
+        ))
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+
+        dlg.exec()
+
+    # ── 图表输出目录浏览 ──
+
+    def _browse_chart_output_dir(self):
+        from PySide6.QtWidgets import QFileDialog
+        d = QFileDialog.getExistingDirectory(
+            self, self.tr("选择图表输出目录 (Word)"))
+        if d and hasattr(self, '_edit_chart_output_dir'):
+            self._edit_chart_output_dir.setText(d)
+            self._sync_to_mw()
+
+    # ── 3D 多视角弹窗 ──
+
+    def _show_view_angle_popup(self):
+        """弹出 3D 方向图多视角设置窗口。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("3D 多视角设置"))
+        dlg.setMinimumSize(500, 350)
+        import copy
+        _pairs: List[Tuple[float, float]] = copy.deepcopy(self._view_angle_pairs)
+
+        layout = QVBoxLayout(dlg)
+        display_grp = QGroupBox(self.tr("视角列表 (仰角, 方位角)"))
+        _display_layout = QVBoxLayout(display_grp)
+
+        def _refresh_display():
+            while _display_layout.count():
+                item = _display_layout.takeAt(0)
+                if item.widget(): item.widget().deleteLater()
+            if _pairs:
+                scroll = QScrollArea()
+                scroll.setWidgetResizable(True); scroll.setFrameShape(QScrollArea.NoFrame)
+                scroll.setMaximumHeight(140)
+                tags = QWidget()
+                tag_layout = FlowLayout(tags)
+                for el, az in _pairs:
+                    row_w = QWidget()
+                    row_h = QHBoxLayout(row_w)
+                    row_h.setContentsMargins(2, 1, 2, 1); row_h.setSpacing(2)
+                    row_h.addWidget(QLabel(f"仰角 {el:.0f}°, 方位 {az:.0f}°"))
+                    btn_del = QPushButton("✕")
+                    btn_del.setFixedSize(20, 20)
+                    btn_del.clicked.connect(lambda checked, p=(el, az): (
+                        _pairs.remove(p), _refresh_display()))
+                    row_h.addWidget(btn_del); row_h.addStretch()
+                    tag_layout.addWidget(row_w)
+                scroll.setWidget(tags)
+                _display_layout.addWidget(scroll)
+                btn_clear = QPushButton(self.tr("清空全部"))
+                btn_clear.clicked.connect(lambda: (_pairs.clear(), _refresh_display()))
+                _display_layout.addWidget(btn_clear)
+            else:
+                _display_layout.addWidget(QLabel(self.tr(
+                    "  (未设置，使用上方仰角/方位角单值)")))
+        _refresh_display()
+        layout.addWidget(display_grp)
+
+        add_grp = QGroupBox(self.tr("添加视角"))
+        add_layout = QHBoxLayout(add_grp)
+        add_layout.addWidget(QLabel(self.tr("仰角:")))
+        spin_el = QDoubleSpinBox()
+        spin_el.setRange(-90, 90); spin_el.setDecimals(1)
+        spin_el.setValue(30); spin_el.setSuffix("°")
+        add_layout.addWidget(spin_el)
+        add_layout.addWidget(QLabel(self.tr("方位角:")))
+        spin_az = QDoubleSpinBox()
+        spin_az.setRange(-180, 180); spin_az.setDecimals(1)
+        spin_az.setValue(-60); spin_az.setSuffix("°")
+        add_layout.addWidget(spin_az)
+        btn_add = QPushButton("+ " + self.tr("添加"))
+        btn_add.clicked.connect(lambda: (
+            _pairs.append((spin_el.value(), spin_az.value())),
+            _refresh_display()))
+        add_layout.addWidget(btn_add); add_layout.addStretch()
+        layout.addWidget(add_grp)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            self._view_angle_pairs.clear(),
+            self._view_angle_pairs.extend(list(_pairs)),
+            dlg.accept()))
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+
+        dlg.exec()
+        self._sync_to_mw()
+
+    # ── 2D 俯仰面 Phi 角度弹窗 ──
+
+    def _show_2d_phi_angle_popup(self):
+        """弹出 2D 俯仰面切面 Phi 角度选择窗口。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("选择俯仰面切图 Phi 角度"))
+        dlg.setMinimumSize(480, 380)
+        import copy
+        _singles: List[float] = copy.deepcopy(self._cut_2d_phi_angles)
+
+        layout = QVBoxLayout(dlg)
+        display_grp = QGroupBox(self.tr("已选 Phi 角度"))
+        _display_layout = QVBoxLayout(display_grp)
+
+        def _refresh_display():
+            while _display_layout.count():
+                item = _display_layout.takeAt(0)
+                if item.widget(): item.widget().deleteLater()
+            if _singles:
+                scroll = QScrollArea()
+                scroll.setWidgetResizable(True); scroll.setFrameShape(QScrollArea.NoFrame)
+                scroll.setMaximumHeight(120)
+                tags = QWidget()
+                tag_layout = FlowLayout(tags)
+                for a in sorted(set(_singles)):
+                    row_w = QWidget()
+                    row_h = QHBoxLayout(row_w)
+                    row_h.setContentsMargins(2, 1, 2, 1); row_h.setSpacing(2)
+                    row_h.addWidget(QLabel(f"{a:.0f}°"))
+                    btn_del = QPushButton("✕")
+                    btn_del.setFixedSize(20, 20)
+                    btn_del.clicked.connect(lambda checked, angle=a: (
+                        _singles.remove(angle), _refresh_display()))
+                    row_h.addWidget(btn_del); row_h.addStretch()
+                    tag_layout.addWidget(row_w)
+                scroll.setWidget(tags)
+                _display_layout.addWidget(scroll)
+                btn_clear = QPushButton(self.tr("清空全部"))
+                btn_clear.clicked.connect(lambda: (_singles.clear(), _refresh_display()))
+                _display_layout.addWidget(btn_clear)
+            else:
+                _display_layout.addWidget(QLabel(self.tr("  (未选择，默认 φ=0°, 90°)")))
+        _refresh_display()
+        layout.addWidget(display_grp)
+
+        splitter = QSplitter(Qt.Vertical)
+        bottom = QWidget()
+        bottom_layout = QVBoxLayout(bottom)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+
+        # 自定义 Phi
+        cust_grp = QGroupBox(self.tr("自定义"))
+        cust_layout = QHBoxLayout(cust_grp)
+        spin_custom = QDoubleSpinBox()
+        spin_custom.setRange(0, 360); spin_custom.setDecimals(1)
+        spin_custom.setValue(0); spin_custom.setSuffix("°")
+        cust_layout.addWidget(QLabel(self.tr("Phi:")))
+        cust_layout.addWidget(spin_custom)
+        btn_add = QPushButton("+ " + self.tr("添加"))
+        btn_add.clicked.connect(lambda: (
+            _singles.append(spin_custom.value()) if spin_custom.value() not in _singles else None,
+            _refresh_display()))
+        cust_layout.addWidget(btn_add); cust_layout.addStretch()
+        bottom_layout.addWidget(cust_grp)
+
+        # 步进
+        step_grp = QGroupBox(self.tr("步进批量生成"))
+        step_layout = QHBoxLayout(step_grp)
+        for label, default in [("起始:", 0), ("结束:", 180), ("步进:", 45)]:
+            step_layout.addWidget(QLabel(self.tr(label)))
+            sp = QDoubleSpinBox()
+            sp.setRange(0, 360); sp.setDecimals(1); sp.setSuffix("°")
+            sp.setValue(default)
+            step_layout.addWidget(sp)
+            if label == "步进:":
+                spin_step = sp
+            elif label == "起始:":
+                spin_start = sp
+            else:
+                spin_end = sp
+        btn_gen = QPushButton(self.tr("生成"))
+        btn_gen.clicked.connect(lambda: (
+            [_singles.append(float(a)) for a in
+             np.linspace(spin_start.value(), spin_end.value(),
+                         max(1, int((spin_end.value()-spin_start.value())/
+                                    max(1, spin_step.value()))+1))
+             if float(a) not in _singles],
+            _refresh_display()))
+        step_layout.addWidget(btn_gen); step_layout.addStretch()
+        bottom_layout.addWidget(step_grp)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            self._cut_2d_phi_angles.clear(),
+            self._cut_2d_phi_angles.extend(sorted(set(_singles))),
+            dlg.accept()))
+        btns.rejected.connect(dlg.reject)
+        bottom_layout.addWidget(btns)
+
+        splitter.addWidget(bottom)
         layout.addWidget(splitter)
         dlg.exec()
         self._sync_to_mw()

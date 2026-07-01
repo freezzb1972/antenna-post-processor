@@ -39,6 +39,7 @@ from .datasource import DataSource
 from .excel_reader import ColumnInfo, SheetInfo, read_template
 from .exporter import export_results
 from .lag_config import LagConfig
+from .azimuth_config import AzimuthReportConfig
 from .parser import MergedCSVParser
 from .plot_config import PlotConfig
 from .chart_config import ChartConfig
@@ -133,6 +134,7 @@ def _process_one_frequency(
     extra_params: set = None,
     chart_config: "ChartConfig" = None,
     ar_lag_config: "LagConfig" = None,
+    azimuth_config: "AzimuthReportConfig" = None,
     nh_custom_angles: Optional[List[float]] = None,
     ar_output_db: bool = True,
     log_cb=None,
@@ -256,8 +258,10 @@ def _process_one_frequency(
         for k, v in bw.items(): row[k] = v if v is not None else 0
 
     # Axial Ratio (仅当有 Phase 数据且需要 AR 列)
+    # 若 azimuth_config 要求 AR 方位面图，强制计算 AR
     ar_need = compute_set & {"axial_ratio", "ar_single", "ar_range"}
-    if ar_need or not need:
+    az_force_ar = (azimuth_config is not None and azimuth_config.cut_azimuth_polar_ar)
+    if ar_need or az_force_ar or not need:
         tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
         if tp is not None and pp is not None:
             try:
@@ -338,28 +342,44 @@ def _process_one_frequency(
         for (lo, hi), val in compute_lag_ranges(gain_linear, theta_deg, ranges).items():
             row[f"lag_range_{lo}_{hi}"] = round(val, 6)
 
-    # ── 图形生成 (A/C 类: 每频点 PNG) ──
-    if chart_config is not None and chart_config.has_any_pattern_or_cut:
+    # ── 图形生成 (A/C 类: 每频点 PNG + 方位面) ──
+    az_need = (azimuth_config is not None and azimuth_config.has_any_azimuth)
+    if (chart_config is not None and chart_config.has_any_pattern_or_cut) or az_need:
         try:
             from .plotter import generate_all_for_frequency
+            # 确保 chart_config 不为 None（纯 azimuth 模式时 ChartConfig 可能为 None）
+            ccfg = chart_config if chart_config is not None else ChartConfig()
             n_phi = phi_lm.shape[0]
             phi_angles = np.linspace(0, 360, n_phi, endpoint=False)
-            # AR 线性值（如果有）
+            # AR 线性值（如果需要 3D AR 或 方位面 AR）
             ar_lin = None
-            if chart_config.pattern_3d_ar and "axial_ratio" not in str(row.get("axial_ratio_error", "")):
-                # 尝试从已计算的 AR 获取
+            need_ar_for_graphics = (
+                ccfg.pattern_3d_ar or
+                (azimuth_config is not None and azimuth_config.cut_azimuth_polar_ar)
+            )
+            if need_ar_for_graphics and "axial_ratio" not in str(row.get("axial_ratio_error", "")):
                 tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
                 if tp is not None and pp is not None:
                     ar = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
                     if ar is not None:
                         ar_lin = ar
+            gain_dbi = 10.0 * np.log10(np.maximum(gain_linear, 1e-15))
             images = generate_all_for_frequency(
-                theta_deg, phi_angles, 10.0 * np.log10(np.maximum(gain_linear, 1e-15)),
-                freq, chart_config, ar_linear=ar_lin,
+                theta_deg, phi_angles, gain_dbi,
+                freq, ccfg, ar_linear=ar_lin,
                 antenna_name="",
+                azimuth_config=azimuth_config,
             )
             if images:
                 row["_images"] = images
+            # 存储中间数据供方位面导出使用
+            if azimuth_config.cut_azimuth_polar and azimuth_config.azimuth_cut_angles:
+                row["_azimuth_gain_dbi"] = gain_dbi
+                row["_azimuth_theta_deg"] = theta_deg.copy()
+            if azimuth_config.cut_azimuth_polar_ar and ar_lin is not None and azimuth_config.azimuth_cut_angles_ar:
+                row["_azimuth_ar_db"] = 20.0 * np.log10(np.maximum(ar_lin, 1e-15))
+                if "_azimuth_theta_deg" not in row:
+                    row["_azimuth_theta_deg"] = theta_deg.copy()
         except Exception as e:
             row["_graph_error"] = str(e)  # 图形生成失败不阻塞数据处理
 
@@ -587,6 +607,7 @@ def _load_and_compute(
     chart_config: "ChartConfig" = None,
     ar_lag_config: "LagConfig" = None,
     sheet_ar_configs: Dict[str, "LagConfig"] = None,
+    azimuth_config: "AzimuthReportConfig" = None,
     nh_custom_angles: Optional[List[float]] = None,
     ar_output_db: bool = True,
     cancel_callback=None,
@@ -615,7 +636,7 @@ def _load_and_compute(
         theta_list = list(task_ds.theta_angles)
         # 每 sheet 的 AR 配置: 优先用全局 override, 否则用模板自动检测的
         ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db))
+        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, azimuth_config))
         if (i + 1) % 20 == 0 or (i + 1) == total:
             _report(progress_callback, i + 1, progress_max, f"📂 加载数据 {int((i+1)/total*100)}%")
 
@@ -642,22 +663,23 @@ def _load_and_compute(
                         f"🧮 计算中 {int((data_done+completed)/progress_max*100)}%")
     else:
         _run_compute_serial(compute_tasks, sheet_results, data_done, progress_max,
-                            cancel_callback, progress_callback, log_cb=log_callback)
+                            cancel_callback, progress_callback, log_cb=log_callback,
+                            azimuth_config=azimuth_config)
 
     return sheet_results
 
 
 def _run_compute_serial(
     compute_tasks, sheet_results, data_done, progress_max,
-    cancel_callback, progress_callback, log_cb=None,
+    cancel_callback, progress_callback, log_cb=None, azimuth_config=None,
 ):
     """串行逐频点计算（单进程或 parallel=1）。"""
-    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db) in enumerate(compute_tasks):
+    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg) in enumerate(compute_tasks):
         if cancel_callback and cancel_callback():
             break
         try:
             theta_arr = np.array(theta_list)
-            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, log_cb=log_cb)
+            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, log_cb=log_cb)
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
@@ -702,6 +724,10 @@ def run_pipeline(
     trim_start: int = 0,
     trim_end: int = 0,
     chart_config_obj: Optional[ChartConfig] = None,
+    azimuth_config: Optional["AzimuthReportConfig"] = None,
+    out_excel: bool = True,
+    out_word: bool = False,
+    out_data: bool = False,
     robust_peak: bool = False,
     extra_params: Optional[set] = None,
     nh_custom_angles: Optional[List[float]] = None,
@@ -800,6 +826,7 @@ def run_pipeline(
             extra_params=extra_params, chart_config=chart_config_obj,
             ar_lag_config=ar_lag_config_override,
             sheet_ar_configs=sheet_ar_configs,
+            azimuth_config=azimuth_config,
             nh_custom_angles=nh_custom_angles,
             ar_output_db=ar_output_db,
             cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,
@@ -807,23 +834,25 @@ def run_pipeline(
     finally:
         _close_datasources(use_multi_ds, datasource, datasource_map)
 
-    # ---- 3. 写入 Excel ----
+    # ---- 3. 写入 Excel (可选) ----
     total = len(tasks)
     progress_max = total * 2 + 5
-    _log(log_callback, f"写入输出: {output_path}")
-    _report(progress_callback, progress_max - 3, progress_max, "💾 写入 Excel...")
-
-    export_results(
-        template_path=template_path,
-        output_path=output_path,
-        sheet_results=sheet_results,
-        pattern_images=None,
-        sheets_info=sheets_info,
-        chart_config=chart_config_obj,
-        log_callback=log_callback,
-        remove_template_sheets=template_sheet_names_to_remove,
-    )
-    _report(progress_callback, progress_max - 1, progress_max, "✅ Excel 写入完成")
+    if out_excel and output_path:
+        _log(log_callback, f"写入输出: {output_path}")
+        _report(progress_callback, progress_max - 3, progress_max, "💾 写入 Excel...")
+        export_results(
+            template_path=template_path,
+            output_path=output_path,
+            sheet_results=sheet_results,
+            pattern_images=None,
+            sheets_info=sheets_info,
+            chart_config=chart_config_obj,
+            log_callback=log_callback,
+            remove_template_sheets=template_sheet_names_to_remove,
+        )
+        _report(progress_callback, progress_max - 1, progress_max, "✅ Excel 写入完成")
+    elif not out_excel:
+        _log(log_callback, "⏭ 跳过天线参数 Excel 输出")
 
     # ---- 4. 完整报告 (可选) ----
     if full_report_path:
@@ -833,12 +862,138 @@ def run_pipeline(
             sheet_results=sheet_results,
         )
 
+    # ---- 5. 方位面报告 (可选) ----
+    if azimuth_config is not None and azimuth_config.has_any_azimuth and (out_word or out_data):
+        _export_azimuth(sheet_results, azimuth_config, log_callback,
+                        out_word=out_word, out_data=out_data)
+
     elapsed = time.time() - t0
     total_rows = sum(len(v) for v in sheet_results.values())
     _log(log_callback, f"✓ 完成: {total_rows} 行, {elapsed:.1f}s")
     _report(progress_callback, progress_max, progress_max, "✅ 完成")
 
     return sheet_results
+
+# ---------------------------------------------------------------------------
+# 方位面报告导出
+# ---------------------------------------------------------------------------
+
+def _export_azimuth(
+    sheet_results: Dict[str, List[Dict[str, Any]]],
+    azimuth_config: "AzimuthReportConfig",
+    log_callback=None,
+    out_word: bool = True,
+    out_data: bool = True,
+):
+    """从处理结果中收集方位面图片和中间数据，写入 Word 和 Excel。"""
+    from .chart_word_writer import write_chart_word_report
+    from .azimuth_data_writer import write_azimuth_data
+
+    # ── 收集所有图片和中间数据 ──
+    image_groups: "Dict[str, Dict[float, io.BytesIO]]" = {}
+    freq_gain_data: "List[Tuple[float, Dict[float, np.ndarray]]]" = []
+    freq_ar_data: "List[Tuple[float, Dict[float, np.ndarray]]]" = []
+
+    import io as _io
+
+    # 图片类型 → 用户可读组名
+    def _label_for_image_key(img_key: str) -> str:
+        """将 image key 映射为用户可读组名。"""
+        if img_key.startswith("2d_polar_phi"):
+            phi = img_key[len("2d_polar_phi"):]
+            return f"2D Polar Cut (φ={phi}°)"
+        if img_key.startswith("2d_rect_phi"):
+            phi = img_key[len("2d_rect_phi"):]
+            return f"2D Rectangular Cut (φ={phi}°)"
+        # 3D multi-view keys: 3d_gain_v0, 3d_gain_v1, ...
+        if "_v" in img_key and any(img_key.startswith(p) for p in ("3d_gain", "3d_eirp", "3d_ar")):
+            base = img_key.rsplit("_v", 1)[0]
+            known = {"3d_gain": "3D Gain Pattern", "3d_eirp": "3D EIRP Pattern", "3d_ar": "3D Axial Ratio Pattern"}
+            return known.get(base, img_key)
+        known = {
+            "3d_gain": "3D Gain Pattern",
+            "3d_eirp": "3D EIRP Pattern",
+            "3d_ar": "3D Axial Ratio Pattern",
+            "azimuth_polar": "Gain Azimuth Cut",
+            "azimuth_polar_ar": "AR Azimuth Cut",
+        }
+        return known.get(img_key, img_key)
+
+    for sheet_name, rows in sheet_results.items():
+        for row in rows:
+            freq = row.get("frequency")
+            if freq is None:
+                continue
+            images = row.get("_images", {})
+            for img_key, buf in images.items():
+                if buf is None:
+                    continue
+                label = _label_for_image_key(img_key)
+                if label not in image_groups:
+                    image_groups[label] = {}
+                image_groups[label][freq] = buf
+
+            # Collect intermediate data
+            gain_dbi = row.get("_azimuth_gain_dbi")
+            ar_db_v = row.get("_azimuth_ar_db")
+            theta_deg_arr = row.get("_azimuth_theta_deg")
+            if gain_dbi is not None and theta_deg_arr is not None and azimuth_config.azimuth_cut_angles:
+                gd = {}
+                for angle in azimuth_config.angles_sorted:
+                    idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
+                    nearest = float(theta_deg_arr[idx])
+                    gd[nearest] = gain_dbi[:, idx].copy()
+                freq_gain_data.append((freq, gd))
+            if ar_db_v is not None and theta_deg_arr is not None and azimuth_config.azimuth_cut_angles_ar:
+                ad = {}
+                for angle in azimuth_config.angles_ar_sorted:
+                    idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
+                    nearest = float(theta_deg_arr[idx])
+                    ad[nearest] = ar_db_v[:, idx].copy()
+                freq_ar_data.append((freq, ad))
+
+    # Write Word
+    if out_word and image_groups:
+        word_path = azimuth_config.chart_output_path
+        if word_path:
+            _log(log_callback, f"生成图表报告: {word_path}")
+            try:
+                angles_str = ", ".join(
+                    f"{a:.0f}°" for a in azimuth_config.azimuth_cut_angles
+                ) if azimuth_config.azimuth_cut_angles else ""
+                write_chart_word_report(
+                    image_groups, word_path,
+                    antenna_name=azimuth_config.antenna_name,
+                    angles_str=angles_str,
+                    layout_columns=azimuth_config.word_columns,
+                    image_width_pct=azimuth_config.word_image_width_pct,
+                )
+                total_imgs = sum(len(v) for v in image_groups.values())
+                _log(log_callback, f"  ✓ Word 报告已保存 ({len(image_groups)} 组, {total_imgs} 张图)")
+            except Exception as e:
+                _log(log_callback, f"  ✗ Word 报告生成失败: {e}")
+
+    # Write intermediate data
+    if out_data and freq_gain_data:
+        gain_path = azimuth_config.data_gain_output_path
+        if gain_path:
+            _log(log_callback, f"Gain 中间数据: {gain_path}")
+            try:
+                write_azimuth_data(freq_gain_data, gain_path, "Gain (dBi)")
+                _log(log_callback, f"  ✓ Gain 数据已保存 ({len(freq_gain_data)} 频点)")
+            except Exception as e:
+                _log(log_callback, f"  ✗ Gain 数据导出失败: {e}")
+
+    if out_data and freq_ar_data:
+        ar_path = azimuth_config.data_ar_output_path
+        if ar_path:
+            _log(log_callback, f"AR 中间数据: {ar_path}")
+            try:
+                write_azimuth_data(freq_ar_data, ar_path, "AR (dB)")
+                _log(log_callback, f"  ✓ AR 数据已保存 ({len(freq_ar_data)} 频点)")
+            except Exception as e:
+                _log(log_callback, f"  ✗ AR 数据导出失败: {e}")
+
 
 # ---------------------------------------------------------------------------
 # 向后兼容: 保留旧版 run_batch_pipeline
@@ -899,11 +1054,11 @@ def _compute_chunk(
     """
     import numpy as np
     results = []
-    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db in compute_tasks:
+    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg in compute_tasks:
         try:
             theta_raw = np.array(theta_list)
             row = _process_one_frequency(raw, freq, theta_raw, lag_cfg,
-                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db)
+                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db)
             results.append((sheet_name, row))
         except Exception as e:
             results.append((sheet_name, {"frequency": freq, "_error": str(e)}))

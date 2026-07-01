@@ -13,6 +13,7 @@ import numpy as np
 
 from .chart_config import ChartConfig
 from .renderer import BaseRenderer, MatplotlibRenderer, CloudRenderer
+from .azimuth_config import AzimuthReportConfig
 
 # 模块级默认渲染器（可通过 set_renderer 切换）
 _renderer: BaseRenderer = MatplotlibRenderer()
@@ -87,6 +88,51 @@ def generate_2d_rectangular_cut(
     )
 
 
+def _match_theta_indices(
+    theta_deg: np.ndarray,
+    target_angles: "List[float]",
+    tolerance_deg: float = 2.0,
+) -> "List[int]":
+    """将目标 Theta 角度映射为最近的 theta 数组索引。
+
+    Args:
+        theta_deg: 数据中的 theta 角度数组 (°), (n_theta,)
+        target_angles: 用户选定的 theta 角度 (°)
+        tolerance_deg: 容差 (°)，超出此值仅 log warning
+
+    Returns:
+        索引列表。
+    """
+    indices = []
+    for angle in sorted(set(target_angles)):
+        idx = int(np.argmin(np.abs(theta_deg - angle)))
+        nearest = theta_deg[idx]
+        if abs(nearest - angle) > tolerance_deg:
+            import logging
+            logging.warning(
+                f"方位面切图: Theta {angle}° 在数据中未找到 "
+                f"(最近匹配: {nearest:.1f}°, 容差: {tolerance_deg}°)"
+            )
+        indices.append(idx)
+    return indices
+
+
+def generate_azimuth_polar_cut(
+    phi_deg: np.ndarray,
+    curves: "List[Tuple[float, np.ndarray]]",
+    freq_mhz: float,
+    *,
+    antenna_name: str = "",
+    dpi: int = 150,
+    ylabel: str = "Gain (dBi)",
+) -> io.BytesIO:
+    """生成方位面极坐标切面图（多条 Theta 曲线叠加）。"""
+    return _renderer.render_azimuth_polar(
+        phi_deg, curves, freq_mhz,
+        antenna_name=antenna_name, dpi=dpi, ylabel=ylabel,
+    )
+
+
 # ---------------------------------------------------------------------------
 # 批量生成
 # ---------------------------------------------------------------------------
@@ -100,6 +146,7 @@ def generate_all_for_frequency(
     *,
     ar_linear: Optional[np.ndarray] = None,
     antenna_name: str = "",
+    azimuth_config: Optional[AzimuthReportConfig] = None,
 ) -> Dict[str, io.BytesIO]:
     """根据 ChartConfig 为一个频点生成所有需要的图形。
 
@@ -118,73 +165,109 @@ def generate_all_for_frequency(
     images: Dict[str, io.BytesIO] = {}
 
     # ── A 类: 3D 方向图 ──
+    # 多视角支持: 若有 view_angle_pairs 则循环，否则用单个 elev/azim
+    view_pairs = list(chart_config.view_angle_pairs) if chart_config.view_angle_pairs else [
+        (chart_config.elev, chart_config.azim)
+    ]
+
     if chart_config.pattern_3d_gain:
-        images["3d_gain"] = _renderer.render_3d_pattern(
-            theta_deg, phi_deg, gain_dbi, freq_mhz,
-            elev=chart_config.elev, azim=chart_config.azim,
-            dpi=chart_config.dpi,
-            title="3D Gain Pattern", antenna_name=antenna_name,
-            colormap="emquest",
-        )
+        for vi, (el, az) in enumerate(view_pairs):
+            suffix = f"_v{vi}" if len(view_pairs) > 1 else ""
+            images[f"3d_gain{suffix}"] = _renderer.render_3d_pattern(
+                theta_deg, phi_deg, gain_dbi, freq_mhz,
+                elev=el, azim=az,
+                dpi=chart_config.dpi,
+                title="3D Gain Pattern", antenna_name=antenna_name,
+                colormap="emquest",
+            )
 
     if chart_config.pattern_3d_eirp:
-        images["3d_eirp"] = _renderer.render_3d_pattern(
-            theta_deg, phi_deg, gain_dbi, freq_mhz,
-            elev=chart_config.elev, azim=chart_config.azim,
-            dpi=chart_config.dpi,
-            title="3D EIRP Pattern", antenna_name=antenna_name,
-            colormap="emquest",
-        )
+        for vi, (el, az) in enumerate(view_pairs):
+            suffix = f"_v{vi}" if len(view_pairs) > 1 else ""
+            images[f"3d_eirp{suffix}"] = _renderer.render_3d_pattern(
+                theta_deg, phi_deg, gain_dbi, freq_mhz,
+                elev=el, azim=az,
+                dpi=chart_config.dpi,
+                title="3D EIRP Pattern", antenna_name=antenna_name,
+                colormap="emquest",
+            )
 
     if chart_config.pattern_3d_ar and ar_linear is not None:
         ar_db = 20.0 * np.log10(np.maximum(ar_linear, 1e-15))
-        images["3d_ar"] = _renderer.render_3d_pattern(
-            theta_deg, phi_deg, ar_db, freq_mhz,
-            elev=chart_config.elev, azim=chart_config.azim,
-            dpi=chart_config.dpi,
-            title="3D Axial Ratio", antenna_name=antenna_name,
-            colormap="emquest",
-        )
+        for vi, (el, az) in enumerate(view_pairs):
+            suffix = f"_v{vi}" if len(view_pairs) > 1 else ""
+            images[f"3d_ar{suffix}"] = _renderer.render_3d_pattern(
+                theta_deg, phi_deg, ar_db, freq_mhz,
+                elev=el, azim=az,
+                dpi=chart_config.dpi,
+                title="3D Axial Ratio", antenna_name=antenna_name,
+                colormap="emquest",
+            )
 
-    # ── C 类: 2D 切面图 ──
+    # ── C 类: 俯仰面切面图 ──
     if chart_config.cut_2d_polar or chart_config.cut_2d_rect:
         n_phi = len(phi_deg)
         if n_phi > 0:
-            # φ=0° 切面
-            phi0_idx = 0
-            cut_gain = gain_dbi[phi0_idx, :]
+            # 选定 Phi 角度（默认 0° 和 90°）
+            phi_angles = list(chart_config.cut_2d_phi_angles) if chart_config.cut_2d_phi_angles else [0.0, 90.0]
 
-            if chart_config.cut_2d_polar:
-                images["2d_polar_phi0"] = _renderer.render_2d_polar(
-                    theta_deg, cut_gain, freq_mhz,
-                    cut_label="φ=0°", dpi=chart_config.dpi,
-                    antenna_name=antenna_name,
-                )
-
-            if chart_config.cut_2d_rect:
-                images["2d_rect_phi0"] = _renderer.render_2d_rect(
-                    theta_deg, cut_gain, freq_mhz,
-                    xlabel="Theta (deg)", cut_label="φ=0°",
-                    dpi=chart_config.dpi, antenna_name=antenna_name,
-                )
-
-            # φ=90° 切面
-            phi90_idx = min(n_phi // 4, n_phi - 1)
-            if n_phi >= 4:
-                cut_gain_90 = gain_dbi[phi90_idx, :]
+            for phi_deg_target in sorted(set(phi_angles)):
+                # 找最近 phi 索引
+                phi_idx = int(np.argmin(np.abs(phi_deg - phi_deg_target)))
+                nearest_phi = float(phi_deg[phi_idx])
+                cut_label = f"φ={nearest_phi:.0f}°"
+                cut_gain = gain_dbi[phi_idx, :]
 
                 if chart_config.cut_2d_polar:
-                    images["2d_polar_phi90"] = _renderer.render_2d_polar(
-                        theta_deg, cut_gain_90, freq_mhz,
-                        cut_label="φ=90°", dpi=chart_config.dpi,
+                    key = f"2d_polar_phi{nearest_phi:.0f}"
+                    images[key] = _renderer.render_2d_polar(
+                        theta_deg, cut_gain, freq_mhz,
+                        cut_label=cut_label, dpi=chart_config.dpi,
                         antenna_name=antenna_name,
                     )
 
                 if chart_config.cut_2d_rect:
-                    images["2d_rect_phi90"] = _renderer.render_2d_rect(
-                        theta_deg, cut_gain_90, freq_mhz,
-                        xlabel="Theta (deg)", cut_label="φ=90°",
+                    key = f"2d_rect_phi{nearest_phi:.0f}"
+                    images[key] = _renderer.render_2d_rect(
+                        theta_deg, cut_gain, freq_mhz,
+                        xlabel="Theta (deg)", cut_label=cut_label,
                         dpi=chart_config.dpi, antenna_name=antenna_name,
+                    )
+
+    # ── 方位面极坐标切面图 (Gain + AR) ──
+    if azimuth_config is not None and azimuth_config.has_any_azimuth:
+        az_antenna = azimuth_config.antenna_name or antenna_name
+        az_dpi = azimuth_config.dpi or getattr(chart_config, 'dpi', 150)
+
+        if azimuth_config.cut_azimuth_polar:
+            _az_angles = azimuth_config.angles_sorted
+            if _az_angles and len(phi_deg) > 0:
+                theta_indices = _match_theta_indices(theta_deg, _az_angles)
+                curves = [
+                    (float(theta_deg[i]), gain_dbi[:, i])
+                    for i in theta_indices
+                ]
+                if curves:
+                    images["azimuth_polar"] = _renderer.render_azimuth_polar(
+                        phi_deg, curves, freq_mhz,
+                        antenna_name=az_antenna, dpi=az_dpi,
+                        ylabel="Gain (dBi)",
+                    )
+
+        if azimuth_config.cut_azimuth_polar_ar and ar_linear is not None:
+            _az_ar_angles = azimuth_config.angles_ar_sorted
+            if _az_ar_angles and len(phi_deg) > 0:
+                theta_indices = _match_theta_indices(theta_deg, _az_ar_angles)
+                ar_db = 20.0 * np.log10(np.maximum(ar_linear, 1e-15))
+                curves = [
+                    (float(theta_deg[i]), ar_db[:, i])
+                    for i in theta_indices
+                ]
+                if curves:
+                    images["azimuth_polar_ar"] = _renderer.render_azimuth_polar(
+                        phi_deg, curves, freq_mhz,
+                        antenna_name=az_antenna, dpi=az_dpi,
+                        ylabel="AR (dB)",
                     )
 
     return images

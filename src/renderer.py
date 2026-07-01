@@ -91,6 +91,30 @@ class BaseRenderer(ABC):
         """渲染 2D 直角坐标切面图。"""
         ...
 
+    @abstractmethod
+    def render_azimuth_polar(
+        self,
+        phi_deg: np.ndarray,
+        curves: "List[Tuple[float, np.ndarray]]",
+        freq_mhz: float,
+        *,
+        antenna_name: str = "",
+        dpi: int = 150,
+        ylabel: str = "Gain (dBi)",
+    ) -> io.BytesIO:
+        """渲染方位面极坐标切面图。
+
+        Args:
+            phi_deg: Phi 角度数组 (°)，作为极坐标角度轴。
+            curves: [(theta_deg, values_over_phi), ...]，每个 tuple
+                    是一条 Theta 曲线在 Phi 上的取值。
+            freq_mhz: 频率 (MHz)。
+            antenna_name: 天线名（标题用）。
+            dpi: 图像分辨率。
+            ylabel: 径向轴标签 ("Gain (dBi)" 或 "AR (dB)")。
+        """
+        ...
+
     def close(self):
         """释放渲染器资源（可选覆盖）。"""
         pass
@@ -260,6 +284,68 @@ class MatplotlibRenderer(BaseRenderer):
         fig.tight_layout(pad=1.2)
         return _fig_to_png_buffer(fig, dpi)
 
+    def render_azimuth_polar(
+        self,
+        phi_deg: np.ndarray,
+        curves: "List[Tuple[float, np.ndarray]]",
+        freq_mhz: float,
+        *,
+        antenna_name: str = "",
+        dpi: int = 150,
+        ylabel: str = "Gain (dBi)",
+    ) -> io.BytesIO:
+        """方位面极坐标切面图：Phi 角轴 + 多条 Theta 曲线。"""
+        phi_rad = np.deg2rad(phi_deg)
+
+        # 颜色 + 线型循环 (颜色优先, 最多 32 种组合)
+        colors = ["#E74C3C", "#2980B9", "#27AE60", "#F39C12",
+                  "#8E44AD", "#1ABC9C", "#E67E22", "#2C3E50"]
+        linestyles = ["-", "--", "-.", ":"]
+
+        fig, ax = plt.subplots(subplot_kw={"projection": "polar"},
+                               dpi=dpi, figsize=(8, 7))
+
+        sorted_curves = sorted(curves, key=lambda x: x[0])
+
+        # Pre-allocate closed phi array (same for all curves)
+        phi_close = np.empty(len(phi_rad) + 1)
+        phi_close[:-1] = phi_rad
+        phi_close[-1] = phi_rad[0] + 2 * np.pi
+
+        for i, (theta_angle, gain_1d) in enumerate(sorted_curves):
+            color = colors[i % len(colors)]
+            ls = linestyles[(i // len(colors)) % len(linestyles)]
+            label = f"θ={theta_angle:.0f}°"
+            # 闭合曲线: 追加起点到终点 (phi=0 → phi=360)
+            gain_close = np.empty(len(gain_1d) + 1)
+            gain_close[:-1] = gain_1d
+            gain_close[-1] = gain_1d[0]
+            ax.plot(phi_close, gain_close, color=color, linestyle=ls,
+                    linewidth=1.2, label=label)
+
+        ax.set_theta_zero_location("N")
+        ax.set_theta_direction(-1)
+        ax.set_thetagrids(range(0, 360, 30))
+
+        title_parts = []
+        if antenna_name:
+            title_parts.append(antenna_name)
+        title_parts.append(f"{freq_mhz:.0f} MHz")
+        # ylabel 区分 Gain / AR
+        cut_type = "Gain" if "Gain" in ylabel else "AR"
+        title_parts.append(f"{cut_type} Azimuth Cut")
+        ax.set_title(" — ".join(title_parts), fontsize=12, pad=18)
+
+        ax.set_ylabel(ylabel, fontsize=9, labelpad=20)
+        ax.grid(True, alpha=0.4)
+
+        if len(sorted_curves) > 1:
+            ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.0),
+                      fontsize=7, framealpha=0.8)
+
+        fig.tight_layout(pad=1.5)
+        return _fig_to_png_buffer(fig, dpi)
+
 
 # ═══════════════════════════════════════════════════════════════
 # Cloud GPU 渲染器（预留接口）
@@ -395,6 +481,27 @@ class CloudRenderer(BaseRenderer):
                 angles_deg, gain_dbi, freq_mhz,
                 xlabel=xlabel, cut_label=cut_label, dpi=dpi,
                 antenna_name=antenna_name)
+
+    def render_azimuth_polar(self, phi_deg, curves, freq_mhz,
+                             *, antenna_name="", dpi=150,
+                             ylabel="Gain (dBi)"):
+        if not self._is_available():
+            return self._fallback.render_azimuth_polar(
+                phi_deg, curves, freq_mhz,
+                antenna_name=antenna_name, dpi=dpi, ylabel=ylabel)
+        try:
+            return self._post_render("/api/v1/render/2d/azimuth_polar", {
+                "phi": phi_deg.tolist(),
+                "curves": [(float(k), v.tolist()) for k, v in curves],
+                "freq_mhz": freq_mhz,
+                "antenna_name": antenna_name,
+                "dpi": dpi,
+                "ylabel": ylabel,
+            })
+        except Exception:
+            return self._fallback.render_azimuth_polar(
+                phi_deg, curves, freq_mhz,
+                antenna_name=antenna_name, dpi=dpi, ylabel=ylabel)
 
 
 # ═══════════════════════════════════════════════════════════════

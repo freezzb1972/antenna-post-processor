@@ -1,0 +1,192 @@
+"""
+方位面极坐标切面图 — 配置数据模型
+===================================
+AzimuthReportConfig 管理方位面极坐标图的生成选项、
+输出路径、中间数据路径等。独立于 ChartConfig，关注点分离。
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List, Optional
+
+
+@dataclass
+class AzimuthReportConfig:
+    """方位面极坐标报告配置。
+
+    所有字段均可通过 from_dict() / to_dict() 序列化。
+    """
+
+    # ── 图表开关 ──
+    cut_azimuth_polar: bool = False          # Gain 方位面极坐标切面
+    cut_azimuth_polar_ar: bool = False       # AR   方位面极坐标切面
+    azimuth_cut_angles: List[float] = field(default_factory=list)      # Gain 选定 Theta 角度 (°)
+    azimuth_cut_angles_ar: List[float] = field(default_factory=list)   # AR  选定 Theta 角度 (°)
+    antenna_name: str = ""                   # 天线名（标题用）
+
+    # ── Word 布局模式 ──
+    # "side_by_side": 每频点同行 2 列 (左 Gain 右 AR)
+    # "sequential":   先全部 Gain（前加 Heading1），再全部 AR（前加 Heading1）
+    word_layout_mode: str = "side_by_side"
+
+    # ── Word 图片尺寸 ──
+    word_columns: int = 2                       # 列数: 1=单列, 2=双列
+    word_image_width_pct: int = 90              # 图片宽度占列宽的百分比 (10-100)
+
+    # ── 输出路径 — 图表 (Word) ──
+    chart_output_dir: str = ""               # 图表输出目录
+    chart_output_filename: str = ""          # 图表输出文件名
+
+    # ── 输出路径 — 中间数据 ──
+    data_gain_output_dir: str = ""
+    data_gain_output_filename: str = ""
+    data_ar_output_dir: str = ""
+    data_ar_output_filename: str = ""
+
+    # ── 渲染 ──
+    dpi: int = 150
+
+    # ── 内部标志 ──
+    _angles_initialized: bool = False  # 角度是否已从 LAG 初始化过
+
+    # ═══════════════════════════════════════════════════════════
+    # 属性
+    # ═══════════════════════════════════════════════════════════
+
+    @property
+    def has_any_azimuth(self) -> bool:
+        """是否启用了任一 azimuth 切面。"""
+        return self.cut_azimuth_polar or self.cut_azimuth_polar_ar
+
+    @property
+    def has_both(self) -> bool:
+        """是否同时启用了 Gain 和 AR。"""
+        return self.cut_azimuth_polar and self.cut_azimuth_polar_ar
+
+    @property
+    def angles_sorted(self) -> List[float]:
+        """排序去重后的 Gain 选定角度。"""
+        return sorted(set(self.azimuth_cut_angles))
+
+    @property
+    def angles_ar_sorted(self) -> List[float]:
+        """排序去重后的 AR 选定角度。"""
+        return sorted(set(self.azimuth_cut_angles_ar))
+
+    @property
+    def is_empty(self) -> bool:
+        """是否没有任何方位面图表启用。"""
+        return not self.has_any_azimuth
+
+    @property
+    def chart_output_path(self) -> str:
+        """完整的图表输出路径。"""
+        if self.chart_output_dir and self.chart_output_filename:
+            return str(Path(self.chart_output_dir) / self.chart_output_filename)
+        return ""
+
+    @property
+    def data_gain_output_path(self) -> str:
+        """Gain 中间数据完整输出路径。"""
+        if self.data_gain_output_dir and self.data_gain_output_filename:
+            return str(Path(self.data_gain_output_dir) / self.data_gain_output_filename)
+        return ""
+
+    @property
+    def data_ar_output_path(self) -> str:
+        """AR 中间数据完整输出路径。"""
+        if self.data_ar_output_dir and self.data_ar_output_filename:
+            return str(Path(self.data_ar_output_dir) / self.data_ar_output_filename)
+        return ""
+
+    # ═══════════════════════════════════════════════════════════
+    # 序列化
+    # ═══════════════════════════════════════════════════════════
+
+    def to_dict(self) -> dict:
+        """序列化为 dict。"""
+        return {
+            "cut_azimuth_polar": self.cut_azimuth_polar,
+            "cut_azimuth_polar_ar": self.cut_azimuth_polar_ar,
+            "azimuth_cut_angles": self.azimuth_cut_angles,
+            "azimuth_cut_angles_ar": self.azimuth_cut_angles_ar,
+            "antenna_name": self.antenna_name,
+            "word_layout_mode": self.word_layout_mode,
+            "word_columns": self.word_columns,
+            "word_image_width_pct": self.word_image_width_pct,
+            "chart_output_dir": self.chart_output_dir,
+            "chart_output_filename": self.chart_output_filename,
+            "data_gain_output_dir": self.data_gain_output_dir,
+            "data_gain_output_filename": self.data_gain_output_filename,
+            "data_ar_output_dir": self.data_ar_output_dir,
+            "data_ar_output_filename": self.data_ar_output_filename,
+            "dpi": self.dpi,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "AzimuthReportConfig":
+        """从 dict 反序列化。"""
+        return cls(
+            cut_azimuth_polar=bool(d.get("cut_azimuth_polar", False)),
+            cut_azimuth_polar_ar=bool(d.get("cut_azimuth_polar_ar", False)),
+            azimuth_cut_angles=list(d.get("azimuth_cut_angles", [])),
+            azimuth_cut_angles_ar=list(d.get("azimuth_cut_angles_ar", [])),
+            antenna_name=str(d.get("antenna_name", "")),
+            word_layout_mode=str(d.get("word_layout_mode", "side_by_side")),
+            word_columns=int(d.get("word_columns", 2)),
+            word_image_width_pct=int(d.get("word_image_width_pct", 90)),
+            chart_output_dir=str(d.get("chart_output_dir", "")),
+            chart_output_filename=str(d.get("chart_output_filename", "")),
+            data_gain_output_dir=str(d.get("data_gain_output_dir", "")),
+            data_gain_output_filename=str(d.get("data_gain_output_filename", "")),
+            data_ar_output_dir=str(d.get("data_ar_output_dir", "")),
+            data_ar_output_filename=str(d.get("data_ar_output_filename", "")),
+            dpi=int(d.get("dpi", 150)),
+        )
+
+    # ═══════════════════════════════════════════════════════════
+    # 合并
+    # ═══════════════════════════════════════════════════════════
+
+    def merge(self, other: "AzimuthReportConfig") -> "AzimuthReportConfig":
+        """合并两个配置（OR 逻辑），角度取并集，路径取 self 优先。"""
+        return AzimuthReportConfig(
+            cut_azimuth_polar=self.cut_azimuth_polar or other.cut_azimuth_polar,
+            cut_azimuth_polar_ar=self.cut_azimuth_polar_ar or other.cut_azimuth_polar_ar,
+            azimuth_cut_angles=sorted(set(self.azimuth_cut_angles + other.azimuth_cut_angles)),
+            azimuth_cut_angles_ar=sorted(set(self.azimuth_cut_angles_ar + other.azimuth_cut_angles_ar)),
+            antenna_name=self.antenna_name or other.antenna_name,
+            word_layout_mode=self.word_layout_mode,
+            word_columns=self.word_columns or other.word_columns,
+            word_image_width_pct=self.word_image_width_pct or other.word_image_width_pct,
+            chart_output_dir=self.chart_output_dir or other.chart_output_dir,
+            chart_output_filename=self.chart_output_filename or other.chart_output_filename,
+            data_gain_output_dir=self.data_gain_output_dir or other.data_gain_output_dir,
+            data_gain_output_filename=self.data_gain_output_filename or other.data_gain_output_filename,
+            data_ar_output_dir=self.data_ar_output_dir or other.data_ar_output_dir,
+            data_ar_output_filename=self.data_ar_output_filename or other.data_ar_output_filename,
+            dpi=self.dpi or other.dpi,
+        )
+
+    # ═══════════════════════════════════════════════════════════
+    # 默认路径计算
+    # ═══════════════════════════════════════════════════════════
+
+    def reset_to_defaults(self, source_path: str) -> None:
+        """根据源文件路径重置所有输出路径为默认值。
+
+        不重置 azimuth_cut_angles 和 antenna_name（尊重用户设置）。
+        """
+        source = Path(source_path)
+        source_dir = str(source.parent)
+        source_stem = source.stem
+
+        self.chart_output_dir = source_dir
+        self.chart_output_filename = f"{source_stem}图表报告.docx"
+        self.data_gain_output_dir = source_dir
+        self.data_gain_output_filename = f"{source_stem}Gain.xlsx"
+        self.data_ar_output_dir = source_dir
+        self.data_ar_output_filename = f"{source_stem}AR.xlsx"
