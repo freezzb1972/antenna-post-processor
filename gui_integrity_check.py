@@ -27,13 +27,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # G1: 必须存在且可见的 widget
 REQUIRED_VISIBLE = [
     "editOutputName", "editOutputDir", "editTemplatePath",
-    "btnStop", "progressBar", "logOutput",
+    "btnStart", "btnStop", "progressBar", "logOutput",
 ]
 
 # G1: 必须隐藏的 widget
 REQUIRED_HIDDEN = [
     "editCsvPath", "btnBrowseCsv", "lblCsv",
-    "btnStart",  # Phase 3: 替换为 btnPreview + btnExport, 原按钮隐藏
 ]
 
 # G1: 最小尺寸要求 (widget_attr, min_w, min_h)
@@ -47,8 +46,12 @@ MIN_SIZE_REQUIREMENTS = [
 DYNAMIC_WIDGETS_REQUIRED = [
     "_file_list_widget", "_match_table", "_btn_add_files",
     "_btn_auto_match", "_check_extrapolate",
-    "_btn_preview", "_btn_export",  # Phase 3: 替换 btnStart
+    "_btn_export",  # Phase 3: 出报告按钮
 ]
+
+# G3 信号检查: btnStart 重用于预览, _btn_export 用于出报告
+PREVIEW_SIGNAL = "self.ui.btnStart.clicked.connect(self._on_preview)"
+EXPORT_SIGNAL = "self._btn_export.clicked.connect(self._on_export)"
 
 # G7: 动态 widget 必须正确添加到布局中(在父容器内可见)
 DYNAMIC_LAYOUT_CHECKS = [
@@ -306,10 +309,11 @@ def check_g3_signal_chain() -> List[str]:
     src = _read_source(main_win)
     errors = []
 
-    # 1. _btn_preview → _on_preview, _btn_export → _on_export (程序化创建)
-    for btn, method in [("_btn_preview", "_on_preview"), ("_btn_export", "_on_export")]:
-        if f"self.{btn}.clicked.connect(self.{method})" not in src:
-            errors.append(f"SIGNAL: {btn}.clicked not connected to {method}")
+    # 1. btnStart → _on_preview, _btn_export → _on_export
+    if PREVIEW_SIGNAL not in src:
+        errors.append(f"SIGNAL: btnStart.clicked not connected to _on_preview")
+    if EXPORT_SIGNAL not in src:
+        errors.append(f"SIGNAL: _btn_export.clicked not connected to _on_export")
 
     # 2. _on_start 内必须包含线程启动协议的所有步骤
     for required in THREAD_START_REQUIRED:

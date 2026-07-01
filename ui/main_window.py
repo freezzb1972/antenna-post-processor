@@ -491,20 +491,18 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._mode_freq_label.setStyleSheet("padding: 2px 4px; font-size: 12px;")
         btn_row.addWidget(self._mode_freq_label)
         btn_row.addStretch()
-        # 三按钮: 预览/出报告/停止 (btnStart 降级为隐藏)
-        self._btn_preview = QPushButton(self.tr("👁 预览"), left_panel)
-        self._btn_preview.setMinimumSize(100, 32)
-        self._btn_preview.clicked.connect(self._on_preview)
-        btn_row.addWidget(self._btn_preview)
+        # 复用编译 UI 的 btnStart/btnStop — 不创建新 widget, 避免 parent/layout 问题
+        self.ui.btnStart.setText(self.tr("👁 预览"))
+        self.ui.btnStart.clicked.disconnect()
+        self.ui.btnStart.clicked.connect(self._on_preview)
+        btn_row.addWidget(self.ui.btnStart)
         self._btn_export = QPushButton(self.tr("📄 出报告"), left_panel)
         self._btn_export.setMinimumSize(110, 32)
         self._btn_export.clicked.connect(self._on_export)
         self._btn_export.setEnabled(False)
         btn_row.addWidget(self._btn_export)
-        btn_row.addWidget(self.ui.btnStop)
-        self._btn_preview.show()
         self._btn_export.show()
-        self.ui.btnStart.hide()  # 不再使用，保留在编译 UI 中避免引用错误
+        btn_row.addWidget(self.ui.btnStop)
 
         left_panel.setLayout(left_layout)
         h_splitter.addWidget(left_panel)
@@ -1748,14 +1746,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         idle = state == self._PREVIEW_IDLE
         running = state == self._PREVIEWING or state == self._EXPORTING
         ready = state == self._READY
-        self._btn_preview.setEnabled(idle or ready)
+        self.ui.btnStart.setEnabled(idle or ready)
         self._btn_export.setEnabled(ready)
         self.ui.btnStop.setEnabled(running)
 
     def _enter_previewing(self):
         self._running = True
         self._set_preview_state(self._PREVIEWING)
-        self._btn_preview.setText(self.tr("⏳ 预览中..."))
+        self.ui.btnStart.setText(self.tr("⏳ 预览中..."))
 
     def _enter_exporting(self):
         self._running = True
@@ -1765,12 +1763,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _enter_ready(self):
         self._running = False
         self._set_preview_state(self._READY)
-        self._btn_preview.setText(self.tr("👁 预览"))
+        self.ui.btnStart.setText(self.tr("👁 预览"))
 
     def _enter_idle(self):
         self._running = False
         self._set_preview_state(self._PREVIEW_IDLE)
-        self._btn_preview.setText(self.tr("👁 预览"))
+        self.ui.btnStart.setText(self.tr("👁 预览"))
         self._btn_export.setText(self.tr("📄 出报告"))
 
     def _staleness_check(self):
@@ -2086,16 +2084,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _enter_busy(self, text="⏳ 处理中..."):
         """进入忙碌状态：锁定预览按钮，防止主计算与工具操作并发。"""
         self._running = True
-        self._btn_preview.setText(self.tr(text))
-        self._btn_preview.setEnabled(False)
+        self.ui.btnStart.setText(self.tr(text))
+        self.ui.btnStart.setEnabled(False)
         self._btn_export.setEnabled(False)
         self.ui.btnStop.setEnabled(True)
 
     def _exit_busy(self):
         """退出忙碌状态：恢复预览按钮。_btn_export 由状态机管理。"""
         self._running = False
-        self._btn_preview.setText(self.tr("👁 预览"))
-        self._btn_preview.setEnabled(True)
+        self.ui.btnStart.setText(self.tr("👁 预览"))
+        self.ui.btnStart.setEnabled(True)
         self.ui.btnStop.setEnabled(False)
         # _btn_export 不由这里管 — 状态机(_enter_ready/_enter_idle)负责
 
