@@ -147,6 +147,7 @@ def generate_all_for_frequency(
     ar_linear: Optional[np.ndarray] = None,
     antenna_name: str = "",
     azimuth_config: Optional[AzimuthReportConfig] = None,
+    extra_patterns: Dict[str, np.ndarray] = None,
 ) -> Dict[str, io.BytesIO]:
     """根据 ChartConfig 为一个频点生成所有需要的图形。
 
@@ -158,11 +159,14 @@ def generate_all_for_frequency(
         chart_config: 图形配置
         ar_linear:    轴比线性值，(n_phi, n_theta)，3D AR 需要
         antenna_name: 天线名称
+        azimuth_config: 方位面报告配置
+        extra_patterns: 额外数据源映射，如 {"3d_etheta": theta_logmag_db, "3d_ephi": phi_logmag_db}
 
     Returns:
         {"3d_gain": buf, "2d_polar_phi0": buf, "2d_rect_phi0": buf, ...}
     """
     images: Dict[str, io.BytesIO] = {}
+    extra = extra_patterns or {}
 
     # ── A 类: 3D 方向图 ──
     # 多视角支持: 若有 view_angle_pairs 则循环，否则用单个 elev/azim
@@ -201,6 +205,29 @@ def generate_all_for_frequency(
                 elev=el, azim=az,
                 dpi=chart_config.dpi,
                 title="3D Axial Ratio", antenna_name=antenna_name,
+                colormap="emquest",
+            )
+
+    # ── A 类: E_θ / E_φ 分量（extra_patterns 提供数据） ──
+    if chart_config.pattern_3d_etheta and "3d_etheta" in extra:
+        for vi, (el, az) in enumerate(view_pairs):
+            suffix = f"_v{vi}" if len(view_pairs) > 1 else ""
+            images[f"3d_etheta{suffix}"] = _renderer.render_3d_pattern(
+                theta_deg, phi_deg, extra["3d_etheta"], freq_mhz,
+                elev=el, azim=az,
+                dpi=chart_config.dpi,
+                title="3D E_θ Pattern", antenna_name=antenna_name,
+                colormap="emquest",
+            )
+
+    if chart_config.pattern_3d_ephi and "3d_ephi" in extra:
+        for vi, (el, az) in enumerate(view_pairs):
+            suffix = f"_v{vi}" if len(view_pairs) > 1 else ""
+            images[f"3d_ephi{suffix}"] = _renderer.render_3d_pattern(
+                theta_deg, phi_deg, extra["3d_ephi"], freq_mhz,
+                elev=el, azim=az,
+                dpi=chart_config.dpi,
+                title="3D E_φ Pattern", antenna_name=antenna_name,
                 colormap="emquest",
             )
 

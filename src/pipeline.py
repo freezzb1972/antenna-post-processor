@@ -364,11 +364,19 @@ def _process_one_frequency(
                     if ar is not None:
                         ar_lin = ar
             gain_dbi = 10.0 * np.log10(np.maximum(gain_linear, 1e-15))
+            # 构建 E_θ/E_φ 分量额外数据
+            extra_patterns = {}
+            if ccfg.pattern_3d_etheta:
+                extra_patterns["3d_etheta"] = theta_lm
+            if ccfg.pattern_3d_ephi:
+                extra_patterns["3d_ephi"] = phi_lm
+            extra_patterns = extra_patterns if extra_patterns else None
             images = generate_all_for_frequency(
                 theta_deg, phi_angles, gain_dbi,
                 freq, ccfg, ar_linear=ar_lin,
                 antenna_name="",
                 azimuth_config=azimuth_config,
+                extra_patterns=extra_patterns,
             )
             if images:
                 row["_images"] = images
