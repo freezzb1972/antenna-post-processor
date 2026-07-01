@@ -110,6 +110,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 预览 → 出报告 状态机
         self._PREVIEW_IDLE = 0; self._PREVIEWING = 1; self._READY = 2; self._EXPORTING = 3
         self._preview_state = self._PREVIEW_IDLE
+        self._preview_dirty = False  # 预览运行中参数变更标记
         self._user_set_output_name = False  # 用户手动编辑输出文件名后置 True
         # 使用统一配置管理器 (antenna_config.json)
         from src.config_manager import get_config_manager
@@ -1760,7 +1761,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
     def _staleness_check(self):
         """天线参数/LAG角度变更 → 强制重新预览。"""
-        if self._preview_state == self._READY:
+        if self._preview_state == self._PREVIEWING:
+            self._preview_dirty = True  # 运行时标记，worker 完成时检查
+        elif self._preview_state == self._READY:
             self._enter_idle()
             self._log("📡 参数已变更，请重新预览")
 
@@ -2141,9 +2144,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             except Exception as e:
                 self._log(f"⚠ 任务包保存失败: {e}")
 
-        # 状态机: 预览完成→READY, 出报告完成→IDLE
+        # 状态机: 预览完成→READY (除非中途参数变更), 出报告完成→IDLE
         if self._preview_state == self._PREVIEWING:
-            self._enter_ready()
+            if self._preview_dirty:
+                self._preview_dirty = False
+                self._enter_idle()
+                self._log("⚠ 预览期间参数已变更，数据已过时，请重新预览")
+            else:
+                self._enter_ready()
         else:
             self._enter_idle()
         self.ui.progressBar.setValue(100)

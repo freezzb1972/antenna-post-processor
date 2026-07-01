@@ -364,7 +364,6 @@ def _process_one_frequency(
                     ar = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
                     if ar is not None:
                         ar_lin = ar
-            gain_dbi = 10.0 * np.log10(np.maximum(gain_linear, 1e-15))
             # compute_only 模式跳过 Matplotlib 渲染
             if not compute_only:
                 # 构建 E_θ/E_φ 分量额外数据
@@ -394,6 +393,9 @@ def _process_one_frequency(
         except Exception as e:
             row["_graph_error"] = str(e)  # 图形生成失败不阻塞数据处理
 
+    # 计算总增益 dB 矩阵 (供 2D Cuts 和图形展示使用)
+    gain_dbi = 10.0 * np.log10(np.maximum(gain_linear, 1e-15))
+
     # 存储原始数据供图形展示使用
     # NOTE: 每频点存储 _raw_data 会大幅增加内存开销。
     # 若有 N 个频点，每个频点的数据为 (n_phi × n_theta) float64 矩阵，
@@ -404,6 +406,10 @@ def _process_one_frequency(
     row["_raw_data"] = {k: v for k, v in raw.items() if v is not None}
     row["_theta_angles"] = list(theta_deg)
     row["_phi_angles"] = [float(i) for i in np.linspace(0, 360, phi_lm.shape[0], endpoint=False)]
+    # 2D Cuts 模式数据源: E_θ/E_φ 分量 + 总增益
+    row["theta_db"] = theta_lm
+    row["phi_db"] = phi_lm
+    row["gain_db"] = gain_dbi
 
     return row
 
@@ -1081,7 +1087,8 @@ def _compute_chunk(
         try:
             theta_raw = np.array(theta_list)
             row = _process_one_frequency(raw, freq, theta_raw, lag_cfg,
-                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co)
+                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co,
+                                         log_cb=None)
             results.append((sheet_name, row))
         except Exception as e:
             results.append((sheet_name, {"frequency": freq, "_error": str(e)}))

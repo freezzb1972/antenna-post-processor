@@ -366,11 +366,7 @@ class MatplotlibRenderer(BaseRenderer):
             ax.set_ylim(lo - margin, hi + margin)
         if label:
             ax.legend(fontsize=8)
-
-        buf = io.BytesIO()
-        FigureCanvasAgg(fig).print_png(buf, dpi=dpi)
-        buf.seek(0)
-        return buf
+        return _fig_to_png_buffer(fig, dpi)
 
 
 # ═══════════════════════════════════════════════════════════════

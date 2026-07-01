@@ -1011,7 +1011,8 @@ class GraphViewer(QWidget):
             cfg = self._mw._chart_config_required
             if phi not in cfg.cut_2d_phi_angles:
                 cfg.cut_2d_phi_angles.append(phi)
-                self._mw._chart_settings_page.load_state_from_mw() if hasattr(self._mw, '_chart_settings_page') else None
+                if hasattr(self._mw, '_chart_settings_page'):
+                    self._mw._chart_settings_page.load_state_from_mw()
 
     def _get_available_freq_curves(self):
         """返回可用的频率曲线列表: [(label, actual_key), ...]."""

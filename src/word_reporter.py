@@ -308,19 +308,33 @@ class WordReporter:
 
     # ── 循环域 + 元数据 ──────────────────────────────────
 
+    _RE_LOOP_START = re.compile(r'\{\{loop_start_(\w+)\}\}')
+    _RE_LOOP_END = re.compile(r'\{\{loop_end_(\w+)\}\}')
+
     def _expand_loops(self) -> Dict[str, tuple]:
-        """扫描段落中的 {{loop_start_<key>}} / {{loop_end_<key>}} 配对。"""
+        """扫描段落和表格中 {{loop_start_<key>}} / {{loop_end_<key>}} 配对。"""
         self._loop_groups = {}
         open_entry: Dict[str, int] = {}
-        for i, para in enumerate(self._doc.paragraphs):
-            text = para.text.strip()
-            if text.startswith("{{loop_start_"):
-                key = text[13:-2]
-                open_entry[key] = i
-            elif text.startswith("{{loop_end_"):
-                key = text[11:-2]
-                if key in open_entry:
-                    self._loop_groups[key] = (open_entry.pop(key), i)
+
+        def _scan_paragraphs(paragraphs):
+            for i, para in enumerate(paragraphs):
+                text = para.text.strip()
+                m_start = self._RE_LOOP_START.match(text)
+                m_end = self._RE_LOOP_END.match(text)
+                if m_start:
+                    open_entry[m_start.group(1)] = i
+                elif m_end:
+                    key = m_end.group(1)
+                    if key in open_entry:
+                        self._loop_groups[key] = (open_entry.pop(key), i)
+
+        # 扫描正文段落
+        _scan_paragraphs(self._doc.paragraphs)
+        # 扫描所有表格单元格
+        for table in self._doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    _scan_paragraphs(cell.paragraphs)
         return dict(self._loop_groups)
 
     def fill_metadata(self, metadata: Dict[str, Any]) -> int:
