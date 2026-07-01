@@ -1960,26 +1960,25 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # ── 方位面配置：默认路径 + 角度自动加载 ──
         if hasattr(self, '_azimuth_config') and self._azimuth_config is not None:
             az = self._azimuth_config
-            if az.has_any_azimuth:
-                # 默认路径：从第一个源文件推导
-                first_path = self._data_file_paths[0] if self._data_file_paths else ""
-                if first_path:
-                    p = Path(first_path)
-                    src_dir = str(p.parent)
-                    src_stem = p.stem
-                    if not az.chart_output_dir:
-                        az.chart_output_dir = src_dir
-                    if not az.chart_output_filename:
-                        az.chart_output_filename = f"{src_stem}图表报告.docx"
-                    if not az.data_gain_output_dir:
-                        az.data_gain_output_dir = src_dir
-                    if not az.data_gain_output_filename:
-                        az.data_gain_output_filename = f"{src_stem}Gain.xlsx"
-                    if not az.data_ar_output_dir:
-                        az.data_ar_output_dir = src_dir
-                    if not az.data_ar_output_filename:
-                        az.data_ar_output_filename = f"{src_stem}AR.xlsx"
-                # 角度自动加载 (仅首次，之后用户手动管理)
+            # 默认路径：从第一个源文件推导（不管是否启用 azimuth, Word 输出需要路径）
+            first_path = self._data_file_paths[0] if self._data_file_paths else ""
+            if first_path:
+                p = Path(first_path)
+                src_dir = str(p.parent)
+                src_stem = p.stem
+                if not az.chart_output_dir:
+                    az.chart_output_dir = src_dir
+                if not az.chart_output_filename:
+                    az.chart_output_filename = f"{src_stem}图表报告.docx"
+                if not az.data_gain_output_dir:
+                    az.data_gain_output_dir = src_dir
+                if not az.data_gain_output_filename:
+                    az.data_gain_output_filename = f"{src_stem}Gain.xlsx"
+                if not az.data_ar_output_dir:
+                    az.data_ar_output_dir = src_dir
+                if not az.data_ar_output_filename:
+                    az.data_ar_output_filename = f"{src_stem}AR.xlsx"
+            # 角度自动加载 (仅首次，之后用户手动管理)
                 if not az._angles_initialized:
                     if not az.azimuth_cut_angles:
                         az.azimuth_cut_angles = list(self._lag_config.singles_sorted)
@@ -2019,7 +2018,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             chart_config_obj=full_chart_config,
             ar_lag_config=self._ar_lag_config if hasattr(self, '_ar_lag_config') and not self._ar_lag_config.is_empty() else None,
             ar_output_db=self._ar_output_db,
-            azimuth_config=self._azimuth_config if hasattr(self, '_azimuth_config') and self._azimuth_config.has_any_azimuth else None,
+            azimuth_config=getattr(self, '_azimuth_config', None),  # 始终传递(含输出路径)
             out_excel=out_excel,
             out_word=out_word,
             out_data=out_data,

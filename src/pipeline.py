@@ -939,7 +939,7 @@ def run_pipeline(
         )
 
     # ---- 5. 方位面报告 (可选) ----
-    if azimuth_config is not None and azimuth_config.has_any_azimuth and (out_word or out_data):
+    if out_word or out_data:
         _export_azimuth(sheet_results, azimuth_config, log_callback,
                         out_word=out_word, out_data=out_data)
 
@@ -1058,19 +1058,23 @@ def _export_azimuth(
 
     # Write Word
     if out_word and image_groups:
-        word_path = azimuth_config.chart_output_path
+        az = azimuth_config or None
+        word_path = az.chart_output_path if az else ""
+        if not word_path and az is None:
+            # 无 azimuth_config 时用默认路径
+            pass  # 跳过 — image_groups 可能是 B 类频点图, 暂无独立 Word 路径
         if word_path:
             _log(log_callback, f"生成图表报告: {word_path}")
             try:
                 angles_str = ", ".join(
-                    f"{a:.0f}°" for a in azimuth_config.azimuth_cut_angles
-                ) if azimuth_config.azimuth_cut_angles else ""
+                    f"{a:.0f}°" for a in (az.azimuth_cut_angles if az else [])
+                ) if (az and az.azimuth_cut_angles) else ""
                 write_chart_word_report(
                     image_groups, word_path,
-                    antenna_name=azimuth_config.antenna_name,
+                    antenna_name=az.antenna_name if az else "",
                     angles_str=angles_str,
-                    layout_columns=azimuth_config.word_columns,
-                    image_width_pct=azimuth_config.word_image_width_pct,
+                    layout_columns=az.word_columns if az else 2,
+                    image_width_pct=az.word_image_width_pct if az else 90,
                 )
                 total_imgs = sum(len(v) for v in image_groups.values())
                 _log(log_callback, f"  ✓ Word 报告已保存 ({len(image_groups)} 组, {total_imgs} 张图)")
@@ -1079,7 +1083,7 @@ def _export_azimuth(
 
     # Write intermediate data
     if out_data and freq_gain_data:
-        gain_path = azimuth_config.data_gain_output_path
+        gain_path = azimuth_config.data_gain_output_path if azimuth_config else ""
         if gain_path:
             _log(log_callback, f"Gain 中间数据: {gain_path}")
             try:
@@ -1089,7 +1093,7 @@ def _export_azimuth(
                 _log(log_callback, f"  ✗ Gain 数据导出失败: {e}")
 
     if out_data and freq_ar_data:
-        ar_path = azimuth_config.data_ar_output_path
+        ar_path = azimuth_config.data_ar_output_path if azimuth_config else ""
         if ar_path:
             _log(log_callback, f"AR 中间数据: {ar_path}")
             try:
