@@ -962,6 +962,34 @@ def _export_azimuth(
                     image_groups[label] = {}
                 image_groups[label][freq] = buf
 
+    # ── B 类: 频点曲线 PNG (Word 报告) ──
+    _B_PARAM_MAP = {
+        "efficiency_pct": "Efficiency (%)", "gain": "Peak Gain (dBi)",
+        "directivity": "Directivity (dBi)", "trp": "TRP (dBm)",
+        "peak_eirp": "Peak EIRP (dBm)", "avg_gain": "Average Gain (dB)",
+        "nhprp_45": "NHPRP ±45°", "nhprp_30": "NHPRP ±30°",
+    }
+    from .renderer import _renderer as _freq_renderer
+    for sheet_name, rows in sheet_results.items():
+        for param_key, param_label in _B_PARAM_MAP.items():
+            freqs = []; values = []
+            for row in rows:
+                v = row.get(param_key)
+                if v is not None and row.get("frequency") is not None:
+                    freqs.append(row["frequency"]); values.append(v)
+            if len(freqs) > 1:
+                try:
+                    png = _freq_renderer.render_freq_curve(
+                        freqs, values, ylabel=param_label,
+                        title=f"{param_label} vs Frequency")
+                    group = f"B: {param_label} vs Freq"
+                    # B 类图表不按频点分组，用 0.0 做占位 key
+                    if group not in image_groups:
+                        image_groups[group] = {}
+                    image_groups[group][0.0] = png
+                except Exception:
+                    pass
+
             # Collect intermediate data
             gain_dbi = row.get("_azimuth_gain_dbi")
             ar_db_v = row.get("_azimuth_ar_db")
