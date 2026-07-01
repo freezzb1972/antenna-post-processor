@@ -701,11 +701,10 @@ def _load_and_compute(
             break
         raw = task_ds.read_sections(csv_idx)
         theta_list = list(task_ds.theta_angles)
-        # 每 sheet 的 AR 配置: 优先用全局 override, 否则用模板自动检测的
         ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
         compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, azimuth_config, compute_only))
-        if (i + 1) % 20 == 0 or (i + 1) == total:
-            _report(progress_callback, i + 1, progress_max, f"📂 加载数据 {int((i+1)/total*100)}%")
+        # 频繁更新进度 (FinalSummary 单频点 3s+, 20 频点才更新会显得卡死)
+        _report(progress_callback, i + 1, progress_max, f"📂 加载数据 ({i+1}/{total})")
 
     data_done = len(compute_tasks)
     _report(progress_callback, data_done, progress_max, "🧮 计算中...")
