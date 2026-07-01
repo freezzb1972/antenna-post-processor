@@ -477,7 +477,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         left_layout.setContentsMargins(0, 0, 0, 0)
 
         # 参数显示 — 按钮上方
-        self._params_display = QTextEdit()
+        self._params_display = QTextEdit(left_panel)
         self._params_display.setReadOnly(True)
         self._params_display.setStyleSheet(
             "background: rgba(0,0,0,0.03); border: none; padding: 4px; font-size: 12px;")
@@ -492,18 +492,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         btn_row.addWidget(self._mode_freq_label)
         btn_row.addStretch()
         # 三按钮: 预览/出报告/停止 (btnStart 降级为隐藏)
-        self._btn_preview = QPushButton(self.tr("👁 预览"))
+        self._btn_preview = QPushButton(self.tr("👁 预览"), left_panel)
         self._btn_preview.setMinimumSize(100, 32)
         self._btn_preview.clicked.connect(self._on_preview)
         btn_row.addWidget(self._btn_preview)
-        self._btn_export = QPushButton(self.tr("📄 出报告"))
+        self._btn_export = QPushButton(self.tr("📄 出报告"), left_panel)
         self._btn_export.setMinimumSize(110, 32)
         self._btn_export.clicked.connect(self._on_export)
         self._btn_export.setEnabled(False)
         btn_row.addWidget(self._btn_export)
         btn_row.addWidget(self.ui.btnStop)
-        self._btn_preview.show()
-        self._btn_export.show()
         self.ui.btnStart.hide()  # 不再使用，保留在编译 UI 中避免引用错误
 
         left_panel.setLayout(left_layout)
