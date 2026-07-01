@@ -204,10 +204,50 @@ class GraphViewer(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         # 单行主工具栏: 视角预设 + 视图模式 + 频点 + 设置按钮
         layout.addWidget(self._build_advanced_toolbar())
+        # 2D Cuts 控制栏 (默认隐藏)
+        layout.addWidget(self._build_2d_cuts_bar())
         # 隐藏控件仍在 _build_advanced_toolbar 中创建(保持信号连接)
         self._init_hidden_controls()
         self._splitter, self._figure, self._canvas, self._table = self._build_graph_area()
         layout.addWidget(self._splitter, stretch=1)
+
+    def _build_2d_cuts_bar(self) -> QWidget:
+        """2D Cuts 模式工具栏: Phi滑块 + 数据源 + Polar/Rect + 应用角度按钮。"""
+        w = QWidget()
+        w.setObjectName("cuts2dBar")
+        w.setVisible(False)
+        self._cuts2d_bar = w
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(4, 2, 4, 2)
+        lay.setSpacing(6)
+
+        lay.addWidget(QLabel("φ:"))
+        self._slider_2d_phi = QSpinBox()
+        self._slider_2d_phi.setRange(0, 355)
+        self._slider_2d_phi.setSuffix("°")
+        self._slider_2d_phi.setSingleStep(5)
+        self._slider_2d_phi.valueChanged.connect(self._on_2d_cuts_update)
+        lay.addWidget(self._slider_2d_phi)
+
+        lay.addWidget(QLabel("数据源:"))
+        self._cmb_2d_data = QComboBox()
+        self._cmb_2d_data.addItems(["Gain", "AR", "E_θ", "E_φ"])
+        self._cmb_2d_data.currentIndexChanged.connect(self._on_2d_cuts_update)
+        lay.addWidget(self._cmb_2d_data)
+
+        lay.addWidget(QLabel("类型:"))
+        self._cmb_2d_type = QComboBox()
+        self._cmb_2d_type.addItems(["Polar", "Rectangular"])
+        self._cmb_2d_type.currentIndexChanged.connect(self._on_2d_cuts_update)
+        lay.addWidget(self._cmb_2d_type)
+
+        self._btn_apply_angle = QPushButton("📐 应用当前角度到图表配置")
+        self._btn_apply_angle.setToolTip("将当前 Phi 角写入 ChartConfig 切面角度列表")
+        self._btn_apply_angle.clicked.connect(self._on_apply_angles_to_config)
+        lay.addWidget(self._btn_apply_angle)
+
+        lay.addStretch()
+        return w
 
     def _build_advanced_toolbar(self) -> QWidget:
         """单行主工具栏：视角预设 + 视图模式 + 频点选择 + ⚙ 设置。"""
@@ -235,7 +275,7 @@ class GraphViewer(QWidget):
         # ── 视图模式 ──
         lay.addWidget(QLabel("视图:"))
         self._cmb_view_mode = QComboBox()
-        self._cmb_view_mode.addItems(["3D Pattern", "Freq Curves"])
+        self._cmb_view_mode.addItems(["3D Pattern", "Freq Curves", "2D Cuts"])
         self._cmb_view_mode.currentIndexChanged.connect(self._on_view_mode_changed)
         lay.addWidget(self._cmb_view_mode)
 
@@ -573,6 +613,9 @@ class GraphViewer(QWidget):
         if self._cmb_view_mode.currentText() == "Freq Curves":
             self._plot_freq_curves()
             return
+        if self._cmb_view_mode.currentText() == "2D Cuts":
+            self._plot_2d_cuts()
+            return
         freq = self._cmb_freq.currentData()
         if freq is None or freq not in self._graph_data:
             return
@@ -887,12 +930,88 @@ class GraphViewer(QWidget):
     def _on_view_mode_changed(self, index):
         mode = self._cmb_view_mode.currentText()
         is_pattern = (mode == "3D Pattern")
-        # 频点选择器在工具栏始终可见；其他设置通过 ⚙ 设置对话框访问
+        is_2d = (mode == "2D Cuts")
+        # 显示/隐藏 2D Cuts 控制栏
+        if hasattr(self, '_cuts2d_bar'):
+            self._cuts2d_bar.setVisible(is_2d)
         if is_pattern:
             self._rebuild_subplots()
             self._on_update()
+        elif is_2d:
+            self._plot_2d_cuts()
         else:
             self._plot_freq_curves()
+
+    # ── 2D Cuts 模式 ──
+
+    def _on_2d_cuts_update(self):
+        """2D Cuts 控件变化 → 重新绘制。"""
+        if self._cmb_view_mode.currentText() == "2D Cuts":
+            self._plot_2d_cuts()
+
+    def _plot_2d_cuts(self):
+        """2D Cuts 主绘制: 俯仰面 Elevation Cut。"""
+        freq = self._cmb_freq.currentData()
+        if freq is None or freq not in self._graph_data:
+            return
+        d = self._graph_data[freq]
+        theta = d.get("theta"); phi = d.get("phi")
+        if theta is None or phi is None:
+            return
+
+        # 找最近的 phi 角
+        target_phi = self._slider_2d_phi.value()
+        phi_idx = int(np.argmin(np.abs(phi - target_phi)))
+        nearest_phi = float(phi[phi_idx])
+
+        # 数据源
+        source_key = self._cmb_2d_data.currentText()
+        data_map = {"Gain": "gain_db", "AR": "ar_linear", "E_θ": "theta_db", "E_φ": "phi_db"}
+        data_key = data_map.get(source_key, "gain_db")
+        cut_data = d.get(data_key)
+
+        if cut_data is None:
+            cut_data = d.get("gain_db")
+        if cut_data is None:
+            return
+        cut = cut_data[phi_idx, :]
+        # AR 转 dB
+        if source_key == "AR":
+            cut = 20.0 * np.log10(np.maximum(cut, 1e-15))
+
+        is_polar = self._cmb_2d_type.currentText() == "Polar"
+        self._draw_elevation_cut(theta, cut, freq, nearest_phi, source_key, is_polar)
+
+    def _draw_elevation_cut(self, theta, cut, freq, phi_val, source, is_polar):
+        """绘制俯仰面切面图 (Elevation Cut)。"""
+        self._figure.clear()
+        ax = self._figure.add_subplot(111, projection="polar" if is_polar else None)
+        label = f"φ={phi_val:.0f}°"
+        if is_polar:
+            theta_rad = np.deg2rad(theta)
+            ax.plot(theta_rad, np.maximum(cut, -60), linewidth=1.2)
+            ax.set_theta_zero_location("N")
+            ax.set_theta_direction(-1)
+            ax.set_thetagrids([0, 45, 90, 135, 180, 225, 270, 315])
+        else:
+            ax.plot(theta, cut, linewidth=1.2)
+            ax.set_xlabel("Theta (°)")
+            ax.set_ylabel(f"{source} ({'dB' if source != 'AR' else 'dB'})")
+            ax.grid(True)
+        ax.set_title(f"{source} Elevation Cut @ {label} ({freq:.1f} MHz)")
+        self._canvas.draw()
+        self._lbl_info.setText(f"φ={phi_val:.0f}° | θ={len(theta)}点 | {source}")
+
+    def _on_apply_angles_to_config(self):
+        """将当前 Phi 角写入 ChartConfig。"""
+        if not self._mw:
+            return
+        phi = self._slider_2d_phi.value()
+        if hasattr(self._mw, '_chart_config_required') and self._mw._chart_config_required:
+            cfg = self._mw._chart_config_required
+            if phi not in cfg.cut_2d_phi_angles:
+                cfg.cut_2d_phi_angles.append(phi)
+                self._mw._chart_settings_page.load_state_from_mw() if hasattr(self._mw, '_chart_settings_page') else None
 
     def _get_available_freq_curves(self):
         """返回可用的频率曲线列表: [(label, actual_key), ...]."""
