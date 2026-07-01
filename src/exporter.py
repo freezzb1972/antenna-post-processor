@@ -245,6 +245,20 @@ def export_results(
                     if len(parts) == 2:
                         lo, hi = float(parts[0]), float(parts[1])
                         _write_ar_range(ws, excel_row, col_map, lo, hi, value)
+                elif key.startswith("rhcp_single_"):
+                    angle_str = key[len("rhcp_single_"):]
+                    _write_lag_single(ws, excel_row, col_map, float(angle_str), value)
+                elif key.startswith("rhcp_range_"):
+                    parts = key[len("rhcp_range_"):].split("_")
+                    if len(parts) == 2:
+                        _write_lag_range(ws, excel_row, col_map, float(parts[0]), float(parts[1]), value)
+                elif key.startswith("cp_xpi_single_"):
+                    angle_str = key[len("cp_xpi_single_"):]
+                    _write_lag_single(ws, excel_row, col_map, float(angle_str), value)
+                elif key.startswith("cp_xpi_range_"):
+                    parts = key[len("cp_xpi_range_"):].split("_")
+                    if len(parts) == 2:
+                        _write_lag_range(ws, excel_row, col_map, float(parts[0]), float(parts[1]), value)
                 elif key in ("nhprp_225", "uh_prp", "lh_prp", "prp_120",
                              "max_power", "min_power", "avg_gain", "avg_power",
                              "boresight_theta", "boresight_phi",

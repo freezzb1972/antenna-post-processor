@@ -344,9 +344,9 @@ def _process_one_frequency(
         for (lo, hi), val in compute_lag_ranges(gain_linear, theta_deg, ranges).items():
             row[f"lag_range_{lo}_{hi}"] = round(val, 6)
 
-    # ── RHCP/LHCP Gain + CP-XPI (需要 Phase 数据) ──
-    rhcp_need = compute_set & {"rhcp_single", "rhcp_range", "cp_xpi_single", "cp_xpi_range"}
-    if rhcp_need or not need:
+    # ── RHCP/LHCP Gain + CP-XPI (始终计算, 查看器需要 + 轻量公式) ──
+    always_compute_rhcp = True
+    if always_compute_rhcp:
         tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
         if tp is not None and pp is not None:
             try:
@@ -357,23 +357,23 @@ def _process_one_frequency(
                 rhcp_g, lhcp_g = compute_rhcp_lhcp_gain(theta_lm, tp, phi_lm, pp)
                 cp_xpi = compute_cp_xpi(rhcp_g, lhcp_g)
 
-                if compute_set & {"rhcp_single"} or not need:
+                if True:  # RHCP single always computed
                     for angle, val in compute_lag_at_angles(
                         rhcp_g, theta_deg, lag_config.singles_sorted
                     ).items():
                         row[f"rhcp_single_{angle}"] = round(val, 6)
-                if compute_set & {"rhcp_range"} or not need:
+                if lag_config.ranges_sorted:
                     for (lo, hi), val in compute_lag_ranges(
                         rhcp_g, theta_deg, lag_config.ranges_sorted
                     ).items():
                         row[f"rhcp_range_{lo}_{hi}"] = round(val, 6)
 
-                if compute_set & {"cp_xpi_single"} or not need:
+                if True:
                     for angle, val in compute_lag_at_angles(
                         cp_xpi, theta_deg, lag_config.singles_sorted
                     ).items():
                         row[f"cp_xpi_single_{angle}"] = round(val, 6)
-                if compute_set & {"cp_xpi_range"} or not need:
+                if True:
                     for (lo, hi), val in compute_lag_ranges(
                         cp_xpi, theta_deg, lag_config.ranges_sorted
                     ).items():
