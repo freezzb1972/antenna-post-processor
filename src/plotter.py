@@ -171,7 +171,8 @@ def generate_all_for_frequency(
     # ── A 类: 3D 方向图 ──
     # 多视角支持: 若有 view_angle_pairs 则循环，否则用单个 elev/azim
     view_pairs = list(chart_config.view_angle_pairs) if chart_config.view_angle_pairs else [
-        (chart_config.elev, chart_config.azim)
+        (getattr(chart_config, 'elev', None) or 30.0,
+         getattr(chart_config, 'azim', None) or -60.0)
     ]
 
     if chart_config.pattern_3d_gain:

@@ -2078,12 +2078,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.btnStop.setEnabled(True)
 
     def _exit_busy(self):
-        """退出忙碌状态：恢复预览按钮。"""
+        """退出忙碌状态：恢复预览按钮。_btn_export 由状态机管理。"""
         self._running = False
         self._btn_preview.setText(self.tr("👁 预览"))
         self._btn_preview.setEnabled(True)
-        self._btn_export.setEnabled(False)
         self.ui.btnStop.setEnabled(False)
+        # _btn_export 不由这里管 — 状态机(_enter_ready/_enter_idle)负责
 
     def _on_progress(self, current: int, total: int, message: str):
         self.ui.progressBar.setMaximum(total)
@@ -2094,6 +2094,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._log(message)
 
     def _on_finished(self, results, images):
+        # 防 QThread.finished 二次发射: 非运行态直接 return
+        if self._preview_state not in (self._PREVIEWING, self._EXPORTING):
+            return
         self.ui.progressBar.setValue(self.ui.progressBar.maximum())
         self.ui.lblProgressMsg.setText("✅ 完成")
         self._running = False
