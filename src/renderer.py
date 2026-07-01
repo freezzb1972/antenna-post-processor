@@ -350,7 +350,7 @@ class MatplotlibRenderer(BaseRenderer):
                           label: str = "", ylabel: str = "",
                           title: str = "", dpi: int = 150) -> io.BytesIO:
         """渲染频点 vs 参数 Cartesian 线图 (B 类图表 Word 输出)。"""
-        fig = Figure(figsize=(6, 4))
+        fig = plt.figure(figsize=(6, 4))
         ax = fig.add_subplot(111)
         ax.plot(freqs, values, "o-", linewidth=1.2, markersize=4, label=label or ylabel)
         ax.set_xlabel("Frequency (MHz)")
