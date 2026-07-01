@@ -550,7 +550,56 @@ def compute_axial_ratio(
 
     ar_linear = (abs_rhcp + abs_lhcp) / denom
     # EMQuest AxR 输出线性值（不是 dB），保持线性；调用方可自行转换
-    return ar_linear  # (n_phi, n_theta) AR 线性值
+    return ar_linear, abs_rhcp, abs_lhcp  # (n_phi, n_theta) AR 线性值 + RHCP/LHCP 幅度
+
+
+def compute_rhcp_lhcp_gain(
+    theta_logmag: np.ndarray,  # (n_phi, n_theta) dB
+    theta_phase: np.ndarray,   # (n_phi, n_theta) deg
+    phi_logmag: np.ndarray,
+    phi_phase: np.ndarray,
+) -> "Tuple[np.ndarray, np.ndarray]":
+    """计算 RHCP 和 LHCP 增益 (dBi) 矩阵。
+
+    基于复电场分解:
+      E_RHCP = (E_θ - j·E_φ) / √2
+      E_LHCP = (E_θ + j·E_φ) / √2
+      G_RHCP = 20·log₁₀(|E_RHCP|)
+      G_LHCP = 20·log₁₀(|E_LHCP|)
+
+    Returns:
+        (rhcp_gain_dbi, lhcp_gain_dbi): 形状 (n_phi, n_theta)
+    """
+    mag_theta = np.power(10.0, theta_logmag / 20.0)
+    mag_phi = np.power(10.0, phi_logmag / 20.0)
+    ph_theta = np.deg2rad(theta_phase)
+    ph_phi = np.deg2rad(phi_phase)
+
+    e_theta = mag_theta * np.exp(1j * ph_theta)
+    e_phi = mag_phi * np.exp(1j * ph_phi)
+
+    e_rhcp = (e_theta - 1j * e_phi) / np.sqrt(2.0)
+    e_lhcp = (e_theta + 1j * e_phi) / np.sqrt(2.0)
+
+    abs_rhcp = np.maximum(np.abs(e_rhcp), 1e-15)
+    abs_lhcp = np.maximum(np.abs(e_lhcp), 1e-15)
+
+    rhcp_gain = 20.0 * np.log10(abs_rhcp)
+    lhcp_gain = 20.0 * np.log10(abs_lhcp)
+
+    return rhcp_gain, lhcp_gain
+
+
+def compute_cp_xpi(
+    rhcp_gain: np.ndarray,  # (n_phi, n_theta) dBi
+    lhcp_gain: np.ndarray,  # (n_phi, n_theta) dBi
+) -> np.ndarray:
+    """计算圆极化交叉极化隔离度 CP-XPI (dB)。
+
+    CP-XPI = RHCP_Gain - LHCP_Gain (每方向)
+    正值 → RHCP 占优, 负值 → LHCP 占优
+    """
+    return rhcp_gain - lhcp_gain
 
 
 def compute_ar_at_angles(

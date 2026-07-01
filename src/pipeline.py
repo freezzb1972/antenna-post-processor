@@ -269,8 +269,9 @@ def _process_one_frequency(
                 if need_extrap:
                     _, tp = extrapolate_theta(theta_orig, tp, "constant")
                     _, pp = extrapolate_theta(theta_orig, pp, "constant")
-                ar = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
-                if ar is not None and ar.size > 0:
+                ar_result = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
+                if ar_result is not None and ar_result[0].size > 0:
+                    ar, _, _ = ar_result
                     # AR 使用独立的 ar_lag_config 或 fallback 到 lag_config
                     ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else lag_config
                     ar_singles = ar_cfg.singles_sorted
@@ -288,7 +289,7 @@ def _process_one_frequency(
                             row[f"ar_range_{lo}_{hi}"] = round(val, 6)
                     # 向后兼容的 axial_ratio 字段
                     if "axial_ratio" in compute_set or not need:
-                        legacy_ar = float(np.mean(ar[0, :5]))
+                        legacy_ar = float(np.mean(ar[0, :5]))  # ar is set above from ar_result
                         if ar_output_db:
                             legacy_ar = 10.0 * math.log10(max(legacy_ar, 1e-15))
                         row["axial_ratio"] = round(legacy_ar, 6)
@@ -343,6 +344,54 @@ def _process_one_frequency(
         for (lo, hi), val in compute_lag_ranges(gain_linear, theta_deg, ranges).items():
             row[f"lag_range_{lo}_{hi}"] = round(val, 6)
 
+    # ── RHCP/LHCP Gain + CP-XPI (需要 Phase 数据) ──
+    rhcp_need = compute_set & {"rhcp_single", "rhcp_range", "cp_xpi_single", "cp_xpi_range"}
+    if rhcp_need or not need:
+        tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
+        if tp is not None and pp is not None:
+            try:
+                from .calculator import compute_rhcp_lhcp_gain, compute_cp_xpi
+                if need_extrap:
+                    _, tp = extrapolate_theta(theta_orig, tp, "constant")
+                    _, pp = extrapolate_theta(theta_orig, pp, "constant")
+                rhcp_g, lhcp_g = compute_rhcp_lhcp_gain(theta_lm, tp, phi_lm, pp)
+                cp_xpi = compute_cp_xpi(rhcp_g, lhcp_g)
+
+                if compute_set & {"rhcp_single"} or not need:
+                    for angle, val in compute_lag_at_angles(
+                        rhcp_g, theta_deg, lag_config.singles_sorted
+                    ).items():
+                        row[f"rhcp_single_{angle}"] = round(val, 6)
+                if compute_set & {"rhcp_range"} or not need:
+                    for (lo, hi), val in compute_lag_ranges(
+                        rhcp_g, theta_deg, lag_config.ranges_sorted
+                    ).items():
+                        row[f"rhcp_range_{lo}_{hi}"] = round(val, 6)
+
+                if compute_set & {"cp_xpi_single"} or not need:
+                    for angle, val in compute_lag_at_angles(
+                        cp_xpi, theta_deg, lag_config.singles_sorted
+                    ).items():
+                        row[f"cp_xpi_single_{angle}"] = round(val, 6)
+                if compute_set & {"cp_xpi_range"} or not need:
+                    for (lo, hi), val in compute_lag_ranges(
+                        cp_xpi, theta_deg, lag_config.ranges_sorted
+                    ).items():
+                        row[f"cp_xpi_range_{lo}_{hi}"] = round(val, 6)
+            except Exception as e:
+                row["rhcp_error"] = str(e)
+
+        # RHCP/LHCP 矩阵存储供查看器使用
+        if tp is not None and pp is not None and "_rhcp_gain" not in row:
+            try:
+                from .calculator import compute_rhcp_lhcp_gain
+                rhcp_g, lhcp_g = compute_rhcp_lhcp_gain(theta_lm, tp, phi_lm, pp)
+                row["_rhcp_gain"] = rhcp_g
+                row["_lhcp_gain"] = lhcp_g
+                row["_cp_xpi"] = rhcp_g - lhcp_g
+            except Exception:
+                pass
+
     # ── 图形生成 (A/C 类: 每频点 PNG + 方位面) ──
     az_need = (azimuth_config is not None and azimuth_config.has_any_azimuth)
     if (chart_config is not None and chart_config.has_any_pattern_or_cut) or az_need:
@@ -361,9 +410,9 @@ def _process_one_frequency(
             if need_ar_for_graphics and "axial_ratio" not in str(row.get("axial_ratio_error", "")):
                 tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
                 if tp is not None and pp is not None:
-                    ar = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
-                    if ar is not None:
-                        ar_lin = ar
+                    ar_result = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
+                    if ar_result is not None:
+                        ar_lin = ar_result[0]
             # compute_only 模式跳过 Matplotlib 渲染
             if not compute_only:
                 # 构建 E_θ/E_φ 分量额外数据

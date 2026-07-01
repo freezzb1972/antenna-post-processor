@@ -37,9 +37,12 @@ PATTERN_DATA_MAP = {
     "theta_db": "E_θ (dB)",
     "phi_db": "E_φ (dB)",
     "ar_linear": "AR (线性)",
+    "rhcp_db": "RHCP (dBi)",
+    "lhcp_db": "LHCP (dBi)",
+    "cpxpi_db": "CP-XPI (dB)",
 }
 # 默认显示的数据类型 (按序)
-DEFAULT_PATTERN_KEYS = ["gain_db", "theta_db", "phi_db", "ar_linear"]
+DEFAULT_PATTERN_KEYS = ["gain_db", "theta_db", "phi_db", "ar_linear", "rhcp_db", "lhcp_db", "cpxpi_db"]
 
 GRID_OPTIONS = ["1×1", "1×2", "2×2"]
 PLOT_TYPES = ["Spherical 3D", "Polar 2D", "Cartesian 3D"]

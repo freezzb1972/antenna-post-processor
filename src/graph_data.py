@@ -138,5 +138,18 @@ def extract_graph_data(
                 "phi_db": pl_ds,
                 "ar_linear": ar_ds,
             }
+            # RHCP/LHCP: 从 row 直接读取 (pipeline 已计算)
+            rhcp_g = row.get("_rhcp_gain")
+            lhcp_g = row.get("_lhcp_gain")
+            cp_xpi = row.get("_cp_xpi")
+            if rhcp_g is not None:
+                rhcp_ds, _, _ = downsample_pattern(rhcp_g, theta_ds, phi_ds, step_deg)
+                output[freq]["rhcp_db"] = rhcp_ds
+            if lhcp_g is not None:
+                lhcp_ds, _, _ = downsample_pattern(lhcp_g, theta_ds, phi_ds, step_deg)
+                output[freq]["lhcp_db"] = lhcp_ds
+            if cp_xpi is not None:
+                xpi_ds, _, _ = downsample_pattern(cp_xpi, theta_ds, phi_ds, step_deg)
+                output[freq]["cpxpi_db"] = xpi_ds
 
     return output

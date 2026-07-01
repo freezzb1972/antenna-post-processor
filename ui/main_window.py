@@ -493,7 +493,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         btn_row.addStretch()
         # 复用编译 UI 的 btnStart/btnStop — 不创建新 widget, 避免 parent/layout 问题
         self.ui.btnStart.setText(self.tr("👁 预览"))
-        self.ui.btnStart.clicked.disconnect()
+        try:
+            self.ui.btnStart.clicked.disconnect()
+        except RuntimeError:
+            pass  # 首次运行无旧连接, disconnect 抛异常忽略
         self.ui.btnStart.clicked.connect(self._on_preview)
         btn_row.addWidget(self.ui.btnStart)
         self._btn_export = QPushButton(self.tr("📄 出报告"), left_panel)

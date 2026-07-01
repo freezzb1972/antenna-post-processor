@@ -286,6 +286,14 @@ def classify_header(raw_header: str) -> str:
         return "lag_range"
     if _RE_LAG_SINGLE.search(raw_header) or _RE_LAG_SINGLE_NO_PREFIX.search(raw_header):
         return "lag_single"
+    # RHCP/LHCP/CP-XPI regex fallback
+    _RE_RHCP = re.compile(r"RHCP\s*(?:Gain)?", re.IGNORECASE)
+    _RE_CP_XPI = re.compile(r"CP[\s-]*XPI", re.IGNORECASE)
+    if _RE_RHCP.search(raw_header) or _RE_CP_XPI.search(raw_header):
+        normalized = normalize_header(raw_header)
+        if "range" in normalized.lower() or re.search(r"\d+.*[-–].*\d+", raw_header):
+            return "rhcp_range" if _RE_RHCP.search(raw_header) else "cp_xpi_range"
+        return "rhcp_single" if _RE_RHCP.search(raw_header) else "cp_xpi_single"
     return "unknown"
 
 
@@ -430,6 +438,10 @@ ALL_COL_TYPE_LABELS = [
     ("mismatch_loss_db",    "Mismatch Loss"),
     ("pc_theta_mm",         "Phase Center θ"),
     ("pc_phi_mm",           "Phase Center φ"),
+    ("rhcp_single",         "RHCP Gain 单角度"),
+    ("rhcp_range",          "RHCP Gain 范围"),
+    ("cp_xpi_single",       "CP-XPI 单角度"),
+    ("cp_xpi_range",        "CP-XPI 范围"),
     ("lag_single",          "LAG (单角度)"),
     ("lag_range",           "LAG (范围)"),
     ("unknown",             "未知"),
