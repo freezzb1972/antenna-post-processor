@@ -471,21 +471,23 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._params_display.setMinimumWidth(250)
         left_layout.addWidget(self._params_display, 1)
 
-        # 按钮行: hButtons 提取为 layout item, 在此重建
+        # 按钮行: 模式标签 + hButtons (spBtnLeft → btnStart → btnStop → _btn_export)
+        btn_row = QHBoxLayout()
         self._mode_freq_label = QLabel()
         self._mode_freq_label.setTextFormat(Qt.RichText)
         self._mode_freq_label.setStyleSheet("padding: 2px 4px; font-size: 12px;")
-        left_layout.addWidget(self._mode_freq_label)
-        # hButtons (含 spBtnLeft → btnStart → btnStop) 直接包进 QWidget 保持原对齐
+        btn_row.addWidget(self._mode_freq_label)
+        btn_row.addStretch()
+        # hButtons 直接包进 QWidget 保持原对齐
         btn_wrap = QWidget()
         btn_wrap.setLayout(self.ui.hButtons)
-        # 额外加出报告按钮
         self._btn_export = QPushButton(self.tr("📄 出报告"))
         self._btn_export.setMinimumSize(110, 32)
         self._btn_export.clicked.connect(self._on_export)
         self._btn_export.setEnabled(False)
         self.ui.hButtons.addWidget(self._btn_export)
-        left_layout.addWidget(btn_wrap)
+        btn_row.addWidget(btn_wrap)
+        left_layout.addLayout(btn_row)
 
         h_splitter.addWidget(left_panel)
         self.ui.logOutput.setParent(exec_bar)
