@@ -985,7 +985,8 @@ class GraphViewer(QWidget):
 
     def _draw_elevation_cut(self, theta, cut, freq, phi_val, source, is_polar):
         """绘制俯仰面切面图 (Elevation Cut)。"""
-        self._figure.clear()
+        for ax in list(self._figure.axes):
+            self._figure.delaxes(ax)
         ax = self._figure.add_subplot(111, projection="polar" if is_polar else None)
         label = f"φ={phi_val:.0f}°"
         if is_polar:
