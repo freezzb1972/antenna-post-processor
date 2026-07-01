@@ -1729,14 +1729,19 @@ class AntennaParamsPage(QWidget):
 
     def _rebuild_param_columns(self):
         params = self._get_params_for_tab(self._active_tab)
-        content = QWidget()
-        vbox = QVBoxLayout(content)
-        vbox.setContentsMargins(4, 4, 4, 4)
-        vbox.setSpacing(6)
         self._left_checkboxes.clear()
         self._right_checkboxes.clear()
 
-        # 阻止信号，全部构建完成后一次性同步（避免部分构建状态覆盖 MainWindow）
+        # 左右分栏: 报告需要 | 额外(full_report) — 与 ChartSettingsPage 对齐
+        content = QWidget()
+        hbox = QHBoxLayout(content)
+        hbox.setContentsMargins(0, 0, 0, 0)
+        hbox.setSpacing(8)
+
+        # 左列: 报告需要 (模板识别自动勾选)
+        left_box = QGroupBox(self.tr("报告需要"))
+        left_layout = QVBoxLayout(left_box)
+        left_layout.setSpacing(2)
         for grp_name, items in params:
             grp = QGroupBox(grp_name)
             gl = QVBoxLayout(grp)
@@ -1744,11 +1749,8 @@ class AntennaParamsPage(QWidget):
             for key, label in items:
                 cb = QCheckBox(label)
                 self._left_checkboxes[key] = cb
-                self._right_checkboxes[key] = cb
                 cb.toggled.connect(lambda checked, k=key: self._sync_to_mw())
-                cb.blockSignals(True)
                 cb.setChecked(key in self._template_params)
-                cb.blockSignals(False)
                 gl.addWidget(cb)
             if grp_name == "Gain":
                 btn = QPushButton(self.tr("📡 Gain 角度设置..."))
@@ -1758,23 +1760,37 @@ class AntennaParamsPage(QWidget):
                 btn = QPushButton(self.tr("🔄 AR 角度设置..."))
                 btn.clicked.connect(lambda: self._show_angle_popup("ar"))
                 gl.addWidget(btn)
-            vbox.addWidget(grp)
-        # 额外参数（full_report 专用，不自动选中）
-        extra_grp = QGroupBox(self.tr("额外参数（full_report）"))
-        extra_gl = QVBoxLayout(extra_grp)
-        extra_gl.setSpacing(2)
+            left_layout.addWidget(grp)
+        left_layout.addStretch()
+        hbox.addWidget(left_box, 1)
+
+        # 右列: 额外 (full_report, 默认不选)
+        right_box = QGroupBox(self.tr("额外 (full_report)"))
+        right_layout = QVBoxLayout(right_box)
+        right_layout.setSpacing(2)
         for grp_name, items in params:
+            grp = QGroupBox(grp_name)
+            gl = QVBoxLayout(grp)
+            gl.setSpacing(2)
             for key, label in items:
                 cb = QCheckBox(label)
                 self._right_checkboxes[key] = cb
                 cb.toggled.connect(lambda checked, k=key: self._sync_to_mw())
                 cb.setChecked(False)
-                extra_gl.addWidget(cb)
-        vbox.addWidget(extra_grp)
-        vbox.addStretch()
+                gl.addWidget(cb)
+            if grp_name == "Gain":
+                btn = QPushButton(self.tr("📡 Gain 角度设置..."))
+                btn.clicked.connect(lambda: self._show_angle_popup("gain"))
+                gl.addWidget(btn)
+            elif grp_name == "Axial Ratio":
+                btn = QPushButton(self.tr("🔄 AR 角度设置..."))
+                btn.clicked.connect(lambda: self._show_angle_popup("ar"))
+                gl.addWidget(btn)
+            right_layout.addWidget(grp)
+        right_layout.addStretch()
+        hbox.addWidget(right_box, 1)
 
         self._left_scroll.setWidget(content)
-        # 构建完成后一次性同步到 MainWindow
         self._sync_to_mw()
         self._update_summary()
 
