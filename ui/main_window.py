@@ -486,7 +486,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 按钮行: 模式+频点在左, 按钮在右
         btn_row = QHBoxLayout()
-        self._mode_freq_label = QLabel()
+        self._mode_freq_label = QLabel(left_panel)
         self._mode_freq_label.setTextFormat(Qt.RichText)
         self._mode_freq_label.setStyleSheet("padding: 2px 4px; font-size: 12px;")
         btn_row.addWidget(self._mode_freq_label)
@@ -502,6 +502,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._btn_export.setEnabled(False)
         btn_row.addWidget(self._btn_export)
         btn_row.addWidget(self.ui.btnStop)
+        self._btn_preview.show()
+        self._btn_export.show()
         self.ui.btnStart.hide()  # 不再使用，保留在编译 UI 中避免引用错误
 
         left_panel.setLayout(left_layout)
