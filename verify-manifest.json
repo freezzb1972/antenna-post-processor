@@ -108,12 +108,6 @@
       "vTabPlot",
       "vTabResults",
       "vboxLayout",
-      "btnPreview",
-      "btnExport",
-      "_mode_freq_label",
-      "_params_display",
-      "_btn_export",
-      "_btn_preview",
       "btnStart"
     ],
     "dynamic_widgets": [
@@ -274,7 +268,15 @@
       "ui/rsp_picker_dialog.py",
       "ui/splash_screen.py",
       "ui/theme_manager.py",
-      "worker.py"
+      "worker.py",
+      "azimuth_config.py",
+      "azimuth_data_writer.py",
+      "chart_word_writer.py",
+      "column_mapping.py",
+      "data_quality.py",
+      "task_package.py",
+      "ui_utils.py",
+      "word_reporter.py"
     ]
   },
   "tests": {
@@ -516,8 +518,8 @@
         "btnStop",
         "progressBar",
         "logOutput",
-        "btnPreview",
-        "btnExport"
+        "_btn_preview",
+        "_btn_export"
       ],
       "methods": [
         "_on_stop",
@@ -968,44 +970,52 @@
     },
     {
       "id": "ui-module-shell_window",
-      "description": "Auto-registered: ui/shell_window.py",
+      "description": "UI module: ui/shell_window.py (auto-registered)",
       "type": "ui",
       "widgets": [],
       "methods": [],
-      "src_modules": [],
+      "src_modules": [
+        "ui/shell_window.py"
+      ],
       "tests": [],
       "e2e_verified": false,
       "status": "verified"
     },
     {
       "id": "ui-module-template_recognizer",
-      "description": "Auto-registered: ui/template_recognizer.py",
+      "description": "UI module: ui/template_recognizer.py (auto-registered)",
       "type": "ui",
       "widgets": [],
       "methods": [],
-      "src_modules": [],
+      "src_modules": [
+        "ui/template_recognizer.py"
+      ],
       "tests": [],
       "e2e_verified": false,
       "status": "verified"
     },
     {
       "id": "ui-module-widgets",
-      "description": "Auto-registered: ui/widgets.py",
+      "description": "UI module: ui/widgets.py (auto-registered)",
       "type": "ui",
       "widgets": [],
       "methods": [],
-      "src_modules": [],
+      "src_modules": [
+        "ui/widgets.py"
+      ],
       "tests": [],
       "e2e_verified": false,
       "status": "verified"
     },
     {
       "id": "ui-module-window_manager",
-      "description": "Auto-registered: ui/window_manager.py",
+      "description": "UI module: ui/window_manager.py (auto-registered)",
       "type": "ui",
       "widgets": [],
       "methods": [],
-      "src_modules": [],
+      "src_modules": [
+        "ui/window_manager.py"
+      ],
       "tests": [],
       "e2e_verified": false,
       "status": "verified"

@@ -27,7 +27,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # G1: 必须存在且可见的 widget
 REQUIRED_VISIBLE = [
     "editOutputName", "editOutputDir", "editTemplatePath",
-    "btnPreview", "btnExport", "btnStop", "progressBar", "logOutput",
+    "btnStop", "progressBar", "logOutput",
 ]
 
 # G1: 必须隐藏的 widget
@@ -47,6 +47,7 @@ MIN_SIZE_REQUIREMENTS = [
 DYNAMIC_WIDGETS_REQUIRED = [
     "_file_list_widget", "_match_table", "_btn_add_files",
     "_btn_auto_match", "_check_extrapolate",
+    "_btn_preview", "_btn_export",  # Phase 3: 替换 btnStart
 ]
 
 # G7: 动态 widget 必须正确添加到布局中(在父容器内可见)
@@ -248,8 +249,7 @@ def check_g1_widget_tree(window) -> List[str]:
             errors.append(f"SIZE: ui.{attr} minHeight={w.minimumHeight()} < {min_h}")
 
     # 自定义 widget 存在性
-    for attr in ["_file_list_widget", "_match_table", "_btn_add_files",
-                  "_btn_auto_match", "_check_extrapolate"]:
+    for attr in DYNAMIC_WIDGETS_REQUIRED:
         if getattr(window, attr, None) is None:
             errors.append(f"MISSING: window.{attr}")
 
@@ -300,9 +300,10 @@ def check_g3_signal_chain() -> List[str]:
     src = _read_source(main_win)
     errors = []
 
-    # 1. btnPreview → _on_preview, btnExport → _on_export
-    if "self.ui.btnPreview.clicked.connect(self._on_preview)" not in src:
-        errors.append("SIGNAL: btnPreview.clicked not connected to _on_preview")
+    # 1. _btn_preview → _on_preview, _btn_export → _on_export (程序化创建)
+    for btn, method in [("_btn_preview", "_on_preview"), ("_btn_export", "_on_export")]:
+        if f"self.{btn}.clicked.connect(self.{method})" not in src:
+            errors.append(f"SIGNAL: {btn}.clicked not connected to {method}")
 
     # 2. _on_start 内必须包含线程启动协议的所有步骤
     for required in THREAD_START_REQUIRED:
