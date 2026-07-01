@@ -314,10 +314,12 @@ def _process_one_frequency(
             directivity_dbi = compute_directivity(gain_linear, theta_rad)
         te_eff_pct, _ = compute_efficiency(peak_dbi, directivity_dbi)
         te_result = compute_total_efficiency(te_eff_pct)
-        if "total_efficiency_pct" in compute_set or not need:
-            row["total_efficiency_pct"] = round(te_result["total_efficiency_pct"], 6)
-        if "mismatch_loss_db" in compute_set or not need:
-            row["mismatch_loss_db"] = round(te_result["mismatch_loss_db"], 6)
+        if te_result and ("total_efficiency_pct" in compute_set or not need):
+            if te_result.get("total_efficiency_pct") is not None:
+                row["total_efficiency_pct"] = round(te_result["total_efficiency_pct"], 6)
+        if te_result and ("mismatch_loss_db" in compute_set or not need):
+            if te_result.get("mismatch_loss_db") is not None:
+                row["mismatch_loss_db"] = round(te_result["mismatch_loss_db"], 6)
         # total_efficiency_pct 为 None 说明 S11 数据未提供
         if te_result["total_efficiency_pct"] is None and log_cb:
             _log(log_cb,
@@ -392,6 +394,9 @@ def _process_one_frequency(
             except Exception:
                 pass
 
+    # 计算总增益 dB 矩阵 (供图形和 2D Cuts 使用)
+    gain_dbi = 10.0 * np.log10(np.maximum(gain_linear, 1e-15))
+
     # ── 图形生成 (A/C 类: 每频点 PNG + 方位面) ──
     az_need = (azimuth_config is not None and azimuth_config.has_any_azimuth)
     if (chart_config is not None and chart_config.has_any_pattern_or_cut) or az_need:
@@ -441,9 +446,6 @@ def _process_one_frequency(
                     row["_azimuth_theta_deg"] = theta_deg.copy()
         except Exception as e:
             row["_graph_error"] = str(e)  # 图形生成失败不阻塞数据处理
-
-    # 计算总增益 dB 矩阵 (供 2D Cuts 和图形展示使用)
-    gain_dbi = 10.0 * np.log10(np.maximum(gain_linear, 1e-15))
 
     # 存储原始数据供图形展示使用
     # NOTE: 每频点存储 _raw_data 会大幅增加内存开销。
