@@ -696,15 +696,48 @@ def _load_and_compute(
     _log(log_callback, f"读取 {total} 个频点数据...")
     _report(progress_callback, 0, progress_max, "📂 加载数据 0%")
     compute_tasks = []
+
+    # 批量读取优化: 有 read_batch 的数据源一次性加载, 避免逐频点 XML 解析
+    _batch_ds = {}
+    _batch_indices = {}
     for i, (sheet_name, freq, csv_idx, lag_cfg, task_ds, needed_params) in enumerate(tasks):
-        if cancel_callback and cancel_callback():
-            break
-        raw = task_ds.read_sections(csv_idx)
-        theta_list = list(task_ds.theta_angles)
-        ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, azimuth_config, compute_only))
-        # 频繁更新进度 (FinalSummary 单频点 3s+, 20 频点才更新会显得卡死)
-        _report(progress_callback, i + 1, progress_max, f"📂 加载数据 ({i+1}/{total})")
+        if hasattr(task_ds, 'read_batch'):
+            if task_ds not in _batch_ds:
+                _batch_ds[task_ds] = []
+                _batch_indices[task_ds] = []
+            _batch_ds[task_ds].append((i, sheet_name, freq, csv_idx, lag_cfg, needed_params))
+            _batch_indices[task_ds].append(csv_idx)
+        else:
+            raw = task_ds.read_sections(csv_idx)
+            compute_tasks.append((sheet_name, freq, raw, lag_cfg,
+                                  list(task_ds.theta_angles),
+                                  extrapolate_theta, robust_peak, needed_params,
+                                  extra_params, chart_config,
+                                  ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty()
+                                  else sheet_ar_configs.get(sheet_name, LagConfig()),
+                                  nh_custom_angles, ar_output_db, azimuth_config, compute_only))
+
+    for task_ds, items in _batch_ds.items():
+        indices = _batch_indices[task_ds]
+        # 分批读取 + 进度回调 (避免 read_batch(139) 一气 330s 无反馈)
+        CHUNK = 5
+        for chunk_start in range(0, len(items), CHUNK):
+            chunk_items = items[chunk_start:chunk_start + CHUNK]
+            chunk_indices = [it[3] for it in chunk_items]  # csv_idx
+            batch_result = task_ds.read_batch(chunk_indices)
+            for _, sheet_name, freq, csv_idx, lag_cfg, needed_params in chunk_items:
+                raw = batch_result.get(freq)
+                if raw is None:
+                    raw = task_ds.read_sections(csv_idx)
+                compute_tasks.append((sheet_name, freq, raw, lag_cfg,
+                                      list(task_ds.theta_angles),
+                                      extrapolate_theta, robust_peak, needed_params,
+                                      extra_params, chart_config,
+                                      ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty()
+                                      else sheet_ar_configs.get(sheet_name, LagConfig()),
+                                      nh_custom_angles, ar_output_db, azimuth_config, compute_only))
+            _report(progress_callback, len(compute_tasks), progress_max,
+                    f"📂 加载数据 ({len(compute_tasks)}/{total})")
 
     data_done = len(compute_tasks)
     _report(progress_callback, data_done, progress_max, "🧮 计算中...")

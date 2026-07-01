@@ -293,6 +293,57 @@ class FinalSummarySource(DataSource):
     def phi_angles(self) -> List[float]:
         return list(self._phi)
 
+    def read_batch(self, freq_indices: List[int]) -> Dict[float, Dict[str, Optional[np.ndarray]]]:
+        """批量读取多个频点数据 — 复用打开的 workbook, 避免重复 XML 解析。
+
+        逐频点调用 read_sections() 每次都要 ws = wb[sn] 触发 XML 解析,
+        139 频点 → 139 次独立解析 → 3.2s×139≈7.5min。
+        批量读取复用同一个 worksheet 迭代器, 大幅减少开销。
+        """
+        result: Dict[float, Dict[str, Optional[np.ndarray]]] = {}
+        ntheta = self._n_theta
+        nphi = self._n_phi
+
+        for idx in freq_indices:
+            freq = self._freqs[idx]
+            if freq in self._cache:
+                tl, pl, tp_data, pp_data = self._cache[freq]
+            else:
+                sn = _freq_sheet_name(freq)
+                if sn not in self._wb.sheetnames:
+                    continue
+                ws = self._wb[sn]
+
+                tl = _read_matrix(ws, self._theta_start_row, nphi, ntheta)
+                tp_data = None
+                if self._has_phase and self._theta_phase_start > 0:
+                    try:
+                        tp_data = _read_matrix(ws, self._theta_phase_start, nphi, ntheta)
+                    except Exception:
+                        tp_data = None
+
+                if self._has_phi_pol and self._phi_pol_start > 0:
+                    pl = _read_matrix(ws, self._phi_pol_start, nphi, ntheta)
+                else:
+                    pl = np.full_like(tl, -999.0)
+
+                pp_data = None
+                if self._has_phase and self._phi_phase_start > 0:
+                    try:
+                        pp_data = _read_matrix(ws, self._phi_phase_start, nphi, ntheta)
+                    except Exception:
+                        pp_data = None
+
+                self._cache[freq] = (tl, pl, tp_data, pp_data)
+
+            result[freq] = {
+                "theta_logmag": tl,
+                "theta_phase": tp_data,
+                "phi_logmag": pl,
+                "phi_phase": pp_data,
+            }
+        return result
+
     def read_sections(self, freq_index: int) -> Dict[str, Optional[np.ndarray]]:
         freq = self._freqs[freq_index]
 
