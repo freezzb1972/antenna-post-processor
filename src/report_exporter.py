@@ -270,6 +270,12 @@ def _write_data_table(ws, rows: List[Dict[str, Any]], start_row: int):
         for ci, key in enumerate(ordered, 1):
             cell = ws.cell(row=data_row, column=ci)
             val = row.get(key, "")
+            # 跳过内部数据键和非标量值 (numpy array / dict / BytesIO)
+            if key.startswith("_") or isinstance(val, (list, dict, io.BytesIO)):
+                val = ""
+            # 跳过 numpy array
+            if hasattr(val, 'shape') or hasattr(val, 'dtype'):
+                val = ""
             cell.value = val
             cell.font = DATA_FONT
             cell.alignment = DATA_ALIGN
