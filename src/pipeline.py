@@ -1037,18 +1037,22 @@ def _export_azimuth(
                 except Exception:
                     pass
 
-            # Collect intermediate data
+    # ── 中间数据收集 ──
+    for sheet_name, rows in sheet_results.items():
+        for row in rows:
+            freq = row.get("frequency")
+            if freq is None: continue
             gain_dbi = row.get("_azimuth_gain_dbi")
             ar_db_v = row.get("_azimuth_ar_db")
             theta_deg_arr = row.get("_azimuth_theta_deg")
-            if gain_dbi is not None and theta_deg_arr is not None and azimuth_config.azimuth_cut_angles:
+            if gain_dbi is not None and theta_deg_arr is not None and azimuth_config and azimuth_config.azimuth_cut_angles:
                 gd = {}
                 for angle in azimuth_config.angles_sorted:
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
                     nearest = float(theta_deg_arr[idx])
                     gd[nearest] = gain_dbi[:, idx].copy()
                 freq_gain_data.append((freq, gd))
-            if ar_db_v is not None and theta_deg_arr is not None and azimuth_config.azimuth_cut_angles_ar:
+            if ar_db_v is not None and theta_deg_arr is not None and azimuth_config and azimuth_config.azimuth_cut_angles_ar:
                 ad = {}
                 for angle in azimuth_config.angles_ar_sorted:
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
