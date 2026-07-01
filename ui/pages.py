@@ -276,6 +276,7 @@ class FileSettingsPage(QWidget):
         self._check_out_word.toggled.connect(lambda c: (
             self._edit_az_chart_dir.setEnabled(c),
             self._edit_az_chart_fn.setEnabled(c),
+            self._sync_azimuth_cut_switch(),
         ))
 
         row_word_settings = QHBoxLayout()
@@ -330,6 +331,7 @@ class FileSettingsPage(QWidget):
             self._edit_az_gain_fn.setEnabled(c),
             self._edit_az_ar_dir.setEnabled(c),
             self._edit_az_ar_fn.setEnabled(c),
+            self._sync_azimuth_cut_switch(),
         ))
 
         right_layout.addWidget(out_grp)
@@ -487,6 +489,21 @@ class FileSettingsPage(QWidget):
             az.data_ar_output_dir = self._edit_az_ar_dir.text().strip()
         if hasattr(self, '_edit_az_ar_fn'):
             az.data_ar_output_filename = self._edit_az_ar_fn.text().strip()
+
+    def _sync_azimuth_cut_switch(self):
+        """勾选 Word 或数据输出时自动开启方位面开关。"""
+        if not self._mw:
+            return
+        az = getattr(self._mw, '_azimuth_config', None)
+        if az is None:
+            return
+        need_azimuth = (
+            getattr(self, '_check_out_word', None) is not None and self._check_out_word.isChecked()
+        ) or (
+            getattr(self, '_check_out_data', None) is not None and self._check_out_data.isChecked()
+        )
+        if need_azimuth:
+            az.cut_azimuth_polar = True
 
     def get_output_flags(self):
         """返回输出开关: (excel, word, data)。"""

@@ -209,10 +209,13 @@ class FinalSummarySource(DataSource):
             elif preview_phi_count > 0:
                 break
         if preview_phi_count >= 5:
-            # 扫描找真实边界：第一个空行/文本行出现的位置
+            # 扫描找真实边界：第一个空行/标签行出现的位置
             phi_count = 0
             for row in ws.iter_rows(min_row=theta_start_row, max_row=max_r, values_only=True):
                 col_a = row[0] if len(row) > 0 else None
+                # 列 A 为非数值文本 (如 "Linear Avg Gain") → 标签行，非数据行
+                if col_a is not None and isinstance(col_a, str) and not _is_numeric(col_a):
+                    break
                 has_data = any(v is not None and _is_numeric(v) for v in row[1:])
                 if has_data:
                     phi_count += 1
