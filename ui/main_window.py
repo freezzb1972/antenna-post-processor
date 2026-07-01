@@ -264,7 +264,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # ---- 图形展示 Tab: 启动时创建空 GraphViewer (工具栏立即可见) ----
         from ui.graph_viewer import GraphViewer
-        self._graph_viewer = GraphViewer()
+        viewer = GraphViewer()
+        viewer._mw = self  # 用于 _on_apply_angles_to_config 回写
+        self._graph_viewer = viewer
         self.ui.vTabCharts.addWidget(self._graph_viewer)
 
     # ── Widget 代理 — 所有控件现在由 FileSettingsPage 统一管理 ──
