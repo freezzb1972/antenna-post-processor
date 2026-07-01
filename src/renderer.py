@@ -346,6 +346,32 @@ class MatplotlibRenderer(BaseRenderer):
         fig.tight_layout(pad=1.5)
         return _fig_to_png_buffer(fig, dpi)
 
+    def render_freq_curve(self, freqs: list, values: list, *,
+                          label: str = "", ylabel: str = "",
+                          title: str = "", dpi: int = 150) -> io.BytesIO:
+        """渲染频点 vs 参数 Cartesian 线图 (B 类图表 Word 输出)。"""
+        fig = Figure(figsize=(6, 4))
+        ax = fig.add_subplot(111)
+        ax.plot(freqs, values, "o-", linewidth=1.2, markersize=4, label=label or ylabel)
+        ax.set_xlabel("Frequency (MHz)")
+        ax.set_ylabel(ylabel or label)
+        ax.set_title(title or f"{label or ylabel} vs Frequency")
+        ax.grid(True, alpha=0.3)
+        if freqs:
+            pad = (max(freqs) - min(freqs)) * 0.05 if len(freqs) > 1 else 50
+            ax.set_xlim(min(freqs) - pad, max(freqs) + pad)
+        if values:
+            lo, hi = min(values), max(values)
+            margin = (hi - lo) * 0.1 if hi != lo else 1.0
+            ax.set_ylim(lo - margin, hi + margin)
+        if label:
+            ax.legend(fontsize=8)
+
+        buf = io.BytesIO()
+        FigureCanvasAgg(fig).print_png(buf, dpi=dpi)
+        buf.seek(0)
+        return buf
+
 
 # ═══════════════════════════════════════════════════════════════
 # Cloud GPU 渲染器（预留接口）
