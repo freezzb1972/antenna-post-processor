@@ -137,6 +137,7 @@ def _process_one_frequency(
     azimuth_config: "AzimuthReportConfig" = None,
     nh_custom_angles: Optional[List[float]] = None,
     ar_output_db: bool = True,
+    compute_only: bool = False,
     log_cb=None,
 ) -> Dict[str, Any]:
     """处理单个频点。按 needed_params（模板列）+ extra_params（用户额外）计算。"""
@@ -364,22 +365,24 @@ def _process_one_frequency(
                     if ar is not None:
                         ar_lin = ar
             gain_dbi = 10.0 * np.log10(np.maximum(gain_linear, 1e-15))
-            # 构建 E_θ/E_φ 分量额外数据
-            extra_patterns = {}
-            if ccfg.pattern_3d_etheta:
-                extra_patterns["3d_etheta"] = theta_lm
-            if ccfg.pattern_3d_ephi:
-                extra_patterns["3d_ephi"] = phi_lm
-            extra_patterns = extra_patterns if extra_patterns else None
-            images = generate_all_for_frequency(
-                theta_deg, phi_angles, gain_dbi,
-                freq, ccfg, ar_linear=ar_lin,
-                antenna_name="",
-                azimuth_config=azimuth_config,
-                extra_patterns=extra_patterns,
-            )
-            if images:
-                row["_images"] = images
+            # compute_only 模式跳过 Matplotlib 渲染
+            if not compute_only:
+                # 构建 E_θ/E_φ 分量额外数据
+                extra_patterns = {}
+                if ccfg.pattern_3d_etheta:
+                    extra_patterns["3d_etheta"] = theta_lm
+                if ccfg.pattern_3d_ephi:
+                    extra_patterns["3d_ephi"] = phi_lm
+                extra_patterns = extra_patterns if extra_patterns else None
+                images = generate_all_for_frequency(
+                    theta_deg, phi_angles, gain_dbi,
+                    freq, ccfg, ar_linear=ar_lin,
+                    antenna_name="",
+                    azimuth_config=azimuth_config,
+                    extra_patterns=extra_patterns,
+                )
+                if images:
+                    row["_images"] = images
             # 存储中间数据供方位面导出使用
             if azimuth_config.cut_azimuth_polar and azimuth_config.azimuth_cut_angles:
                 row["_azimuth_gain_dbi"] = gain_dbi
@@ -618,6 +621,7 @@ def _load_and_compute(
     azimuth_config: "AzimuthReportConfig" = None,
     nh_custom_angles: Optional[List[float]] = None,
     ar_output_db: bool = True,
+    compute_only: bool = False,
     cancel_callback=None,
     progress_callback=None,
     log_callback=None,
@@ -644,7 +648,7 @@ def _load_and_compute(
         theta_list = list(task_ds.theta_angles)
         # 每 sheet 的 AR 配置: 优先用全局 override, 否则用模板自动检测的
         ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, azimuth_config))
+        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, azimuth_config, compute_only))
         if (i + 1) % 20 == 0 or (i + 1) == total:
             _report(progress_callback, i + 1, progress_max, f"📂 加载数据 {int((i+1)/total*100)}%")
 
@@ -682,12 +686,12 @@ def _run_compute_serial(
     cancel_callback, progress_callback, log_cb=None, azimuth_config=None,
 ):
     """串行逐频点计算（单进程或 parallel=1）。"""
-    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg) in enumerate(compute_tasks):
+    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co) in enumerate(compute_tasks):
         if cancel_callback and cancel_callback():
             break
         try:
             theta_arr = np.array(theta_list)
-            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, log_cb=log_cb)
+            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co, log_cb=log_cb)
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
@@ -727,6 +731,7 @@ def run_pipeline(
     ar_lag_config_override: Optional[LagConfig] = None,
     plot_config: Optional[PlotConfig] = None,
     full_report_path: Optional[str] = None,
+    compute_only: bool = False,  # True → 只计算不导出 (预览模式)
     extrapolate_theta: bool = False,
     freq_source: str = "datasource",
     trim_start: int = 0,
@@ -837,10 +842,20 @@ def run_pipeline(
             azimuth_config=azimuth_config,
             nh_custom_angles=nh_custom_angles,
             ar_output_db=ar_output_db,
+            compute_only=compute_only,
             cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,
         )
     finally:
         _close_datasources(use_multi_ds, datasource, datasource_map)
+
+    # ── compute_only 模式下跳过所有导出步骤 ──
+    if compute_only:
+        _log(log_callback, "⏭ 预览模式 — 跳过 Excel/Word/报告导出")
+        elapsed = time.time() - t0
+        total_rows = sum(len(v) for v in sheet_results.values())
+        _log(log_callback, f"✓ 计算完成: {total_rows} 行, {elapsed:.1f}s")
+        _report(progress_callback, 1, 1, "✅ 预览就绪")
+        return sheet_results
 
     # ---- 3. 写入 Excel (可选) ----
     total = len(tasks)
@@ -1062,11 +1077,11 @@ def _compute_chunk(
     """
     import numpy as np
     results = []
-    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg in compute_tasks:
+    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co in compute_tasks:
         try:
             theta_raw = np.array(theta_list)
             row = _process_one_frequency(raw, freq, theta_raw, lag_cfg,
-                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db)
+                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co)
             results.append((sheet_name, row))
         except Exception as e:
             results.append((sheet_name, {"frequency": freq, "_error": str(e)}))

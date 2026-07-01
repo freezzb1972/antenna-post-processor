@@ -113,6 +113,7 @@ class ProcessingWorker(QObject):
         nh_custom_angles: Optional[List[float]] = None,
         ar_output_db: bool = True,
         worksheet_naming_mode: int = 0,
+        compute_only: bool = False,  # 预览模式: True→只计算不导出
         # 多步进参数
         step_values: Optional[List[float]] = None,
         skip_original: bool = False,
@@ -148,6 +149,7 @@ class ProcessingWorker(QObject):
         self.skip_original = skip_original
         self.gen_diff = gen_diff
         self.gen_diff_chart = gen_diff_chart
+        self.compute_only = compute_only
         self._cancelled = False
 
     def cancel(self):
@@ -184,6 +186,7 @@ class ProcessingWorker(QObject):
                 nh_custom_angles=self.nh_custom_angles,
                 ar_output_db=self.ar_output_db,
                 worksheet_naming_mode=self.worksheet_naming_mode,
+                compute_only=self.compute_only,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
                 log_callback=self._on_log,
