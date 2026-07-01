@@ -502,6 +502,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._btn_export.setEnabled(False)
         btn_row.addWidget(self._btn_export)
         btn_row.addWidget(self.ui.btnStop)
+        self._btn_preview.show()
+        self._btn_export.show()
         self.ui.btnStart.hide()  # 不再使用，保留在编译 UI 中避免引用错误
 
         left_panel.setLayout(left_layout)
