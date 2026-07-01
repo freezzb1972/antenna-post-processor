@@ -2086,6 +2086,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.progressBar.setMaximum(total)
         self.ui.progressBar.setValue(current)
         self.ui.lblProgressMsg.setText(message)
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()
 
     def _on_worker_log(self, message: str):
         self._log(message)
@@ -2305,7 +2307,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         输出，调用方可预先 strip 掉 emoji 字符。"""
         ts = datetime.now().strftime("%H:%M:%S")
         self.ui.logOutput.appendPlainText(f"[{ts}] {message}")
-        # 自动滚动到底部
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()
         cursor = self.ui.logOutput.textCursor()
         cursor.movePosition(QTextCursor.End)
         self.ui.logOutput.setTextCursor(cursor)
