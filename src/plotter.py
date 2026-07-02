@@ -7,13 +7,12 @@
 from __future__ import annotations
 
 import io
-from typing import Dict, Optional, Tuple
 
 import numpy as np
 
-from .chart_config import ChartConfig
-from .renderer import BaseRenderer, MatplotlibRenderer, CloudRenderer
 from .azimuth_config import AzimuthReportConfig
+from .chart_config import ChartConfig
+from .renderer import BaseRenderer, MatplotlibRenderer
 
 # 模块级默认渲染器（可通过 set_renderer 切换）
 _renderer: BaseRenderer = MatplotlibRenderer()
@@ -42,8 +41,8 @@ def generate_3d_pattern(
     elev: float = 30.0,
     azim: float = -60.0,
     dpi: int = 150,
-    figsize: Tuple[float, float] = (9, 7),
-    title: Optional[str] = None,
+    figsize: tuple[float, float] = (9, 7),
+    title: str | None = None,
     antenna_name: str = "",
 ) -> io.BytesIO:
     """生成 3D 球面辐射方向图 PNG。委托给当前渲染器。"""
@@ -90,9 +89,9 @@ def generate_2d_rectangular_cut(
 
 def _match_theta_indices(
     theta_deg: np.ndarray,
-    target_angles: "List[float]",
+    target_angles: list[float],
     tolerance_deg: float = 2.0,
-) -> "List[int]":
+) -> list[int]:
     """将目标 Theta 角度映射为最近的 theta 数组索引。
 
     Args:
@@ -142,7 +141,7 @@ def generate_gain_vs_theta(
 
 def generate_azimuth_polar_cut(
     phi_deg: np.ndarray,
-    curves: "List[Tuple[float, np.ndarray]]",
+    curves: list[tuple[float, np.ndarray]],
     freq_mhz: float,
     *,
     antenna_name: str = "",
@@ -162,8 +161,8 @@ def generate_azimuth_polar_cut(
 
 def _build_azimuth_curves(
     theta_deg: np.ndarray, data_db: np.ndarray,
-    angles: List[float], phi_count: int,
-) -> "List[Tuple[float, np.ndarray]]":
+    angles: list[float], phi_count: int,
+) -> list[tuple[float, np.ndarray]]:
     """从数据矩阵提取选定 Theta 角度的 phi 切片，构建方位图曲线列表。"""
     if not angles or phi_count == 0:
         return []
@@ -178,13 +177,13 @@ def generate_all_for_frequency(
     freq_mhz: float,
     chart_config: ChartConfig,
     *,
-    ar_linear: Optional[np.ndarray] = None,
-    rhcp_db: Optional[np.ndarray] = None,
-    lhcp_db: Optional[np.ndarray] = None,
+    ar_linear: np.ndarray | None = None,
+    rhcp_db: np.ndarray | None = None,
+    lhcp_db: np.ndarray | None = None,
     antenna_name: str = "",
-    azimuth_config: Optional[AzimuthReportConfig] = None,
-    extra_patterns: Dict[str, np.ndarray] = None,
-) -> Dict[str, io.BytesIO]:
+    azimuth_config: AzimuthReportConfig | None = None,
+    extra_patterns: dict[str, np.ndarray] = None,
+) -> dict[str, io.BytesIO]:
     """根据 ChartConfig 为一个频点生成所有需要的图形。
 
     Args:
@@ -203,7 +202,7 @@ def generate_all_for_frequency(
     Returns:
         {"3d_gain": buf, "2d_polar_phi0": buf, "2d_rect_phi0": buf, ...}
     """
-    images: Dict[str, io.BytesIO] = {}
+    images: dict[str, io.BytesIO] = {}
     extra = extra_patterns or {}
 
     # ── A 类: 3D 方向图 ──
@@ -305,26 +304,29 @@ def generate_all_for_frequency(
         az_antenna = azimuth_config.antenna_name or antenna_name
         az_dpi = azimuth_config.dpi or getattr(chart_config, 'dpi', 150)
 
-        def _render_azimuth(data_db, angles, image_key, ylabel):
+        def _render_azimuth(data_db, angles, image_key, ylabel, title=None):
             curves = _build_azimuth_curves(theta_deg, data_db, angles, len(phi_deg))
             if curves:
                 images[image_key] = _renderer.render_azimuth_polar(
                     phi_deg, curves, freq_mhz,
                     antenna_name=az_antenna, dpi=az_dpi, ylabel=ylabel,
+                    title=title or f"{freq_mhz:.0f}MHz - {ylabel}",
                 )
 
         if azimuth_config.cut_azimuth_polar:
             _render_azimuth(gain_dbi, azimuth_config.angles_sorted,
-                           "azimuth_polar", "Gain (dBi)")
+                           "azimuth_polar", "Gain (dBi)",
+                           title=f"{freq_mhz:.0f}MHz - Gain (dBi)")
         if azimuth_config.cut_azimuth_polar_pk070:
             try:
                 mask = theta_deg <= 70.1
                 pk_070 = np.max(gain_dbi[:, mask], axis=1)
+                t = f"{freq_mhz:.0f}MHz - Gain (dBi) Theta 0°-70° (step=1°)"
                 curves_070 = [(70.0, pk_070)]
                 images["azimuth_polar_pk070"] = _renderer.render_azimuth_polar(
                     phi_deg, curves_070, freq_mhz,
                     antenna_name=az_antenna, dpi=az_dpi,
-                    ylabel="Gain θ=0°-70° (step=1°)",
+                    ylabel="Gain (dBi)", title=t,
                 )
             except Exception:
                 pass

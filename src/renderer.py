@@ -312,6 +312,7 @@ class MatplotlibRenderer(BaseRenderer):
         antenna_name: str = "",
         dpi: int = 150,
         ylabel: str = "Gain (dBi)",
+        title: str = "",
     ) -> io.BytesIO:
         """方位面极坐标切面图：Phi 角轴 + 多条 Theta 曲线。"""
         phi_rad = np.deg2rad(phi_deg)
@@ -332,7 +333,7 @@ class MatplotlibRenderer(BaseRenderer):
         for i, (theta_angle, gain_1d) in enumerate(sorted_curves):
             color = colors[i % len(colors)]
             ls = linestyles[(i // len(colors)) % len(linestyles)]
-            label = f"{ylabel.split()[0]} at θ={theta_angle:.0f}°"
+            label = f"Gain at θ={theta_angle:.0f}°"
             gain_close = np.empty(len(gain_1d) + 1)
             gain_close[:-1] = gain_1d
             gain_close[-1] = gain_1d[0]
@@ -341,24 +342,19 @@ class MatplotlibRenderer(BaseRenderer):
 
         ax.set_theta_zero_location("N")
         ax.set_theta_direction(-1)
-        # 外圈角度刻度标注
         ax.set_thetagrids(range(0, 360, 30),
                           labels=[f"{d}°" for d in range(0, 360, 30)],
                           fontsize=7)
-        ax.set_rlabel_position(135)  # 径向标签位置避开曲线
+        ax.set_rlabel_position(135)
 
-        # 标题区: 频率 + ylabel 作为副标题 (避免与图形重叠)
-        title_line = f"{freq_mhz:.0f} MHz"
-        if antenna_name:
-            title_line = f"{antenna_name} — {title_line}"
-        ax.set_title(title_line, fontsize=11, pad=12)
-        # ylabel 放在标题下方, 用 fig.text 避免与极坐标重叠
-        fig.text(0.5, 0.01, ylabel, ha="center", va="bottom",
-                 fontsize=9, color="#555555")
+        # 标题: 频率+ylabel 合一 (由 title 参数控制)
+        if title:
+            ax.set_title(title, fontsize=11, pad=12)
+        else:
+            ax.set_title(f"{freq_mhz:.0f}MHz - {ylabel}", fontsize=11, pad=12)
 
         ax.grid(True, alpha=0.4)
 
-        # 径向刻度标注
         ylim = ax.get_ylim()
         r_ticks = np.linspace(ylim[0], ylim[1], 5)
         ax.set_yticks(r_ticks)
