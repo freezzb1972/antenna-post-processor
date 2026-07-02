@@ -348,24 +348,85 @@ class MatplotlibRenderer(BaseRenderer):
 
     def render_freq_curve(self, freqs: list, values: list, *,
                           label: str = "", ylabel: str = "",
-                          title: str = "", dpi: int = 150) -> io.BytesIO:
-        """渲染频点 vs 参数 Cartesian 线图 (B 类图表 Word 输出)。"""
-        fig = plt.figure(figsize=(6, 4))
-        ax = fig.add_subplot(111)
-        ax.plot(freqs, values, "o-", linewidth=1.2, markersize=4, label=label or ylabel)
-        ax.set_xlabel("Frequency (MHz)")
-        ax.set_ylabel(ylabel or label)
-        ax.set_title(title or f"{label or ylabel} vs Frequency")
-        ax.grid(True, alpha=0.3)
-        if freqs:
+                          title: str = "", dpi: int = 150,
+                          gap_mhz: int = 10) -> io.BytesIO:
+        """渲染频点 vs 参数 Cartesian 线图 (B 类图表 Word 输出)。
+
+        自动检测频段间隙 (>gap_mhz): 分段绘制、断线、x轴标注段边界频率。
+        gap_mhz=0 时不打断，用传统单轴。
+        """
+        import math
+        n = len(freqs)
+        threshold = gap_mhz if gap_mhz > 0 else 999999
+        # 检测频段间隙
+        segments = []
+        seg_start = 0
+        for i in range(1, n):
+            if freqs[i] - freqs[i-1] > threshold:
+                segments.append((seg_start, i))
+                seg_start = i
+        segments.append((seg_start, n))
+        has_gap = len(segments) > 1
+
+        fig = plt.figure(figsize=(8, 4.5))
+        if has_gap:
+            # 双轴: 左半 L5, 右半 L1, 中间 gap 压缩为 10MHz
+            import matplotlib.gridspec as gridspec
+            gs = gridspec.GridSpec(1, 2, width_ratios=[1, 1], wspace=0.05)
+            ax_left = fig.add_subplot(gs[0])
+            ax_right = fig.add_subplot(gs[1], sharey=ax_left)
+
+            # 隐藏右轴 y 标签避免重叠
+            plt.setp(ax_right.get_yticklabels(), visible=False)
+
+            for seg_i, (si, ei) in enumerate(segments):
+                ax = ax_left if seg_i == 0 else ax_right
+                sf = freqs[si:ei]
+                sv = values[si:ei]
+                ax.plot(sf, sv, "o-", linewidth=1.5, markersize=4, label=label or ylabel)
+                ax.grid(True, alpha=0.3)
+                # x 轴显示段首尾频率
+                tick_freqs = [sf[0], sf[-1]]
+                if len(sf) > 3:
+                    mid = sf[len(sf)//2]
+                    tick_freqs.insert(1, mid)
+                ax.set_xticks(tick_freqs)
+                ax.set_xticklabels([f"{f:.0f}" for f in tick_freqs], fontsize=8)
+
+            # 右轴左侧 spine 设为虚线表示断点
+            ax_left.spines['right'].set_visible(False)
+            ax_right.spines['left'].set_visible(False)
+            ax_left.tick_params(axis='x', labelrotation=0)
+            ax_right.tick_params(axis='x', labelrotation=0)
+            # 断点标记
+            d = 0.015
+            kwargs = dict(transform=ax_left.transAxes, color='k', clip_on=False, linewidth=1)
+            ax_left.plot((1-d, 1+d), (-d, +d), **kwargs)
+            ax_left.plot((1-d, 1+d), (1-d, 1+d), **kwargs)
+            kwargs.update(transform=ax_right.transAxes)
+            ax_right.plot((-d, +d), (-d, +d), **kwargs)
+            ax_right.plot((-d, +d), (1-d, 1+d), **kwargs)
+
+            fig.supxlabel("Frequency (MHz)", fontsize=10, y=0.02)
+            fig.supylabel(ylabel or label, fontsize=10, x=0.04)
+            if label:
+                ax_left.legend(fontsize=8)
+        else:
+            ax = fig.add_subplot(111)
+            ax.plot(freqs, values, "o-", linewidth=1.5, markersize=4, label=label or ylabel)
+            ax.set_xlabel("Frequency (MHz)")
+            ax.set_ylabel(ylabel or label)
+            ax.grid(True, alpha=0.3)
             pad = (max(freqs) - min(freqs)) * 0.05 if len(freqs) > 1 else 50
             ax.set_xlim(min(freqs) - pad, max(freqs) + pad)
-        if values:
-            lo, hi = min(values), max(values)
-            margin = (hi - lo) * 0.1 if hi != lo else 1.0
-            ax.set_ylim(lo - margin, hi + margin)
-        if label:
-            ax.legend(fontsize=8)
+            if values:
+                lo, hi = min(values), max(values)
+                margin = (hi - lo) * 0.1 if hi != lo else 1.0
+                ax.set_ylim(lo - margin, hi + margin)
+            if label:
+                ax.legend(fontsize=8)
+
+        fig.tight_layout(rect=[0.05, 0.08, 1, 0.96])
         return _fig_to_png_buffer(fig, dpi)
 
 

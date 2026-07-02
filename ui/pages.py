@@ -286,6 +286,22 @@ class FileSettingsPage(QWidget):
         row_word_settings.addStretch()
         out_layout.addLayout(row_word_settings)
 
+        # 频段间隔设置 (B类 vs频率曲线多段打断)
+        row_gap = QHBoxLayout()
+        row_gap.addWidget(QLabel(self.tr("频段间隔 (MHz):")))
+        self._spin_freq_gap = QSpinBox()
+        self._spin_freq_gap.setRange(0, 999)
+        self._spin_freq_gap.setValue(10)
+        self._spin_freq_gap.setToolTip(self.tr(
+            "B类 vs频率曲线多段间隔阈值。0=不打断单轴；>0=相邻频点差超此值时分段绘制"))
+        self._spin_freq_gap.valueChanged.connect(lambda v: (
+            setattr(getattr(self._mw, '_azimuth_config', None), 'freq_gap_mhz', v)
+            if self._mw and getattr(self._mw, '_azimuth_config', None) else None
+        ))
+        row_gap.addWidget(self._spin_freq_gap)
+        row_gap.addStretch()
+        out_layout.addLayout(row_gap)
+
         out_layout.addWidget(_make_hsep())
 
         # 3) 中间数据文件 (.xlsx)

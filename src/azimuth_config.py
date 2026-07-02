@@ -26,6 +26,7 @@ class AzimuthReportConfig:
     azimuth_cut_angles: List[float] = field(default_factory=list)      # Gain 选定 Theta 角度 (°)
     azimuth_cut_angles_ar: List[float] = field(default_factory=list)   # AR  选定 Theta 角度 (°)
     antenna_name: str = ""                   # 天线名（标题用）
+    freq_gap_mhz: int = 10                  # B类频点曲线多段间隔阈值(MHz), 0=不打断
 
     # ── Word 布局模式 ──
     # "side_by_side": 每频点同行 2 列 (左 Gain 右 AR)
@@ -124,6 +125,7 @@ class AzimuthReportConfig:
             "data_ar_output_dir": self.data_ar_output_dir,
             "data_ar_output_filename": self.data_ar_output_filename,
             "dpi": self.dpi,
+            "freq_gap_mhz": self.freq_gap_mhz,
         }
 
     @classmethod
@@ -145,6 +147,7 @@ class AzimuthReportConfig:
             data_ar_output_dir=str(d.get("data_ar_output_dir", "")),
             data_ar_output_filename=str(d.get("data_ar_output_filename", "")),
             dpi=int(d.get("dpi", 150)),
+            freq_gap_mhz=int(d.get("freq_gap_mhz", 10)),
         )
 
     # ═══════════════════════════════════════════════════════════
@@ -169,6 +172,7 @@ class AzimuthReportConfig:
             data_ar_output_dir=self.data_ar_output_dir or other.data_ar_output_dir,
             data_ar_output_filename=self.data_ar_output_filename or other.data_ar_output_filename,
             dpi=self.dpi or other.dpi,
+            freq_gap_mhz=self.freq_gap_mhz if self.freq_gap_mhz >= 0 else other.freq_gap_mhz,
         )
 
     # ═══════════════════════════════════════════════════════════

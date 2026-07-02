@@ -1074,6 +1074,13 @@ def _export_azimuth(
         "peak_eirp": "Peak EIRP (dBm)", "avg_gain": "Average Gain (dB)",
         "nhprp_45": "NHPRP ±45°", "nhprp_30": "NHPRP ±30°",
     }
+    # 当模板无 Efficiency 列但有 Gain+Directivity 时, 推导效率
+    _flat = [r for rows in sheet_results.values() for r in rows]
+    if _flat and "efficiency_pct" not in _flat[0] and "gain" in _flat[0] and "directivity" in _flat[0]:
+        for r in _flat:
+            g = r.get("gain"); d = r.get("directivity")
+            if g is not None and d is not None:
+                r["efficiency_pct"] = 10 ** ((g - d) / 10) * 100
     from .plotter import _renderer as _freq_renderer
     for sheet_name, rows in sheet_results.items():
         for param_key, param_label in _B_PARAM_MAP.items():
@@ -1084,9 +1091,11 @@ def _export_azimuth(
                     freqs.append(row["frequency"]); values.append(v)
             if len(freqs) > 1:
                 try:
+                    gap = getattr(azimuth_config, 'freq_gap_mhz', 10) if azimuth_config else 10
                     png = _freq_renderer.render_freq_curve(
                         freqs, values, ylabel=param_label,
-                        title=f"{param_label} vs Frequency")
+                        title=f"{param_label} vs Frequency",
+                        gap_mhz=gap)
                     group = f"B: {param_label} vs Freq"
                     # B 类图表不按频点分组，用 0.0 做占位 key
                     if group not in image_groups:
