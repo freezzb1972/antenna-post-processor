@@ -1051,7 +1051,10 @@ class GraphViewer(QWidget):
         return available
 
     def _plot_freq_curves(self):
-        """绘制选中的频率曲线为 2D Cartesian 子图, 垂直堆叠."""
+        """绘制选中的频率曲线为 2D Cartesian 子图, 垂直堆叠。
+
+        多段频率自动用 GridSpec 断轴 (与 Word 报告 render_freq_curve 一致)。
+        """
         self._figure.clear()
         all_available = self._get_available_freq_curves()
         if not all_available:
@@ -1059,7 +1062,6 @@ class GraphViewer(QWidget):
             self._lbl_info.setText("无频率曲线数据可用")
             return
 
-        # 根据用户选择过滤曲线
         if self._active_freq_curve_indices:
             available = [all_available[i] for i in self._active_freq_curve_indices
                          if i < len(all_available)]
@@ -1071,7 +1073,6 @@ class GraphViewer(QWidget):
             self._lbl_info.setText("未选择任何频率曲线")
             return
 
-        # 收集数据: freq → {column_key: value}
         freq_data = {}
         for rows in self._results.values():
             for row in rows:
@@ -1092,73 +1093,127 @@ class GraphViewer(QWidget):
         freqs = sorted(freq_data.keys())
         n = len(available)
 
-        fig_height = max(3, n * 2.5)
-        self._figure.set_size_inches(8, fig_height, forward=True)
+        # 检测频段间隙 (与 renderer 一致: >30MHz)
+        _gap_segments = []
+        _seg_start = 0
+        for i in range(1, len(freqs)):
+            if freqs[i] - freqs[i-1] > 30.0:
+                _gap_segments.append((_seg_start, i))
+                _seg_start = i
+        _gap_segments.append((_seg_start, len(freqs)))
+        has_gap = len(_gap_segments) > 1
 
-        # 双Y轴模式: 0=单轴, 1=自动, 2=强制
+        # 双Y轴模式
         dual_mode = self._cmb_dual_y.currentIndex() if hasattr(self, '_cmb_dual_y') else 0
         _PCT_KEYS = {"efficiency_pct", "total_efficiency_pct"}
 
         if dual_mode == 0:
-            # 单Y轴: 堆叠子图
-            for i, (label, key) in enumerate(available):
-                ax = self._figure.add_subplot(n, 1, i + 1)
-                values = [freq_data[f].get(key) for f in freqs]
-                ax.plot(freqs, values, 'o-', markersize=4)
-                ax.set_ylabel(label)
-                ax.grid(True, alpha=0.3)
-                if i < n - 1:
-                    ax.tick_params(labelbottom=False)
-                else:
-                    ax.set_xlabel("Frequency (MHz)")
+            # 单Y轴: 计算行数
+            rows_count = n
+            pairs_list = [(a, None, False) for a in available]
         else:
-            # 双Y轴: 成对叠加, 左右各一轴
-            pairs = []
+            pairs_list = []
             for i in range(0, n, 2):
                 a = available[i]
                 b = available[i + 1] if i + 1 < n else None
-                # 自动模式: 检查是否需要双Y
-                need_dual = dual_mode == 2  # 强制
+                need_dual = dual_mode == 2
                 if dual_mode == 1 and b is not None:
                     va = [freq_data[f].get(a[1]) for f in freqs if freq_data[f].get(a[1]) is not None]
                     vb = [freq_data[f].get(b[1]) for f in freqs if freq_data[f].get(b[1]) is not None]
                     if va and vb:
                         ra = (max(va) - min(va)) or 1
                         rb = (max(vb) - min(vb)) or 1
-                        # 比值 > 50 或一个是%一个是dB → 需要双Y
                         if max(ra, rb) / min(ra, rb) > 50:
                             need_dual = True
                         if (a[1] in _PCT_KEYS) != (b[1] in _PCT_KEYS):
                             need_dual = True
-                pairs.append((a, b, need_dual))
+                pairs_list.append((a, b, need_dual))
+            rows_count = len(pairs_list)
 
-            n_pairs = len(pairs)
-            for pi, (a, b, need_dual) in enumerate(pairs):
-                ax1 = self._figure.add_subplot(n_pairs, 1, pi + 1)
-                v1 = [freq_data[f].get(a[1]) for f in freqs]
-                if b is not None and need_dual:
-                    v2 = [freq_data[f].get(b[1]) for f in freqs]
+        fig_height = max(3, rows_count * 2.5)
+        self._figure.set_size_inches(8, fig_height, forward=True)
+
+        import matplotlib.gridspec as gridspec
+        ncols = len(_gap_segments) if has_gap else 1
+        gs = gridspec.GridSpec(rows_count, ncols,
+                               width_ratios=[1] * ncols,
+                               wspace=0.05 if has_gap else 0.2,
+                               hspace=0.35)
+
+        for row_i, (a, b, need_dual) in enumerate(pairs_list):
+            is_last = (row_i == rows_count - 1)
+
+            if has_gap:
+                ax_left = self._figure.add_subplot(gs[row_i, 0])
+                ax_right = self._figure.add_subplot(gs[row_i, 1])
+                if row_i > 0:
+                    ax_right.sharey(ax_left)  # 同列不share, 同行可share
+                # 隐藏相邻 spine + 断点标记
+                ax_left.spines['right'].set_visible(False)
+                ax_right.spines['left'].set_visible(False)
+                d = 0.015
+                kw = dict(transform=ax_left.transAxes, color='k', clip_on=False, linewidth=1)
+                ax_left.plot((1-d, 1+d), (-d, +d), **kw)
+                ax_left.plot((1-d, 1+d), (1-d, 1+d), **kw)
+                kw.update(transform=ax_right.transAxes)
+                ax_right.plot((-d, +d), (-d, +d), **kw)
+                ax_right.plot((-d, +d), (1-d, 1+d), **kw)
+
+                # 绘制每个段
+                for seg_i, (si, ei) in enumerate(_gap_segments):
+                    ax = ax_left if seg_i == 0 else ax_right
+                    sf = freqs[si:ei]
+                    if need_dual and b is not None:
+                        v1 = [freq_data[f].get(a[1]) for f in sf]
+                        v2 = [freq_data[f].get(b[1]) for f in sf]
+                        from src.renderer import _render_dual_y_axes
+                        _render_dual_y_axes(ax, sf, v1, a[0], v2, b[0])
+                    else:
+                        v1 = [freq_data[f].get(a[1]) for f in sf]
+                        ax.plot(sf, v1, 'o-', markersize=4, color='#1f77b4')
+                        ax.set_ylabel(a[0])
+                        ax.grid(True, alpha=0.3)
+                        if b is not None:
+                            v2 = [freq_data[f].get(b[1]) for f in sf]
+                            ax.plot(sf, v2, 's--', markersize=4, color='#d62728')
+                            lines = ax.get_lines()
+                            ax.legend(lines, [a[0], b[0]], fontsize=7)
+                    # x 轴标注段首尾频率
+                    tick_f = [sf[0], sf[-1]]
+                    if len(sf) > 3:
+                        tick_f.insert(1, sf[len(sf)//2])
+                    ax.set_xticks(tick_f)
+                    ax.set_xticklabels([f"{f:.0f}" for f in tick_f], fontsize=7)
+
+                if not is_last:
+                    ax_left.tick_params(labelbottom=False)
+                    ax_right.tick_params(labelbottom=False)
+                else:
+                    ax_left.set_xlabel("Frequency (MHz)")
+                    ax_right.set_xlabel("Frequency (MHz)")
+            else:
+                ax = self._figure.add_subplot(gs[row_i, 0])
+                sf = freqs
+                if need_dual and b is not None:
+                    v1 = [freq_data[f].get(a[1]) for f in sf]
+                    v2 = [freq_data[f].get(b[1]) for f in sf]
                     from src.renderer import _render_dual_y_axes
-                    _render_dual_y_axes(ax1, freqs, v1, a[0], v2, b[0])
-                elif b is not None:
-                    v2 = [freq_data[f].get(b[1]) for f in freqs]
-                    ax1.plot(freqs, v1, 'o-', markersize=4, color='#1f77b4')
-                    ax1.plot(freqs, v2, 's--', markersize=4, color='#d62728')
-                    ax1.set_ylabel(a[0])
-                    ax1.grid(True, alpha=0.3)
-                    lines = ax1.get_lines()
-                    ax1.legend(lines, [a[0], b[0]], fontsize=7)
+                    _render_dual_y_axes(ax, sf, v1, a[0], v2, b[0])
                 else:
-                    ax1.plot(freqs, v1, 'o-', markersize=4, color='#1f77b4')
-                    ax1.set_ylabel(a[0])
-                    ax1.grid(True, alpha=0.3)
-
-                if pi < n_pairs - 1:
-                    ax1.tick_params(labelbottom=False)
+                    v1 = [freq_data[f].get(a[1]) for f in sf]
+                    ax.plot(sf, v1, 'o-', markersize=4, color='#1f77b4')
+                    ax.set_ylabel(a[0])
+                    ax.grid(True, alpha=0.3)
+                    if b is not None:
+                        v2 = [freq_data[f].get(b[1]) for f in sf]
+                        ax.plot(sf, v2, 's--', markersize=4, color='#d62728')
+                        lines = ax.get_lines()
+                        ax.legend(lines, [a[0], b[0]], fontsize=7)
+                if not is_last:
+                    ax.tick_params(labelbottom=False)
                 else:
-                    ax1.set_xlabel("Frequency (MHz)")
+                    ax.set_xlabel("Frequency (MHz)")
 
-        self._figure.tight_layout()
         self._canvas.draw()
         _mode_label = ["单Y轴", "双Y轴(自动)", "双Y轴(强制)"][dual_mode]
         self._lbl_info.setText(f"频率曲线: {n} 项, {len(freqs)} 个频点 [{_mode_label}]")
