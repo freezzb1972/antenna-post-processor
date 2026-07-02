@@ -617,8 +617,9 @@ def _setup_polar_radial_ticks(ax):
     import matplotlib.ticker as _ticker
     ax.yaxis.set_major_locator(_ticker.FixedLocator(best_ticks))
     ax.yaxis.set_minor_locator(_ticker.NullLocator())
-    # 确保中心点刻度也显示
+    # 确保所有刻度标签可见 (含中心点)
     for t in ax.yaxis.get_major_ticks():
+        t.set_visible(True)
         t.label1.set_visible(True)
     ax.set_rlabel_position(15)
 
