@@ -22,6 +22,7 @@ class AzimuthReportConfig:
 
     # ── 图表开关 ──
     cut_azimuth_polar: bool = False          # Gain 方位面极坐标切面
+    cut_azimuth_polar_pk070: bool = False    # Gain 0-70° Pk 方位面
     cut_azimuth_polar_ar: bool = False       # AR   方位面极坐标切面
     cut_azimuth_polar_rhcp: bool = False     # RHCP 方位面极坐标切面
     cut_azimuth_polar_lhcp: bool = False     # LHCP 方位面极坐标切面
@@ -65,7 +66,8 @@ class AzimuthReportConfig:
     @property
     def has_any_azimuth(self) -> bool:
         """是否启用了任一 azimuth 切面。"""
-        return self.cut_azimuth_polar or self.cut_azimuth_polar_ar \
+        return self.cut_azimuth_polar or self.cut_azimuth_polar_pk070 \
+            or self.cut_azimuth_polar_ar \
             or self.cut_azimuth_polar_rhcp or self.cut_azimuth_polar_lhcp
 
     @property
@@ -127,6 +129,7 @@ class AzimuthReportConfig:
         """序列化为 dict。"""
         return {
             "cut_azimuth_polar": self.cut_azimuth_polar,
+            "cut_azimuth_polar_pk070": self.cut_azimuth_polar_pk070,
             "cut_azimuth_polar_ar": self.cut_azimuth_polar_ar,
             "cut_azimuth_polar_rhcp": self.cut_azimuth_polar_rhcp,
             "cut_azimuth_polar_lhcp": self.cut_azimuth_polar_lhcp,
@@ -154,6 +157,7 @@ class AzimuthReportConfig:
         """从 dict 反序列化。"""
         return cls(
             cut_azimuth_polar=bool(d.get("cut_azimuth_polar", False)),
+            cut_azimuth_polar_pk070=bool(d.get("cut_azimuth_polar_pk070", False)),
             cut_azimuth_polar_ar=bool(d.get("cut_azimuth_polar_ar", False)),
             cut_azimuth_polar_rhcp=bool(d.get("cut_azimuth_polar_rhcp", False)),
             cut_azimuth_polar_lhcp=bool(d.get("cut_azimuth_polar_lhcp", False)),
@@ -184,6 +188,7 @@ class AzimuthReportConfig:
         """合并两个配置（OR 逻辑），角度取并集，路径取 self 优先。"""
         return AzimuthReportConfig(
             cut_azimuth_polar=self.cut_azimuth_polar or other.cut_azimuth_polar,
+            cut_azimuth_polar_pk070=self.cut_azimuth_polar_pk070 or other.cut_azimuth_polar_pk070,
             cut_azimuth_polar_ar=self.cut_azimuth_polar_ar or other.cut_azimuth_polar_ar,
             cut_azimuth_polar_rhcp=self.cut_azimuth_polar_rhcp or other.cut_azimuth_polar_rhcp,
             cut_azimuth_polar_lhcp=self.cut_azimuth_polar_lhcp or other.cut_azimuth_polar_lhcp,

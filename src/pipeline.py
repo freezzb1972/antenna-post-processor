@@ -456,11 +456,11 @@ def _process_one_frequency(
                 row["_azimuth_lhcp_db"] = lhcp_db
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
-            # Gain 0-70° Pk 中间数据: Theta 范围峰值增益 vs Phi
-            if azimuth_config and azimuth_config.cut_azimuth_polar:
+            # Gain 0-70° Pk 中间数据
+            if azimuth_config and azimuth_config.cut_azimuth_polar_pk070:
                 mask = theta_deg <= 70.1
                 row["_gain_pk070_deg"] = theta_deg[mask].copy()
-                row["_gain_pk070_db"] = np.max(gain_dbi[:, mask], axis=1)  # max over theta per phi
+                row["_gain_pk070_db"] = np.max(gain_dbi[:, mask], axis=1)
         except Exception as e:
             row["_graph_error"] = str(e)  # 图形生成失败不阻塞数据处理
 

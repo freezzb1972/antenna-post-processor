@@ -2389,6 +2389,16 @@ class ChartSettingsPage(QWidget):
                 row_az_ar.addStretch()
                 left_layout.addLayout(row_az_ar)
 
+                # Gain 0-70° Pk azimuth
+                row_az_pk = QHBoxLayout()
+                cb_az_pk = QCheckBox(self.tr("Gain 0-70° Pk 方位面"))
+                cb_az_pk.setToolTip(self.tr("每频点单曲线极坐标图: Theta 0-70°峰值增益 vs Phi"))
+                cb_az_pk.toggled.connect(lambda: self._sync_to_mw())
+                row_az_pk.addWidget(cb_az_pk)
+                self._chart_required["cut_azimuth_polar_pk070"] = cb_az_pk
+                row_az_pk.addStretch()
+                left_layout.addLayout(row_az_pk)
+
                 # ── 方位面图表参数 ──
                 sep_az = QFrame()
                 sep_az.setFrameShape(QFrame.HLine)
@@ -2601,6 +2611,8 @@ class ChartSettingsPage(QWidget):
                 self._chart_required["cut_azimuth_polar"].setChecked(az.cut_azimuth_polar)
             if "cut_azimuth_polar_ar" in self._chart_required:
                 self._chart_required["cut_azimuth_polar_ar"].setChecked(az.cut_azimuth_polar_ar)
+            if "cut_azimuth_polar_pk070" in self._chart_required:
+                self._chart_required["cut_azimuth_polar_pk070"].setChecked(az.cut_azimuth_polar_pk070)
 
             self._azimuth_angles = list(az.azimuth_cut_angles)
             self._azimuth_angles_ar = list(az.azimuth_cut_angles_ar)
@@ -2703,6 +2715,7 @@ class ChartSettingsPage(QWidget):
         azimuth = existing if existing is not None else AzimuthReportConfig()
         azimuth.cut_azimuth_polar = self._chart_required.get("cut_azimuth_polar", QCheckBox()).isChecked()
         azimuth.cut_azimuth_polar_ar = self._chart_required.get("cut_azimuth_polar_ar", QCheckBox()).isChecked()
+        azimuth.cut_azimuth_polar_pk070 = self._chart_required.get("cut_azimuth_polar_pk070", QCheckBox()).isChecked()
         azimuth.azimuth_cut_angles = list(self._azimuth_angles)
         azimuth.azimuth_cut_angles_ar = list(self._azimuth_angles_ar)
         azimuth.antenna_name = self._edit_antenna_name.text().strip() if hasattr(self, '_edit_antenna_name') else ""
