@@ -14,7 +14,6 @@ FinalSummary.xlsx 直接读取器 (v3)
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Dict, List, Optional, Union
 
 import numpy as np
 import openpyxl
@@ -79,7 +78,7 @@ class FinalSummarySource(DataSource):
         self._wb = openpyxl.load_workbook(path, data_only=True, read_only=False)
 
         # ---- 频点列表（数字命名的 sheet，排除 Cplx/AxR/Original 等汇总 sheet） ----
-        self._freqs: List[float] = []
+        self._freqs: list[float] = []
         for sn in self._wb.sheetnames:
             try:
                 self._freqs.append(float(sn))
@@ -98,7 +97,7 @@ class FinalSummarySource(DataSource):
             self._probe_structure(ws0)
 
         # ---- 读 theta 角度（流式，仅 header 行） ----
-        self._theta: List[float] = []
+        self._theta: list[float] = []
         for row in ws0.iter_rows(min_row=self._theta_header_row, max_row=self._theta_header_row,
                                   values_only=True):
             for v in row[1:]:
@@ -109,7 +108,7 @@ class FinalSummarySource(DataSource):
                         pass
 
         # ---- 读 phi 角度（从数据区列 A，流式） ----
-        self._phi: List[float] = []
+        self._phi: list[float] = []
         for row in ws0.iter_rows(min_row=self._theta_start_row,
                                  max_row=self._theta_start_row + self._n_phi - 1,
                                  min_col=1, max_col=1, values_only=True):
@@ -285,25 +284,25 @@ class FinalSummarySource(DataSource):
         return result
 
     @property
-    def frequencies(self) -> List[float]:
+    def frequencies(self) -> list[float]:
         return list(self._freqs)
 
     @property
-    def theta_angles(self) -> List[float]:
+    def theta_angles(self) -> list[float]:
         return list(self._theta)
 
     @property
-    def phi_angles(self) -> List[float]:
+    def phi_angles(self) -> list[float]:
         return list(self._phi)
 
-    def read_batch(self, freq_indices: List[int]) -> Dict[float, Dict[str, Optional[np.ndarray]]]:
+    def read_batch(self, freq_indices: list[int]) -> dict[float, dict[str, np.ndarray | None]]:
         """批量读取多个频点数据 — 复用打开的 workbook, 避免重复 XML 解析。
 
         逐频点调用 read_sections() 每次都要 ws = wb[sn] 触发 XML 解析,
         139 频点 → 139 次独立解析 → 3.2s×139≈7.5min。
         批量读取复用同一个 worksheet 迭代器, 大幅减少开销。
         """
-        result: Dict[float, Dict[str, Optional[np.ndarray]]] = {}
+        result: dict[float, dict[str, np.ndarray | None]] = {}
         ntheta = self._n_theta
         nphi = self._n_phi
 
@@ -347,7 +346,7 @@ class FinalSummarySource(DataSource):
             }
         return result
 
-    def read_sections(self, freq_index: int) -> Dict[str, Optional[np.ndarray]]:
+    def read_sections(self, freq_index: int) -> dict[str, np.ndarray | None]:
         freq = self._freqs[freq_index]
 
         if freq in self._cache:

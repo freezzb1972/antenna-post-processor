@@ -13,16 +13,14 @@ import numpy as np
 import pytest
 
 from src.calculator import (
-    compute_total_gain_linear,
     compute_directivity,
     compute_efficiency,
-    compute_lag_single,
     compute_lag_at_angles,
     compute_lag_range,
     compute_lag_ranges,
+    compute_total_gain_linear,
 )
 from src.parser import MergedCSVParser
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import numpy as np
-from typing import Dict, List, Optional
 
 
 def extend_theta_to_180(data: np.ndarray, theta_arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -55,9 +54,9 @@ def downsample_pattern(
 
 
 def extract_graph_data(
-    results: Dict[str, List[Dict]],
+    results: dict[str, list[dict]],
     step_deg: float = 5.0,
-) -> Dict[float, Dict[str, np.ndarray]]:
+) -> dict[float, dict[str, np.ndarray]]:
     """从处理结果中提取每个频点的图形数据。
 
     Args:
@@ -69,9 +68,8 @@ def extract_graph_data(
                      "gain_db": ndarray, "theta_db": ndarray,
                      "phi_db": ndarray, "ar_linear": ndarray}}
     """
-    from src.finalsummary_reader import FinalSummarySource
 
-    output: Dict[float, Dict[str, np.ndarray]] = {}
+    output: dict[float, dict[str, np.ndarray]] = {}
 
     for rows in results.values():
         if not rows:

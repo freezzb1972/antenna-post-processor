@@ -12,7 +12,6 @@ _PROJECT_ROOT = Path(__file__).resolve().parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from i18n.i18n_manager import I18nManager
@@ -36,6 +35,7 @@ def _check_license(cfg_mgr) -> bool:
 
     # 2. 回退: 搜索独立许可文件（兼容旧版）
     import json
+
     from src.license import LicenseManager
     mgr = LicenseManager()
     if mgr.auto_load() and mgr.license_info:
@@ -81,6 +81,7 @@ def _print_license_ok(lic):
 def _migrate_license_to_config(cfg_mgr):
     """将独立许可文件迁移到配置文件。"""
     import json
+
     from src.license import LicenseManager
     mgr = LicenseManager()
     if mgr.auto_load() and mgr.license_info:
@@ -99,7 +100,6 @@ def _show_activation() -> bool:
 
 
 def main():
-    import json
 
     app = QApplication(sys.argv)
     app.setApplicationName("AntennaPostProcessor")

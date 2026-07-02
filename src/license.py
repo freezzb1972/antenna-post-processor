@@ -35,8 +35,6 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
-from typing import Dict, Optional, Tuple
-
 
 # ═══════════════════════════════════════════════════════════════
 # ECDSA 公钥（内嵌，编译进 EXE）
@@ -75,6 +73,7 @@ def _load_ecdsa_public_key():
 def _sign_ecdsa(data: dict) -> str:
     """用 ECDSA 私钥对数据字典签名，返回 base64 字符串。"""
     import base64 as _b64
+
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives.hashes import SHA256
     payload = json.dumps(data, sort_keys=True, ensure_ascii=False).encode("utf-8")
@@ -86,6 +85,7 @@ def _sign_ecdsa(data: dict) -> str:
 def _verify_ecdsa(data: dict, signature_b64: str) -> bool:
     """用内嵌 ECDSA 公钥验证签名。"""
     import base64 as _b64
+
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives.hashes import SHA256
     try:
@@ -117,8 +117,8 @@ def _generate_random_key() -> bytes:
             file=sys.stderr,
         )
         print(
-            f"⚠ 重启后密钥将丢失，所有已签发的 HMAC 许可将失效。"
-            f" 请检查磁盘空间和目录权限。",
+            "⚠ 重启后密钥将丢失，所有已签发的 HMAC 许可将失效。"
+            " 请检查磁盘空间和目录权限。",
             file=sys.stderr,
         )
     return key
@@ -186,7 +186,7 @@ class LicenseInfo:
         return self.expiry.upper() == "PERMANENT"
 
     @property
-    def expiry_date(self) -> Optional[date]:
+    def expiry_date(self) -> date | None:
         if self.is_permanent:
             return None
         try:
@@ -202,7 +202,7 @@ class LicenseInfo:
         return date.today() > ed
 
     @property
-    def days_remaining(self) -> Optional[int]:
+    def days_remaining(self) -> int | None:
         ed = self.expiry_date
         if ed is None:
             return None  # 永久
@@ -229,7 +229,7 @@ class LicenseManager:
 
     def __init__(self, secret_key: bytes = None):
         self._key = secret_key or _SECRET_KEY
-        self._license: Optional[LicenseInfo] = None
+        self._license: LicenseInfo | None = None
         self._error: str = ""
 
     # ── 属性 ──
@@ -239,7 +239,7 @@ class LicenseManager:
         return self._license is not None and not self._license.is_expired
 
     @property
-    def license_info(self) -> Optional[LicenseInfo]:
+    def license_info(self) -> LicenseInfo | None:
         return self._license
 
     @property
@@ -262,7 +262,7 @@ class LicenseManager:
     def load_from_file(self, path: str) -> bool:
         """从许可文件加载并验证。"""
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 data = json.load(f)
             return self._verify(data)
         except FileNotFoundError:
@@ -443,6 +443,7 @@ def get_machine_id() -> str:
 # ═══════════════════════════════════════════════════════════════
 
 import base64 as _base64
+
 
 def _derive_cipher_key() -> bytes:
     """从机器 ID 派生 256-bit AES-like 密钥（用于 QSettings 加密）。"""

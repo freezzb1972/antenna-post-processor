@@ -13,10 +13,7 @@ Pure NumPy 向量化实现。所有函数无副作用。
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
-
 import numpy as np
-
 
 # ======================================================================
 # 增益计算
@@ -27,7 +24,7 @@ def compute_total_gain_linear(
     phi_logmag: np.ndarray,    # (n_phi, n_theta)  dB
     *,
     robust: bool = False,
-) -> Tuple[np.ndarray, float]:
+) -> tuple[np.ndarray, float]:
     """计算总增益（Theta + Phi 极化合成）。
 
     Args:
@@ -105,7 +102,7 @@ def compute_directivity(
 def compute_efficiency(
     peak_gain_dbi: float,
     directivity_dbi: float,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """从增益和方向性推算辐射效率。
 
     η = 10^((G - D) / 10) × 100%
@@ -154,14 +151,14 @@ def compute_lag_single(
 def compute_lag_at_angles(
     gain_linear: np.ndarray,  # (n_phi, n_theta)
     theta_angles_deg: np.ndarray,  # (n_theta,) 度
-    target_angles_deg: List[float],
-) -> Dict[float, float]:
+    target_angles_deg: list[float],
+) -> dict[float, float]:
     """批量计算多个 θ 角的 LAG。
 
     Returns:
         {theta_deg: lag_db, ...}
     """
-    results: Dict[float, float] = {}
+    results: dict[float, float] = {}
     for target in target_angles_deg:
         # 找最近索引
         idx = int(np.argmin(np.abs(theta_angles_deg - target)))
@@ -204,14 +201,14 @@ def compute_lag_range(
 def compute_lag_ranges(
     gain_linear: np.ndarray,
     theta_angles_deg: np.ndarray,
-    ranges: List[Tuple[float, float]],
-) -> Dict[Tuple[float, float], float]:
+    ranges: list[tuple[float, float]],
+) -> dict[tuple[float, float], float]:
     """批量计算多个 θ 范围的 LAG。
 
     Returns:
         {(start, end): lag_db, ...}
     """
-    results: Dict[Tuple[float, float], float] = {}
+    results: dict[tuple[float, float], float] = {}
     for start, end in ranges:
         results[(start, end)] = compute_lag_range(
             gain_linear, theta_angles_deg, start, end
@@ -396,7 +393,7 @@ def compute_partial_prp(
 def compute_prp_trp_ratio(
     prp_dbm: float,
     trp_dbm: float,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """PRP 与 TRP 之比。
 
     Args:
@@ -421,7 +418,7 @@ def compute_boresight(
     gain_linear: np.ndarray,        # (n_phi, n_theta)  mW
     theta_angles_deg: np.ndarray,   # (n_theta,) 度
     phi_angles_deg: np.ndarray,     # (n_phi,) 度
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """查找主波束指向（最大增益方向）。
 
     Args:
@@ -497,7 +494,7 @@ def compute_axial_ratio(
     theta_phase: np.ndarray,   # (n_phi, n_theta)  deg
     phi_logmag: np.ndarray,    # (n_phi, n_theta)  dB
     phi_phase: np.ndarray,     # (n_phi, n_theta)  deg
-) -> Optional[np.ndarray]:
+) -> np.ndarray | None:
     """计算轴比 AR（线性值），基于极化椭圆。
 
     AR = |E_major| / |E_minor|  (线性, ≥ 1)
@@ -561,7 +558,7 @@ def compute_rhcp_lhcp_gain(
     theta_phase: np.ndarray,   # (n_phi, n_theta) deg
     phi_logmag: np.ndarray,
     phi_phase: np.ndarray,
-) -> "Tuple[np.ndarray, np.ndarray]":
+) -> tuple[np.ndarray, np.ndarray]:
     """计算 RHCP 和 LHCP 增益 (dBi) 矩阵。
 
     基于复电场分解:
@@ -608,8 +605,8 @@ def compute_cp_xpi(
 def compute_ar_at_angles(
     ar_linear: np.ndarray,
     theta_angles_deg: np.ndarray,
-    target_angles_deg: List[float],
-) -> Dict[float, float]:
+    target_angles_deg: list[float],
+) -> dict[float, float]:
     """批量计算多个 θ 角的 AR（取 phi 最大值，行业标准的 worst-case）。
 
     NOTE: 此函数使用 `np.max` 而非 `np.mean`，因为行业规范
@@ -621,7 +618,7 @@ def compute_ar_at_angles(
     Returns:
         {theta_deg: ar_linear_max, ...}
     """
-    results: Dict[float, float] = {}
+    results: dict[float, float] = {}
     for target in target_angles_deg:
         idx = int(np.argmin(np.abs(theta_angles_deg - target)))
         results[target] = float(np.max(ar_linear[:, idx]))
@@ -661,7 +658,7 @@ def compute_ar_range(
 
 def compute_power_ratios(
     max_power_dbm: float, min_power_dbm: float, avg_power_dbm: float,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """计算功率比: Max/Min, Max/Avg, Min/Avg (dB)。"""
     return {
         "max_min_ratio_db": round(max_power_dbm - min_power_dbm, 2),
@@ -672,7 +669,7 @@ def compute_power_ratios(
 
 def compute_beamwidth(
     gain_linear: np.ndarray, theta_deg: np.ndarray, phi_deg: np.ndarray
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """计算3dB波束宽度 (theta 和 phi 方向)。
 
     Returns:
@@ -718,7 +715,7 @@ def compute_beamwidth(
 def compute_xpi(
     theta_logmag: np.ndarray,  # (n_phi, n_theta) dB
     phi_logmag: np.ndarray,    # (n_phi, n_theta) dB
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """计算交叉极化隔离度 (Cross-Polarization Isolation).
 
     XPI(θ) = 主极化增益 - 交叉极化增益 (dB)
@@ -759,8 +756,8 @@ def compute_xpi(
 
 def compute_total_efficiency(
     efficiency_pct: float,  # 辐射效率 (%)
-    s11_db: Optional[float] = None,  # S11 回波损耗 (dB, 负值=反射少)
-) -> Dict[str, Optional[float]]:
+    s11_db: float | None = None,  # S11 回波损耗 (dB, 负值=反射少)
+) -> dict[str, float | None]:
     """计算总效率 = 辐射效率 × (1 - |S11|²).
 
     S11 的单位是 dB: S11_linear = 10^(S11_dB/20).
@@ -801,7 +798,7 @@ def compute_phase_center(
     theta_angles_deg: np.ndarray,  # (n_theta,) deg
     freq_mhz: float,               # 频率 (MHz)
     boresight_range_deg: float = 30.0,  # 计算范围 (θ ∈ [0, range])
-) -> Dict[str, Optional[float]]:
+) -> dict[str, float | None]:
     """计算相位中心偏移 (mm).
 
     原理: 远场相位随角度变化 → 等效辐射点不在旋转中心。

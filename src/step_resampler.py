@@ -11,9 +11,8 @@ EMQuest Merged CSV 步进重采样器
 from __future__ import annotations
 
 import os
-import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
 
 
 def resample_merged_csv(
@@ -22,7 +21,7 @@ def resample_merged_csv(
     theta_step_deg: float,
     phi_step_deg: float,
     *,
-    progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> str:
     """将 merged CSV 重采样到指定步进。
 
@@ -107,7 +106,7 @@ def resample_merged_csv(
     return output_path
 
 
-def _read_all(input_path: str) -> Tuple[dict, list, list, dict]:
+def _read_all(input_path: str) -> tuple[dict, list, list, dict]:
     """读取 merged CSV 全部数据到内存。
 
     Returns:
@@ -129,10 +128,10 @@ def _read_all(input_path: str) -> Tuple[dict, list, list, dict]:
 
     current_section = None
     current_freq_idx = -1
-    section_freq_idx = {s: -1 for s in section_names_set}
+    section_freq_idx = dict.fromkeys(section_names_set, -1)
     in_block = False
 
-    with open(input_path, "r", encoding=encoding, newline="") as f:
+    with open(input_path, encoding=encoding, newline="") as f:
         for line in f:
             stripped = line.strip()
 
@@ -194,7 +193,7 @@ def _is_freq_start(line: str) -> bool:
         return False
 
 
-def _parse_freq(line: str) -> Optional[float]:
+def _parse_freq(line: str) -> float | None:
     parts = line.split(",")
     if len(parts) >= 2:
         try:
@@ -204,7 +203,7 @@ def _parse_freq(line: str) -> Optional[float]:
     return None
 
 
-def _parse_theta_from_header(line: str) -> List[float]:
+def _parse_theta_from_header(line: str) -> list[float]:
     parts = line.split(",")
     vals = []
     for part in parts[3:]:
@@ -216,7 +215,7 @@ def _parse_theta_from_header(line: str) -> List[float]:
     return vals
 
 
-def _parse_data_line(line: str) -> Tuple[Optional[float], List[float]]:
+def _parse_data_line(line: str) -> tuple[float | None, list[float]]:
     parts = line.split(",")
     if len(parts) < 3:
         return None, []
@@ -236,10 +235,10 @@ def _parse_data_line(line: str) -> Tuple[Optional[float], List[float]]:
 def batch_resample(
     input_path: str,
     output_dir: str,
-    steps: List[float],
+    steps: list[float],
     *,
-    progress_callback: Optional[Callable[[int, int, str], None]] = None,
-) -> List[str]:
+    progress_callback: Callable[[int, int, str], None] | None = None,
+) -> list[str]:
     """批量重采样：对同一源文件生成多个步进的输出。
 
     Args:

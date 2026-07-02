@@ -6,19 +6,22 @@ QThread 封装的异步处理任务，通过 Signal 与 GUI 通信。
 """
 
 from __future__ import annotations
-from typing import Any, Dict, List, Optional
-from PySide6.QtCore import QObject, Signal
-from .lag_config import LagConfig
-from .plot_config import PlotConfig
-from .chart_config import ChartConfig
-from .pipeline import run_pipeline, run_batch_pipeline
-import math
-import traceback
-from openpyxl.chart import ScatterChart, Reference, Series
-from openpyxl.chart.axis import NumericAxis
-from openpyxl.utils import get_column_letter
-from .datasource import DataSource, ResampledDataSource
 
+import traceback
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .azimuth_config import AzimuthReportConfig
+
+from openpyxl.chart import Reference, ScatterChart, Series
+from openpyxl.utils import get_column_letter
+from PySide6.QtCore import QObject, Signal
+
+from .chart_config import ChartConfig
+from .datasource import DataSource, ResampledDataSource
+from .lag_config import LagConfig
+from .pipeline import run_batch_pipeline, run_pipeline
+from .plot_config import PlotConfig
 
 # ── 工具 ──────────────────────────────────────────────────────
 
@@ -92,32 +95,32 @@ class ProcessingWorker(QObject):
         template_path: str = "",
         output_path: str = "",
         *,
-        datasource: Optional[DataSource] = None,
-        datasource_map: Optional[Dict[str, DataSource]] = None,
-        sheet_mode_map: Optional[Dict[str, int]] = None,
-        lag_config: Optional[LagConfig] = None,
-        plot_config: Optional[PlotConfig] = None,
-        full_report_path: Optional[str] = None,
+        datasource: DataSource | None = None,
+        datasource_map: dict[str, DataSource] | None = None,
+        sheet_mode_map: dict[str, int] | None = None,
+        lag_config: LagConfig | None = None,
+        plot_config: PlotConfig | None = None,
+        full_report_path: str | None = None,
         extrapolate_theta: bool = False,
         freq_source: str = "datasource",
         trim_start: int = 0,
         trim_end: int = 0,
         robust_peak: bool = False,
-        extra_params: Optional[set] = None,
-        chart_config_obj: Optional[ChartConfig] = None,
-        ar_lag_config: Optional[LagConfig] = None,
-        azimuth_config: Optional["AzimuthReportConfig"] = None,
+        extra_params: set | None = None,
+        chart_config_obj: ChartConfig | None = None,
+        ar_lag_config: LagConfig | None = None,
+        azimuth_config: AzimuthReportConfig | None = None,
         out_excel: bool = True,
         out_word: bool = False,
         out_data: bool = False,
-        word_template_path: Optional[str] = None,
-        nh_custom_angles: Optional[List[float]] = None,
+        word_template_path: str | None = None,
+        nh_custom_angles: list[float] | None = None,
         ar_output_db: bool = True,
         worksheet_naming_mode: int = 0,
         compute_only: bool = False,  # 预览模式: True→只计算不导出
         dir_extrap_method: str = "linear",  # Directivity外推方法: linear|constant|mirror
         # 多步进参数
-        step_values: Optional[List[float]] = None,
+        step_values: list[float] | None = None,
         skip_original: bool = False,
         gen_diff: bool = False,
         gen_diff_chart: bool = False,
@@ -225,7 +228,7 @@ class ProcessingWorker(QObject):
             import traceback
             self.error.emit(f"{e}\n{traceback.format_exc()}")
 
-    def _run_multi_step(self, base_ds: DataSource, **kwargs) -> Dict[str, list]:
+    def _run_multi_step(self, base_ds: DataSource, **kwargs) -> dict[str, list]:
         """多步进并行计算：源文件一次读取，各步进在独立线程中同时计算。
 
         自动适配硬件：
@@ -233,9 +236,10 @@ class ProcessingWorker(QObject):
           - 4核以下: 串行或2线程; 8核+: 最多6线程并行
         """
         import os
-        import openpyxl
         from concurrent.futures import ThreadPoolExecutor, as_completed
         from tempfile import NamedTemporaryFile
+
+        import openpyxl
 
         # 原始步进
         orig_theta_step = round(
@@ -519,9 +523,14 @@ class ProcessingWorker(QObject):
         """在 DiffChart sheet 创建含 PageField 下拉筛选的 PivotTable。"""
         from openpyxl.pivot.cache import CacheDefinition, CacheSource, WorksheetSource
         from openpyxl.pivot.table import (
-            TableDefinition, Location, PageField, DataField, RowColField, PivotField
+            DataField,
+            Location,
+            PageField,
+            PivotField,
+            RowColField,
+            TableDefinition,
         )
-        from openpyxl.styles import Font, Alignment
+        from openpyxl.styles import Alignment, Font
 
         last_col_letter = get_column_letter(4)
         data_ref = f"A1:{last_col_letter}{n_data + 1}"

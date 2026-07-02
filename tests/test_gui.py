@@ -4,7 +4,6 @@ import sys
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 # Add project root

@@ -10,8 +10,7 @@ GUI 和 CLI 共用同一入口: convert_fs_to_csv(src_path, out_path, progress_c
 from __future__ import annotations
 
 import os
-import time
-from typing import Callable, List, Optional
+from collections.abc import Callable
 
 import numpy as np
 import openpyxl
@@ -21,8 +20,8 @@ from .raw_converter import _write_normal_csv
 
 def convert_fs_to_csv(
     src_path: str,
-    out_path: Optional[str] = None,
-    progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    out_path: str | None = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> str:
     """将 FinalSummary .xlsx 转换为 merged CSV。
 
@@ -49,7 +48,7 @@ def convert_fs_to_csv(
     wb = openpyxl.load_workbook(src_path, data_only=True, read_only=False)
 
     # 收集频点
-    freqs: List[float] = []
+    freqs: list[float] = []
     for sn in wb.sheetnames:
         try:
             freqs.append(float(sn))
@@ -62,7 +61,7 @@ def convert_fs_to_csv(
     sn0 = str(int(freqs[0])) if freqs[0] == int(freqs[0]) else str(freqs[0])
     ws0 = wb[sn0]
 
-    theta_vals: List[float] = []
+    theta_vals: list[float] = []
     theta_start = 0
     n_phi = 0
     n_theta = 0
@@ -104,7 +103,7 @@ def convert_fs_to_csv(
             pp_phase_start = r_idx + 2
             break
 
-    def _read_section(sec_start: int) -> Optional[np.ndarray]:
+    def _read_section(sec_start: int) -> np.ndarray | None:
         if sec_start <= 0:
             return None
         data = np.full((n_freqs, n_phi, n_theta), np.nan, dtype=np.float64)

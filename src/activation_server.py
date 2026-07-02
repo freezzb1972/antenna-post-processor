@@ -24,20 +24,16 @@ E-mail 通过 SMTP（QQ/Gmail/企业邮箱均可）。
 
 from __future__ import annotations
 
-import hashlib
 import hmac
 import json
 import os
 import smtplib
-import sys
 import time
-import uuid
 from datetime import date, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
 # ── 路径（环境变量可覆盖）─────────────────────────────────────
@@ -126,6 +122,7 @@ def generate_activation_code() -> str:
 def sign_license(licensee: str, expiry_days: int, machine_id: str = "") -> dict:
     """用 ECDSA 私钥签发许可，返回完整 license JSON。"""
     import base64
+
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives.hashes import SHA256
     from cryptography.hazmat.primitives.serialization import load_pem_private_key
@@ -471,7 +468,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode())
 
-    def _read_body(self) -> Optional[dict]:
+    def _read_body(self) -> dict | None:
         length = int(self.headers.get("Content-Length", 0))
         if length == 0:
             return None
@@ -520,8 +517,9 @@ class ServerHandler(BaseHTTPRequestHandler):
             if not self._check_admin():
                 self._send_html(200, PAGE_ADMIN_LOGIN)
                 return
+            qs_raw = parse_qs(parsed.query)
             self._send_html(200, _render_admin_page(
-                qs.get("token", [""])[0]))
+                qs_raw.get("token", [""])[0]))
 
         else:
             self._send_json(404, {"error": "not found"})
@@ -681,7 +679,7 @@ def main():
     if not ADMIN_TOKEN:
         log("⚠ 管理员令牌未配置！")
         log("  请在 config.json 中设置 admin_token，或设置 ADMIN_TOKEN 环境变量。")
-        log(f"  建议随机生成: python3 -c \"import secrets; print(secrets.token_urlsafe(24))\"")
+        log("  建议随机生成: python3 -c \"import secrets; print(secrets.token_urlsafe(24))\"")
     if not CONFIG["smtp"]["password"]:
         log("⚠ SMTP 密码未配置！邮件发送将不可用。请在 config.json 中设置 smtp.password。")
 

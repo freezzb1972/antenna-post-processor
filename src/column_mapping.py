@@ -11,8 +11,6 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-
 
 # ═══════════════════════════════════════════════════════════════
 # 数据结构
@@ -41,7 +39,7 @@ class ColumnMapping:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "ColumnMapping":
+    def from_dict(cls, d: dict) -> ColumnMapping:
         return cls(
             col_letter=d.get("col_letter", ""),
             col_index=d.get("col_index", 0),
@@ -59,7 +57,7 @@ class TemplatePreset:
     manufacturer: str = ""
     default_output_dir: str = ""
     file_type: str = "xlsx"  # xlsx, xls, docx, doc
-    column_mappings: List[ColumnMapping] = field(default_factory=list)
+    column_mappings: list[ColumnMapping] = field(default_factory=list)
     calc_params: dict = field(default_factory=dict)  # extrapolate_theta, etc.
     graph_config: dict = field(default_factory=dict)  # elevation, DPI, etc.
 
@@ -76,7 +74,7 @@ class TemplatePreset:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "TemplatePreset":
+    def from_dict(cls, d: dict) -> TemplatePreset:
         mappings = [ColumnMapping.from_dict(m)
                     for m in d.get("column_mappings", [])]
         return cls(
@@ -96,7 +94,7 @@ class TemplatePreset:
 # ═══════════════════════════════════════════════════════════════
 
 def detect_columns_from_template(template_path: str,
-                                  header_row: int = None) -> List[ColumnMapping]:
+                                  header_row: int = None) -> list[ColumnMapping]:
     """从模板文件检测所有列的 col_type。
 
     支持 .xlsx, .xls, .docx, .doc 格式。
@@ -111,9 +109,10 @@ def detect_columns_from_template(template_path: str,
         raise ValueError(f"不支持的模板格式: {ext}")
 
 
-def _detect_excel_columns(path: str, header_row: int = None) -> List[ColumnMapping]:
+def _detect_excel_columns(path: str, header_row: int = None) -> list[ColumnMapping]:
     """Excel 模板列检测。"""
     import openpyxl
+
     from src.excel_reader import is_frequency_column
 
     wb = openpyxl.load_workbook(path, data_only=True)
@@ -157,7 +156,7 @@ def _detect_excel_columns(path: str, header_row: int = None) -> List[ColumnMappi
     return mappings
 
 
-def _detect_word_columns(path: str, header_row: int = None) -> List[ColumnMapping]:
+def _detect_word_columns(path: str, header_row: int = None) -> list[ColumnMapping]:
     """Word 模板列检测 (.docx/.doc)。"""
     # 对于 .doc，先尝试转换为 .docx
     actual_path = path
@@ -178,7 +177,7 @@ def _detect_word_columns(path: str, header_row: int = None) -> List[ColumnMappin
                 pass
 
 
-def _detect_word_columns_docx(path: str, header_row: int = None) -> List[ColumnMapping]:
+def _detect_word_columns_docx(path: str, header_row: int = None) -> list[ColumnMapping]:
     """读取 .docx 文件表格中的列头。"""
     try:
         from docx import Document
@@ -225,20 +224,41 @@ def classify_header(raw_header: str) -> str:
     单一入口，供 excel_reader, template_recognizer, chart_config 共用。
     """
     from src.excel_reader import (
-        _classify_by_json_patterns, is_frequency_column, is_directivity_column,
-        is_efficiency_column, is_total_efficiency_column, is_gain_column,
-        is_trp_column, is_nhprp_45_column, is_nhprp_30_column,
-        is_peak_eirp_column, is_ar_single_column, is_ar_range_column,
-        is_nhprp_225_column, is_uh_prp_column, is_lh_prp_column,
-        detect_ratio_column_type, is_boresight_phi_column,
-        is_boresight_theta_column, is_max_power_column, is_min_power_column,
-        is_avg_gain_column, is_avg_power_column, is_xpi_boresight_column,
-        is_xpi_mean_column, is_xpi_min_column, is_mismatch_loss_column,
-        is_pc_theta_column, is_pc_phi_column, normalize_header, _normalize_key,
+        _classify_by_json_patterns,
+        detect_ratio_column_type,
+        is_ar_range_column,
+        is_ar_single_column,
+        is_avg_gain_column,
+        is_avg_power_column,
+        is_boresight_phi_column,
+        is_boresight_theta_column,
+        is_directivity_column,
+        is_efficiency_column,
+        is_frequency_column,
+        is_gain_column,
+        is_lh_prp_column,
+        is_max_power_column,
+        is_min_power_column,
+        is_mismatch_loss_column,
+        is_nhprp_30_column,
+        is_nhprp_45_column,
+        is_nhprp_225_column,
+        is_pc_phi_column,
+        is_pc_theta_column,
+        is_peak_eirp_column,
+        is_total_efficiency_column,
+        is_trp_column,
+        is_uh_prp_column,
+        is_xpi_boresight_column,
+        is_xpi_mean_column,
+        is_xpi_min_column,
+        normalize_header,
     )
     from src.lag_config import (
-        _RE_LAG_RANGE, _RE_LAG_RANGE_NO_PREFIX,
-        _RE_LAG_SINGLE, _RE_LAG_SINGLE_NO_PREFIX,
+        _RE_LAG_RANGE,
+        _RE_LAG_RANGE_NO_PREFIX,
+        _RE_LAG_SINGLE,
+        _RE_LAG_SINGLE_NO_PREFIX,
     )
 
     # JSON 模式优先
@@ -315,12 +335,12 @@ def _classify_full_static(raw_header: str) -> str:
 _TEMPLATES_PATH = Path(__file__).resolve().parent.parent / "config" / "templates.json"
 
 
-def load_presets() -> List[TemplatePreset]:
+def load_presets() -> list[TemplatePreset]:
     """从 templates.json 加载所有模板预设。"""
     if not _TEMPLATES_PATH.exists():
         return []
     try:
-        with open(_TEMPLATES_PATH, "r", encoding="utf-8") as f:
+        with open(_TEMPLATES_PATH, encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError):
         return []
@@ -338,7 +358,7 @@ def save_preset(preset: TemplatePreset) -> None:
     """保存一个模板预设到 templates.json（合并写入）。"""
     if _TEMPLATES_PATH.exists():
         try:
-            with open(_TEMPLATES_PATH, "r", encoding="utf-8") as f:
+            with open(_TEMPLATES_PATH, encoding="utf-8") as f:
                 data = json.load(f)
         except (json.JSONDecodeError, OSError):
             data = {"manufacturers": []}
@@ -376,7 +396,7 @@ def save_preset(preset: TemplatePreset) -> None:
 # Word 格式转换
 # ═══════════════════════════════════════════════════════════════
 
-def _convert_doc_to_docx(doc_path: str) -> Optional[str]:
+def _convert_doc_to_docx(doc_path: str) -> str | None:
     """将 .doc 转换为 .docx（使用 libreoffice）。"""
     import subprocess
     import tempfile

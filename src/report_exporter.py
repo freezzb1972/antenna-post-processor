@@ -15,13 +15,13 @@ import io
 import json
 import os
 import sys
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 import openpyxl
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
-
 
 # ---------------------------------------------------------------------------
 # 样式常量
@@ -50,11 +50,11 @@ IMG_3D_SIZE = (300, 225)    # 3D 球面图
 IMG_2D_SIZE = (280, 210)    # 2D 切面图
 
 # ── JSON 列配置缓存 ──
-_REPORT_COLUMNS: Optional[List[dict]] = None
-_REPORT_VALIDATION: Optional[dict] = None
+_REPORT_COLUMNS: list[dict] | None = None
+_REPORT_VALIDATION: dict | None = None
 
 
-def _load_report_columns() -> List[dict]:
+def _load_report_columns() -> list[dict]:
     """加载 config/full_report_columns.json 中的列定义。"""
     global _REPORT_COLUMNS, _REPORT_VALIDATION
     if _REPORT_COLUMNS is not None:
@@ -72,7 +72,7 @@ def _load_report_columns() -> List[dict]:
         path = os.path.normpath(candidate)
         if os.path.isfile(path):
             try:
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     data = json.load(f)
                 _REPORT_COLUMNS = data.get("columns", [])
                 _REPORT_VALIDATION = data.get("validation", {})
@@ -85,7 +85,7 @@ def _load_report_columns() -> List[dict]:
     return _REPORT_COLUMNS
 
 
-def _get_column_order(all_keys: List[str]) -> List[str]:
+def _get_column_order(all_keys: list[str]) -> list[str]:
     """根据 JSON 配置对列排序，未知列追加到末尾。"""
     config = _load_report_columns()
     # JSON 中声明的 key（非动态）
@@ -163,13 +163,13 @@ def _auto_width(ws, min_width: int = 10, max_width: int = 30):
 
 def export_full_report(
     output_path: str,
-    sheet_results: Dict[str, List[Dict[str, Any]]],
+    sheet_results: dict[str, list[dict[str, Any]]],
     *,
-    pattern_images_3d: Optional[Dict[str, Dict[float, io.BytesIO]]] = None,
-    pattern_images_2d_polar: Optional[Dict[str, Dict[float, Dict[str, io.BytesIO]]]] = None,
-    pattern_images_2d_rect: Optional[Dict[str, Dict[float, Dict[str, io.BytesIO]]]] = None,
-    bands: Optional[Dict[str, Tuple[float, float]]] = None,
-    progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    pattern_images_3d: dict[str, dict[float, io.BytesIO]] | None = None,
+    pattern_images_2d_polar: dict[str, dict[float, dict[str, io.BytesIO]]] | None = None,
+    pattern_images_2d_rect: dict[str, dict[float, dict[str, io.BytesIO]]] | None = None,
+    bands: dict[str, tuple[float, float]] | None = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> None:
     """生成完整天线指标报告。
 
@@ -234,7 +234,7 @@ def _write_sheet_title(ws, sheet_name: str):
     ws.row_dimensions[1].height = 30
 
 
-def _write_data_table(ws, rows: List[Dict[str, Any]], start_row: int):
+def _write_data_table(ws, rows: list[dict[str, Any]], start_row: int):
     """写入完整指标数据表。
 
     动态检测所有 row key，按固定顺序排列已知列，其余 LAG 列追加。
@@ -296,10 +296,10 @@ def _write_data_table(ws, rows: List[Dict[str, Any]], start_row: int):
 def _embed_report_images(
     ws,
     sheet_name: str,
-    rows: List[Dict[str, Any]],
-    images_3d: Optional[Dict[str, Dict[float, io.BytesIO]]],
-    images_2d_polar: Optional[Dict[str, Dict[float, Dict[str, io.BytesIO]]]],
-    images_2d_rect: Optional[Dict[str, Dict[float, Dict[str, io.BytesIO]]]],
+    rows: list[dict[str, Any]],
+    images_3d: dict[str, dict[float, io.BytesIO]] | None,
+    images_2d_polar: dict[str, dict[float, dict[str, io.BytesIO]]] | None,
+    images_2d_rect: dict[str, dict[float, dict[str, io.BytesIO]]] | None,
 ):
     """在数据表右侧嵌入 3D + 2D 图像及说明。
 
@@ -394,8 +394,8 @@ def _embed_report_images(
 
 def _write_summary_sheet(
     wb,
-    sheet_results: Dict[str, List[Dict[str, Any]]],
-    bands: Optional[Dict[str, Tuple[float, float]]] = None,
+    sheet_results: dict[str, list[dict[str, Any]]],
+    bands: dict[str, tuple[float, float]] | None = None,
 ):
     """写入摘要 Sheet（概览统计）。"""
     ws = wb.create_sheet(title="Summary", index=0)
@@ -451,9 +451,9 @@ def _write_summary_sheet(
 # ---------------------------------------------------------------------------
 
 def validate_report_data(
-    rows: List[Dict[str, Any]],
+    rows: list[dict[str, Any]],
     sheet_name: str = "",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """验证报告数据是否符合 JSON 中定义的规则。
 
     Returns:
@@ -518,9 +518,9 @@ def validate_report_data(
 
 def export_full_report_with_validation(
     output_path: str,
-    sheet_results: Dict[str, List[Dict[str, Any]]],
+    sheet_results: dict[str, list[dict[str, Any]]],
     **kwargs,
-) -> Tuple[bool, Dict[str, Any]]:
+) -> tuple[bool, dict[str, Any]]:
     """生成报告 + 数据验证，返回 (success, validation_result)。"""
     # 先验证
     all_errors = []

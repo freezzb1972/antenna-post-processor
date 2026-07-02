@@ -13,18 +13,15 @@ Word 报告输出引擎
 """
 from __future__ import annotations
 
-import io
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from docx import Document
-from docx.oxml.ns import qn, nsdecls
 from docx.oxml import parse_xml
-from docx.shared import Inches, Cm, Emu
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-
+from docx.oxml.ns import nsdecls, qn
+from docx.shared import Inches
 
 # ═══════════════════════════════════════════════════════════════
 # 数据类
@@ -33,10 +30,10 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 class WordTemplateInfo:
     """模板扫描结果 — 用于 GUI 预览。"""
     def __init__(self):
-        self.tables: List[dict] = []        # [{sheet_index, header_row, columns: [{col_type, text}]}]
-        self.bookmarks: List[str] = []       # [bookmark_name, ...]
-        self.content_controls: List[str] = []  # [tag_name, ...]
-        self.placeholders: List[str] = []    # [var_name, ...]
+        self.tables: list[dict] = []        # [{sheet_index, header_row, columns: [{col_type, text}]}]
+        self.bookmarks: list[str] = []       # [bookmark_name, ...]
+        self.content_controls: list[str] = []  # [tag_name, ...]
+        self.placeholders: list[str] = []    # [var_name, ...]
 
     @property
     def has_content(self) -> bool:
@@ -124,7 +121,7 @@ class WordReporter:
 
     # ── 填充表格 ──────────────────────────────────────────
 
-    def fill_tables(self, sheet_results: Dict[str, List[Dict[str, Any]]],
+    def fill_tables(self, sheet_results: dict[str, list[dict[str, Any]]],
                     progress_callback=None) -> int:
         """将计算结果填入模板中的表格。
 
@@ -146,7 +143,7 @@ class WordReporter:
             table = self._doc.tables[ti]
 
             # 构建列映射: col_type → column index
-            col_map: Dict[str, int] = {}
+            col_map: dict[str, int] = {}
             for col in tinfo["columns"]:
                 ct = col["col_type"]
                 if ct != "unknown" and ct not in col_map:
@@ -187,7 +184,7 @@ class WordReporter:
 
     # ── 填充内容控件 ──────────────────────────────────────
 
-    def fill_content_controls(self, data: Dict[str, Any]) -> int:
+    def fill_content_controls(self, data: dict[str, Any]) -> int:
         """按 tag 名匹配内容控件并填入值。
 
         data: {tag_name: value, ...}
@@ -225,7 +222,7 @@ class WordReporter:
 
     # ── 填充占位符 ────────────────────────────────────────
 
-    def fill_placeholders(self, data: Dict[str, Any]) -> int:
+    def fill_placeholders(self, data: dict[str, Any]) -> int:
         """搜索替换 {{variable}} 占位符。
 
         data: {var_name: value, ...}
@@ -258,14 +255,13 @@ class WordReporter:
 
     # ── 插入图片（书签定位） ────────────────────────────────
 
-    def insert_images_at_bookmarks(self, bookmark_images: Dict[str, bytes],
+    def insert_images_at_bookmarks(self, bookmark_images: dict[str, bytes],
                                     max_width_inches: float = 5.5) -> int:
         """在书签位置插入图片（使用 tempfile + add_picture）。"""
         import tempfile
-        from docx.shared import Inches
 
         body = self._doc.element.body
-        bookmark_paras: Dict[str, int] = {}
+        bookmark_paras: dict[str, int] = {}
         for el in body.iter():
             if el.tag == qn('w:bookmarkStart'):
                 name = el.get(qn('w:name'), '')
@@ -311,10 +307,10 @@ class WordReporter:
     _RE_LOOP_START = re.compile(r'\{\{loop_start_(\w+)\}\}')
     _RE_LOOP_END = re.compile(r'\{\{loop_end_(\w+)\}\}')
 
-    def _expand_loops(self) -> Dict[str, tuple]:
+    def _expand_loops(self) -> dict[str, tuple]:
         """扫描段落和表格中 {{loop_start_<key>}} / {{loop_end_<key>}} 配对。"""
         self._loop_groups = {}
-        open_entry: Dict[str, int] = {}
+        open_entry: dict[str, int] = {}
 
         def _scan_paragraphs(paragraphs):
             for i, para in enumerate(paragraphs):
@@ -341,15 +337,15 @@ class WordReporter:
             warnings.warn(f"loop_start_{key} 缺少对应的 loop_end_{key}")
         return dict(self._loop_groups)
 
-    def fill_metadata(self, metadata: Dict[str, Any]) -> int:
+    def fill_metadata(self, metadata: dict[str, Any]) -> int:
         """填充元数据: 内容控件 + 占位符，统一入口。"""
         return self.fill_content_controls(metadata) + self.fill_placeholders(metadata)
 
     # ── 通用填充 ──────────────────────────────────────────
 
-    def fill_all(self, sheet_results: Dict[str, List[Dict]],
-                 single_values: Optional[Dict[str, Any]] = None,
-                 bookmark_images: Optional[Dict[str, bytes]] = None,
+    def fill_all(self, sheet_results: dict[str, list[dict]],
+                 single_values: dict[str, Any] | None = None,
+                 bookmark_images: dict[str, bytes] | None = None,
                  progress_callback=None) -> dict:
         """执行全部填充操作。
 

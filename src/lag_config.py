@@ -16,8 +16,6 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-
 
 # ---------------------------------------------------------------------------
 # 列头规范化
@@ -75,22 +73,22 @@ class LagConfig:
         ranges: θ 范围列表，如 [(0, 90), (60, 90)]。
     """
 
-    single_angles: List[float] = field(default_factory=list)
-    ranges: List[Tuple[float, float]] = field(default_factory=list)
+    single_angles: list[float] = field(default_factory=list)
+    ranges: list[tuple[float, float]] = field(default_factory=list)
 
     # --- 工厂方法 ---
 
     @classmethod
     def from_start_step(
         cls, start: float, end: float, step: float
-    ) -> "LagConfig":
+    ) -> LagConfig:
         """起始+步进快速生成单角度列表。
 
         Example:
             LagConfig.from_start_step(0, 90, 10)
             → single_angles = [0, 10, 20, ..., 90]
         """
-        angles: List[float] = []
+        angles: list[float] = []
         a = start
         while a <= end + 1e-9:
             angles.append(round(a, 6))
@@ -98,7 +96,7 @@ class LagConfig:
         return cls(single_angles=angles)
 
     @classmethod
-    def from_template_headers(cls, headers: List[str]) -> "LagConfig":
+    def from_template_headers(cls, headers: list[str]) -> LagConfig:
         """从 Excel 列头自动解析 LAG 需求。
 
         识别模式：
@@ -109,8 +107,8 @@ class LagConfig:
 
         注意：列头可能含换行符 ``\\n``、全角括号等，先做规范化。
         """
-        singles: List[float] = []
-        ranges: List[Tuple[float, float]] = []
+        singles: list[float] = []
+        ranges: list[tuple[float, float]] = []
 
         for raw in headers:
             h = normalize_header(raw)
@@ -141,7 +139,7 @@ class LagConfig:
         return cls(single_angles=singles, ranges=ranges)
 
     @classmethod
-    def from_ar_headers(cls, headers: List[str]) -> "LagConfig":
+    def from_ar_headers(cls, headers: list[str]) -> LagConfig:
         """从 Excel 列头自动解析 AR (Axial Ratio) 角度需求。
 
         识别模式：
@@ -150,8 +148,8 @@ class LagConfig:
 
         注意：列头可能含换行符 ``\\n``、全角括号等，先做规范化。
         """
-        singles: List[float] = []
-        ranges: List[Tuple[float, float]] = []
+        singles: list[float] = []
+        ranges: list[tuple[float, float]] = []
 
         # AR 单角度: "AR at Theta=30" / "Axial Ratio at Theta=60"
         _RE_AR_SINGLE = re.compile(
@@ -191,12 +189,12 @@ class LagConfig:
     # --- 查询 ---
 
     @property
-    def singles_sorted(self) -> List[float]:
+    def singles_sorted(self) -> list[float]:
         """去重排序后的单角度列表。"""
         return sorted(set(self.single_angles))
 
     @property
-    def ranges_sorted(self) -> List[Tuple[float, float]]:
+    def ranges_sorted(self) -> list[tuple[float, float]]:
         """排序后的范围列表。"""
         return sorted(set(self.ranges), key=lambda x: (x[0], x[1]))
 
@@ -234,7 +232,7 @@ class LagConfig:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "LagConfig":
+    def from_dict(cls, d: dict) -> LagConfig:
         return cls(
             single_angles=d.get("single_angles", []),
             ranges=[(lo, hi) for lo, hi in d.get("ranges", [])],
@@ -247,7 +245,7 @@ class LagConfig:
         )
 
     @classmethod
-    def load_preset(cls, path: Path) -> "LagConfig":
+    def load_preset(cls, path: Path) -> LagConfig:
         return cls.from_dict(json.loads(path.read_text(encoding="utf-8")))
 
 

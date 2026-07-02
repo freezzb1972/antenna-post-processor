@@ -10,7 +10,7 @@ IEEE 1720 标准球面矢量波函数 M_nm, N_nm 及其远场渐近形式。
 from __future__ import annotations
 
 import numpy as np
-from scipy.special import sph_harm_y, lpmv, spherical_jn, spherical_yn
+from scipy.special import lpmv, sph_harm_y, spherical_jn, spherical_yn
 
 
 def _associated_legendre_derivative(n: int, m: int, x: np.ndarray) -> np.ndarray:

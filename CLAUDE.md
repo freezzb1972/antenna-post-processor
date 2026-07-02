@@ -138,6 +138,21 @@ DESIGN → PLAN → DEVELOP → VERIFY → COMMIT → MANAGE
 
 **状态文件**：`.claude/dev-flow.json`（跟踪阶段、文件修改计数、检查点计数）
 
+### 函数复用体系（新增规则）
+
+> 通用规则见全局 `~/.claude/CLAUDE.md` 第 7 条「功能实现前审计已有代码」。
+
+**写新函数前必须**:
+1. 查阅 `FUNC_CATALOG.md` → `grep -i '<关键词>' FUNC_CATALOG.md`
+2. 若已有 ≥80% 相似函数 → 复用/扩展，**禁止新写**
+3. 若逻辑相似但分散在多处 → 先提取公共，再基于公共实现新功能
+
+**`FUNC_CATALOG.md`** 自动维护: 每次 `git commit` 后由 `generate_func_catalog.py` 重新生成。
+315 个公开函数按 A(纯函数)/B(模块级)/C(内部) 三级标注复用等级。
+
+**`src/excel_reader.py` 列类型注册表**: 新增列类型只需向 `_COLUMN_CLASSIFIERS` dict 添加一条规则，
+`classify_column()` + 所有 `is_xxx_column()` 包装器自动生成。不再单独写 `is_xxx_column` 函数。
+
 ### 质量门禁（自动触发）
 
 修改以下文件后，**必须**运行对应的 harness。Harness 已内置在项目中，

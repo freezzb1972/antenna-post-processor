@@ -24,7 +24,7 @@ ScaleManager + AdaptiveWidgetMixin — 仿 Web rem 机制的桌面 UI 缩放引�
 
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QWidget
 
 

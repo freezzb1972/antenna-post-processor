@@ -18,7 +18,6 @@ individual frequency blocks on demand. Peak memory ~1.3 MB per frequency.
 """
 
 import os
-from typing import List, Tuple, Optional, Dict
 
 import numpy as np
 
@@ -41,11 +40,11 @@ class MergedCSVParser(DataSource):
         self.path = path
         self._file_size = os.path.getsize(path)
         # Byte offsets: section_name -> list of file positions for each freq block
-        self._section_offsets: Dict[str, List[int]] = {}
-        self._frequencies: List[float] = []
+        self._section_offsets: dict[str, list[int]] = {}
+        self._frequencies: list[float] = []
         self._fh = None  # 缓存文件句柄，避免重复 open
-        self._theta_angles: List[float] = []
-        self._phi_angles: List[float] = []
+        self._theta_angles: list[float] = []
+        self._phi_angles: list[float] = []
         self._indexed = False
 
     # ------------------------------------------------------------------
@@ -53,21 +52,21 @@ class MergedCSVParser(DataSource):
     # ------------------------------------------------------------------
 
     @property
-    def frequencies(self) -> List[float]:
+    def frequencies(self) -> list[float]:
         """Return list of frequency values in MHz, in file order."""
         if not self._indexed:
             self._build_index()
         return self._frequencies
 
     @property
-    def theta_angles(self) -> List[float]:
+    def theta_angles(self) -> list[float]:
         """Return list of theta angles in degrees."""
         if not self._indexed:
             self._build_index()
         return self._theta_angles
 
     @property
-    def phi_angles(self) -> List[float]:
+    def phi_angles(self) -> list[float]:
         """Return list of phi angles in degrees."""
         if not self._indexed:
             self._build_index()
@@ -93,7 +92,7 @@ class MergedCSVParser(DataSource):
 
     def read_section_block(
         self, section_name: str, freq_index: int
-    ) -> List[List[float]]:
+    ) -> list[list[float]]:
         """
         Read one frequency block from a section.
 
@@ -126,7 +125,7 @@ class MergedCSVParser(DataSource):
 
     def read_all_sections_for_freq(
         self, freq_index: int
-    ) -> Dict[str, List[List[float]]]:
+    ) -> dict[str, list[list[float]]]:
         """
         Read all 4 sections for a given frequency.
 
@@ -146,7 +145,7 @@ class MergedCSVParser(DataSource):
             result[key] = self.read_section_block(section_name, freq_index)
         return result
 
-    def read_sections(self, freq_index: int) -> Dict[str, Optional[np.ndarray]]:
+    def read_sections(self, freq_index: int) -> dict[str, np.ndarray | None]:
         """DataSource 接口: 返回 ndarray 格式的数据。"""
         raw = self.read_all_sections_for_freq(freq_index)
         return {
@@ -165,12 +164,12 @@ class MergedCSVParser(DataSource):
         # Detect encoding (UTF-8 with or without BOM)
         encoding = self._ENCODING
 
-        with open(self.path, "r", encoding=encoding, newline="") as f:
+        with open(self.path, encoding=encoding, newline="") as f:
             # We use tell() after each readline to record byte offsets.
             # csv.reader would consume the iterator and lose positions,
             # so we use raw readline and minimal parsing.
             self._section_offsets = {name: [] for name in self.SECTION_NAMES}
-            current_section: Optional[str] = None
+            current_section: str | None = None
 
             while True:
                 pos = f.tell()
@@ -228,10 +227,10 @@ class MergedCSVParser(DataSource):
 
     def _read_block_at_offset(
         self, offset: int, n_phi: int, n_theta: int
-    ) -> List[List[float]]:
+    ) -> list[list[float]]:
         """Read a single frequency block from a given byte offset."""
         if self._fh is None:
-            self._fh = open(self.path, "r", encoding=self._ENCODING, newline="")
+            self._fh = open(self.path, encoding=self._ENCODING, newline="")
         self._fh.seek(offset)
 
         # Skip the frequency+theta header line
@@ -261,7 +260,7 @@ class MergedCSVParser(DataSource):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _detect_section_header(line: str) -> Optional[str]:
+    def _detect_section_header(line: str) -> str | None:
         """Check if a line is a section header."""
         for name in MergedCSVParser.SECTION_NAMES:
             if line.startswith(name + ","):
@@ -300,7 +299,7 @@ class MergedCSVParser(DataSource):
             return False
 
     @staticmethod
-    def _parse_freq_from_line(line: str) -> Optional[float]:
+    def _parse_freq_from_line(line: str) -> float | None:
         """Extract frequency value from a block start line: ',<freq>,Theta Angle...'."""
         parts = line.split(",")
         if len(parts) >= 2:
@@ -311,7 +310,7 @@ class MergedCSVParser(DataSource):
         return None
 
     @staticmethod
-    def _parse_theta_angles(line: str) -> List[float]:
+    def _parse_theta_angles(line: str) -> list[float]:
         """Extract theta angles from a frequency header line.
         Format: ',<freq>,Theta Angle  (?,0,1,2,...,110,...'
         """
@@ -327,7 +326,7 @@ class MergedCSVParser(DataSource):
         return theta_vals
 
     @staticmethod
-    def _parse_phi_from_line(line: str) -> Optional[float]:
+    def _parse_phi_from_line(line: str) -> float | None:
         """Extract phi angle from a data line: ',,<phi>,<val0>,...'."""
         parts = line.split(",")
         if len(parts) >= 3:
@@ -338,7 +337,7 @@ class MergedCSVParser(DataSource):
         return None
 
     @staticmethod
-    def _parse_phi_data_line(line: str, n_theta: int) -> List[float]:
+    def _parse_phi_data_line(line: str, n_theta: int) -> list[float]:
         """Parse a phi data line into list of theta values.
         Format: ',,<phi>,<val0>,<val1>,...,<valN>,...'
         """
@@ -370,7 +369,7 @@ class MergedCSVParser(DataSource):
         """
         for enc in self._ENCODING_CANDIDATES:
             try:
-                with open(self.path, "r", encoding=enc) as f:
+                with open(self.path, encoding=enc) as f:
                     f.read(4096)  # 读开头4KB验证
                 return enc
             except (UnicodeDecodeError, UnicodeError):

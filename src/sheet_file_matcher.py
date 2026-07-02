@@ -14,10 +14,8 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
-
 
 # ---------------------------------------------------------------------------
 # 键提取
@@ -63,7 +61,7 @@ def sanitize_sheet_name(name: str, max_len: int = 31) -> str:
 @dataclass
 class MatchResult:
     sheet_name: str
-    file_path: Optional[str] = None
+    file_path: str | None = None
     confidence: float = 0.0  # 1.0 = 精确, 0.8 = 子串, 0.5 = 回退, 0.0 = 未匹配
 
 
@@ -72,9 +70,9 @@ class MatchResult:
 # ---------------------------------------------------------------------------
 
 def auto_match(
-    sheet_names: List[str],
-    file_paths: List[str],
-) -> List[MatchResult]:
+    sheet_names: list[str],
+    file_paths: list[str],
+) -> list[MatchResult]:
     """自动将工作表名称匹配到数据文件路径。
 
     Args:
@@ -88,10 +86,10 @@ def auto_match(
         return [MatchResult(sheet_name=sn) for sn in sheet_names]
 
     # 提取所有键
-    sheet_keys: Dict[str, str] = {sn: extract_key(sn) for sn in sheet_names}
-    file_keys: Dict[str, str] = {fp: extract_key(fp) for fp in file_paths}
+    sheet_keys: dict[str, str] = {sn: extract_key(sn) for sn in sheet_names}
+    file_keys: dict[str, str] = {fp: extract_key(fp) for fp in file_paths}
 
-    results: List[MatchResult] = []
+    results: list[MatchResult] = []
     used_files: set = set()
 
     # ------- 第一轮: 精确键匹配 -------

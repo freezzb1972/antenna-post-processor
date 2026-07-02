@@ -19,21 +19,19 @@ Raw CSV 转换 & 合并工具
 from __future__ import annotations
 
 import csv
-import math
 import os
-import re
-from dataclasses import dataclass, field
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
 from .rsp_calibration import (
-    RspCoverageResult, _apply_rsp_calibration, _apply_rsp_phase,
-    _apply_rsp_to_logmag, _parse_rsp_file, _rsp_freq_bounds,
-    check_rsp_coverage, parse_rsp_csv, parse_rsp_phase,
+    RspCoverageResult,
+    _apply_rsp_calibration,
+    check_rsp_coverage,
+    parse_rsp_csv,
+    parse_rsp_phase,
 )
-
 
 # ═══════════════════════════════════════════════════════════
 # 数据转换: 实部/虚部格式 CSV → 对数域标准格式 CSV
@@ -41,8 +39,8 @@ from .rsp_calibration import (
 
 def convert_aborted_to_normal(
     input_path: str,
-    output_path: Optional[str] = None,
-    progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    output_path: str | None = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> str:
     """将实部/虚部格式 (线性域) CSV 转换为对数域标准格式。
 
@@ -146,14 +144,14 @@ def _find_data_start(block, header_row: int, phi_col: int,
     return header_row + 2  # 回退兼容旧格式
 
 
-def _parse_streaming(path: str, section_names: Tuple[str, ...],
+def _parse_streaming(path: str, section_names: tuple[str, ...],
                      block_parser: Callable):
     """流式逐 section 解析 CSV，避免全量 Python 字符串加载。
 
     一次只持有一个 section 的 Python 行在内存中，
     处理完毕立即释放，消除 list(csv.reader(f)) 的 3-5x 内存膨胀。
     """
-    with open(path, 'r', encoding='utf-8-sig') as f:
+    with open(path, encoding='utf-8-sig') as f:
         reader = csv.reader(f)
         try:
             metadata = next(reader)[0] if reader else ""
@@ -165,7 +163,7 @@ def _parse_streaming(path: str, section_names: Tuple[str, ...],
         theta_angles = []
         phi_angles = []
         current_section = None
-        section_rows: List[List[str]] = []
+        section_rows: list[list[str]] = []
 
         for row in reader:
             r0 = row[0].strip() if row else ''
@@ -510,7 +508,7 @@ def _write_normal_csv(path, metadata, freqs, theta, phi,
 
 def _detect_format(path: str) -> str:
     """检测 CSV 文件格式: 'standard' | 'aborted' | 'unknown'。"""
-    with open(path, 'r', encoding='utf-8-sig') as f:
+    with open(path, encoding='utf-8-sig') as f:
         for line in f:
             line = line.strip()
             if line.startswith('Theta Log Magnitude,') or \
@@ -526,19 +524,19 @@ def _detect_format(path: str) -> str:
     return 'unknown'
 
 
-def _scan_file_meta(path: str) -> Tuple[str, List[float], List[float], List[float], str]:
+def _scan_file_meta(path: str) -> tuple[str, list[float], list[float], list[float], str]:
     """快速扫描文件元数据 (fmt/phi/freq/theta/meta)，不解析数据值。
 
     同时自动检测文件格式 (aborted/standard)，无需单独调用 _detect_format。
     一次文件打开完成格式检测 + 元数据扫描。
     """
-    phis: List[float] = []
-    freqs: List[float] = []
-    theta: List[float] = []
+    phis: list[float] = []
+    freqs: list[float] = []
+    theta: list[float] = []
     metadata = ""
     fmt = 'unknown'
 
-    with open(path, 'r', encoding='utf-8-sig') as f:
+    with open(path, encoding='utf-8-sig') as f:
         reader = csv.reader(f)
         try:
             metadata = next(reader)[0] if reader else ""
@@ -691,11 +689,11 @@ def _scan_standard_meta(reader, phis, freqs, theta):
 
 
 def merge_csv_files(
-    file_paths: List[str],
-    output_path: Optional[str] = None,
-    rsp_h_path: Optional[str] = None,
-    rsp_v_path: Optional[str] = None,
-    progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    file_paths: list[str],
+    output_path: str | None = None,
+    rsp_h_path: str | None = None,
+    rsp_v_path: str | None = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> str:
     """合并多个分段测量 CSV 为完整 360° 覆盖文件。
 
@@ -720,10 +718,10 @@ def merge_csv_files(
         output_path = str(p.parent / f"{p.stem.split('_')[0]}_merged.csv")
 
     # 加载 RSP 校准数据 (如有)
-    rsp_h: Dict[float, float] = {}
-    rsp_v: Dict[float, float] = {}
-    rsp_h_phase: Dict[float, float] = {}
-    rsp_v_phase: Dict[float, float] = {}
+    rsp_h: dict[float, float] = {}
+    rsp_v: dict[float, float] = {}
+    rsp_h_phase: dict[float, float] = {}
+    rsp_v_phase: dict[float, float] = {}
     has_rsp = False
     if rsp_h_path and Path(rsp_h_path).exists():
         rsp_h = parse_rsp_csv(rsp_h_path)
@@ -744,8 +742,8 @@ def merge_csv_files(
     # ═══════════════════════════════════════════════════════════════
     file_meta: list = []  # [(path, fmt, phis, freqs, theta, metadata)]
     all_phis: set = set()
-    base_freqs: List[float] = []
-    base_theta: List[float] = []
+    base_freqs: list[float] = []
+    base_theta: list[float] = []
     base_metadata = ""
 
     for fp in file_paths:
@@ -876,7 +874,7 @@ _PHI_MAX = 360.0  # Phi 值的有效上界 (不含)
 # 频率范围检查 (用于 RSP 覆盖率校验)
 # ═══════════════════════════════════════════════════════════
 
-def extract_freq_range(file_path: str) -> Optional[Tuple[float, float]]:
+def extract_freq_range(file_path: str) -> tuple[float, float] | None:
     """提取 CSV 文件的频率范围 (min, max MHz)。
 
     使用现有解析器获取频点列表，不做完整数据解析。
@@ -904,10 +902,10 @@ def extract_freq_range(file_path: str) -> Optional[Tuple[float, float]]:
 
 
 def batch_check_rsp_coverage(
-    file_paths: List[str],
-    rsp_h: Dict[float, float],
-    rsp_v: Dict[float, float],
-    only_fmt: Optional[str] = None,
+    file_paths: list[str],
+    rsp_h: dict[float, float],
+    rsp_v: dict[float, float],
+    only_fmt: str | None = None,
 ) -> RspCoverageResult:
     """批量检查 RSP 校准数据是否覆盖所有文件的频率范围。
 
@@ -970,10 +968,10 @@ def batch_check_rsp_coverage(
 
 def apply_path_loss_calibration(
     input_path: str,
-    rsp_h_path: Optional[str],
-    rsp_v_path: Optional[str],
-    output_path: Optional[str] = None,
-    progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    rsp_h_path: str | None,
+    rsp_v_path: str | None,
+    output_path: str | None = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> str:
     """对 CSV 文件应用路径损耗补偿 (RSP 校准)。
 
@@ -1005,10 +1003,10 @@ def apply_path_loss_calibration(
         progress_callback(step, total, "加载 RSP 校准数据...")
     step += 1
 
-    rsp_h: Dict[float, float] = {}
-    rsp_v: Dict[float, float] = {}
-    rsp_h_phase: Dict[float, float] = {}
-    rsp_v_phase: Dict[float, float] = {}
+    rsp_h: dict[float, float] = {}
+    rsp_v: dict[float, float] = {}
+    rsp_h_phase: dict[float, float] = {}
+    rsp_v_phase: dict[float, float] = {}
     if rsp_h_path and Path(rsp_h_path).exists():
         rsp_h = parse_rsp_csv(rsp_h_path)
         rsp_h_phase = parse_rsp_phase(rsp_h_path)
@@ -1099,12 +1097,12 @@ def apply_path_loss_calibration(
 # ═══════════════════════════════════════════════════════════
 
 def batch_check_and_convert(
-    file_paths: List[str],
-    output_dir: Optional[str] = None,
-    rsp_h_path: Optional[str] = None,
-    rsp_v_path: Optional[str] = None,
-    progress_callback: Optional[Callable[[int, int, str], None]] = None,
-) -> Dict:
+    file_paths: list[str],
+    output_dir: str | None = None,
+    rsp_h_path: str | None = None,
+    rsp_v_path: str | None = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+) -> dict:
     """批量检查文件格式，并将实部/虚部格式文件转换为对数域标准格式。
 
     Args:
@@ -1122,7 +1120,7 @@ def batch_check_and_convert(
             'failed': [{source, error}],                  # 转换失败
         }
     """
-    result: Dict = {
+    result: dict = {
         'checked': [],
         'aborted': [],
         'converted': [],

@@ -3,11 +3,15 @@
     "claude-api@anthropic-agent-skills": true,
     "document-skills@anthropic-agent-skills": false
   },
-  "disabledMcpjsonServers": ["context7"],
+  "disabledMcpjsonServers": [
+    "context7"
+  ],
   "mcpServers": {
     "memory": {
       "command": "npx",
-      "args": ["@modelcontextprotocol/server-memory"]
+      "args": [
+        "@modelcontextprotocol/server-memory"
+      ]
     }
   },
   "hooks": {
@@ -33,6 +37,16 @@
         "description": "文件修改计数：.py 文件修改 ≥5 次时建议验证"
       },
       {
+        "matcher": "tool == \"Write\" && path.match(/src\\//)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '📋 新增 src/ 函数? 先检查 FUNC_CATALOG.md:'; grep -i \"$(echo \"$CLAUDE_CODE_FILE_PATH\" | sed 's/.*\\///' | sed 's/\\.py$//')\" FUNC_CATALOG.md 2>/dev/null | head -10 || echo '  (catalog not found, run: python3 generate_func_catalog.py)'"
+          }
+        ],
+        "description": "写入 src/ 文件时提醒查看已有函数目录"
+      },
+      {
         "matcher": "tool == \"Write\" && path.match(/ui\\//)",
         "hooks": [
           {
@@ -44,6 +58,26 @@
       }
     ],
     "PostToolUse": [
+      {
+        "matcher": "tool == \"Bash\" && command.match(/git commit/)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "find . -type d -name __pycache__ -not -path './.venv/*' -not -path './venv/*' -exec rm -rf {} + 2>/dev/null; find . -type f -name '*.pyc' -delete 2>/dev/null; python3 generate_func_catalog.py; echo '---'; python3 targeted_verify.py 2>&1"
+          }
+        ],
+        "description": "每次 git commit 后清理缓存 + 针对性验证"
+      },
+      {
+        "matcher": "tool == \"Write\" && path.match(/ui\\//)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 targeted_verify.py --dry-run 2>&1 | head -15"
+          }
+        ],
+        "description": "UI 文件变更后提示应运行哪些针对性测试"
+      },
       {
         "matcher": "tool == \"Bash\" && command.match(/pytest/)",
         "hooks": [
@@ -67,5 +101,8 @@
         "description": "压缩前自动 distill: 保存 git log + 文件变更到 CURRENT_STATE.md"
       }
     ]
+  },
+  "env": {
+    "QT_QPA_PLATFORM": "offscreen"
   }
 }

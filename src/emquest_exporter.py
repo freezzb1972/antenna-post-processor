@@ -9,10 +9,8 @@ from __future__ import annotations
 
 import os
 import subprocess
-import time
-import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
 
 EMQUEST_EXE = r"C:\Program Files (x86)\ETS-Lindgren\EMQuest\EMQuest.exe"
 
@@ -119,7 +117,7 @@ Write-Host "NI Watchdog stopped"
 '''
 
 
-def _start_ni_watchdog(timeout_seconds: int = 600) -> Optional[subprocess.Popen]:
+def _start_ni_watchdog(timeout_seconds: int = 600) -> subprocess.Popen | None:
     """启动 PowerShell 后台脚本，自动点击 NI 弹窗的 OK 按钮。"""
     try:
         proc = subprocess.Popen(
@@ -133,7 +131,7 @@ def _start_ni_watchdog(timeout_seconds: int = 600) -> Optional[subprocess.Popen]
         return None
 
 
-def _stop_ni_watchdog(proc: Optional[subprocess.Popen]):
+def _stop_ni_watchdog(proc: subprocess.Popen | None):
     """停止 NI 弹窗看门狗。"""
     if proc and proc.poll() is None:
         try:
@@ -164,7 +162,7 @@ def _suppress_emq_warnings(suppress: bool):
             return
         try:
             # 备份原始 INI
-            with open(ini_wsl, "r") as f:
+            with open(ini_wsl) as f:
                 original = f.read()
             with open(bak_wsl, "w") as f:
                 f.write(original)
@@ -180,7 +178,7 @@ def _suppress_emq_warnings(suppress: bool):
         # 恢复原始配置
         if os.path.isfile(bak_wsl):
             try:
-                with open(bak_wsl, "r") as f:
+                with open(bak_wsl) as f:
                     original = f.read()
                 with open(ini_wsl, "w") as f:
                     f.write(original)
@@ -194,11 +192,11 @@ def _suppress_emq_warnings(suppress: bool):
 # ═══════════════════════════════════════════════════════════
 
 def export_raw_files(
-    file_paths: List[str],
+    file_paths: list[str],
     export_format: str = "csv",
-    output_dir: Optional[str] = None,
-    progress_callback: Optional[Callable[[int, int, str], None]] = None,
-) -> Dict:
+    output_dir: str | None = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+) -> dict:
     """使用 EMQuest CLI 将 .raw 文件批量导出为指定格式。
 
     Args:
@@ -210,7 +208,7 @@ def export_raw_files(
     Returns:
         {'exported': [{source, output, size_mb}], 'failed': [{source, error}]}
     """
-    result: Dict = {"exported": [], "failed": []}
+    result: dict = {"exported": [], "failed": []}
     if not file_paths:
         return result
 
@@ -250,7 +248,7 @@ def export_raw_files(
             # EMQuest CLI: -s = silent (后台), -export_xxx output, -file input, -exit
             bat_path = str(Path(out_dir) / f"_emq_export_{i}.bat")
             with open(bat_path, "w") as f:
-                f.write(f'@echo off\r\n')
+                f.write('@echo off\r\n')
                 f.write(f'cd /d "{emq_dir_win}"\r\n')
                 f.write(f'"{emq_win}" -s {flag} "{out_win}" -file "{raw_win}" -exit\r\n')
 
@@ -310,7 +308,7 @@ def _to_wsl_path(win_path: str) -> str:
     return p
 
 
-def discover_raw_files(root_dir: str, recursive: bool = True) -> List[str]:
+def discover_raw_files(root_dir: str, recursive: bool = True) -> list[str]:
     """扫描目录下所有 .raw 文件。
 
     Args:

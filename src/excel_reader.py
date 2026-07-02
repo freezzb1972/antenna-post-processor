@@ -11,17 +11,20 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import re
+import sys
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 import openpyxl
 
-from .lag_config import (LagConfig, normalize_header,
-                         _RE_LAG_RANGE, _RE_LAG_RANGE_NO_PREFIX,
-                         _RE_LAG_SINGLE, _RE_LAG_SINGLE_NO_PREFIX)
-
+from .lag_config import (
+    _RE_LAG_RANGE,
+    _RE_LAG_RANGE_NO_PREFIX,
+    _RE_LAG_SINGLE,
+    _RE_LAG_SINGLE_NO_PREFIX,
+    LagConfig,
+    normalize_header,
+)
 
 # ---------------------------------------------------------------------------
 # 列头规范化 & 分类 (从 lag_config.py 移入 — 它们只被模板解析使用)
@@ -36,10 +39,10 @@ def _normalize_key(name: str) -> str:
 # JSON 列头模式加载器 — 用户可编辑的外部配置
 # ═══════════════════════════════════════════════════════════════
 
-_COLUMN_PATTERNS: Optional[List[dict]] = None
+_COLUMN_PATTERNS: list[dict] | None = None
 
 
-def _load_column_patterns() -> List[dict]:
+def _load_column_patterns() -> list[dict]:
     """加载 config/column_patterns.json，若文件不存在则返回空列表。"""
     global _COLUMN_PATTERNS
     if _COLUMN_PATTERNS is not None:
@@ -57,7 +60,7 @@ def _load_column_patterns() -> List[dict]:
         path = os.path.normpath(candidate)
         if os.path.isfile(path):
             try:
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     data = json.load(f)
                 _COLUMN_PATTERNS = data.get("patterns", [])
                 return _COLUMN_PATTERNS
@@ -68,7 +71,7 @@ def _load_column_patterns() -> List[dict]:
     return _COLUMN_PATTERNS
 
 
-def _classify_by_json_patterns(raw_header: str) -> Optional[str]:
+def _classify_by_json_patterns(raw_header: str) -> str | None:
     """用 config/column_patterns.json 中的规则匹配列头（唯一分类器）。
 
     匹配优先级（按 JSON 顺序，先匹配者胜）：
@@ -137,95 +140,162 @@ def reload_column_patterns():
     _load_column_patterns()
 
 
-def is_frequency_column(header: str) -> bool:
-    h = _normalize_key(header)
-    return "frequency" in h or h in ("freq", "f", "f(mhz)", "freq(mhz)")
+# ═══════════════════════════════════════════════════════════════
+# 列类型分类注册表 — 所有 is_xxx_column 函数的单一数据源
+#
+# 新增列类型时只需:
+#   1. 向 _COLUMN_CLASSIFIERS 添加一条规则
+#   2. 向 _CLASSIFY_ORDER 添加 (col_type, 优先级)
+#   3. 自动获得 classify_column() 聚合函数 + is_xxx_column() 包装器
+# ═══════════════════════════════════════════════════════════════
 
-
-def is_directivity_column(header: str) -> bool:
-    h = _normalize_key(header)
-    return "directivity" in h or h in ("dir", "d(dbi)")
-
-
-def is_efficiency_column(header: str) -> bool:
-    h = _normalize_key(header)
-    return "efficiency" in h
-
-
-def is_gain_column(header: str) -> bool:
-    """峰值增益列（不是 LAG / Average Gain / Gain at Theta / Peak EIRP / PKGain）。
-
-    注意: PKGain / Peak Gain / Peak EIRP 由 is_peak_eirp_column() 处理。
-    """
-    h = _normalize_key(header)
-    if "average" in h:
-        return False
-    if "theta" in h:
-        return False
-    if "pkgain" in h or "peakgain" in h or "peakeirp" in h:
-        return False  # 交由 is_peak_eirp_column() 检测
-    return h.startswith("gain") or h in ("g(dbi)", "pk")
-
-
-def is_trp_column(header: str) -> bool:
-    """TRP 列 (含 'Tot. Rad. Pwr.' 别名)."""
-    h = header.lower()
-    if "trp" in h and "nhprp" not in h:
+def _col_classifier(must_contain: str = "", must_not_contain: str = "",
+                    exact_words: tuple = (), keywords: tuple = (),
+                    extra_checks: tuple = ()) -> callable:
+    """生成列头匹配器。模式: (must_contain OR exact_words) AND keywords - must_not_contain。"""
+    def _match(header: str) -> bool:
+        lo = header.lower()
+        # must_contain: 主关键词必须在 header 中出现
+        if must_contain and must_contain not in lo:
+            # 备选: exact_words 精确匹配整个 header (如 "freq"→frequency)
+            if not (exact_words and lo in exact_words):
+                return False
+        # must_not_contain: 排除词 (如 gain 列排除 "average", "theta")
+        if must_not_contain:
+            for w in must_not_contain.split():
+                if w in lo:
+                    return False
+        # keywords: 所有关键词必须 AND 出现
+        if keywords and not all(k in lo for k in keywords):
+            return False
+        # extra_checks: 额外自定义条件 (lambda header, header_lower → bool)
+        if extra_checks:
+            return all(check(header, lo) for check in extra_checks)
         return True
-    return "total radiated power" in h or "tot. rad. pwr." in h
+    return _match
 
 
-def is_nhprp_45_column(header: str) -> bool:
-    """NHPRP +/-45 列。"""
-    h = header.lower()
-    return ("nhprp" in h or "nhprp" in h) and "45" in h
+# 分类规则注册表: col_type → (match_fn, is_ratio_subtype)
+_COLUMN_CLASSIFIERS: dict[str, tuple[callable, bool]] = {}
+
+def _reg(col_type: str, **kw) -> None:
+    _COLUMN_CLASSIFIERS[col_type] = (_col_classifier(**kw), False)
+
+def _reg_fn(col_type: str, fn: callable, is_ratio: bool = False) -> None:
+    _COLUMN_CLASSIFIERS[col_type] = (fn, is_ratio)
 
 
-def is_nhprp_30_column(header: str) -> bool:
-    """NHPRP +/-30 列。"""
-    h = header.lower()
-    return ("nhprp" in h or "nhprp" in h) and "30" in h
+# ── 基础列类型 ──
+_reg("frequency",     must_contain="frequency", exact_words=("freq", "f", "f(mhz)", "freq(mhz)"))
+_reg("directivity",   must_contain="directivity", exact_words=("dir", "d(dbi)"))
+_reg("efficiency_pct", must_contain="efficiency", must_not_contain="total")
+_reg("total_efficiency", must_contain="total", keywords=("efficiency",))
 
-
-def is_peak_eirp_column(header: str) -> bool:
-    """Peak EIRP / PKGain / Peak Gain 列。"""
+# ── Gain (需排除 LAG/Peak 变体) ──
+def _match_gain(header: str) -> bool:
     h = _normalize_key(header)
-    return "peakeirp" in h or "eirppeak" in h or "pkgain" in h or "peakgain" in h
-
-
-def is_ar_single_column(header: str) -> bool:
-    """AR 单角度列: 'AR at Theta=30' → ar_single_30"""
-    h = header.lower()
-    return ("ar" in h and "theta" in h and "~" not in h) or ("axial" in h and "theta" in h and "~" not in h)
-
-
-def is_ar_range_column(header: str) -> bool:
-    """AR 范围列: 'AR at Theta=0~70' → ar_range_0_70"""
-    h = header.lower()
-    return ("ar" in h and "~" in h) or ("axial" in h and "~" in h)
-
-
-def is_nhprp_225_column(header: str) -> bool:
-    """NHPRP +/-22.5 列 (Pi/8)."""
-    h = header.lower()
-    if "nhprp" not in h:
+    if any(w in h for w in ("average", "theta", "pkgain", "peakgain", "peakeirp")):
         return False
-    return "22.5" in h or "pi/8" in h or "π/8" in h
+    return h.startswith("gain") or h in ("g(dbi)", "pk")
+_reg_fn("gain", _match_gain)
 
-
-def is_uh_prp_column(header: str) -> bool:
-    """Upper Hemisphere PRP."""
+# ── TRP / NHPRP ──
+def _match_trp(header: str) -> bool:
     h = header.lower()
-    return "upper" in h and "hem" in h and "prp" in h
+    return ("trp" in h and "nhprp" not in h) or "total radiated power" in h or "tot. rad. pwr." in h
+_reg_fn("trp", _match_trp)
+
+_reg("nhprp_45",  must_contain="nhprp", keywords=("45",))
+_reg("nhprp_30",  must_contain="nhprp", keywords=("30",))
+_reg("nhprp_225", must_contain="nhprp", must_not_contain="45 30",
+      extra_checks=(lambda h, lo: any(x in lo for x in ("22.5", "pi/8", "π/8")),))
+
+# ── Peak EIRP ──
+_reg("peak_eirp", must_contain="peakeirp", exact_words=("eirppeak", "pkgain", "peakgain"))
+
+# ── AR ──
+_reg("ar_single", must_contain="theta", extra_checks=(lambda h, lo: ("ar" in lo or "axial" in lo) and "~" not in lo,))
+_reg("ar_range",  extra_checks=(lambda h, lo: ("ar" in lo or "axial" in lo) and "~" in lo,))
+
+# ── PRP ──
+_reg("uh_prp", keywords=("upper", "hem", "prp"))
+_reg("lh_prp", keywords=("lower", "hem", "prp"))
+
+# ── Power 统计 (min/max/avg 都含 "power") ──
+_reg("max_power", must_contain="power", extra_checks=(lambda h, lo: ("maximum" in lo or "max" in lo) and "average" not in lo,))
+_reg("min_power", must_contain="power", extra_checks=(lambda h, lo: ("minimum" in lo or "min" in lo) and "average" not in lo,))
+_reg("avg_power", must_contain="power", extra_checks=(lambda h, lo: ("average" in lo or "avg" in lo),))
+
+# ── Average Gain ──
+_reg("avg_gain", must_contain="gain", extra_checks=(lambda h, lo: ("average" in lo or "avg" in lo) and "at" not in lo,))
+
+# ── Boresight ──
+_reg("boresight_phi",   keywords=("boresight", "phi"))
+_reg("boresight_theta", must_contain="boresight", extra_checks=(lambda h, lo: any(x in lo for x in ("theta", "th.", "θ")),))
+
+# ── XPI ──
+_reg("xpi_boresight", keywords=("xpi", "boresight"))
+_reg("xpi_mean",      keywords=("xpi", "mean"))
+_reg("xpi_min",       keywords=("xpi", "min"), must_not_contain="mean")
+
+# ── Total Efficiency / Mismatch ──
+_reg("mismatch_loss", keywords=("mismatch", "loss"))
+
+# ── Phase Center ──
+_reg("pc_theta", extra_checks=(lambda h, lo: ("pc" in lo or "phase center" in lo) and ("theta" in lo or "θ" in lo),))
+_reg("pc_phi",   extra_checks=(lambda h, lo: ("pc" in lo or "phase center" in lo) and "phi" in lo,))
 
 
-def is_lh_prp_column(header: str) -> bool:
-    """Lower Hemisphere PRP."""
-    h = header.lower()
-    return "lower" in h and "hem" in h and "prp" in h
+# ═══════════════════════════════════════════════════════════════
+# 公开 API: 聚合分类器 + 向后兼容包装器
+# ═══════════════════════════════════════════════════════════════
+
+def classify_column(header: str) -> str | None:
+    """统一列头分类入口。按优先级匹配所有已注册列类型。"""
+    for col_type, (matcher, _is_ratio) in _COLUMN_CLASSIFIERS.items():
+        try:
+            if matcher(header):
+                return col_type
+        except Exception:
+            continue
+    return detect_ratio_column_type(header)
 
 
-def detect_ratio_column_type(header: str) -> Optional[str]:
+# ── 向后兼容的 is_xxx_column 函数 (委托给注册表) ──
+def _make_is_fn(col_type: str):
+    """为指定 col_type 生成 is_xxx_column() 包装器。"""
+    matcher, _ = _COLUMN_CLASSIFIERS.get(col_type, (lambda h: False, False))
+    return lambda header: matcher(header)
+
+is_frequency_column          = _make_is_fn("frequency")
+is_directivity_column        = _make_is_fn("directivity")
+is_efficiency_column         = _make_is_fn("efficiency_pct")
+is_gain_column               = _make_is_fn("gain")
+is_trp_column                = _make_is_fn("trp")
+is_nhprp_45_column           = _make_is_fn("nhprp_45")
+is_nhprp_30_column           = _make_is_fn("nhprp_30")
+is_nhprp_225_column          = _make_is_fn("nhprp_225")
+is_peak_eirp_column          = _make_is_fn("peak_eirp")
+is_ar_single_column          = _make_is_fn("ar_single")
+is_ar_range_column           = _make_is_fn("ar_range")
+is_uh_prp_column             = _make_is_fn("uh_prp")
+is_lh_prp_column             = _make_is_fn("lh_prp")
+is_max_power_column          = _make_is_fn("max_power")
+is_min_power_column          = _make_is_fn("min_power")
+is_avg_gain_column           = _make_is_fn("avg_gain")
+is_avg_power_column          = _make_is_fn("avg_power")
+is_boresight_phi_column      = _make_is_fn("boresight_phi")
+is_boresight_theta_column    = _make_is_fn("boresight_theta")
+is_xpi_boresight_column      = _make_is_fn("xpi_boresight")
+is_xpi_mean_column           = _make_is_fn("xpi_mean")
+is_xpi_min_column            = _make_is_fn("xpi_min")
+is_total_efficiency_column   = _make_is_fn("total_efficiency")
+is_mismatch_loss_column      = _make_is_fn("mismatch_loss")
+is_pc_theta_column           = _make_is_fn("pc_theta")
+is_pc_phi_column             = _make_is_fn("pc_phi")
+
+
+def detect_ratio_column_type(header: str) -> str | None:
     """检测比率列类型，返回带 db/pct 后缀的 column type。
 
     Returns:
@@ -234,103 +304,22 @@ def detect_ratio_column_type(header: str) -> Optional[str]:
     h = header.lower()
     if "ratio" not in h:
         return None
-    base = None
-    if "nhprp4" in h or "nhprp45" in h or "nhprp+/-45" in h or "nhprp+-45" in h:
-        base = "nhprp45_ratio"
-    elif "nhprp3" in h or "nhprp30" in h or "nhprp+/-30" in h or "nhprp+-30" in h:
-        base = "nhprp30_ratio"
-    elif "nhprp2" in h or "nhprp225" in h or "nhprp22.5" in h or "nhprp+/-22.5" in h:
-        base = "nhprp225_ratio"
-    elif "upper" in h and "hem" in h:
-        base = "uh_ratio"
-    elif "lower" in h and "hem" in h:
-        base = "lh_ratio"
-    if base:
-        # 检测 dB/pct 后缀
-        if "%" in header or "pct" in h:
-            return base + "_pct"
-        elif "db" in h:
-            return base + "_db"
-        return base
+    # 比率基点 → base type 映射
+    ratio_bases = [
+        (("nhprp4", "nhprp45", "nhprp+/-45", "nhprp+-45"), "nhprp45_ratio"),
+        (("nhprp3", "nhprp30", "nhprp+/-30", "nhprp+-30"), "nhprp30_ratio"),
+        (("nhprp2", "nhprp225", "nhprp22.5", "nhprp+/-22.5"), "nhprp225_ratio"),
+        (("upper", "hem"), "uh_ratio"),
+        (("lower", "hem"), "lh_ratio"),
+    ]
+    for keywords, base in ratio_bases:
+        if all(k in h for k in keywords):
+            if "%" in header or "pct" in h:
+                return base + "_pct"
+            if "db" in h:
+                return base + "_db"
+            return base
     return None
-
-
-def is_boresight_phi_column(header: str) -> bool:
-    """Boresight Phi 列。"""
-    h = header.lower()
-    return "boresight" in h and "phi" in h
-
-
-def is_boresight_theta_column(header: str) -> bool:
-    """Boresight Theta 列。"""
-    h = header.lower()
-    return "boresight" in h and ("theta" in h or "th." in h or "θ" in h)
-
-
-def is_max_power_column(header: str) -> bool:
-    """Maximum Power 列。"""
-    h = header.lower()
-    return ("maximum" in h or "max" in h) and "power" in h and "average" not in h
-
-
-def is_min_power_column(header: str) -> bool:
-    """Minimum Power 列。"""
-    h = header.lower()
-    return ("minimum" in h or "min" in h) and "power" in h and "average" not in h
-
-
-def is_avg_gain_column(header: str) -> bool:
-    """Average Gain 列。"""
-    h = header.lower()
-    return ("average" in h or "avg" in h) and "gain" in h and "at" not in h
-
-
-def is_avg_power_column(header: str) -> bool:
-    """Average Power 列。"""
-    h = header.lower()
-    return ("average" in h or "avg" in h) and "power" in h
-
-
-def is_xpi_boresight_column(header: str) -> bool:
-    """XPI Boresight 列。"""
-    h = header.lower()
-    return "xpi" in h and "boresight" in h
-
-
-def is_xpi_mean_column(header: str) -> bool:
-    """XPI Mean 列。"""
-    h = header.lower()
-    return "xpi" in h and "mean" in h
-
-
-def is_xpi_min_column(header: str) -> bool:
-    """XPI Min 列。"""
-    h = header.lower()
-    return "xpi" in h and "min" in h and "mean" not in h
-
-
-def is_total_efficiency_column(header: str) -> bool:
-    """Total Efficiency 列。"""
-    h = header.lower()
-    return "total" in h and "efficiency" in h
-
-
-def is_mismatch_loss_column(header: str) -> bool:
-    """Mismatch Loss 列。"""
-    h = header.lower()
-    return "mismatch" in h and "loss" in h
-
-
-def is_pc_theta_column(header: str) -> bool:
-    """Phase Center Theta 列。"""
-    h = header.lower()
-    return ("pc" in h or "phase center" in h) and ("theta" in h or "θ" in h)
-
-
-def is_pc_phi_column(header: str) -> bool:
-    """Phase Center Phi 列。"""
-    h = header.lower()
-    return ("pc" in h or "phase center" in h) and "phi" in h
 
 
 @dataclass
@@ -355,20 +344,20 @@ class SheetInfo:
     header_row: int                    # 列头所在行号
     data_start_row: int                # 数据起始行号
     data_end_row: int                  # 数据结束行号
-    columns: List[ColumnInfo] = field(default_factory=list)
-    frequencies: List[float] = field(default_factory=list)
+    columns: list[ColumnInfo] = field(default_factory=list)
+    frequencies: list[float] = field(default_factory=list)
     lag_config: LagConfig = field(default_factory=LagConfig)
     ar_config: LagConfig = field(default_factory=LagConfig)  # AR 角度配置
-    theta_range: Optional[str] = None  # e.g., "0-110°"
+    theta_range: str | None = None  # e.g., "0-110°"
 
 
-def read_template(template_path: str) -> List[SheetInfo]:
+def read_template(template_path: str) -> list[SheetInfo]:
     """读取输出模板，返回所有工作表信息。
 
     会自动跳过纯元数据的 Sheet（无 Frequency 列）。
     """
     wb = openpyxl.load_workbook(template_path, data_only=True)
-    sheets: List[SheetInfo] = []
+    sheets: list[SheetInfo] = []
 
     for ws in wb.worksheets:
         info = _parse_sheet(ws)
@@ -379,7 +368,7 @@ def read_template(template_path: str) -> List[SheetInfo]:
     return sheets
 
 
-def _classify_by_builtin(raw: str, norm: str) -> Optional[str]:
+def _classify_by_builtin(raw: str, norm: str) -> str | None:
     """内置函数检测链（不含 JSON 匹配），用于 JSON 冲突校验。"""
     if is_frequency_column(raw):        return "frequency"
     if is_directivity_column(raw):      return "directivity"
@@ -435,7 +424,7 @@ def _classify_by_builtin(raw: str, norm: str) -> Optional[str]:
     return None
 
 
-def _parse_sheet(ws) -> Optional[SheetInfo]:
+def _parse_sheet(ws) -> SheetInfo | None:
     """解析单个 Sheet。返回 None 表示非天线数据 Sheet（无 Frequency 列）。"""
     name = ws.title
     max_row = ws.max_row or 100
@@ -463,9 +452,9 @@ def _parse_sheet(ws) -> Optional[SheetInfo]:
         return None
 
     # ---- 解析列头 ----
-    columns: List[ColumnInfo] = []
-    lag_headers: List[str] = []
-    ar_headers: List[str] = []
+    columns: list[ColumnInfo] = []
+    lag_headers: list[str] = []
+    ar_headers: list[str] = []
 
     for c in range(1, max_col + 1):
         raw = _cell_str(ws.cell(header_row, c))
@@ -506,7 +495,7 @@ def _parse_sheet(ws) -> Optional[SheetInfo]:
 
     # ---- 解析频点列表 ----
     data_start_row = header_row + 1
-    frequencies: List[float] = []
+    frequencies: list[float] = []
     freq_col = None
     for cinfo in columns:
         if cinfo.col_type == "frequency":

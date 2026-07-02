@@ -9,15 +9,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
-
-
 
 # ═══════════════════════════════════════════════════════════════
 # 标题匹配正则 — 英文 + 中文
 # ═══════════════════════════════════════════════════════════════
 
-_CHART_PATTERNS: Dict[str, List[str]] = {
+_CHART_PATTERNS: dict[str, list[str]] = {
     # A 类: 3D 方向图
     "pattern_3d_gain": [
         r"3D.*Gain.*(Pattern|Radiation|方向图)",
@@ -116,26 +113,26 @@ class ChartConfig:
     chart_ar_vs_phi: bool = False       # AR  vs Phi 散点图 (待修复: 数据结构需重写)
 
     # B 类子选择: 具体角度/范围 (为空时自动使用模板默认值)
-    gain_chart_angles: List[float] = field(default_factory=list)   # PK Gain + 指定 θ 单角度
-    gain_chart_ranges: List[tuple] = field(default_factory=list)   # 指定 θ 范围
-    ar_chart_angles: List[float] = field(default_factory=list)     # AR 指定 θ 单角度
-    ar_chart_ranges: List[tuple] = field(default_factory=list)     # AR 指定 θ 范围
+    gain_chart_angles: list[float] = field(default_factory=list)   # PK Gain + 指定 θ 单角度
+    gain_chart_ranges: list[tuple] = field(default_factory=list)   # 指定 θ 范围
+    ar_chart_angles: list[float] = field(default_factory=list)     # AR 指定 θ 单角度
+    ar_chart_ranges: list[tuple] = field(default_factory=list)     # AR 指定 θ 范围
 
     # C 类: 俯仰面切面
     cut_2d_polar: bool = False
     cut_2d_rect: bool = False
-    cut_2d_phi_angles: List[float] = field(default_factory=list)  # 选定 Phi 切面角度 (°)
+    cut_2d_phi_angles: list[float] = field(default_factory=list)  # 选定 Phi 切面角度 (°)
 
     # 视角参数
     elev: float = 30.0
     azim: float = -60.0
-    view_angle_pairs: List[Tuple[float, float]] = field(default_factory=list)  # [(elev, azim), ...]
+    view_angle_pairs: list[tuple[float, float]] = field(default_factory=list)  # [(elev, azim), ...]
     dpi: int = 150
     step_deg: float = 5.0          # 3D 图形采样精度 (°)
 
     # 输出方式
     embed_in_excel: bool = True
-    save_png_folder: Optional[str] = None
+    save_png_folder: str | None = None
 
     # ── 属性 ──
 
@@ -162,7 +159,7 @@ class ChartConfig:
 
     # ── 合并 ──
 
-    def merge(self, other: "ChartConfig") -> "ChartConfig":
+    def merge(self, other: ChartConfig) -> ChartConfig:
         """合并两个配置（OR 逻辑），视角参数取 self 的值。"""
         fields = [
             "pattern_3d_gain", "pattern_3d_eirp", "pattern_3d_ar",
@@ -189,7 +186,7 @@ class ChartConfig:
     # ── 工厂方法 ──
 
     @classmethod
-    def from_template(cls, template_path: str) -> "ChartConfig":
+    def from_template(cls, template_path: str) -> ChartConfig:
         """扫描模板文件：元数据行 + 列头 → 自动检测图形需求。
 
         扫描策略:
@@ -200,7 +197,7 @@ class ChartConfig:
         import openpyxl
         wb = openpyxl.load_workbook(template_path, data_only=True)
         config = ChartConfig()
-        col_types: Set[str] = set()
+        col_types: set[str] = set()
 
         try:
             for ws in wb.worksheets:
@@ -227,7 +224,6 @@ class ChartConfig:
                         for c_idx in range(1, max_col + 1):
                             v = ws.cell(header_row, c_idx).value
                             if v is not None:
-                                from .excel_reader import _parse_sheet
                                 # 简化: 直接通过文本判断
                                 col_type = _classify_column_text(str(v).strip())
                                 if col_type:
@@ -256,7 +252,7 @@ class ChartConfig:
         return config
 
     @classmethod
-    def from_template_headers(cls, headers: List[str], col_types: Set[str]) -> "ChartConfig":
+    def from_template_headers(cls, headers: list[str], col_types: set[str]) -> ChartConfig:
         """从列头文本列表和 col_type 集合推导图形需求。
 
         用于 UI 对话框在已有 SheetInfo 的情况下快速推导。
@@ -281,7 +277,7 @@ class ChartConfig:
         return config
 
     @classmethod
-    def all_chart_keys(cls) -> List[str]:
+    def all_chart_keys(cls) -> list[str]:
         """返回所有图形 flag 的 key 列表（不含视角参数和角度列表）。"""
         return [
             "pattern_3d_gain", "pattern_3d_eirp", "pattern_3d_ar",
@@ -292,14 +288,14 @@ class ChartConfig:
         ]
 
     @classmethod
-    def all_sub_angle_keys(cls) -> List[str]:
+    def all_sub_angle_keys(cls) -> list[str]:
         """返回所有子角度列表的 key。"""
         return ["gain_chart_angles", "gain_chart_ranges",
                 "ar_chart_angles", "ar_chart_ranges",
                 "cut_2d_phi_angles"]
 
     @classmethod
-    def chart_labels(cls) -> Dict[str, str]:
+    def chart_labels(cls) -> dict[str, str]:
         """返回图形 key → 中文显示名称映射。"""
         return {
             "pattern_3d_gain": "3D 增益方向图",
@@ -321,7 +317,7 @@ class ChartConfig:
         }
 
     @classmethod
-    def chart_categories(cls) -> Dict[str, List[str]]:
+    def chart_categories(cls) -> dict[str, list[str]]:
         """返回图形分类: 类别名 → [chart_key, ...]"""
         return {
             "A 类: 3D 方向图": [
@@ -343,7 +339,7 @@ class ChartConfig:
 # 内部辅助
 # ═══════════════════════════════════════════════════════════════
 
-def _match_text(text: str, patterns: List[str]) -> bool:
+def _match_text(text: str, patterns: list[str]) -> bool:
     """检查 text 是否匹配任一正则 pattern。"""
     for pat in patterns:
         if re.search(pat, text, re.IGNORECASE):
@@ -351,17 +347,30 @@ def _match_text(text: str, patterns: List[str]) -> bool:
     return False
 
 
-def _classify_column_text(text: str) -> Optional[str]:
+def _classify_column_text(text: str) -> str | None:
     """从列头文本推导 col_type（简化版，JSON 模式优先，fallback 到内置正则）。"""
     from .excel_reader import (
-        _classify_by_json_patterns, is_frequency_column, is_directivity_column,
-        is_efficiency_column, is_gain_column, is_trp_column, is_nhprp_45_column,
-        is_nhprp_30_column, is_peak_eirp_column, is_ar_single_column,
-        is_ar_range_column, is_nhprp_225_column, is_uh_prp_column,
-        is_lh_prp_column, detect_ratio_column_type,
-        is_boresight_phi_column, is_boresight_theta_column,
-        is_max_power_column, is_min_power_column,
-        is_avg_gain_column, is_avg_power_column,
+        _classify_by_json_patterns,
+        detect_ratio_column_type,
+        is_ar_range_column,
+        is_ar_single_column,
+        is_avg_gain_column,
+        is_avg_power_column,
+        is_boresight_phi_column,
+        is_boresight_theta_column,
+        is_directivity_column,
+        is_efficiency_column,
+        is_frequency_column,
+        is_gain_column,
+        is_lh_prp_column,
+        is_max_power_column,
+        is_min_power_column,
+        is_nhprp_30_column,
+        is_nhprp_45_column,
+        is_nhprp_225_column,
+        is_peak_eirp_column,
+        is_trp_column,
+        is_uh_prp_column,
     )
     # JSON 用户模式优先
     json_type = _classify_by_json_patterns(text)

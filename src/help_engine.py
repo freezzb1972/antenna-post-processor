@@ -13,8 +13,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-
+from typing import Any
 
 # ═══════════════════════════════════════════════════════════════
 # 文档分块
@@ -27,7 +26,7 @@ class HelpChunk:
     title: str         # e.g., "3. 模板准备"
     content: str       # 纯文本内容（去 HTML 标签）
     html_content: str  # 原始 HTML 片段
-    tokens: List[str] = field(default_factory=list)
+    tokens: list[str] = field(default_factory=list)
 
 
 def _strip_html(text: str) -> str:
@@ -40,7 +39,7 @@ def _strip_html(text: str) -> str:
     return text.strip()
 
 
-def _tokenize(text: str) -> List[str]:
+def _tokenize(text: str) -> list[str]:
     """中文+英文混合分词。"""
     # 提取中文字符序列 + 英文单词 + 数字
     tokens = []
@@ -57,9 +56,9 @@ def _tokenize(text: str) -> List[str]:
     return tokens
 
 
-def chunk_document(html_path: str) -> List[HelpChunk]:
+def chunk_document(html_path: str) -> list[HelpChunk]:
     """将 USER_GUIDE.html 按 <h2> 标签拆分为章节块。"""
-    with open(html_path, 'r', encoding='utf-8') as f:
+    with open(html_path, encoding='utf-8') as f:
         content = f.read()
 
     # 按 <h2> 拆分
@@ -108,13 +107,13 @@ class BM25Index:
     def __init__(self, k1: float = 1.5, b: float = 0.75):
         self.k1 = k1
         self.b = b
-        self.chunks: List[HelpChunk] = []
-        self._df: Dict[str, int] = {}       # document frequency
-        self._doc_len: List[int] = []        # token count per doc
+        self.chunks: list[HelpChunk] = []
+        self._df: dict[str, int] = {}       # document frequency
+        self._doc_len: list[int] = []        # token count per doc
         self._avgdl: float = 0.0
         self._built = False
 
-    def build(self, chunks: List[HelpChunk]):
+    def build(self, chunks: list[HelpChunk]):
         self.chunks = chunks
         self._df.clear()
         self._doc_len = []
@@ -129,7 +128,7 @@ class BM25Index:
         self._avgdl = sum(self._doc_len) / n if n > 0 else 0
         self._built = True
 
-    def search(self, query: str, top_k: int = 5) -> List[Tuple[HelpChunk, float]]:
+    def search(self, query: str, top_k: int = 5) -> list[tuple[HelpChunk, float]]:
         """BM25 搜索，返回 (chunk, score) 列表。"""
         if not self._built:
             return []
@@ -169,17 +168,17 @@ class SemanticIndex:
     def __init__(self):
         self._model = None
         self._index = None
-        self._chunks: List[HelpChunk] = []
+        self._chunks: list[HelpChunk] = []
         self._available = False
 
     @property
     def available(self) -> bool:
         return self._available
 
-    def build(self, chunks: List[HelpChunk]):
+    def build(self, chunks: list[HelpChunk]):
         try:
-            from sentence_transformers import SentenceTransformer
             import numpy as np
+            from sentence_transformers import SentenceTransformer
 
             self._model = SentenceTransformer(
                 'paraphrase-multilingual-MiniLM-L12-v2')
@@ -206,7 +205,7 @@ class SemanticIndex:
         except ImportError:
             self._available = False
 
-    def search(self, query: str, top_k: int = 5) -> List[Tuple[HelpChunk, float]]:
+    def search(self, query: str, top_k: int = 5) -> list[tuple[HelpChunk, float]]:
         if not self._available or not self._chunks:
             return []
 
@@ -253,8 +252,8 @@ class RAGSettings:
 class HelpEngine:
     """帮助搜索引擎 — 组合 BM25 + 可选语义搜索 + 可选 LLM RAG。"""
 
-    def __init__(self, html_path: Optional[str] = None):
-        self._chunks: List[HelpChunk] = []
+    def __init__(self, html_path: str | None = None):
+        self._chunks: list[HelpChunk] = []
         self._bm25 = BM25Index()
         self._semantic = SemanticIndex()
         self._rag_settings = RAGSettings()
@@ -269,7 +268,7 @@ class HelpEngine:
                 self._bm25.build(self._chunks)
 
     @staticmethod
-    def _find_guide() -> Optional[str]:
+    def _find_guide() -> str | None:
         """查找 USER_GUIDE.html 路径（支持 PyInstaller 打包和开发模式）。"""
         import sys
         # PyInstaller 打包后 sys._MEIPASS 指向临时解压目录
@@ -305,7 +304,7 @@ class HelpEngine:
         self._rag_settings = settings
 
     def search(self, query: str, top_k: int = 5,
-               use_semantic: bool = True) -> List[Dict[str, Any]]:
+               use_semantic: bool = True) -> list[dict[str, Any]]:
         """搜索帮助文档。
 
         Returns: [{"title": ..., "content": ..., "html": ..., "score": ..., "source": "bm25"|"semantic"}, ...]
@@ -334,7 +333,7 @@ class HelpEngine:
         results.sort(key=lambda r: -r["score"])
         return results[:top_k]
 
-    def ask(self, question: str, top_k: int = 3) -> Dict[str, Any]:
+    def ask(self, question: str, top_k: int = 3) -> dict[str, Any]:
         """LLM RAG 问答。
 
         Returns: {"answer": "...", "sources": [...], "error": None|str}
@@ -458,7 +457,7 @@ class HelpEngine:
                     "error": str(e)}
 
 
-def _chunk_to_result(ch: HelpChunk, score: float, source: str) -> Dict[str, Any]:
+def _chunk_to_result(ch: HelpChunk, score: float, source: str) -> dict[str, Any]:
     return {
         "id": ch.id,
         "title": ch.title,

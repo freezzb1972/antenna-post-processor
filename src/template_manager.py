@@ -9,8 +9,7 @@ from __future__ import annotations
 import json
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-
+from typing import Any
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "templates.json"
 
@@ -25,7 +24,7 @@ class TemplatePreset:
         self.default_output_dir = default_output_dir
         self.manufacturer = manufacturer
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         return {
             "name": self.name,
             "path": self.path,
@@ -36,15 +35,15 @@ class TemplatePreset:
 class TemplateManager:
     """加载/查询模板预设 JSON。"""
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None):
         self._path = Path(config_path) if config_path else CONFIG_PATH
-        self._data: Dict[str, Any] = {"manufacturers": []}
+        self._data: dict[str, Any] = {"manufacturers": []}
         self.load()
 
     def load(self):
         if self._path.exists():
             try:
-                with open(self._path, "r", encoding="utf-8") as f:
+                with open(self._path, encoding="utf-8") as f:
                     self._data = json.load(f)
             except (json.JSONDecodeError, OSError):
                 self._data = {"manufacturers": []}
@@ -55,10 +54,10 @@ class TemplateManager:
             json.dump(self._data, f, ensure_ascii=False, indent=2)
 
     @property
-    def manufacturers(self) -> List[str]:
+    def manufacturers(self) -> list[str]:
         return [m["name"] for m in self._data.get("manufacturers", [])]
 
-    def get_templates(self, manufacturer: str) -> List[TemplatePreset]:
+    def get_templates(self, manufacturer: str) -> list[TemplatePreset]:
         for m in self._data.get("manufacturers", []):
             if m["name"] == manufacturer:
                 return [
@@ -72,8 +71,8 @@ class TemplateManager:
                 ]
         return []
 
-    def get_all_templates(self) -> List[TemplatePreset]:
-        result: List[TemplatePreset] = []
+    def get_all_templates(self) -> list[TemplatePreset]:
+        result: list[TemplatePreset] = []
         for m in self._data.get("manufacturers", []):
             for t in m.get("templates", []):
                 result.append(TemplatePreset(
@@ -121,13 +120,6 @@ class TemplateManager:
 
     @staticmethod
     def next_available_filename(base_dir: str, template_name: str) -> str:
-        """在 base_dir 中查找下一个可用序号。"""
-        today = date.today().strftime("%Y%m%d")
-        name = template_name.replace("/", "_").replace("\\", "_")
-        base = Path(base_dir)
-        seq = 1
-        while True:
-            fname = f"{name}_{today}_{seq:02d}.xlsx"
-            if not (base / fname).exists():
-                return fname
-            seq += 1
+        """在 base_dir 中查找下一个可用序号。委托给 ui_utils 统一实现。"""
+        from .ui_utils import next_available_filename as _next_fn
+        return _next_fn(base_dir, template_name, ext=".xlsx", sanitize=True)

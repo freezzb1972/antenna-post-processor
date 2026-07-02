@@ -22,9 +22,8 @@ import os
 import secrets
 import sys
 import threading
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 
 # ── 可选: cryptography 库 (AES-GCM) ──
 try:
@@ -57,7 +56,7 @@ def _sign_trial(machine_id: str, trial_start: str, trial_days: int) -> str:
     签名绑定 (machine_id + trial_start + trial_days)，
     任何篡改都会导致签名验证失败。
     """
-    payload = f"{machine_id}|{trial_start}|{trial_days}".encode('utf-8')
+    payload = f"{machine_id}|{trial_start}|{trial_days}".encode()
     h = _hmac.new(_TRIAL_HMAC_KEY, payload, hashlib.sha256)
     return h.hexdigest()
 
@@ -80,7 +79,7 @@ def _verify_trial(machine_id: str, trial_start: str, trial_days: int, signature:
 # 试用期 = 首次运行日期 + trial_days，但首次运行日期不能晚于
 # build_date + trial_days。这防止了"备份旧 EXE 恢复后重新试用"的攻击。
 
-_build_config_cache: Optional[dict] = None
+_build_config_cache: dict | None = None
 
 
 def _load_build_config() -> dict:
@@ -119,7 +118,7 @@ def _load_build_config() -> dict:
     return config
 
 
-def _get_last_seen_paths() -> List[Path]:
+def _get_last_seen_paths() -> list[Path]:
     """获取单调时间戳的冗余存储路径（防止时间回滚）。"""
     paths = []
     if sys.platform == 'win32':
@@ -132,14 +131,14 @@ def _get_last_seen_paths() -> List[Path]:
     return paths
 
 
-def _get_last_seen() -> Optional[str]:
+def _get_last_seen() -> str | None:
     """读取单调时间戳（从所有冗余位置，取最大值即最新）。
 
     如果某位置不存在或损坏，忽略该位置继续检查其他位置。
     返回 ISO 格式日期字符串 "YYYY-MM-DD"，或 None（首次运行）。
     """
     from datetime import date as _date
-    latest: Optional[_date] = None
+    latest: _date | None = None
 
     # 1. QSettings
     try:
@@ -235,7 +234,7 @@ class LicenseConfig:
     product: str = "AntennaPostProcessor"
     licensee: str = ""
     expiry: str = "PERMANENT"          # "YYYY-MM-DD" 或 "PERMANENT"
-    features: List[str] = field(default_factory=lambda: ["full"])
+    features: list[str] = field(default_factory=lambda: ["full"])
     issued: str = ""
     machine_id: str = ""               # 绑定机器（必填，签发时填入）
     signature: str = ""                # ECDSA base64 签名（正式许可）
@@ -293,7 +292,7 @@ class AppConfig:
     # 路径
     last_template_path: str = ""
     last_output_dir: str = ""
-    last_csv_paths: List[str] = field(default_factory=list)
+    last_csv_paths: list[str] = field(default_factory=list)
     last_rsp_preset_name: str = ""  # 最后使用的 RSP 预设名称
     # LLM
     llm: LLMConfig = field(default_factory=LLMConfig)
@@ -355,7 +354,7 @@ def _derive_key(salt: bytes = None) -> tuple:
     username = os.environ.get('USER', os.environ.get('USERNAME', 'unknown'))
 
     # 组合特征 → 派生密钥
-    material = f"{machine_id}:{hostname}:{username}:{salt.hex()}".encode('utf-8')
+    material = f"{machine_id}:{hostname}:{username}:{salt.hex()}".encode()
     key = hashlib.pbkdf2_hmac('sha256', material, salt, 100_000, dklen=32)
     return key, salt
 
@@ -438,7 +437,7 @@ def decrypt_api_key(ciphertext: str) -> str:
 class ConfigManager:
     """线程安全的配置管理器单例。"""
 
-    _instance: Optional["ConfigManager"] = None
+    _instance: ConfigManager | None = None
     _lock = threading.Lock()
 
     def __new__(cls):
@@ -465,7 +464,7 @@ class ConfigManager:
 
         if config_path.exists():
             try:
-                with open(config_path, 'r', encoding='utf-8') as f:
+                with open(config_path, encoding='utf-8') as f:
                     raw = json.load(f)
                 self._config = self._from_dict(raw)
             except Exception:
@@ -713,7 +712,7 @@ class ConfigManager:
 
         return False
 
-    def get_license_info(self) -> "LicenseConfig":
+    def get_license_info(self) -> LicenseConfig:
         """获取当前许可信息。"""
         return self._config.license
 
@@ -862,7 +861,7 @@ def _get_machine_id_for_trial() -> str:
 
 
 # ── 全局单例 ──
-_config_manager: Optional[ConfigManager] = None
+_config_manager: ConfigManager | None = None
 
 
 def get_config() -> AppConfig:

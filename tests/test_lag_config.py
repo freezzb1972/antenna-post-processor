@@ -9,9 +9,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.lag_config import (
+    PRESET_AUTOMOTIVE,
     LagConfig,
     normalize_header,
-    PRESET_AUTOMOTIVE,
 )
 
 

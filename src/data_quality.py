@@ -17,21 +17,20 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
 
 import numpy as np
-
 
 # ═══════════════════════════════════════════════════════════
 # 检测
 # ═══════════════════════════════════════════════════════════
 
 def detect_phi_anomalies(
-    sections: Dict[str, np.ndarray],
+    sections: dict[str, np.ndarray],
     is_aborted: bool = True,
     q25_threshold: float = 0.72,
-) -> List[int]:
+) -> list[int]:
     """检测损坏的 phi 位置。
 
     对 ABORTED 格式:
@@ -49,9 +48,9 @@ def detect_phi_anomalies(
 
 
 def _detect_aborted_pattern(
-    sections: Dict[str, np.ndarray],
+    sections: dict[str, np.ndarray],
     q25_threshold: float = 0.72,
-) -> List[int]:
+) -> list[int]:
     """检测 ABORTED 格式的 phi 损坏模式。
 
     策略: 检测 `mag(pi) / mag(pi-1)` 的 25% 分位数 < threshold
@@ -107,7 +106,7 @@ def _detect_aborted_pattern(
     return sorted(bad_phis)
 
 
-def _detect_standard_outliers(sections: Dict[str, np.ndarray]) -> List[int]:
+def _detect_standard_outliers(sections: dict[str, np.ndarray]) -> list[int]:
     """标准格式 MAD 离群检测。"""
     bad_phis = set()
 
@@ -158,11 +157,11 @@ def _detect_standard_outliers(sections: Dict[str, np.ndarray]) -> List[int]:
 # ═══════════════════════════════════════════════════════════
 
 def repair_phi_interpolation(
-    sections: Dict[str, np.ndarray],
-    bad_phis: List[int],
+    sections: dict[str, np.ndarray],
+    bad_phis: list[int],
     k_neighbors: int = 4,
     max_search: int = 20,
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """逆距离加权 K 近邻插值修复。
 
     对每个坏 phi，找 K 个最近正常 phi，加权平均修复。
@@ -237,13 +236,13 @@ def repair_phi_interpolation(
 
 def auto_detect_and_repair(
     csv_path: str,
-    output_path: Optional[str] = None,
+    output_path: str | None = None,
     k_neighbors: int = 4,
     q25_threshold: float = 0.72,
     max_search: int = 20,
-    force_phis: Optional[List[int]] = None,
-    progress_callback: Optional[Callable[[int, int, str], None]] = None,
-) -> Dict:
+    force_phis: list[int] | None = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+) -> dict:
     """检测+修复 CSV 文件中的 phi 损坏数据。
 
     Args:
@@ -335,9 +334,9 @@ def auto_detect_and_repair(
 # ═══════════════════════════════════════════════════════════
 
 def _write_repaired_csv(
-    path: str, metadata: str, freqs: List[float],
-    theta: List[float], phi: List[float],
-    sections: Dict[str, np.ndarray],
+    path: str, metadata: str, freqs: list[float],
+    theta: list[float], phi: list[float],
+    sections: dict[str, np.ndarray],
     is_aborted: bool,
 ) -> None:
     """写出修复后的标准格式 CSV。"""

@@ -1,8 +1,9 @@
 """统一数据源抽象接口"""
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+
 import numpy as np
 
 
@@ -16,24 +17,24 @@ class DataSource(ABC):
 
     @property
     @abstractmethod
-    def frequencies(self) -> List[float]:
+    def frequencies(self) -> list[float]:
         """频点列表 (MHz)，按文件顺序。"""
         ...
 
     @property
     @abstractmethod
-    def theta_angles(self) -> List[float]:
+    def theta_angles(self) -> list[float]:
         """俯仰角列表 (°)。"""
         ...
 
     @property
     @abstractmethod
-    def phi_angles(self) -> List[float]:
+    def phi_angles(self) -> list[float]:
         """方位角列表 (°)。"""
         ...
 
     @abstractmethod
-    def read_sections(self, freq_index: int) -> Dict[str, Optional[np.ndarray]]:
+    def read_sections(self, freq_index: int) -> dict[str, np.ndarray | None]:
         """读取单个频点的全部 section 数据。
 
         Args:
@@ -54,7 +55,7 @@ class DataSource(ABC):
         pass
 
     @staticmethod
-    def from_path(path: str) -> "DataSource":
+    def from_path(path: str) -> DataSource:
         """根据文件扩展名自动创建合适的 DataSource。
 
         - .xlsx / .xls → FinalSummarySource
@@ -88,21 +89,21 @@ class ResampledDataSource(DataSource):
         self._base = base
         self._theta_stride = max(1, int(theta_stride))
         self._phi_stride = max(1, int(phi_stride))
-        self._cached: Optional[Dict[int, Dict[str, np.ndarray]]] = None
+        self._cached: dict[int, dict[str, np.ndarray]] | None = None
 
     @property
-    def frequencies(self) -> List[float]:
+    def frequencies(self) -> list[float]:
         return self._base.frequencies
 
     @property
-    def theta_angles(self) -> List[float]:
+    def theta_angles(self) -> list[float]:
         return self._base.theta_angles[::self._theta_stride]
 
     @property
-    def phi_angles(self) -> List[float]:
+    def phi_angles(self) -> list[float]:
         return self._base.phi_angles[::self._phi_stride]
 
-    def read_sections(self, freq_index: int) -> Dict[str, Optional[np.ndarray]]:
+    def read_sections(self, freq_index: int) -> dict[str, np.ndarray | None]:
         data = self._base.read_sections(freq_index)
         out = {}
         for key, arr in data.items():

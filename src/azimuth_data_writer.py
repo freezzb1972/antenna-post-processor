@@ -11,14 +11,13 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, List, Tuple
 
 import numpy as np
 import openpyxl
 
 
 def write_azimuth_data(
-    freq_data: "List[Tuple[float, Dict[float, np.ndarray]]]",
+    freq_data: list[tuple[float, dict[float, np.ndarray]]],
     output_path: str,
     value_label: str = "Gain (dBi)",
 ) -> None:

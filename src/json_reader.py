@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -44,10 +43,10 @@ class JsonDataSource(DataSource):
         if not os.path.isfile(path):
             raise FileNotFoundError(f"JSON 文件不存在: {path}")
         self._path = path
-        self._parsed: Optional[dict] = None
-        self._frequencies: List[float] = []
-        self._theta_angles: List[float] = []
-        self._phi_angles: List[float] = []
+        self._parsed: dict | None = None
+        self._frequencies: list[float] = []
+        self._theta_angles: list[float] = []
+        self._phi_angles: list[float] = []
         self._indexed = False
 
     # ------------------------------------------------------------------
@@ -59,7 +58,7 @@ class JsonDataSource(DataSource):
         if self._parsed is not None:
             return
 
-        with open(self._path, "r", encoding="utf-8") as f:
+        with open(self._path, encoding="utf-8") as f:
             self._parsed = json.load(f)
 
         # 提取 Final Data
@@ -113,17 +112,17 @@ class JsonDataSource(DataSource):
     # ------------------------------------------------------------------
 
     @property
-    def frequencies(self) -> List[float]:
+    def frequencies(self) -> list[float]:
         self._ensure_loaded()
         return list(self._frequencies)
 
     @property
-    def theta_angles(self) -> List[float]:
+    def theta_angles(self) -> list[float]:
         self._ensure_loaded()
         return list(self._theta_angles)
 
     @property
-    def phi_angles(self) -> List[float]:
+    def phi_angles(self) -> list[float]:
         self._ensure_loaded()
         return list(self._phi_angles)
 
@@ -142,7 +141,7 @@ class JsonDataSource(DataSource):
         self._ensure_loaded()
         return len(self._phi_angles)
 
-    def read_sections(self, freq_index: int) -> Dict[str, Optional[np.ndarray]]:
+    def read_sections(self, freq_index: int) -> dict[str, np.ndarray | None]:
         """读取指定频率的 4 个 section 数据。
 
         Returns:
@@ -165,7 +164,7 @@ class JsonDataSource(DataSource):
 
         n_phi = len(self._phi_angles)
         n_theta = len(self._theta_angles)
-        result: Dict[str, Optional[np.ndarray]] = {}
+        result: dict[str, np.ndarray | None] = {}
 
         for out_key, section_name in self.SECTION_MAP.items():
             section = final.get(section_name, {})

@@ -5,17 +5,15 @@ UI 工具函数（无 Qt 依赖）
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Set, Tuple
-
 from src.lag_config import LagConfig
 
 
 def build_param_summary_text(
     test_mode: int,
-    required_params: Set[str],
-    extra_params: Set[str],
+    required_params: set[str],
+    extra_params: set[str],
     lag_config: LagConfig,
-    ar_lag_config: Optional[LagConfig] = None,
+    ar_lag_config: LagConfig | None = None,
 ) -> str:
     """构建天线参数摘要字符串。
 
@@ -67,7 +65,7 @@ def build_param_summary_text(
     return "\n".join(lines)
 
 
-def _get_param_labels() -> Dict[str, str]:
+def _get_param_labels() -> dict[str, str]:
     """返回参数 key → 人类可读名称的映射。"""
     return {
         "gain": "Gain",
@@ -100,7 +98,7 @@ def _get_param_labels() -> Dict[str, str]:
     }
 
 
-def merge_params_from_columns(column_types: Set[str]) -> Set[str]:
+def merge_params_from_columns(column_types: set[str]) -> set[str]:
     """从模板列类型推断需要的计算参数。
 
     从 column_patterns.json 的 col_type 映射到计算参数 key。
@@ -146,8 +144,42 @@ def merge_params_from_columns(column_types: Set[str]) -> Set[str]:
         "unknown": set(),
     }
 
-    result: Set[str] = set()
+    result: set[str] = set()
     for ct in column_types:
         params = COL_TYPE_TO_PARAM.get(ct, {ct})
         result.update(params)
     return result
+
+
+# ═══════════════════════════════════════════════════════════════
+# 通用文件工具
+# ═══════════════════════════════════════════════════════════════
+
+def next_available_filename(directory: str, base_name: str, ext: str = "",
+                            mkdir: bool = False, sanitize: bool = False) -> str:
+    """生成不重复的文件名: {name}_{YYYYMMDD}_{seq:02d}{ext}
+
+    Args:
+        directory: 目标目录
+        base_name: 基础文件名
+        ext: 扩展名 (含点, 如 ".xlsx")
+        mkdir: 是否自动创建目录
+        sanitize: 是否清理路径分隔符
+
+    Returns:
+        完整路径 (若 mkdir=False 且 dir 不存在则只返回文件名)
+    """
+    from datetime import date
+    from pathlib import Path
+
+    name = base_name.replace("/", "_").replace("\\", "_") if sanitize else base_name
+    today = date.today().strftime("%Y%m%d")
+    d = Path(directory)
+    if mkdir:
+        d.mkdir(parents=True, exist_ok=True)
+    seq = 1
+    while True:
+        fname = f"{name}_{today}_{seq:02d}{ext}"
+        if not (d / fname).exists():
+            return str(d / fname) if mkdir else fname
+        seq += 1

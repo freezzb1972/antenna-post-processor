@@ -1,0 +1,48 @@
+{
+  "_description": "控件/函数 → 测试 映射表。git diff 后自动选择最少的测试集验证改动。",
+  "ui_widgets": {
+    "btnStart": ["test_gui_smoke.py::TestAlwaysVisibleButtons", "test_gui_e2e.py"],
+    "btnStop": ["test_gui_smoke.py::TestAlwaysVisibleButtons"],
+    "btnQuick": ["test_gui_smoke.py::TestConfigTabButtons::test_quick_angle*"],
+    "btnAddCustomAngle": ["test_gui_smoke.py::TestConfigTabButtons::test_add_custom_angle_click_no_crash"],
+    "btnAddRange": ["test_gui_smoke.py::TestConfigTabButtons::test_add_range_click_no_crash"],
+    "btnStepGenerate": ["test_gui_smoke.py::TestConfigTabButtons::test_step_generate_click_no_crash"],
+    "btnClearConfig": ["test_gui_smoke.py::TestConfigTabButtons::test_clear_config_click_no_crash"],
+    "btnLoadFromTemplate": ["test_gui_smoke.py::TestConfigTabButtons::test_load_from_template_click_no_crash"],
+    "btnLoadPreset": ["test_gui_smoke.py::TestConfigTabButtons::test_load_preset_click_no_crash"],
+    "btnSavePreset": ["test_gui_smoke.py::TestConfigTabButtons::test_save_preset_click_no_crash"],
+    "_btn_add_files": ["test_gui_smoke.py::TestFileSettingsPageButtons", "test_gui_e2e.py"],
+    "_btn_auto_match": ["test_gui_smoke.py::TestFileSettingsPageButtons", "test_gui_e2e.py"],
+    "_btn_clear_all": ["test_gui_smoke.py::TestFileSettingsPageButtons"],
+    "_btn_clear_selected": ["test_gui_smoke.py::TestFileSettingsPageButtons"],
+    "editTemplatePath": ["test_gui_health.py::TestLayoutGeometry", "test_gui_e2e.py::TestFileInput"],
+    "editOutputDir": ["test_gui_health.py::TestLayoutGeometry"],
+    "editOutputName": ["test_gui_health.py::TestLayoutGeometry"],
+    "tabConfig": ["test_gui_smoke.py::TestTabConfig", "test_gui_health.py::TestTabVisibility"],
+    "_nav_list": ["test_gui_smoke.py::TestNavItems", "test_gui_e2e.py::TestNavAntennaParams"],
+    "_page_stack": ["test_gui_smoke.py::TestNavItems::test_nav_round_trip"],
+    "progressBar": ["test_gui_health.py::TestLayoutGeometry", "test_gui_e2e.py::TestProgressBar"],
+    "logOutput": ["test_gui_health.py::TestLayoutGeometry"],
+    "menuBar": ["test_gui_smoke.py::TestAllMenuActions"],
+    "_file_settings_page": ["test_gui_smoke.py::TestFileSettingsPageButtons", "test_gui_e2e.py::TestFileInput"]
+  },
+  "src_modules": {
+    "calculator.py": ["test_calculator.py"],
+    "pipeline.py": ["test_pipeline.py", "test_e2e_features.py::TestStaleDataProtection"],
+    "exporter.py": ["test_exporter.py"],
+    "parser.py": ["test_parser.py"],
+    "excel_reader.py": ["test_excel_reader.py"],
+    "lag_config.py": ["test_lag_config.py"],
+    "sheet_file_matcher.py": ["test_sheet_file_matcher.py"],
+    "finalsummary_reader.py": ["test_finalsummary_reader.py"],
+    "datasource.py": ["test_pipeline.py", "test_e2e_features.py"],
+    "worker.py": ["test_gui_e2e.py"],
+    "dialogs.py": ["test_gui_smoke.py::TestAllDialogs", "test_gui_e2e.py::TestDialogs"],
+    "main_window.py": ["test_gui_smoke.py", "test_gui_health.py", "test_gui_e2e.py"]
+  },
+  "ui_files": {
+    "main_window.py": ["test_gui_smoke.py", "test_gui_health.py", "test_gui_e2e.py"],
+    "dialogs.py": ["test_gui_smoke.py::TestAllDialogs", "test_gui_e2e.py::TestDialogs"],
+    "compiled/ui_main_window.py": ["test_gui_health.py::TestLayoutGeometry"]
+  }
+}

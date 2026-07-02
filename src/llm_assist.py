@@ -9,8 +9,9 @@ to an empty result, so the caller's pipeline is never blocked.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Optional
 
 Logger = Optional[Callable[[str], None]]
 
@@ -27,7 +28,7 @@ class LLMSettings:
     local_endpoint: str = "http://localhost:11434"
 
     @classmethod
-    def from_qsettings(cls) -> "LLMSettings":
+    def from_qsettings(cls) -> LLMSettings:
         """从统一配置文件加载 LLM 设置。"""
         from src.config_manager import get_config_manager
         mgr = get_config_manager()
@@ -106,7 +107,7 @@ class LLMAssist:
     def suggest_file_matches(
         sheet_names: list,
         data_files: list,
-        current_matches: Optional[dict] = None,
+        current_matches: dict | None = None,
         logger: Logger = None,
     ) -> dict:
         """对自动匹配后仍未匹配的工作表/文件, 使用 LLM 给出建议。

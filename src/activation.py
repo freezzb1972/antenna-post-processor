@@ -19,9 +19,7 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
-from typing import Optional, Tuple
 
 # 默认激活服务器 URL（用户可通过 QSettings 或环境变量覆盖）
 _DEFAULT_SERVER_URL = "http://activation.antenna-pp.local:8899"
@@ -55,15 +53,15 @@ def set_server_url(url: str):
 
 
 def activate(activation_code: str, machine_id: str,
-             server_url: Optional[str] = None) -> Tuple[bool, str]:
+             server_url: str | None = None) -> tuple[bool, str]:
     """
     向激活服务器请求许可。返回 (成功与否, 消息)。
 
     成功时自动保存许可到 ~/.antenna_pp_license.json。
     失败时返回错误消息。
     """
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     url = (server_url or get_server_url()).rstrip("/") + "/activate"
 

@@ -62,7 +62,6 @@ class TestMultiFileInput:
 
     def test_auto_match_triggered(self, window, qtbot):
         """设置模板后，添加数据文件触发自动匹配。"""
-        import os
         tpl = str(Path(__file__).parent.parent / "data" / "template_5G1.xlsx")
         if not Path(tpl).exists():
             pytest.skip("template_5G1.xlsx not found")
@@ -79,13 +78,12 @@ class TestMultiFileInput:
 
     def test_build_datasource_map(self, window, qtbot):
         """构建 datasource_map — 不崩溃且有结果。"""
-        from src.datasource import DataSource
 
         window._data_file_paths = []
         try:
             ds_map = window._build_datasource_map()
             assert isinstance(ds_map, dict)
-        except Exception as e:
+        except Exception:
             # 如果文件不存在，允许返回空 dict
             pass
 
@@ -267,10 +265,11 @@ class TestStaleDataProtection:
 
     def test_pipeline_double_run_consistency(self):
         """两次独立运行 pipeline，结果应完全一致。"""
-        from src.datasource import DataSource
-        from src.pipeline import run_pipeline
-        from src.lag_config import PRESET_AUTOMOTIVE
         from pathlib import Path
+
+        from src.datasource import DataSource
+        from src.lag_config import PRESET_AUTOMOTIVE
+        from src.pipeline import run_pipeline
 
         data_path = "data/5G1_merged.csv"
         template_path = "data/template_5G1.xlsx"
@@ -296,6 +295,7 @@ class TestStaleDataProtection:
 
         # 逐行逐字段比对（只比数值，跳过路径相关字段）
         from itertools import zip_longest
+
         import numpy as np
         all_keys = sorted(set().union(*(d.keys() for v in r1.values() for d in v)))
         skip_keys = {"输出文件", "输出目录", "完整报告", "数据源"}
@@ -341,8 +341,9 @@ class TestStaleDataProtection:
 
     def test_datasource_close_reopen_consistency(self):
         """关闭后重新打开同一数据源，频点列表和读取结果应一致。"""
-        from src.datasource import DataSource
         from pathlib import Path
+
+        from src.datasource import DataSource
 
         data_path = "data/5G1_merged.csv"
         if not Path(data_path).exists():
@@ -359,7 +360,7 @@ class TestStaleDataProtection:
         ds2.close()
 
         assert freqs1 == freqs2, f"频点列表不一致: {freqs1} vs {freqs2}"
-        assert data1.keys() == data2.keys(), f"section 不一致"
+        assert data1.keys() == data2.keys(), "section 不一致"
         for k in data1:
             d1, d2 = data1[k], data2[k]
             assert len(d1) == len(d2), f"{k} 行数不一致"

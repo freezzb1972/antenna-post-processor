@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
 
 # 与 src/file_entry.py 保持一致的测试模式常量
 MODE_PASSIVE = 0   # 无源天线
@@ -52,7 +51,7 @@ class RspPreset:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "RspPreset":
+    def from_dict(cls, d: dict) -> RspPreset:
         return cls(
             name=d.get("name", ""),
             test_mode=d.get("test_mode", MODE_ANY),
@@ -72,10 +71,10 @@ class RspPresetManager:
     }
     """
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None):
         self._path = Path(config_path) if config_path else CONFIG_PATH
-        self._presets: List[RspPreset] = []
-        self._defaults: Dict[int, str] = {}  # test_mode → preset_name
+        self._presets: list[RspPreset] = []
+        self._defaults: dict[int, str] = {}  # test_mode → preset_name
         self.load()
 
     # ── 持久化 ──
@@ -83,7 +82,7 @@ class RspPresetManager:
     def load(self):
         if self._path.exists():
             try:
-                with open(self._path, "r", encoding="utf-8") as f:
+                with open(self._path, encoding="utf-8") as f:
                     data = json.load(f)
                 self._presets = [RspPreset.from_dict(p) for p in data.get("presets", [])]
                 raw_defaults = data.get("defaults", {})
@@ -102,7 +101,7 @@ class RspPresetManager:
 
     # ── 默认值管理 ──
 
-    def set_default(self, test_mode: int, preset_name: Optional[str]):
+    def set_default(self, test_mode: int, preset_name: str | None):
         """设置某测试模式的默认 RSP 预设。preset_name 为 None 则清除。"""
         if preset_name:
             self._defaults[test_mode] = preset_name
@@ -110,36 +109,36 @@ class RspPresetManager:
             self._defaults.pop(test_mode, None)
         self.save()
 
-    def get_default(self, test_mode: int) -> Optional[str]:
+    def get_default(self, test_mode: int) -> str | None:
         """获取某测试模式的默认预设名。"""
         return self._defaults.get(test_mode)
 
     @property
-    def defaults(self) -> Dict[int, str]:
+    def defaults(self) -> dict[int, str]:
         return dict(self._defaults)
 
     # ── 查询 ──
 
     @property
-    def presets(self) -> List[RspPreset]:
+    def presets(self) -> list[RspPreset]:
         return self._presets.copy()
 
     @property
-    def names(self) -> List[str]:
+    def names(self) -> list[str]:
         return [p.name for p in self._presets]
 
-    def get_by_name(self, name: str) -> Optional[RspPreset]:
+    def get_by_name(self, name: str) -> RspPreset | None:
         for p in self._presets:
             if p.name == name:
                 return p
         return None
 
-    def get_by_test_mode(self, test_mode: int) -> List[RspPreset]:
+    def get_by_test_mode(self, test_mode: int) -> list[RspPreset]:
         """返回匹配指定测试模式的预设（包括 MODE_ANY 通用预设）。"""
         return [p for p in self._presets
                 if p.test_mode in (test_mode, MODE_ANY)]
 
-    def get_best_match(self, test_mode: int) -> Optional[RspPreset]:
+    def get_best_match(self, test_mode: int) -> RspPreset | None:
         """返回最匹配的预设。
 
         优先级:

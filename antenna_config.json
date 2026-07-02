@@ -1,9 +1,9 @@
 {
-  "font_size": 13,
+  "font_size": 16,
   "theme": "dark_teal",
   "language": "zh_CN",
-  "last_template_path": "",
-  "last_output_dir": "",
+  "last_template_path": "D:/CC/Ralab Test Data/安费诺L1andL5/AFN_GNSS.xlsx",
+  "last_output_dir": "D:/CC/Ralab Test Data/安费诺L1andL5/ETS/AFN_withAMP",
   "last_csv_paths": [
     "/tmp/file1.csv"
   ],
@@ -25,17 +25,17 @@
     "local_endpoint": "http://localhost:11434",
     "_api_key": ""
   },
-  "window_geometry": "AdnQywADAAAAAAAAAAAAAAAABBkAAAK7AAAAAAAAAAAAAAQZAAACuwAAAAAAAAAAB4AAAAAAAAAAAAAABBkAAAK7",
+  "window_geometry": "AdnQywADAAAAAAABAAAAFwAAA1YAAALWAAAAAwAAABkAAANUAAAC1AAAAAAAAAAAAyAAAAADAAAAGQAAA1QAAALU",
   "license": {
     "product": "AntennaPostProcessor",
     "licensee": "Trial User",
-    "expiry": "2026-07-21",
+    "expiry": "2026-07-30",
     "features": [
       "full"
     ],
-    "issued": "2026-06-21",
+    "issued": "2026-06-30",
     "machine_id": "",
-    "signature": "MEYCIQDNdqzPdbCSs+0PxyrzJxxPQkxUqUgCaAc815gMncm8eQIhANfxr6s9ZEeKpWJ6r/kmxJ8nVD8oElXfStYhNwHex8ZY",
+    "signature": "MEUCIAR9x0V5U2toEqJrDQUxiaroNlSeWm81tAkXpUoQzrSNAiEAsXYq1CpELnSoY3Fxx9MLxmAi0APlGlgA/uOURrCbPbE=",
     "trial_start": "",
     "trial_days": 0,
     "trial_hmac": ""

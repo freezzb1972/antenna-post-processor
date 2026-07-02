@@ -31,7 +31,7 @@ class ProbeCalibration:
 
     @classmethod
     def from_boresight(cls, e_measured: np.ndarray,
-                        expected_gain_dbi: float = 0.0) -> "ProbeCalibration":
+                        expected_gain_dbi: float = 0.0) -> ProbeCalibration:
         """从 boresight 方向测量数据估计校准系数。
 
         假设 boresight 方向各探头应有相同的响应 (全向参考天线),
@@ -50,7 +50,7 @@ class ProbeCalibration:
         return cls(coeffs)
 
     @classmethod
-    def from_file(cls, path: str) -> "ProbeCalibration":
+    def from_file(cls, path: str) -> ProbeCalibration:
         """从校准文件加载系数 (CSV: probe_index, amplitude_dB, phase_deg)."""
         data = np.loadtxt(path, delimiter=",", skiprows=1)
         amp_db = data[:, 1]

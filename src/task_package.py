@@ -16,14 +16,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import shutil
 import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-
+from typing import Any
 
 TASK_PACKAGE_EXT = ".ant"
 TASK_PACKAGE_VERSION = 1
@@ -32,11 +30,11 @@ TASK_PACKAGE_VERSION = 1
 def save_task_package(
     output_path: str,
     task_name: str,
-    data_file_paths: List[str],
+    data_file_paths: list[str],
     template_path: str,
-    config_snapshot: Dict[str, Any],
-    results: Optional[Dict[str, List[Dict]]] = None,
-    images: Optional[Dict[str, List[str]]] = None,
+    config_snapshot: dict[str, Any],
+    results: dict[str, list[dict]] | None = None,
+    images: dict[str, list[str]] | None = None,
 ) -> str:
     """保存任务包到 .ant 文件。"""
     p = Path(output_path)
@@ -106,7 +104,7 @@ def save_task_package(
     return str(p)
 
 
-def load_task_package(path: str) -> Dict[str, Any]:
+def load_task_package(path: str) -> dict[str, Any]:
     """加载 .ant 任务包，返回 task.json 内容。"""
     p = Path(path)
     if not p.exists() or p.suffix.lower() != TASK_PACKAGE_EXT:
@@ -114,12 +112,12 @@ def load_task_package(path: str) -> Dict[str, Any]:
 
     with zipfile.ZipFile(str(p), "r") as zf:
         if "task.json" not in zf.namelist():
-            raise ValueError(f"任务包损坏: 缺少 task.json")
+            raise ValueError("任务包损坏: 缺少 task.json")
         with zf.open("task.json") as f:
             return json.loads(f.read().decode("utf-8"))
 
 
-def verify_data_integrity(task_meta: Dict[str, Any]) -> Dict[str, str]:
+def verify_data_integrity(task_meta: dict[str, Any]) -> dict[str, str]:
     """验证任务包中的数据文件是否与原文件一致。
 
     返回: {"原文件路径": "ok|modified|missing"}
@@ -148,13 +146,6 @@ def _file_hash(path: Path) -> str:
 
 
 def next_available_filename(directory: str, base_name: str) -> str:
-    """生成不重复的任务包文件名。"""
-    d = Path(directory)
-    d.mkdir(parents=True, exist_ok=True)
-    today = datetime.now().strftime("%Y%m%d")
-    seq = 1
-    while True:
-        name = f"{base_name}_{today}_{seq:02d}{TASK_PACKAGE_EXT}"
-        if not (d / name).exists():
-            return str(d / name)
-        seq += 1
+    """生成不重复的任务包文件名。委托给 ui_utils 统一实现。"""
+    from .ui_utils import next_available_filename as _next_fn
+    return _next_fn(directory, base_name, ext=TASK_PACKAGE_EXT, mkdir=True)

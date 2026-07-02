@@ -1,7 +1,6 @@
 """PlotConfig — 3D 方向图配置，独立于 pipeline 模块避免过早加载 matplotlib。"""
 
 from __future__ import annotations
-from typing import Optional
 
 
 class PlotConfig:
@@ -12,7 +11,7 @@ class PlotConfig:
     dpi: int = 150
     step_deg: float = 5.0       # 3D 图形采样精度 (°) — 值越小越精细但越慢
     embed_in_excel: bool = True
-    save_png_folder: Optional[str] = None
+    save_png_folder: str | None = None
 
     def __init__(self, *, elev=30.0, azim=-60.0, dpi=150,
                  step_deg=5.0, embed_in_excel=True, save_png_folder=None):

@@ -595,7 +595,10 @@ class CloudRenderer(BaseRenderer):
         except Exception:
             return False
 
+    # ── 核心分流逻辑: try-remote-or-fallback ──
+
     def _post_render(self, path: str, payload: dict) -> io.BytesIO:
+        """POST 到云端渲染服务，返回 PNG 字节流。"""
         try:
             import requests
         except ImportError:
@@ -616,96 +619,82 @@ class CloudRenderer(BaseRenderer):
         buf.seek(0)
         return buf
 
+    def _render_remote_or_fallback(self, method_name: str, path: str,
+                                    payload: dict, args: tuple, kwargs: dict) -> io.BytesIO:
+        """统一的 try-remote-or-fallback 分流器。
+
+        Args:
+            method_name: BaseRenderer 方法名 (如 "render_3d_pattern")
+            path: REST API 路径
+            payload: JSON 请求体
+            args: 位置参数 (传给 fallback)
+            kwargs: 关键字参数 (传给 fallback)
+        """
+        if not self._is_available():
+            return getattr(self._fallback, method_name)(*args, **kwargs)
+        try:
+            return self._post_render(path, payload)
+        except Exception:
+            return getattr(self._fallback, method_name)(*args, **kwargs)
+
+    # ── 渲染方法: 全部委托给 _render_remote_or_fallback ──
+
     def render_3d_pattern(self, theta_deg, phi_deg, gain_dbi, freq_mhz,
                           *, elev=30.0, azim=-60.0, dpi=150,
                           title="", antenna_name="", colormap="emquest"):
-        if not self._is_available():
-            return self._fallback.render_3d_pattern(
-                theta_deg, phi_deg, gain_dbi, freq_mhz,
-                elev=elev, azim=azim, dpi=dpi,
-                title=title, antenna_name=antenna_name, colormap=colormap)
-
-        try:
-            return self._post_render("/api/v1/render/3d", {
-                "theta": theta_deg.tolist(),
-                "phi": phi_deg.tolist(),
-                "gain": gain_dbi.tolist(),
-                "freq_mhz": freq_mhz,
-                "elev": elev, "azim": azim, "dpi": dpi,
-                "title": title, "antenna_name": antenna_name,
-                "colormap": colormap,
-            })
-        except Exception:
-            return self._fallback.render_3d_pattern(
-                theta_deg, phi_deg, gain_dbi, freq_mhz,
-                elev=elev, azim=azim, dpi=dpi,
-                title=title, antenna_name=antenna_name, colormap=colormap)
+        return self._render_remote_or_fallback(
+            "render_3d_pattern", "/api/v1/render/3d",
+            {"theta": theta_deg.tolist(), "phi": phi_deg.tolist(),
+             "gain": gain_dbi.tolist(), "freq_mhz": freq_mhz,
+             "elev": elev, "azim": azim, "dpi": dpi,
+             "title": title, "antenna_name": antenna_name, "colormap": colormap},
+            (theta_deg, phi_deg, gain_dbi, freq_mhz),
+            {"elev": elev, "azim": azim, "dpi": dpi,
+             "title": title, "antenna_name": antenna_name, "colormap": colormap})
 
     def render_2d_polar(self, angles_deg, gain_dbi, freq_mhz,
                         *, cut_label="", dpi=150, antenna_name=""):
-        if not self._is_available():
-            return self._fallback.render_2d_polar(
-                angles_deg, gain_dbi, freq_mhz,
-                cut_label=cut_label, dpi=dpi, antenna_name=antenna_name)
-        try:
-            return self._post_render("/api/v1/render/2d/polar", {
-                "angles": angles_deg.tolist(),
-                "gain": gain_dbi.tolist(),
-                "freq_mhz": freq_mhz,
-                "cut_label": cut_label, "dpi": dpi,
-                "antenna_name": antenna_name,
-            })
-        except Exception:
-            return self._fallback.render_2d_polar(
-                angles_deg, gain_dbi, freq_mhz,
-                cut_label=cut_label, dpi=dpi, antenna_name=antenna_name)
+        return self._render_remote_or_fallback(
+            "render_2d_polar", "/api/v1/render/2d/polar",
+            {"angles": angles_deg.tolist(), "gain": gain_dbi.tolist(),
+             "freq_mhz": freq_mhz, "cut_label": cut_label, "dpi": dpi,
+             "antenna_name": antenna_name},
+            (angles_deg, gain_dbi, freq_mhz),
+            {"cut_label": cut_label, "dpi": dpi, "antenna_name": antenna_name})
 
     def render_2d_rect(self, angles_deg, gain_dbi, freq_mhz,
                        *, xlabel="Theta (deg)", cut_label="", dpi=150,
                        antenna_name=""):
-        if not self._is_available():
-            return self._fallback.render_2d_rect(
-                angles_deg, gain_dbi, freq_mhz,
-                xlabel=xlabel, cut_label=cut_label, dpi=dpi,
-                antenna_name=antenna_name)
-        try:
-            return self._post_render("/api/v1/render/2d/rect", {
-                "angles": angles_deg.tolist(),
-                "gain": gain_dbi.tolist(),
-                "freq_mhz": freq_mhz,
-                "xlabel": xlabel, "cut_label": cut_label, "dpi": dpi,
-                "antenna_name": antenna_name,
-            })
-        except Exception:
-            return self._fallback.render_2d_rect(
-                angles_deg, gain_dbi, freq_mhz,
-                xlabel=xlabel, cut_label=cut_label, dpi=dpi,
-                antenna_name=antenna_name)
-
-    def render_gain_vs_theta(self, theta_deg, values, freq_mhz, *,
-                              antenna_name="", dpi=150, ylabel="Gain (dBi)"):
-        return self._fallback("render_gain_vs_theta")
+        return self._render_remote_or_fallback(
+            "render_2d_rect", "/api/v1/render/2d/rect",
+            {"angles": angles_deg.tolist(), "gain": gain_dbi.tolist(),
+             "freq_mhz": freq_mhz, "xlabel": xlabel, "cut_label": cut_label,
+             "dpi": dpi, "antenna_name": antenna_name},
+            (angles_deg, gain_dbi, freq_mhz),
+            {"xlabel": xlabel, "cut_label": cut_label, "dpi": dpi,
+             "antenna_name": antenna_name})
 
     def render_azimuth_polar(self, phi_deg, curves, freq_mhz,
                              *, antenna_name="", dpi=150,
                              ylabel="Gain (dBi)"):
-        if not self._is_available():
-            return self._fallback.render_azimuth_polar(
-                phi_deg, curves, freq_mhz,
-                antenna_name=antenna_name, dpi=dpi, ylabel=ylabel)
-        try:
-            return self._post_render("/api/v1/render/2d/azimuth_polar", {
-                "phi": phi_deg.tolist(),
-                "curves": [(float(k), v.tolist()) for k, v in curves],
-                "freq_mhz": freq_mhz,
-                "antenna_name": antenna_name,
-                "dpi": dpi,
-                "ylabel": ylabel,
-            })
-        except Exception:
-            return self._fallback.render_azimuth_polar(
-                phi_deg, curves, freq_mhz,
-                antenna_name=antenna_name, dpi=dpi, ylabel=ylabel)
+        return self._render_remote_or_fallback(
+            "render_azimuth_polar", "/api/v1/render/2d/azimuth_polar",
+            {"phi": phi_deg.tolist(),
+             "curves": [(float(k), v.tolist()) for k, v in curves],
+             "freq_mhz": freq_mhz, "antenna_name": antenna_name,
+             "dpi": dpi, "ylabel": ylabel},
+            (phi_deg, curves, freq_mhz),
+            {"antenna_name": antenna_name, "dpi": dpi, "ylabel": ylabel})
+
+    def render_gain_vs_theta(self, theta_deg, values, freq_mhz, *,
+                              antenna_name="", dpi=150, ylabel="Gain (dBi)"):
+        return self._render_remote_or_fallback(
+            "render_gain_vs_theta", "/api/v1/render/2d/gain_vs_theta",
+            {"theta": theta_deg.tolist(), "values": values.tolist(),
+             "freq_mhz": freq_mhz, "antenna_name": antenna_name,
+             "dpi": dpi, "ylabel": ylabel},
+            (theta_deg, values, freq_mhz),
+            {"antenna_name": antenna_name, "dpi": dpi, "ylabel": ylabel})
 
 
 # ═══════════════════════════════════════════════════════════════

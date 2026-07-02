@@ -12,8 +12,10 @@
   },
   "qualityGates": {
     "gui-check": { "command": "python3 gui_integrity_check.py", "trigger": "ui/*.py changed" },
+    "gui-health": { "command": "python3 -m pytest tests/test_gui_health.py -q -k \"not RealData and not Performance\"", "trigger": "ui/*.py changed" },
     "size-gate": { "command": "python3 build_size_gate.py --spec-only", "trigger": "*.spec changed" },
-    "verify-py": { "command": "python3 -m pytest tests/ -q", "trigger": "any .py changed" }
+    "verify-py": { "command": "python3 -m pytest tests/ -q", "trigger": "any .py changed" },
+    "static-analysis": { "command": "python3 static_analysis_gate.py --quick", "trigger": "any .py changed" }
   },
   "stats": {
     "filesModified": 0,

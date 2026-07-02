@@ -99,12 +99,12 @@ class ProbeCorrection:
         self.s_max = max(len(self.r_te), len(self.r_tm))
 
     @classmethod
-    def default(cls) -> "ProbeCorrection":
+    def default(cls) -> ProbeCorrection:
         """理想电偶极子探头 (开放式波导近似)."""
         return cls()
 
     @classmethod
-    def from_calibration(cls, cal_path: str) -> "ProbeCorrection":
+    def from_calibration(cls, cal_path: str) -> ProbeCorrection:
         """从校准文件加载探头系数 (CSV: s, Re{R_te}, Im{R_te}, Re{R_tm}, Im{R_tm})."""
         data = np.loadtxt(cal_path, delimiter=",", skiprows=1)
         r_te = data[:, 1] + 1j * data[:, 2]

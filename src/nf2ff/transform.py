@@ -8,11 +8,10 @@ NF2FF 变换核心
 from __future__ import annotations
 
 import numpy as np
-from scipy.special import spherical_jn, spherical_yn
 
+from .probe import ProbeCorrection
 from .utils import estimate_n_max
 from .vector_wave import build_vector_transfer_matrix, synthesize_farfield_vector
-from .probe import ProbeCorrection
 
 
 class NF2FF:

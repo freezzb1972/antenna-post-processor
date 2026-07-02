@@ -14,16 +14,14 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-
 
 # ═══════════════════════════════════════════════════════════
 # RSP 文件解析
 # ═══════════════════════════════════════════════════════════
 
-def _parse_rsp_file(path: str, col_idx: int) -> Dict[float, float]:
+def _parse_rsp_file(path: str, col_idx: int) -> dict[float, float]:
     """从 RSP 文件读取指定列 (CSV 或 Excel 格式)。
 
     Args:
@@ -33,7 +31,7 @@ def _parse_rsp_file(path: str, col_idx: int) -> Dict[float, float]:
     Returns:
         {frequency_mhz: value} 读取到的频率-值映射。
     """
-    result: Dict[float, float] = {}
+    result: dict[float, float] = {}
     ext = path.rsplit('.', 1)[-1].lower() if '.' in path else ''
 
     if ext in ('xlsx', 'xls'):
@@ -58,7 +56,7 @@ def _parse_rsp_file(path: str, col_idx: int) -> Dict[float, float]:
         except Exception: pass
     else:
         try:
-            with open(path, 'r', encoding='utf-8-sig') as f:
+            with open(path, encoding='utf-8-sig') as f:
                 reader = csv.reader(f)
                 in_data = False
                 for row in reader:
@@ -79,7 +77,7 @@ def _parse_rsp_file(path: str, col_idx: int) -> Dict[float, float]:
     return result
 
 
-def parse_rsp_csv(path: str) -> Dict[float, float]:
+def parse_rsp_csv(path: str) -> dict[float, float]:
     """解析 EMQuest 导出的 .rsp 文件第2列 (Response dB)。
 
     公式: Gain(dBi) = S21(dB) - Response(dB)
@@ -88,7 +86,7 @@ def parse_rsp_csv(path: str) -> Dict[float, float]:
     return _parse_rsp_file(path, col_idx=1)
 
 
-def parse_rsp_phase(path: str) -> Dict[float, float]:
+def parse_rsp_phase(path: str) -> dict[float, float]:
     """解析 RSP 文件的 Phase 列 (Response Phase, 第3列)。
 
     Returns:
@@ -135,10 +133,10 @@ def _apply_rsp_phase(data, freqs, rsp_phase_data):
 def _apply_rsp_calibration(
     tl: np.ndarray, tp: np.ndarray,
     pl: np.ndarray, pp: np.ndarray,
-    freqs: List[float],
-    rsp_h: Dict[float, float], rsp_v: Dict[float, float],
-    rsp_h_phase: Dict[float, float], rsp_v_phase: Dict[float, float],
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    freqs: list[float],
+    rsp_h: dict[float, float], rsp_v: dict[float, float],
+    rsp_h_phase: dict[float, float], rsp_v_phase: dict[float, float],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """RSP 路径损耗校准 (幅度 + 相位)，统一入口。
 
     公式:
@@ -164,10 +162,10 @@ def _apply_rsp_calibration(
 # ═══════════════════════════════════════════════════════════
 
 def check_rsp_coverage(
-    rsp_data: Dict[float, float],
-    file_freqs: List[float],
+    rsp_data: dict[float, float],
+    file_freqs: list[float],
     tolerance_mhz: float = 1.0,
-) -> List[str]:
+) -> list[str]:
     """检查 RSP 校准数据是否覆盖文件的频率范围。
 
     Args:
@@ -195,7 +193,7 @@ def check_rsp_coverage(
     return warnings
 
 
-def _rsp_freq_bounds(rsp_data: Dict[float, float]) -> Tuple[float, float]:
+def _rsp_freq_bounds(rsp_data: dict[float, float]) -> tuple[float, float]:
     """返回 RSP 数据的频率边界 (min, max)。"""
     rsp_freqs = sorted(rsp_data.keys())
     return (rsp_freqs[0], rsp_freqs[-1])
@@ -207,4 +205,4 @@ class RspCoverageResult:
     ok: bool = True                              # True = 全部覆盖
     rsp_h_bounds: str = ""                        # "400 - 6000 MHz"
     rsp_v_bounds: str = ""
-    warnings: List[str] = field(default_factory=list)  # 警告信息列表
+    warnings: list[str] = field(default_factory=list)  # 警告信息列表
