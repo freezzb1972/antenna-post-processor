@@ -257,6 +257,7 @@ class MatplotlibRenderer(BaseRenderer):
         ax.set_thetagrids(range(0, 360, 30),
                           labels=[f"{d}°" for d in range(0, 360, 30)],
                           fontsize=7)
+        ax.set_rlabel_position(30)
 
         title_parts = []
         if antenna_name:
@@ -274,7 +275,7 @@ class MatplotlibRenderer(BaseRenderer):
         if r_ticks[-1] < rmax: r_ticks.append(r_ticks[-1] + step)
         ax.set_ylim(0, r_ticks[-1])
         ax.set_yticks(r_ticks)
-        ax.set_yticklabels([f"{v}" for v in r_ticks], fontsize=6)
+        ax.set_yticklabels([f"{v}" for v in r_ticks], fontsize=7)
 
         ax.set_ylabel("Gain (dBi)", fontsize=9, labelpad=20)
         ax.grid(True, alpha=0.4)
@@ -357,7 +358,7 @@ class MatplotlibRenderer(BaseRenderer):
         ax.set_thetagrids(range(0, 360, 30),
                           labels=[f"{d}°" for d in range(0, 360, 30)],
                           fontsize=7)
-        ax.set_rlabel_position(135)
+        ax.set_rlabel_position(30)
 
         # 标题: 频率+ylabel 合一 (由 title 参数控制)
         if title:
@@ -376,10 +377,10 @@ class MatplotlibRenderer(BaseRenderer):
             r_ticks.append(r_ticks[-1] + step)
         ax.set_ylim(0, r_ticks[-1])
         ax.set_yticks(r_ticks)
-        ax.set_yticklabels([f"{v}" for v in r_ticks], fontsize=6)
+        ax.set_yticklabels([f"{v}" for v in r_ticks], fontsize=7)
 
         if len(sorted_curves) > 1:
-            ax.legend(loc="upper right", fontsize=6, framealpha=0.7)
+            ax.legend(loc="upper right", fontsize=7, framealpha=0.7)
 
         fig.tight_layout(pad=1.0)
         return _fig_to_png_buffer(fig, dpi)
