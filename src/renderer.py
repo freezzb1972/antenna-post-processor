@@ -537,14 +537,14 @@ def _render_dual_y_axes(ax, freqs, v1, label1, v2, label2):
     ax1.plot(freqs, v1, "o-", markersize=4, color="#1f77b4")
     ax1.set_ylabel(label1, color="#1f77b4")
     ax1.tick_params(axis="y", labelcolor="#1f77b4")
-    ax1.yaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
+    ax1.yaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True, steps=[1,2,5,10]))
     ax1.grid(True, alpha=0.3)
 
     ax2 = ax1.twinx()
     ax2.plot(freqs, v2, "s--", markersize=4, color="#d62728")
     ax2.set_ylabel(label2, color="#d62728")
     ax2.tick_params(axis="y", labelcolor="#d62728")
-    ax2.yaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
+    ax2.yaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True, steps=[1,2,5,10]))
     return ax1, ax2
 
 
