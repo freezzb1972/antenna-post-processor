@@ -78,6 +78,72 @@ def write_chart_word_report(
     doc.save(output_path)
 
 
+def write_chart_word_report_by_freq(
+    freq_pairs: Dict[float, Dict[str, io.BytesIO]],
+    pair_order: List[str],
+    pair_labels: Dict[str, str],
+    output_path: str,
+    antenna_name: str = "",
+    image_width_cm: float = 8.0,
+    extra_groups: Dict[str, Dict[float, io.BytesIO]] = None,
+    extra_angles: str = "",
+) -> None:
+    """按频点排列图表: 每频点一行 N 张图并排。
+
+    Args:
+        freq_pairs: {freq_mhz: {image_key: BytesIO}}. 如:
+            {1164: {"azimuth_polar": buf, "azimuth_polar_pk070": buf}, ...}
+        pair_order: 图片 key 的输出顺序, 如 ["azimuth_polar", "azimuth_polar_pk070"]
+        pair_labels: {image_key: 题注标签}, 如 {"azimuth_polar": "Gain Azimuth Cut"}
+        output_path: 输出 .docx 路径
+        antenna_name: 天线名
+        image_width_cm: 图片宽度 (cm)
+    """
+    doc = Document()
+
+    for section in doc.sections:
+        section.page_width = Cm(21.0)
+        section.page_height = Cm(29.7)
+        section.top_margin = Cm(2.0)
+        section.bottom_margin = Cm(2.0)
+        section.left_margin = Cm(2.0)
+        section.right_margin = Cm(2.0)
+
+    img_width = Cm(image_width_cm)
+    freqs = sorted(freq_pairs.keys())
+    n_cols = len(pair_order)
+
+    for freq in freqs:
+        images = freq_pairs[freq]
+        if n_cols == 1:
+            key = pair_order[0]
+            buf = images.get(key)
+            if buf:
+                cap = f"{freq:.0f} MHz — {pair_labels.get(key, key)}"
+                _add_single_image(doc, buf, cap, width=img_width)
+        else:
+            table = doc.add_table(rows=1, cols=n_cols)
+            table.alignment = WD_TABLE_ALIGNMENT.CENTER
+            for ci, key in enumerate(pair_order):
+                buf = images.get(key)
+                if buf:
+                    cap = f"{freq:.0f} MHz — {pair_labels.get(key, key)}"
+                    _add_cell_image(table.cell(0, ci), buf, cap, width=img_width)
+
+    # 追加 B 类或其他图表组
+    if extra_groups:
+        for group_name, images in extra_groups.items():
+            if not images: continue
+            heading = doc.add_heading(group_name, level=1)
+            heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            freqs_extra = sorted(images.keys())
+            _write_image_grid(doc, images, freqs_extra, antenna_name,
+                              group_name, extra_angles, Cm(image_width_cm), 1)
+
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    doc.save(output_path)
+
+
 def _make_caption(antenna_name: str, freq_mhz: float, group_name: str,
                   angles_str: str) -> str:
     """生成图片题注。"""
@@ -156,4 +222,4 @@ def _write_image_grid(
                                         angles_str)
                     _add_cell_image(table.cell(0, j), images[freq], cap,
                                     width=img_width)
-                doc.add_paragraph()
+                # 图片间不加空段 — 紧凑排列

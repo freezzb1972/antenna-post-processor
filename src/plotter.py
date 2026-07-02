@@ -324,7 +324,7 @@ def generate_all_for_frequency(
                 images["azimuth_polar_pk070"] = _renderer.render_azimuth_polar(
                     phi_deg, curves_070, freq_mhz,
                     antenna_name=az_antenna, dpi=az_dpi,
-                    ylabel="Gain 0-70° Pk (dBi)",
+                    ylabel="Gain θ=0°-70° (step=1°)",
                 )
             except Exception:
                 pass

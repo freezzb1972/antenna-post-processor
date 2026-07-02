@@ -1087,7 +1087,7 @@ def _export_azimuth(
             "3d_eirp": "3D EIRP Pattern",
             "3d_ar": "3D Axial Ratio Pattern",
             "azimuth_polar": "Gain Azimuth Cut",
-            "azimuth_polar_pk070": "Gain 0-70° Pk Azimuth",
+            "azimuth_polar_pk070": "Gain Azimuth (θ=0°-70°)",
             "azimuth_polar_ar": "AR Azimuth Cut",
             "azimuth_polar_rhcp": "RHCP Azimuth Cut",
             "azimuth_polar_lhcp": "LHCP Azimuth Cut",
@@ -1246,51 +1246,67 @@ def _export_azimuth(
             except Exception as e:
                 _log(log_callback, f"  ✗ Gain 0-70° Pk 数据导出失败: {e}")
 
+    # ── 按频点配对: azimuth_polar + azimuth_polar_pk070 并排 ──
+    freq_pairs: "Dict[float, Dict[str, io.BytesIO]]" = {}
+    if out_word and azimuth_config and azimuth_config.cut_azimuth_polar \
+            and azimuth_config.cut_azimuth_polar_pk070:
+        for row in (r for rows in sheet_results.values() for r in rows):
+            f = row.get("frequency")
+            if f is None: continue
+            imgs = row.get("_images", {})
+            if "azimuth_polar" in imgs and "azimuth_polar_pk070" in imgs:
+                freq_pairs[f] = {"azimuth_polar": imgs["azimuth_polar"],
+                                 "azimuth_polar_pk070": imgs["azimuth_polar_pk070"]}
+
+    # 分离 B 类 (非 azimuth) 图片
+    extra_groups = {k: v for k, v in image_groups.items()
+                    if not k.startswith("Gain Azimuth") and not k.startswith("Gain 0-70")} \
+        if image_groups else {}
+
     # Write Word
-    if out_word and image_groups:
+    if out_word and (freq_pairs or extra_groups):
         az = azimuth_config or None
         word_path = az.chart_output_path if az else ""
         if not word_path:
             _log(log_callback, "  ⚠ 未设置 Word 输出路径, 跳过图表报告")
         elif word_template_path and os.path.exists(word_template_path):
-            # ── 模板模式: 用 WordReporter 填充模板 ──
-            _log(log_callback, f"生成图表报告 (模板): {word_path}")
+            # 模板模式略 (暂不处理 freq_pairs)
+            pass
+        elif freq_pairs:
+            from .chart_word_writer import write_chart_word_report_by_freq
+            _log(log_callback, f"生成图表报告 (按频点): {word_path}")
             try:
-                from .word_reporter import WordReporter
-                reporter = WordReporter(word_template_path)
-                reporter.scan()
-                # 收集 bookmark_images: 每组图片取第一张
-                bookmark_images = {}
-                for group_name, freq_imgs in image_groups.items():
-                    first_img = next(iter(freq_imgs.values()), None)
-                    if first_img:
-                        bookmark_images[group_name] = first_img.getvalue()
-                reporter.fill_all(
-                    sheet_results,
-                    bookmark_images=bookmark_images,
+                write_chart_word_report_by_freq(
+                    freq_pairs,
+                    pair_order=["azimuth_polar", "azimuth_polar_pk070"],
+                    pair_labels={
+                        "azimuth_polar": "Gain Azimuth Cut",
+                        "azimuth_polar_pk070": "Gain Azimuth (θ=0°-70°)",
+                    },
+                    output_path=word_path,
+                    antenna_name=az.antenna_name if az else "",
+                    extra_groups=extra_groups if extra_groups else None,
                 )
-                reporter.save(word_path)
-                total_imgs = sum(len(v) for v in image_groups.values())
-                _log(log_callback, f"  ✓ Word 模板报告已保存 ({len(image_groups)} 组, {total_imgs} 张图)")
+                total = len(freq_pairs) * 2 + sum(len(v) for v in extra_groups.values())
+                _log(log_callback, f"  ✓ Word 报告已保存 ({len(freq_pairs)} 频点, {total} 张图)")
             except Exception as e:
-                _log(log_callback, f"  ✗ Word 模板报告生成失败: {e}")
-                import traceback; traceback.print_exc()
+                _log(log_callback, f"  ✗ Word 报告生成失败: {e}")
         else:
-            # ── 自动模式: 用 chart_word_writer 生成 ──
+            # 无 azimuth 对, 回退到旧 writer
             _log(log_callback, f"生成图表报告: {word_path}")
             try:
                 angles_str = ", ".join(
                     f"{a:.0f}°" for a in (az.azimuth_cut_angles if az else [])
                 ) if (az and az.azimuth_cut_angles) else ""
                 write_chart_word_report(
-                    image_groups, word_path,
+                    extra_groups, word_path,
                     antenna_name=az.antenna_name if az else "",
                     angles_str=angles_str,
                     layout_columns=az.word_columns if az else 2,
                     image_width_pct=az.word_image_width_pct if az else 90,
                 )
-                total_imgs = sum(len(v) for v in image_groups.values())
-                _log(log_callback, f"  ✓ Word 报告已保存 ({len(image_groups)} 组, {total_imgs} 张图)")
+                total_imgs = sum(len(v) for v in extra_groups.values())
+                _log(log_callback, f"  ✓ Word 报告已保存 ({len(extra_groups)} 组, {total_imgs} 张图)")
             except Exception as e:
                 _log(log_callback, f"  ✗ Word 报告生成失败: {e}")
 

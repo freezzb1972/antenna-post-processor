@@ -335,7 +335,7 @@ class MatplotlibRenderer(BaseRenderer):
         for i, (theta_angle, gain_1d) in enumerate(sorted_curves):
             color = colors[i % len(colors)]
             ls = linestyles[(i // len(colors)) % len(linestyles)]
-            label = f"θ={theta_angle:.0f}°"
+            label = f"{ylabel.split()[0]} at θ={theta_angle:.0f}°"
             # 闭合曲线: 追加起点到终点 (phi=0 → phi=360)
             gain_close = np.empty(len(gain_1d) + 1)
             gain_close[:-1] = gain_1d
