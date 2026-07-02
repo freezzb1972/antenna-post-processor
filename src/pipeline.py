@@ -456,6 +456,11 @@ def _process_one_frequency(
                 row["_azimuth_lhcp_db"] = lhcp_db
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
+            # Gain vs Theta 0-70° 中间数据
+            if azimuth_config and azimuth_config.cut_azimuth_polar:
+                mask = theta_deg <= 70.1
+                row["_gain_vs_theta_deg"] = theta_deg[mask].copy()
+                row["_gain_vs_theta_db"] = np.max(gain_dbi[:, mask], axis=0)
         except Exception as e:
             row["_graph_error"] = str(e)  # 图形生成失败不阻塞数据处理
 
@@ -1034,6 +1039,7 @@ def _export_azimuth(
     """
     from .chart_word_writer import write_chart_word_report
     from .azimuth_data_writer import write_azimuth_data
+    from pathlib import Path
 
     # ── 收集所有图片和中间数据 ──
     image_groups: "Dict[str, Dict[float, io.BytesIO]]" = {}
@@ -1041,6 +1047,7 @@ def _export_azimuth(
     freq_ar_data: "List[Tuple[float, Dict[float, np.ndarray]]]" = []
     freq_rhcp_data: "List[Tuple[float, Dict[float, np.ndarray]]]" = []
     freq_lhcp_data: "List[Tuple[float, Dict[float, np.ndarray]]]" = []
+    freq_gain_vs_theta: "List[Tuple[float, np.ndarray, np.ndarray]]" = []  # [(freq, theta_deg, values)]
 
     import io as _io
 
@@ -1063,6 +1070,7 @@ def _export_azimuth(
             "3d_eirp": "3D EIRP Pattern",
             "3d_ar": "3D Axial Ratio Pattern",
             "azimuth_polar": "Gain Azimuth Cut",
+            "gain_vs_theta": "Gain 0-70° vs Theta",
             "azimuth_polar_ar": "AR Azimuth Cut",
             "azimuth_polar_rhcp": "RHCP Azimuth Cut",
             "azimuth_polar_lhcp": "LHCP Azimuth Cut",
@@ -1188,6 +1196,38 @@ def _export_azimuth(
                     nearest = float(theta_deg_arr[idx])
                     ld[nearest] = lhcp_db_v[:, idx].copy()
                 freq_lhcp_data.append((freq, ld))
+            # Gain vs Theta 0-70° 中间数据
+            gvt_deg = row.get("_gain_vs_theta_deg")
+            gvt_db = row.get("_gain_vs_theta_db")
+            if gvt_deg is not None and gvt_db is not None and freq is not None:
+                freq_gain_vs_theta.append((freq, gvt_deg.copy(), gvt_db.copy()))
+
+    # Write Gain vs Theta intermediate data
+    if out_data and freq_gain_vs_theta:
+        gvt_path = ""
+        if azimuth_config:
+            gdir = azimuth_config.data_gain_output_dir
+            gfn = azimuth_config.data_gain_output_filename
+            if gdir and gfn:
+                gvt_path = str(Path(gdir) / gfn.replace('Gain', 'GainVsTheta'))
+        if gvt_path:
+            _log(log_callback, f"Gain vs Theta 中间数据: {gvt_path}")
+            try:
+                import openpyxl as _xl
+                wb = _xl.Workbook(); wb.remove(wb.active)
+                ws = wb.create_sheet("Gain vs Theta")
+                # 表头: Freq | Theta0 | Theta1 | ...
+                ws.cell(1, 1, "Frequency (MHz)")
+                for ti in range(len(freq_gain_vs_theta[0][1])):
+                    ws.cell(1, ti + 2, f"Theta {freq_gain_vs_theta[0][1][ti]:.0f}°")
+                for ri, (f, tdeg, vals) in enumerate(freq_gain_vs_theta):
+                    ws.cell(ri + 2, 1, round(f, 6))
+                    for ti in range(len(vals)):
+                        ws.cell(ri + 2, ti + 2, round(float(vals[ti]), 6))
+                wb.save(gvt_path); wb.close()
+                _log(log_callback, f"  ✓ Gain vs Theta 数据已保存 ({len(freq_gain_vs_theta)} 频点)")
+            except Exception as e:
+                _log(log_callback, f"  ✗ Gain vs Theta 数据导出失败: {e}")
 
     # Write Word
     if out_word and image_groups:

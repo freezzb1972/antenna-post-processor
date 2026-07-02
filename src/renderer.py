@@ -115,6 +115,26 @@ class BaseRenderer(ABC):
         """
         ...
 
+    @abstractmethod
+    def render_gain_vs_theta(
+        self,
+        theta_deg: np.ndarray,
+        values: np.ndarray,
+        freq_mhz: float,
+        *,
+        antenna_name: str = "",
+        dpi: int = 150,
+        ylabel: str = "Gain (dBi)",
+    ) -> io.BytesIO:
+        """渲染 Gain vs Theta 2D Cartesian 线图 (θ=0-70° 峰值增益)。
+
+        Args:
+            theta_deg: Theta 角度数组 (°)
+            values: 每个 theta 角度对应的增益值 (dBi)
+            freq_mhz: 频率 (MHz)
+        """
+        ...
+
     def close(self):
         """释放渲染器资源（可选覆盖）。"""
         pass
@@ -344,6 +364,33 @@ class MatplotlibRenderer(BaseRenderer):
                       fontsize=7, framealpha=0.8)
 
         fig.tight_layout(pad=1.5)
+        return _fig_to_png_buffer(fig, dpi)
+
+    def render_gain_vs_theta(
+        self,
+        theta_deg: np.ndarray,
+        values: np.ndarray,
+        freq_mhz: float,
+        *,
+        antenna_name: str = "",
+        dpi: int = 150,
+        ylabel: str = "Gain (dBi)",
+    ) -> io.BytesIO:
+        """渲染 Gain vs Theta 2D Cartesian 线图 (θ=0-70° 峰值增益)。"""
+        fig, ax = plt.subplots(figsize=(6, 4), dpi=dpi)
+        ax.plot(theta_deg, values, "o-", linewidth=1.5, markersize=3, color="#1f77b4")
+        ax.set_xlabel("Theta (°)")
+        ax.set_ylabel(ylabel)
+        ax.grid(True, alpha=0.3)
+        ax.set_xlim(theta_deg[0] - 1, theta_deg[-1] + 1)
+
+        lo, hi = np.min(values), np.max(values)
+        margin = max((hi - lo) * 0.1, 0.5)
+        ax.set_ylim(lo - margin, hi + margin)
+        ax.set_title(f"{freq_mhz:.0f} MHz" + (f" — {antenna_name}" if antenna_name else ""),
+                     fontsize=9)
+
+        fig.tight_layout()
         return _fig_to_png_buffer(fig, dpi)
 
     def render_freq_curve_dual(self, freqs: list,
@@ -636,6 +683,10 @@ class CloudRenderer(BaseRenderer):
                 angles_deg, gain_dbi, freq_mhz,
                 xlabel=xlabel, cut_label=cut_label, dpi=dpi,
                 antenna_name=antenna_name)
+
+    def render_gain_vs_theta(self, theta_deg, values, freq_mhz, *,
+                              antenna_name="", dpi=150, ylabel="Gain (dBi)"):
+        return self._fallback("render_gain_vs_theta")
 
     def render_azimuth_polar(self, phi_deg, curves, freq_mhz,
                              *, antenna_name="", dpi=150,

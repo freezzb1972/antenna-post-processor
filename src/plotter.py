@@ -117,6 +117,29 @@ def _match_theta_indices(
     return indices
 
 
+def generate_gain_vs_theta(
+    theta_deg: np.ndarray,
+    gain_dbi: np.ndarray,
+    freq_mhz: float,
+    *,
+    antenna_name: str = "",
+    dpi: int = 150,
+    theta_max: float = 70.0,
+) -> io.BytesIO:
+    """生成 Gain vs Theta 2D Cartesian 线图 (θ=0-70° 峰值增益)。
+
+    取每个 theta 角度的 phi 方向峰值增益，绘制 Theta-Gain 曲线。
+    """
+    # 限制 theta 范围 0-70°
+    mask = theta_deg <= theta_max + 0.1
+    t = theta_deg[mask]
+    pk_gain = np.max(gain_dbi[:, mask], axis=0)
+    return _renderer.render_gain_vs_theta(
+        t, pk_gain, freq_mhz,
+        antenna_name=antenna_name, dpi=dpi,
+    )
+
+
 def generate_azimuth_polar_cut(
     phi_deg: np.ndarray,
     curves: "List[Tuple[float, np.ndarray]]",
@@ -293,6 +316,14 @@ def generate_all_for_frequency(
         if azimuth_config.cut_azimuth_polar:
             _render_azimuth(gain_dbi, azimuth_config.angles_sorted,
                            "azimuth_polar", "Gain (dBi)")
+            # 附加: Gain 0-70° 单曲线 2D 图 (每频点一张, 跟在多曲线图后面)
+            try:
+                images["gain_vs_theta"] = generate_gain_vs_theta(
+                    theta_deg, gain_dbi, freq_mhz,
+                    antenna_name=az_antenna, dpi=az_dpi,
+                )
+            except Exception:
+                pass
         if azimuth_config.cut_azimuth_polar_ar and ar_linear is not None:
             ar_db_vals = 20.0 * np.log10(np.maximum(ar_linear, 1e-15))
             _render_azimuth(ar_db_vals, azimuth_config.angles_ar_sorted,
