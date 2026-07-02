@@ -593,16 +593,17 @@ def _setup_polar_radial_ticks(ax):
     if vmax - vmin <= 0:
         vmax = vmin + 10
 
+    # 遍历候选步长, 选内外总浪费最小的 (4-7 圈)
     best_ticks = None
-    best_outer_gap = float('inf')
+    best_waste = float('inf')
     for step in [1, 2, 5, 10, 20, 50, 100, 200, 500]:
         outer = int(np.ceil(vmax / step)) * step
         inner = int(np.floor(vmin / step)) * step
         n = (outer - inner) // step + 1
-        if 4 <= n <= 8:  # 4-8 圈理想
-            gap = outer - vmax
-            if gap < best_outer_gap:
-                best_outer_gap = gap
+        if 4 <= n <= 7:
+            waste = (outer - vmax) + (vmin - inner)
+            if waste < best_waste:
+                best_waste = waste
                 best_ticks = list(range(inner, outer + step, step))
     if best_ticks is None:  # fallback
         step = max(1, int(round((vmax - vmin) / 5)))
