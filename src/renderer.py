@@ -267,15 +267,7 @@ class MatplotlibRenderer(BaseRenderer):
             title_parts.append(cut_label)
         ax.set_title(" — ".join(title_parts), fontsize=12, pad=18)
 
-        # 径向刻度等差取整
-        yl = ax.get_ylim()
-        rmax = yl[1] * 1.05
-        step = max(1.0, round(rmax / 5))
-        r_ticks = list(range(0, int(np.ceil(rmax)) + step, step))
-        if r_ticks[-1] < rmax: r_ticks.append(r_ticks[-1] + step)
-        ax.set_ylim(0, r_ticks[-1])
-        ax.set_yticks(r_ticks)
-        ax.set_yticklabels([f"{v}" for v in r_ticks], fontsize=10)
+        _setup_polar_radial_ticks(ax)
 
         ax.set_ylabel("Gain (dBi)", fontsize=10, labelpad=20)
         ax.grid(True, alpha=0.4)
@@ -368,16 +360,7 @@ class MatplotlibRenderer(BaseRenderer):
 
         ax.grid(True, alpha=0.4)
 
-        # 极坐标径向刻度: 等差取整, 每圈都标数值 (含最外圈)
-        yl = ax.get_ylim()
-        rmax = yl[1] * 1.05
-        step = max(1.0, round(rmax / 5))
-        r_ticks = list(range(0, int(np.ceil(rmax)) + step, step))
-        if r_ticks[-1] < rmax:
-            r_ticks.append(r_ticks[-1] + step)
-        ax.set_ylim(0, r_ticks[-1])
-        ax.set_yticks(r_ticks)
-        ax.set_yticklabels([f"{v}" for v in r_ticks], fontsize=10)
+        _setup_polar_radial_ticks(ax)
 
         if len(sorted_curves) > 1:
             ax.legend(loc="upper right", fontsize=10, framealpha=0.7)
@@ -418,13 +401,7 @@ class MatplotlibRenderer(BaseRenderer):
                                 title: str = "", dpi: int = 150,
                                 gap_mhz: int = 10) -> io.BytesIO:
         """双Y轴频点曲线 GridSpec 多段双轴 + 连接虚线。"""
-        n = len(freqs)
-        threshold = gap_mhz if gap_mhz > 0 else 999999
-        segments = []; seg_start = 0
-        for i in range(1, n):
-            if freqs[i] - freqs[i-1] > threshold:
-                segments.append((seg_start, i)); seg_start = i
-        segments.append((seg_start, n))
+        segments = _detect_freq_gaps(freqs, gap_mhz)
         has_gap = len(segments) > 1
 
         fig = plt.figure(figsize=(8, 4.5))
@@ -472,13 +449,7 @@ class MatplotlibRenderer(BaseRenderer):
         段间用虚线连接示意(不暗示连续数据)。
         gap_mhz=0 时传统单轴。
         """
-        n = len(freqs)
-        threshold = gap_mhz if gap_mhz > 0 else 999999
-        segments = []; seg_start = 0
-        for i in range(1, n):
-            if freqs[i] - freqs[i-1] > threshold:
-                segments.append((seg_start, i)); seg_start = i
-        segments.append((seg_start, n))
+        segments = _detect_freq_gaps(freqs, gap_mhz)
         has_gap = len(segments) > 1
 
         fig = plt.figure(figsize=(8, 4.5))
@@ -560,6 +531,32 @@ def _render_dual_y_axes(ax, freqs, v1, label1, v2, label2):
     ax2.set_ylabel(label2, color="#d62728")
     ax2.tick_params(axis="y", labelcolor="#d62728")
     return ax1, ax2
+
+
+def _setup_polar_radial_ticks(ax):
+    """极坐标径向刻度: 等差取整, 每圈标注, 最外圈覆盖数据。"""
+    yl = ax.get_ylim()
+    rmax = yl[1] * 1.05
+    step = max(1.0, round(rmax / 5))
+    r_ticks = list(range(0, int(np.ceil(rmax)) + step, step))
+    if r_ticks[-1] < rmax:
+        r_ticks.append(r_ticks[-1] + step)
+    ax.set_ylim(0, r_ticks[-1])
+    ax.set_yticks(r_ticks)
+    ax.set_yticklabels([f"{v}" for v in r_ticks], fontsize=10)
+
+
+def _detect_freq_gaps(freqs: list, gap_mhz: int = 10) -> list[tuple[int, int]]:
+    """检测频段间隙 (>gap_mhz), 返回 [(start, end), ...] 段索引列表。"""
+    threshold = gap_mhz if gap_mhz > 0 else 999999
+    segments = []
+    seg_start = 0
+    for i in range(1, len(freqs)):
+        if freqs[i] - freqs[i-1] > threshold:
+            segments.append((seg_start, i))
+            seg_start = i
+    segments.append((seg_start, len(freqs)))
+    return segments
 
 
 class CloudRenderer(BaseRenderer):
