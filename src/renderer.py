@@ -333,7 +333,7 @@ class MatplotlibRenderer(BaseRenderer):
         for i, (theta_angle, gain_1d) in enumerate(sorted_curves):
             color = colors[i % len(colors)]
             ls = linestyles[(i // len(colors)) % len(linestyles)]
-            label = f"Gain at θ={theta_angle:.0f}°"
+            label = f"θ={theta_angle:.0f}°"
             gain_close = np.empty(len(gain_1d) + 1)
             gain_close[:-1] = gain_1d
             gain_close[-1] = gain_1d[0]
