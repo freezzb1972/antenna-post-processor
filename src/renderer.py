@@ -417,8 +417,18 @@ class MatplotlibRenderer(BaseRenderer):
                     x.append(f - off)
                 lo, hi = int(np.ceil(sf[0])), int(np.floor(sf[-1]))
                 span = hi - lo
-                ival = max(1, int(round(span / 4))) if span >= 4 else 1
-                for t in range(lo + ival, hi, ival):
+                # Nice step: 10, 20, 50, 100...
+                raw = span / 4.0
+                mag = 10 ** int(np.floor(np.log10(raw))) if raw > 0 else 1
+                r = raw / mag
+                if r < 1.5:       ival = mag
+                elif r < 3:        ival = 2 * mag
+                elif r < 7:        ival = 5 * mag
+                else:              ival = 10 * mag
+                ival = max(10, int(ival))
+                # Round lo up to next multiple of ival
+                t0 = ((lo + ival - 1) // ival) * ival
+                for t in range(t0, hi, ival):
                     if min(t - sf[0], sf[-1] - t) < ival * 0.5:
                         continue
                     xt.append(t - off)
@@ -457,8 +467,18 @@ class MatplotlibRenderer(BaseRenderer):
                 # 段内整数等差刻度, 跳过距边界 < 半步的
                 lo, hi = int(np.ceil(sf[0])), int(np.floor(sf[-1]))
                 span = hi - lo
-                ival = max(1, int(round(span / 4))) if span >= 4 else 1
-                for t in range(lo + ival, hi, ival):
+                # Nice step: 10, 20, 50, 100...
+                raw = span / 4.0
+                mag = 10 ** int(np.floor(np.log10(raw))) if raw > 0 else 1
+                r = raw / mag
+                if r < 1.5:       ival = mag
+                elif r < 3:        ival = 2 * mag
+                elif r < 7:        ival = 5 * mag
+                else:              ival = 10 * mag
+                ival = max(10, int(ival))
+                # Round lo up to next multiple of ival
+                t0 = ((lo + ival - 1) // ival) * ival
+                for t in range(t0, hi, ival):
                     if min(t - sf[0], sf[-1] - t) < ival * 0.5:
                         continue
                     xt.append(t - off)
