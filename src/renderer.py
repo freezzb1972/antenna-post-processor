@@ -417,17 +417,19 @@ class MatplotlibRenderer(BaseRenderer):
                 if len(sf) > 3: ticks_f.insert(1, sf[len(sf)//2])
                 ax.set_xticks(ticks_f)
                 ax.set_xticklabels([f"{f:.0f}" for f in ticks_f], fontsize=10)
+                # 只保留底部 x 轴, 隐藏间隙相邻 spine
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
                 axes.append(ax)
             for i in range(len(axes)-1):
-                axL, axR = axes[i], axes[i+1]
-                segL = segments[i]; segR = segments[i+1]
-                yL1 = v1[segL[1]-1]; yR1 = v1[segR[0]]
-                pL = axL.transData.transform((freqs[segL[1]-1], yL1))
-                pR = axR.transData.transform((freqs[segR[0]], yR1))
-                fL = fig.transFigure.inverted().transform(pL)
-                fR = fig.transFigure.inverted().transform(pR)
-                fig.lines.append(plt.Line2D([fL[0], fR[0]], [fL[1], fR[1]],
-                    transform=fig.transFigure, color='gray', linewidth=0.8, linestyle='--', alpha=0.5))
+                axes[i].spines['right'].set_visible(False)
+                axes[i+1].spines['left'].set_visible(False)
+            # 横坐标断口连接线
+            for i in range(len(axes)-1):
+                bboxL = axes[i].get_position()
+                bboxR = axes[i+1].get_position()
+                fig.lines.append(plt.Line2D([bboxL.x1, bboxR.x0], [bboxL.y0, bboxR.y0],
+                    transform=fig.transFigure, color='gray', linewidth=0.6, linestyle='-', alpha=0.4))
             fig.supxlabel("Frequency (MHz)", fontsize=10, y=0.03)
             fig.subplots_adjust(wspace=0.15, left=0.12, right=0.85)
         else:
@@ -469,23 +471,23 @@ class MatplotlibRenderer(BaseRenderer):
                 if len(sf) > 3: ticks_f.insert(1, sf[len(sf)//2])
                 ax.set_xticks(ticks_f)
                 ax.set_xticklabels([f"{f:.0f}" for f in ticks_f], fontsize=10)
+                # 只保留底部 x 轴, 隐藏其他 spine (避免顶部横线和间隙竖线)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
                 axes.append(ax)
-            # 段间虚线连接 (示意非连续)
+            # 隐藏间隙相邻 spine (避免竖直实线)
             for i in range(len(axes)-1):
-                axL, axR = axes[i], axes[i+1]
-                segL = segments[i]; segR = segments[i+1]
-                xL = freqs[segL[1]-1]; yL = values[segL[1]-1]
-                xR = freqs[segR[0]];   yR = values[segR[0]]
-                # 在左右轴的交界处画虚线
-                line = plt.Line2D([1, 0], [yL, yR], transform=fig.transFigure,
-                                  color='gray', linewidth=0.8, linestyle='--', alpha=0.5)
-                fig.lines.append(line)
-                # 需转换坐标: ax 的 data coords → figure coords
-                pL = axL.transData.transform((xL, yL))
-                pR = axR.transData.transform((xR, yR))
-                fL = fig.transFigure.inverted().transform(pL)
-                fR = fig.transFigure.inverted().transform(pR)
-                fig.lines[-1].set_data([fL[0], fR[0]], [fL[1], fR[1]])
+                axes[i].spines['right'].set_visible(False)
+                axes[i+1].spines['left'].set_visible(False)
+            # 横坐标断口连接线 (仅示意x轴连续)
+            for i in range(len(axes)-1):
+                # 左轴右下角 → 右轴左下角, 用 figure 坐标
+                bboxL = axes[i].get_position()
+                bboxR = axes[i+1].get_position()
+                xL = bboxL.x1; yL = bboxL.y0
+                xR = bboxR.x0; yR = bboxR.y0
+                fig.lines.append(plt.Line2D([xL, xR], [yL, yR],
+                    transform=fig.transFigure, color='gray', linewidth=0.6, linestyle='-', alpha=0.4))
             fig.supxlabel("Frequency (MHz)", fontsize=10, y=0.03)
             fig.supylabel(ylabel or label, fontsize=10, x=0.04)
             if label: axes[0].legend(fontsize=10)
