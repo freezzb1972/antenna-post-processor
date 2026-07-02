@@ -429,11 +429,14 @@ class MatplotlibRenderer(BaseRenderer):
                 # Round lo up to next multiple of ival
                 t0 = ((lo + ival - 1) // ival) * ival
                 for t in range(t0, hi, ival):
-                    if min(t - sf[0], sf[-1] - t) < ival * 0.5:
+                    if min(t - sf[0], sf[-1] - t) < ival * 0.8:
                         continue
                     xt.append(t - off)
                     xl.append(f"{t}")
                 seg_i += 1; seg_start = i
+        # 首尾频率标注
+        xt.insert(0, x[0]); xl.insert(0, f"{freqs[0]:.0f}")
+        xt.append(x[-1]); xl.append(f"{freqs[-1]:.0f}")
 
         fig, ax = plt.subplots(figsize=(8, 4.5), dpi=dpi)
         # 分段绘制双Y轴, 段间不连线
@@ -486,11 +489,14 @@ class MatplotlibRenderer(BaseRenderer):
                 # Round lo up to next multiple of ival
                 t0 = ((lo + ival - 1) // ival) * ival
                 for t in range(t0, hi, ival):
-                    if min(t - sf[0], sf[-1] - t) < ival * 0.5:
+                    if min(t - sf[0], sf[-1] - t) < ival * 0.8:
                         continue
                     xt.append(t - off)
                     xl.append(f"{t}")
                 seg_i += 1; seg_start = i
+        # 首尾频率标注
+        xt.insert(0, x[0]); xl.insert(0, f"{freqs[0]:.0f}")
+        xt.append(x[-1]); xl.append(f"{freqs[-1]:.0f}")
 
         fig, ax = plt.subplots(figsize=(8, 4.5), dpi=dpi)
         # 分段绘制, 段间不连线
