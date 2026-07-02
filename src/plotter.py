@@ -316,11 +316,16 @@ def generate_all_for_frequency(
         if azimuth_config.cut_azimuth_polar:
             _render_azimuth(gain_dbi, azimuth_config.angles_sorted,
                            "azimuth_polar", "Gain (dBi)")
-            # 附加: Gain 0-70° 单曲线 2D 图 (每频点一张, 跟在多曲线图后面)
+            # 附加: Gain 0-70° LAG 方位图 (均值 vs Phi 单曲线极坐标)
             try:
-                images["gain_vs_theta"] = generate_gain_vs_theta(
-                    theta_deg, gain_dbi, freq_mhz,
+                mask = theta_deg <= 70.1
+                mask070 = theta_deg <= 70.1
+                pk_070 = np.max(gain_dbi[:, mask070], axis=1)  # Theta 0-70° 峰值
+                curves_070 = [(70.0, pk_070)]
+                images["azimuth_polar_pk070"] = _renderer.render_azimuth_polar(
+                    phi_deg, curves_070, freq_mhz,
                     antenna_name=az_antenna, dpi=az_dpi,
+                    ylabel="Gain 0-70° Pk (dBi)",
                 )
             except Exception:
                 pass
