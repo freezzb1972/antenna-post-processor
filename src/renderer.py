@@ -212,7 +212,7 @@ class MatplotlibRenderer(BaseRenderer):
         mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
         mappable.set_array(gain_dbi)
         cbar = fig.colorbar(mappable, ax=ax, shrink=0.55, aspect=20, pad=0.06)
-        cbar.set_label("Total Gain (dBi)", fontsize=9, labelpad=8)
+        cbar.set_label("Total Gain (dBi)", fontsize=10, labelpad=8)
         cbar.ax.tick_params(labelsize=7)
 
         # 标题
@@ -277,7 +277,7 @@ class MatplotlibRenderer(BaseRenderer):
         ax.set_yticks(r_ticks)
         ax.set_yticklabels([f"{v}" for v in r_ticks], fontsize=10)
 
-        ax.set_ylabel("Gain (dBi)", fontsize=9, labelpad=20)
+        ax.set_ylabel("Gain (dBi)", fontsize=10, labelpad=20)
         ax.grid(True, alpha=0.4)
 
         fig.tight_layout(pad=1.5)
@@ -362,9 +362,9 @@ class MatplotlibRenderer(BaseRenderer):
 
         # 标题: 频率+ylabel 合一 (由 title 参数控制)
         if title:
-            ax.set_title(title, fontsize=11, pad=12)
+            ax.set_title(title, fontsize=12, pad=12)
         else:
-            ax.set_title(f"{freq_mhz:.0f}MHz - {ylabel}", fontsize=11, pad=12)
+            ax.set_title(f"{freq_mhz:.0f}MHz - {ylabel}", fontsize=12, pad=12)
 
         ax.grid(True, alpha=0.4)
 
@@ -407,7 +407,7 @@ class MatplotlibRenderer(BaseRenderer):
         margin = max((hi - lo) * 0.1, 0.5)
         ax.set_ylim(lo - margin, hi + margin)
         ax.set_title(f"{freq_mhz:.0f} MHz" + (f" — {antenna_name}" if antenna_name else ""),
-                     fontsize=9)
+                     fontsize=10)
 
         fig.tight_layout()
         return _fig_to_png_buffer(fig, dpi)
@@ -441,7 +441,7 @@ class MatplotlibRenderer(BaseRenderer):
                 ticks_f = [sf[0], sf[-1]]
                 if len(sf) > 3: ticks_f.insert(1, sf[len(sf)//2])
                 ax.set_xticks(ticks_f)
-                ax.set_xticklabels([f"{f:.0f}" for f in ticks_f], fontsize=8)
+                ax.set_xticklabels([f"{f:.0f}" for f in ticks_f], fontsize=10)
                 axes.append(ax)
             for i in range(len(axes)-1):
                 axL, axR = axes[i], axes[i+1]
@@ -499,7 +499,7 @@ class MatplotlibRenderer(BaseRenderer):
                 ticks_f = [sf[0], sf[-1]]
                 if len(sf) > 3: ticks_f.insert(1, sf[len(sf)//2])
                 ax.set_xticks(ticks_f)
-                ax.set_xticklabels([f"{f:.0f}" for f in ticks_f], fontsize=8)
+                ax.set_xticklabels([f"{f:.0f}" for f in ticks_f], fontsize=10)
                 axes.append(ax)
             # 段间虚线连接 (示意非连续)
             for i in range(len(axes)-1):
@@ -519,7 +519,7 @@ class MatplotlibRenderer(BaseRenderer):
                 fig.lines[-1].set_data([fL[0], fR[0]], [fL[1], fR[1]])
             fig.supxlabel("Frequency (MHz)", fontsize=10, y=0.03)
             fig.supylabel(ylabel or label, fontsize=10, x=0.04)
-            if label: axes[0].legend(fontsize=8)
+            if label: axes[0].legend(fontsize=10)
             fig.subplots_adjust(wspace=0.15, left=0.12, right=0.95)
         else:
             ax = fig.add_subplot(111)
@@ -530,7 +530,7 @@ class MatplotlibRenderer(BaseRenderer):
                 lo, hi = min(values), max(values)
                 margin = (hi - lo) * 0.1 if hi != lo else 1.0
                 ax.set_ylim(lo - margin, hi + margin)
-            if label: ax.legend(fontsize=8)
+            if label: ax.legend(fontsize=10)
             fig.tight_layout()
         return _fig_to_png_buffer(fig, dpi)
 
@@ -776,9 +776,9 @@ def _add_axis_labels_3d(ax, max_r: float):
     ax.set_ylim(-lim, lim)
     ax.set_zlim(-lim, lim)
 
-    ax.set_xlabel("X", fontsize=8, labelpad=4)
-    ax.set_ylabel("Y", fontsize=8, labelpad=4)
-    ax.set_zlabel("Z (θ=0°)", fontsize=8, labelpad=4)
+    ax.set_xlabel("X", fontsize=10, labelpad=4)
+    ax.set_ylabel("Y", fontsize=10, labelpad=4)
+    ax.set_zlabel("Z (θ=0°)", fontsize=10, labelpad=4)
 
     # θ=0° 方向箭头
     arrow_len = max_r * 1.15
