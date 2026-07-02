@@ -289,6 +289,14 @@ class GraphViewer(QWidget):
         self._cmb_freq.currentIndexChanged.connect(self._on_update)
         lay.addWidget(self._cmb_freq)
 
+        # ── 双Y轴 (自动/手动) ──
+        self._cmb_dual_y = QComboBox()
+        self._cmb_dual_y.addItems(["单Y轴", "双Y轴(自动)", "双Y轴(强制)"])
+        self._cmb_dual_y.setToolTip(
+            "双Y轴模式: 曲线单位/量级差异大时自动或强制启用左右双Y轴")
+        self._cmb_dual_y.currentIndexChanged.connect(self._on_update)
+        lay.addWidget(self._cmb_dual_y)
+
         sep2 = QFrame(); sep2.setFrameShape(QFrame.VLine); lay.addWidget(sep2)
 
         # ── 设置按钮 ──
@@ -1087,20 +1095,76 @@ class GraphViewer(QWidget):
         fig_height = max(3, n * 2.5)
         self._figure.set_size_inches(8, fig_height, forward=True)
 
-        for i, (label, key) in enumerate(available):
-            ax = self._figure.add_subplot(n, 1, i + 1)
-            values = [freq_data[f].get(key) for f in freqs]
-            ax.plot(freqs, values, 'o-', markersize=4)
-            ax.set_ylabel(label)
-            ax.grid(True, alpha=0.3)
-            if i < n - 1:
-                ax.tick_params(labelbottom=False)
-            else:
-                ax.set_xlabel("Frequency (MHz)")
+        # 双Y轴模式: 0=单轴, 1=自动, 2=强制
+        dual_mode = self._cmb_dual_y.currentIndex() if hasattr(self, '_cmb_dual_y') else 0
+        _PCT_KEYS = {"efficiency_pct", "total_efficiency_pct"}
+
+        if dual_mode == 0:
+            # 单Y轴: 堆叠子图
+            for i, (label, key) in enumerate(available):
+                ax = self._figure.add_subplot(n, 1, i + 1)
+                values = [freq_data[f].get(key) for f in freqs]
+                ax.plot(freqs, values, 'o-', markersize=4)
+                ax.set_ylabel(label)
+                ax.grid(True, alpha=0.3)
+                if i < n - 1:
+                    ax.tick_params(labelbottom=False)
+                else:
+                    ax.set_xlabel("Frequency (MHz)")
+        else:
+            # 双Y轴: 成对叠加, 左右各一轴
+            pairs = []
+            for i in range(0, n, 2):
+                a = available[i]
+                b = available[i + 1] if i + 1 < n else None
+                # 自动模式: 检查是否需要双Y
+                need_dual = dual_mode == 2  # 强制
+                if dual_mode == 1 and b is not None:
+                    va = [freq_data[f].get(a[1]) for f in freqs if freq_data[f].get(a[1]) is not None]
+                    vb = [freq_data[f].get(b[1]) for f in freqs if freq_data[f].get(b[1]) is not None]
+                    if va and vb:
+                        ra = (max(va) - min(va)) or 1
+                        rb = (max(vb) - min(vb)) or 1
+                        # 比值 > 50 或一个是%一个是dB → 需要双Y
+                        if max(ra, rb) / min(ra, rb) > 50:
+                            need_dual = True
+                        if (a[1] in _PCT_KEYS) != (b[1] in _PCT_KEYS):
+                            need_dual = True
+                pairs.append((a, b, need_dual))
+
+            n_pairs = len(pairs)
+            for pi, (a, b, need_dual) in enumerate(pairs):
+                ax1 = self._figure.add_subplot(n_pairs, 1, pi + 1)
+                # 曲线1 (左轴)
+                v1 = [freq_data[f].get(a[1]) for f in freqs]
+                ax1.plot(freqs, v1, 'o-', markersize=4, color='#1f77b4')
+                ax1.set_ylabel(a[0], color='#1f77b4')
+                ax1.tick_params(axis='y', labelcolor='#1f77b4')
+                ax1.grid(True, alpha=0.3)
+
+                if b is not None:
+                    if need_dual:
+                        ax2 = ax1.twinx()
+                        v2 = [freq_data[f].get(b[1]) for f in freqs]
+                        ax2.plot(freqs, v2, 's--', markersize=4, color='#d62728')
+                        ax2.set_ylabel(b[0], color='#d62728')
+                        ax2.tick_params(axis='y', labelcolor='#d62728')
+                    else:
+                        v2 = [freq_data[f].get(b[1]) for f in freqs]
+                        ax1.plot(freqs, v2, 's--', markersize=4, color='#d62728')
+                        # 合并图例
+                        lines = ax1.get_lines()
+                        ax1.legend(lines, [a[0], b[0]], fontsize=7)
+
+                if pi < n_pairs - 1:
+                    ax1.tick_params(labelbottom=False)
+                else:
+                    ax1.set_xlabel("Frequency (MHz)")
 
         self._figure.tight_layout()
         self._canvas.draw()
-        self._lbl_info.setText(f"频率曲线: {n} 项, {len(freqs)} 个频点")
+        _mode_label = ["单Y轴", "双Y轴(自动)", "双Y轴(强制)"][dual_mode]
+        self._lbl_info.setText(f"频率曲线: {n} 项, {len(freqs)} 个频点 [{_mode_label}]")
 
         # 更新数据表
         self._populate_freq_table(freqs, freq_data, available)
