@@ -118,6 +118,7 @@
       "_check_chart_eff",
       "_check_chart_lag",
       "_check_extrapolate",
+      "_cmb_dir_extrap",
       "_check_robust_peak",
       "_cmb_freq_source",
       "_data_file_widget",

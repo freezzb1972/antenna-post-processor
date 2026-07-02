@@ -360,6 +360,20 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._check_extrapolate.setChecked(False)
         algo_vbox.addWidget(self._check_extrapolate)
 
+        # Directivity 外推方法
+        row_dir = QHBoxLayout()
+        row_dir.addWidget(QLabel(self.tr("方向性外推算法:")))
+        self._cmb_dir_extrap = QComboBox()
+        self._cmb_dir_extrap.addItem(self.tr("线性 (默认)"), "linear")
+        self._cmb_dir_extrap.addItem(self.tr("常数填充"), "constant")
+        self._cmb_dir_extrap.addItem(self.tr("镜像"), "mirror")
+        self._cmb_dir_extrap.setToolTip(self.tr(
+            "Directivity 计算时若 theta<175° 自动外推补全球面。\n"
+            "linear: 线性衰减; constant: 末值填充; mirror: 镜像反射"))
+        row_dir.addWidget(self._cmb_dir_extrap)
+        row_dir.addStretch()
+        algo_vbox.addLayout(row_dir)
+
         self._check_robust_peak = QCheckBox(
             self.tr("Robust peak detection (替代 np.max)"))
         self._check_robust_peak.setChecked(False)
@@ -2090,6 +2104,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 从 MainWindow widget 读取（天线参数 dialog 通过 _sync_to_mw 写入此处）
         extrapolate_theta = self._check_extrapolate.isChecked()
+        dir_extrap = self._cmb_dir_extrap.currentData() if hasattr(self, '_cmb_dir_extrap') else "linear"
         freq_source = self._cmb_freq_source.currentData() or "datasource"
         trim_start = self._spin_trim_start.value()
         trim_end = self._spin_trim_end.value()
@@ -2125,6 +2140,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             out_word=out_word,
             out_data=out_data,
             compute_only=compute_only,
+            dir_extrap_method=dir_extrap,
             # 多步进参数
             step_values=step_values,
             skip_original=skip_original,

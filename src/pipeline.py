@@ -137,6 +137,7 @@ def _process_one_frequency(
     azimuth_config: "AzimuthReportConfig" = None,
     nh_custom_angles: Optional[List[float]] = None,
     ar_output_db: bool = True,
+    dir_extrap_method: str = "linear",
     compute_only: bool = False,
     log_cb=None,
 ) -> Dict[str, Any]:
@@ -169,8 +170,8 @@ def _process_one_frequency(
     if need_dir_or_eff:
         if theta_deg[-1] < 175 and not do_extrapolate:
             # 外推 LogMag 数据到 180° 仅用于 Directivity, 不覆盖原始数据
-            ext_th, ext_tl = extrapolate_theta(theta_deg, theta_lm, "linear")
-            _, ext_pl = extrapolate_theta(theta_deg, phi_lm, "linear")
+            ext_th, ext_tl = extrapolate_theta(theta_deg, theta_lm, dir_extrap_method)
+            _, ext_pl = extrapolate_theta(theta_deg, phi_lm, dir_extrap_method)
             ext_gl, _ = compute_total_gain_linear(ext_tl, ext_pl)
             dir_gl = ext_gl
             dir_theta = np.deg2rad(ext_th)
@@ -708,6 +709,7 @@ def _load_and_compute(
     azimuth_config: "AzimuthReportConfig" = None,
     nh_custom_angles: Optional[List[float]] = None,
     ar_output_db: bool = True,
+    dir_extrap_method: str = "linear",
     compute_only: bool = False,
     cancel_callback=None,
     progress_callback=None,
@@ -776,7 +778,7 @@ def _run_compute_serial(
             break
         try:
             theta_arr = np.array(theta_list)
-            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co, log_cb=log_cb)
+            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, dir_extrap_method=dir_extrap_method, compute_only=co, log_cb=log_cb)
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
@@ -827,6 +829,7 @@ def run_pipeline(
     out_word: bool = False,
     out_data: bool = False,
     word_template_path: Optional[str] = None,  # Word 模板路径 (为空则自动生成)
+    dir_extrap_method: str = "linear",  # Directivity 外推方法: linear|constant|mirror
     robust_peak: bool = False,
     extra_params: Optional[set] = None,
     nh_custom_angles: Optional[List[float]] = None,
@@ -928,6 +931,7 @@ def run_pipeline(
             azimuth_config=azimuth_config,
             nh_custom_angles=nh_custom_angles,
             ar_output_db=ar_output_db,
+            dir_extrap_method=dir_extrap_method,
             compute_only=compute_only,
             cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,
         )

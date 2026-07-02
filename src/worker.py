@@ -115,6 +115,7 @@ class ProcessingWorker(QObject):
         ar_output_db: bool = True,
         worksheet_naming_mode: int = 0,
         compute_only: bool = False,  # 预览模式: True→只计算不导出
+        dir_extrap_method: str = "linear",  # Directivity外推方法: linear|constant|mirror
         # 多步进参数
         step_values: Optional[List[float]] = None,
         skip_original: bool = False,
@@ -152,6 +153,7 @@ class ProcessingWorker(QObject):
         self.gen_diff = gen_diff
         self.gen_diff_chart = gen_diff_chart
         self.compute_only = compute_only
+        self.dir_extrap_method = dir_extrap_method
         self._cancelled = False
 
     def cancel(self):
@@ -184,6 +186,7 @@ class ProcessingWorker(QObject):
                 out_word=self.out_word,
                 out_data=self.out_data,
                 word_template_path=self.word_template_path,
+                dir_extrap_method=self.dir_extrap_method,
                 robust_peak=self.robust_peak,
                 extra_params=self.extra_params,
                 nh_custom_angles=self.nh_custom_angles,
