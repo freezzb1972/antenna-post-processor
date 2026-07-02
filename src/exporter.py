@@ -9,18 +9,27 @@ Excel 输出模块
 from __future__ import annotations
 
 import io
-import os
 import math
+import os
 import re
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .chart_config import ChartConfig
 
 import openpyxl
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils import get_column_letter
 
 from .excel_reader import ColumnInfo, SheetInfo, read_template
-from .lag_config import (_RE_LAG_RANGE, _RE_LAG_RANGE_NO_PREFIX,
-                         _RE_LAG_SINGLE, _RE_LAG_SINGLE_NO_PREFIX, normalize_header)
+from .lag_config import (
+    _RE_LAG_RANGE,
+    _RE_LAG_RANGE_NO_PREFIX,
+    _RE_LAG_SINGLE,
+    _RE_LAG_SINGLE_NO_PREFIX,
+    normalize_header,
+)
 
 
 def _replace_cell_text(ws, old_sheet_name: str, new_sheet_name: str, max_scan_rows: int = 15):
@@ -130,14 +139,14 @@ def _name_delta(old: str, new: str):
 def export_results(
     template_path: str,
     output_path: str,
-    sheet_results: Dict[str, List[Dict[str, Any]]],
+    sheet_results: dict[str, list[dict[str, Any]]],
     *,
-    pattern_images: Optional[Dict[str, Dict[float, io.BytesIO]]] = None,
-    sheets_info: Optional[List[SheetInfo]] = None,
-    chart_config: Optional[ChartConfig] = None,
-    progress_callback: Optional[Callable[[int, int, str], None]] = None,
-    log_callback: Optional[Callable[[str], None]] = None,
-    remove_template_sheets: Optional[List[str]] = None,
+    pattern_images: dict[str, dict[float, io.BytesIO]] | None = None,
+    sheets_info: list[SheetInfo] | None = None,
+    chart_config: ChartConfig | None = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+    log_callback: Callable[[str], None] | None = None,
+    remove_template_sheets: list[str] | None = None,
     **kwargs,
 ) -> str:
     """基于模板填充数据 + 嵌入图片。
@@ -247,26 +256,24 @@ def export_results(
                         _write_ar_range(ws, excel_row, col_map, lo, hi, value)
                 elif key.startswith("rhcp_single_"):
                     angle_str = key[len("rhcp_single_"):]
-                    _write_lag_single(ws, excel_row, col_map, float(angle_str), value)
+                    _write_rhcp_single(ws, excel_row, col_map, float(angle_str), value)
                 elif key.startswith("rhcp_range_"):
                     parts = key[len("rhcp_range_"):].split("_")
                     if len(parts) == 2:
-                        _write_lag_range(ws, excel_row, col_map, float(parts[0]), float(parts[1]), value)
+                        _write_rhcp_range(ws, excel_row, col_map, float(parts[0]), float(parts[1]), value)
                 elif key.startswith("cp_xpi_single_"):
                     angle_str = key[len("cp_xpi_single_"):]
-                    _write_lag_single(ws, excel_row, col_map, float(angle_str), value)
+                    _write_cp_xpi_single(ws, excel_row, col_map, float(angle_str), value)
                 elif key.startswith("cp_xpi_range_"):
                     parts = key[len("cp_xpi_range_"):].split("_")
                     if len(parts) == 2:
-                        _write_lag_range(ws, excel_row, col_map, float(parts[0]), float(parts[1]), value)
+                        _write_cp_xpi_range(ws, excel_row, col_map, float(parts[0]), float(parts[1]), value)
                 elif key in ("nhprp_225", "uh_prp", "lh_prp", "prp_120",
                              "max_power", "min_power", "avg_gain", "avg_power",
                              "boresight_theta", "boresight_phi",
                              "xpi_boresight", "xpi_mean", "xpi_min",
                              "total_efficiency_pct", "mismatch_loss_db",
-                             "pc_theta_mm", "pc_phi_mm"):
-                    _write_cell(ws, excel_row, col_map, key, value)
-                elif key.endswith("_ratio_db") or key.endswith("_ratio_pct"):
+                             "pc_theta_mm", "pc_phi_mm") or key.endswith("_ratio_db") or key.endswith("_ratio_pct"):
                     _write_cell(ws, excel_row, col_map, key, value)
 
             current += 1
@@ -381,7 +388,7 @@ def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
 
             if gain_series_cols:
                 if len(gain_series_cols) == 1:
-                    _add_scatter_chart(ws, f"Gain vs Frequency", freq_col, gain_series_cols[0],
+                    _add_scatter_chart(ws, "Gain vs Frequency", freq_col, gain_series_cols[0],
                                       data_start, data_end, n_rows + 5 + chart_offset,
                                       gain_series_cols[0] + 2, y_label="Gain (dBi)", y_step=1.0)
                 else:
@@ -445,7 +452,7 @@ def _add_charts(wb, sheet_results, info_map, chart_config, log_callback=None):
 
             if ar_series_cols:
                 if len(ar_series_cols) == 1:
-                    _add_scatter_chart(ws, f"Axial Ratio vs Frequency", freq_col, ar_series_cols[0],
+                    _add_scatter_chart(ws, "Axial Ratio vs Frequency", freq_col, ar_series_cols[0],
                                       data_start, data_end, n_rows + 5 + chart_offset,
                                       ar_series_cols[0] + 2, y_label="Axial Ratio (dB)")
                 else:
@@ -470,9 +477,8 @@ def _add_phi_charts(wb, sheet_results, chart_config, log_callback=None):
     if not lag_on and not ar_on:
         return
 
-    from openpyxl.chart import ScatterChart, Reference, Series
-    from openpyxl.utils import get_column_letter
     import numpy as np
+    from openpyxl.chart import Reference, ScatterChart, Series
 
     for sheet_name, rows in sheet_results.items():
         if not rows or sheet_name not in wb.sheetnames:
@@ -623,10 +629,9 @@ def _add_multi_line_chart(ws, title, x_col, y_cols, series_names,
     Y 轴 = 每条曲线一列数据;
     每条曲线是同一个 X 值范围上的一个 Series。
     """
-    from openpyxl.chart import ScatterChart, Reference, Series
-    from openpyxl.chart.legend import Legend
-    from openpyxl.utils import get_column_letter
     import openpyxl.chart.axis as _chart_axis
+    from openpyxl.chart import Reference, ScatterChart, Series
+    from openpyxl.utils import get_column_letter
 
     chart = ScatterChart()
     chart.title = title
@@ -744,11 +749,9 @@ def _add_scatter_chart(ws, title, x_col, y_col, data_start, data_end,
     使用 openpyxl ScatterChart，以 X-Y 散点方式绘制，
     频点作为 X 轴值不会在右侧图例中出现。
     """
-    from openpyxl.chart import ScatterChart, Reference, Series
-    from openpyxl.chart.axis import NumericAxis
-    from openpyxl.chart.legend import Legend
-    from openpyxl.utils import get_column_letter
     import openpyxl.chart.axis as _chart_axis
+    from openpyxl.chart import Reference, ScatterChart, Series
+    from openpyxl.utils import get_column_letter
 
     chart = ScatterChart()
     chart.title = title
@@ -899,9 +902,9 @@ def _find_ar_range_column(info, lo: float, hi: float):
 # 内部辅助
 # ---------------------------------------------------------------------------
 
-def _build_col_map(info: SheetInfo) -> Dict[str, List[ColumnInfo]]:
+def _build_col_map(info: SheetInfo) -> dict[str, list[ColumnInfo]]:
     """构建 col_type → [ColumnInfo, ...] 映射（可能有重复类型列，如 5G4 的两个 Gain 列）。"""
-    m: Dict[str, List[ColumnInfo]] = {}
+    m: dict[str, list[ColumnInfo]] = {}
     for cinfo in info.columns:
         m.setdefault(cinfo.col_type, []).append(cinfo)
     return m
@@ -934,7 +937,7 @@ def _write_ar_range(ws, row, col_map, lo, hi, value):
 def _write_cell(
     ws,
     row: int,
-    col_map: Dict[str, List[ColumnInfo]],
+    col_map: dict[str, list[ColumnInfo]],
     ctype: str,
     value: Any,
 ):
@@ -953,7 +956,7 @@ def _write_cell(
 
 
 def _write_lag_single(
-    ws, row: int, col_map: Dict[str, List[ColumnInfo]],
+    ws, row: int, col_map: dict[str, list[ColumnInfo]],
     angle: float, value: Any,
 ):
     """写入单角度 LAG 到匹配的列。"""
@@ -972,7 +975,7 @@ def _write_lag_single(
 
 
 def _write_lag_range(
-    ws, row: int, col_map: Dict[str, List[ColumnInfo]],
+    ws, row: int, col_map: dict[str, list[ColumnInfo]],
     lo: float, hi: float, value: Any,
 ):
     """写入范围 LAG 到匹配的列。"""
@@ -990,10 +993,58 @@ def _write_lag_range(
                 return
 
 
+def _write_rhcp_single(ws, row, col_map, angle, value):
+    """写入 RHCP 单角度到匹配的列（独立列类型，不覆盖 LAG）。"""
+    for cinfo in col_map.get("rhcp_single", []):
+        norm = normalize_header(cinfo.raw_header)
+        m = re.search(r"(\d+\.?\d*)", norm)
+        if m and abs(float(m.group(1)) - angle) < 0.01:
+            cell = ws.cell(row, cinfo.col_index)
+            cell.value = round(value, 6) if isinstance(value, float) else value
+            return
+
+
+def _write_rhcp_range(ws, row, col_map, lo, hi, value):
+    """写入 RHCP 范围到匹配的列。"""
+    for cinfo in col_map.get("rhcp_range", []):
+        norm = normalize_header(cinfo.raw_header)
+        m = re.search(r"(\d+)\s*[~\-–—]\s*(\d+)", norm)
+        if m:
+            clo, chi = float(m.group(1)), float(m.group(2))
+            if abs(clo - lo) < 0.01 and abs(chi - hi) < 0.01:
+                cell = ws.cell(row, cinfo.col_index)
+                cell.value = round(value, 6) if isinstance(value, float) else value
+                return
+
+
+def _write_cp_xpi_single(ws, row, col_map, angle, value):
+    """写入 CP-XPI 单角度到匹配的列。"""
+    for cinfo in col_map.get("cp_xpi_single", []):
+        norm = normalize_header(cinfo.raw_header)
+        m = re.search(r"(\d+\.?\d*)", norm)
+        if m and abs(float(m.group(1)) - angle) < 0.01:
+            cell = ws.cell(row, cinfo.col_index)
+            cell.value = round(value, 6) if isinstance(value, float) else value
+            return
+
+
+def _write_cp_xpi_range(ws, row, col_map, lo, hi, value):
+    """写入 CP-XPI 范围到匹配的列。"""
+    for cinfo in col_map.get("cp_xpi_range", []):
+        norm = normalize_header(cinfo.raw_header)
+        m = re.search(r"(\d+)\s*[~\-–—]\s*(\d+)", norm)
+        if m:
+            clo, chi = float(m.group(1)), float(m.group(2))
+            if abs(clo - lo) < 0.01 and abs(chi - hi) < 0.01:
+                cell = ws.cell(row, cinfo.col_index)
+                cell.value = round(value, 6) if isinstance(value, float) else value
+                return
+
+
 def _embed_images(
     ws,
     info: SheetInfo,
-    images: Dict[float, io.BytesIO],
+    images: dict[float, io.BytesIO],
     log_callback=None,
     *,
     col_offset: int = 3,
