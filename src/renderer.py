@@ -257,7 +257,6 @@ class MatplotlibRenderer(BaseRenderer):
         ax.set_thetagrids(range(0, 360, 30),
                           labels=[f"{d}°" for d in range(0, 360, 30)],
                           fontsize=10)
-        ax.set_rlabel_position(30)
 
         title_parts = []
         if antenna_name:
@@ -350,7 +349,6 @@ class MatplotlibRenderer(BaseRenderer):
         ax.set_thetagrids(range(0, 360, 30),
                           labels=[f"{d}°" for d in range(0, 360, 30)],
                           fontsize=10)
-        ax.set_rlabel_position(30)
 
         # 标题: 频率+ylabel 合一 (由 title 参数控制)
         if title:
@@ -534,18 +532,35 @@ def _render_dual_y_axes(ax, freqs, v1, label1, v2, label2):
 
 
 def _setup_polar_radial_ticks(ax):
-    """极坐标径向刻度: 等差取整, 每圈标注, 最外圈覆盖数据。"""
+    """极坐标径向刻度: 动态范围, 整数等差, 外圈贴近数据, 标签@15°。
+
+    中心 = 最低数据向下取整 (可为负数), 外圈 = ≥max 的最小步长倍数。
+    步长取 nice number (1/2/5/10/20/50)。
+    """
     yl = ax.get_ylim()
-    rmax = yl[1] * 1.05
-    if rmax < 1:
-        rmax = 10  # 数据全 ≤0 时给默认范围
-    step = max(1, int(round(rmax / 5)))
-    r_ticks = list(range(0, int(np.ceil(rmax)) + step, step))
-    if r_ticks[-1] < rmax:
-        r_ticks.append(r_ticks[-1] + step)
-    ax.set_ylim(0, r_ticks[-1])
+    vmin, vmax = yl[0], yl[1]
+    inner = int(np.floor(vmin))  # 内圈: 向下取整, 可为负数
+    span = vmax - inner
+    if span <= 0:
+        span = 10
+
+    # Nice step: 1, 2, 5, 10, 20, 50, ...
+    raw = span / 4.0  # 目标 ~5 圈
+    mag = 10 ** int(np.floor(np.log10(raw))) if raw > 0 else 1
+    r = raw / mag
+    if r < 1.5:       step = mag
+    elif r < 3:        step = 2 * mag
+    elif r < 7:        step = 5 * mag
+    else:              step = 10 * mag
+    step = max(1, int(step))
+
+    outer = int(np.ceil(vmax / step)) * step  # 外圈: ≥max 的最小步长倍数
+    r_ticks = list(range(inner, outer + step, step))
+
+    ax.set_ylim(r_ticks[0], r_ticks[-1])
     ax.set_yticks(r_ticks)
     ax.set_yticklabels([f"{v}" for v in r_ticks], fontsize=10)
+    ax.set_rlabel_position(15)  # 避开 30° 角度标签
 
 
 def _detect_freq_gaps(freqs: list, gap_mhz: int = 10) -> list[tuple[int, int]]:
