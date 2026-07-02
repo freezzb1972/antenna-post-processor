@@ -562,6 +562,9 @@ def _setup_polar_radial_ticks(ax):
     ax.set_ylim(best_ticks[0], best_ticks[-1])
     ax.set_yticks(best_ticks)
     ax.set_yticklabels([f"{v}" for v in best_ticks], fontsize=10)
+    # 确保中心点刻度也显示
+    for t in ax.yaxis.get_major_ticks():
+        t.label1.set_visible(True)
     ax.set_rlabel_position(15)
 
 
