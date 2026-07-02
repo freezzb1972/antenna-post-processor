@@ -763,7 +763,8 @@ def _load_and_compute(
     else:
         _run_compute_serial(compute_tasks, sheet_results, data_done, progress_max,
                             cancel_callback, progress_callback, log_cb=log_callback,
-                            azimuth_config=azimuth_config)
+                            azimuth_config=azimuth_config,
+                            dir_extrap_method=dir_extrap_method)
 
     return sheet_results
 
@@ -771,6 +772,7 @@ def _load_and_compute(
 def _run_compute_serial(
     compute_tasks, sheet_results, data_done, progress_max,
     cancel_callback, progress_callback, log_cb=None, azimuth_config=None,
+    dir_extrap_method="linear",
 ):
     """串行逐频点计算（单进程或 parallel=1）。"""
     for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co) in enumerate(compute_tasks):
