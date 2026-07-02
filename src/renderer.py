@@ -532,16 +532,19 @@ def _render_dual_y_axes(ax, freqs, v1, label1, v2, label2):
     左轴 (蓝色实线): v1, 右轴 (红色虚线): v2.
     供 MatplotlibRenderer.render_freq_curve_dual 和 GraphViewer 共用。
     """
+    import matplotlib.ticker as ticker
     ax1 = ax
     ax1.plot(freqs, v1, "o-", markersize=4, color="#1f77b4")
     ax1.set_ylabel(label1, color="#1f77b4")
     ax1.tick_params(axis="y", labelcolor="#1f77b4")
+    ax1.yaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
     ax1.grid(True, alpha=0.3)
 
     ax2 = ax1.twinx()
     ax2.plot(freqs, v2, "s--", markersize=4, color="#d62728")
     ax2.set_ylabel(label2, color="#d62728")
     ax2.tick_params(axis="y", labelcolor="#d62728")
+    ax2.yaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
     return ax1, ax2
 
 
