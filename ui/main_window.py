@@ -91,6 +91,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
+        # 覆盖编译 UI 中的过长标题
+        self.setWindowTitle(self.tr("天线参数后处理"))
+
         # 允许拖拽文件到窗口 (优先级2)
         self.setAcceptDrops(True)
 
@@ -405,7 +408,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 continue
             w = item.widget()
             if w is not None:
-                w.hide()
+                w.hide()  # 清空旧的 vTabFile 内容（被 Master-Detail 布局替代）
 
         # 3. 构建 Master-Detail 布局
         container = QWidget()
@@ -429,19 +432,23 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._antenna_params_page = AntennaParamsPage(self)
         self._chart_settings_page = ChartSettingsPage(self)
 
+        self._file_settings_page.setObjectName("pageInput")
+        self._antenna_params_page.setObjectName("pageAntenna")
+        self._chart_settings_page.setObjectName("pageChart")
         self._page_stack.addWidget(self._file_settings_page)    # 0
         self._page_stack.addWidget(self._antenna_params_page)   # 1
         self._page_stack.addWidget(self._chart_settings_page)   # 2
 
-        # 导航项
+        # 导航项 (含 tooltip 说明页面内容)
         nav_items = [
-            ("📂 " + self.tr("输入输出"), 0),
-            ("📡 " + self.tr("天线参数"), 1),
-            ("📊 " + self.tr("图表配置"), 2),
+            ("📂 " + self.tr("输入输出"), 0, self.tr("添加数据文件、选择模板、配置输出路径")),
+            ("📡 " + self.tr("天线参数"), 1, self.tr("配置 LAG/AR 角度、计算参数、预览结果")),
+            ("📊 " + self.tr("图表配置"), 2, self.tr("3D方向图、2D切面、频点曲线图表设置")),
         ]
-        for label, idx in nav_items:
+        for label, idx, tip in nav_items:
             item = QListWidgetItem(label)
             item.setData(Qt.UserRole, idx)
+            item.setToolTip(tip)
             self._nav_list.addItem(item)
 
         self._nav_list.currentRowChanged.connect(self._on_nav_changed)
@@ -595,15 +602,18 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # ── 工具 ──
         tm = menubar.addMenu(self.tr("&工具"))
+        # 数据转换组
         tm.addAction(self.tr("数据检查与转换..."), self._on_tool_batch_check)
         tm.addAction(self.tr("路径损耗补偿..."), self._on_tool_calibrate)
         tm.addAction(self.tr("数据合并 (多段拼接)..."), self._on_tool_merge)
         tm.addAction(self.tr("步进重采样..."), self._on_tool_resample)
-        tm.addSeparator()
         tm.addAction(self.tr("数据修复 (插值)"), self._on_tool_quality_repair)
         tm.addSeparator()
+        # 预设管理组
         tm.addAction(self.tr("模板预设管理..."), self._on_tool_template_recognizer)
         tm.addAction(self.tr("校准预设管理..."), self._on_show_rsp_presets)
+        tm.addSeparator()
+        # 导入导出组
         tm.addAction(self.tr("EMQuest 数据导出..."), self._on_tool_emq_export)
         tm.addAction(self.tr("FinalSummary 转 CSV..."), self._on_tool_xlsx_to_csv)
 

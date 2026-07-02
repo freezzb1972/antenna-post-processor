@@ -704,7 +704,7 @@ class FileSettingsPage(QWidget):
         ROW_LABELS = [self.tr("列号"), self.tr("列头文本"), self.tr("检测类型"),
                        self.tr("参数值"), self.tr("修正类型"), self.tr("修正参数"), self.tr("操作")]
         table.setVerticalHeaderLabels(ROW_LABELS)
-        table.horizontalHeader().hide()
+        table.horizontalHeader().hide()  # 使用竖表头作行标签，隐藏横表头
         table.setEditTriggers(QTableWidget.NoEditTriggers)
         detected = 0
         for ci, m in enumerate(mappings):

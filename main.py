@@ -12,6 +12,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from i18n.i18n_manager import I18nManager
@@ -105,6 +106,8 @@ def main():
     app.setApplicationName("AntennaPostProcessor")
     app.setOrganizationName("AntennaPP")
     app.setApplicationDisplayName("天线参数后处理")
+    # 默认字体: 跨平台一致基准。QSettings 有保存值时会由 ThemeManager 覆盖。
+    app.setFont(QFont("Sans Serif", 10))
     # Windows 任务栏分组: 所有窗口归入同一图标
     try:
         import ctypes
