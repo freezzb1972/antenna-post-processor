@@ -439,14 +439,23 @@ class MatplotlibRenderer(BaseRenderer):
         xt.append(x[-1]); xl.append(f"{freqs[-1]:.0f}")
 
         fig, ax = plt.subplots(figsize=(8, 4.5), dpi=dpi)
-        # 分段绘制双Y轴, 段间不连线
+        # 分段绘制双Y轴, 段间不连线; twinx 只创建一次
+        ax1 = ax
+        ax2 = ax1.twinx()
         seg_i2 = 0; seg_start2 = 0
         for i2 in range(1, len(freqs) + 1):
             if i2 == len(freqs) or freqs[i2] - freqs[i2-1] > (gap_mhz if gap_mhz > 0 else 999999):
-                _render_dual_y_axes(ax, x[seg_start2:i2], v1[seg_start2:i2],
-                                    label1 if seg_i2 == 0 else "", v2[seg_start2:i2],
-                                    label2 if seg_i2 == 0 else "")
+                sx = x[seg_start2:i2]; sv1 = v1[seg_start2:i2]; sv2 = v2[seg_start2:i2]
+                ax1.plot(sx, sv1, "o-", markersize=4, color="#1f77b4")
+                ax2.plot(sx, sv2, "s--", markersize=4, color="#d62728")
                 seg_i2 += 1; seg_start2 = i2
+        ax1.set_ylabel(label1, color="#1f77b4")
+        ax1.tick_params(axis="y", labelcolor="#1f77b4")
+        _set_cartesian_y_ticks(ax1, min(v1), max(v1))
+        ax2.set_ylabel(label2, color="#d62728")
+        ax2.tick_params(axis="y", labelcolor="#d62728")
+        _set_cartesian_y_ticks(ax2, min(v2), max(v2))
+        ax1.grid(True, alpha=0.3)
         ax.grid(True, alpha=0.3)
         ax.set_xticks(xt)
         ax.set_xticklabels(xl, fontsize=10)
