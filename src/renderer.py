@@ -532,35 +532,37 @@ def _render_dual_y_axes(ax, freqs, v1, label1, v2, label2):
 
 
 def _setup_polar_radial_ticks(ax):
-    """极坐标径向刻度: 动态范围, 整数等差, 外圈贴近数据, 标签@15°。
+    """极坐标径向刻度: 动态范围, 整数等差, 外圈紧贴数据, 标签@15°。
 
-    中心 = 最低数据向下取整 (可为负数), 外圈 = ≥max 的最小步长倍数。
-    步长取 nice number (1/2/5/10/20/50)。
+    遍历 nice steps (1,2,5,10,20,50,100...), 选 4-8 圈且外圈最贴近 max 的方案。
+    中心 = 最低数据向下取整 (可为负数)。
     """
     yl = ax.get_ylim()
     vmin, vmax = yl[0], yl[1]
-    inner = int(np.floor(vmin))  # 内圈: 向下取整, 可为负数
-    span = vmax - inner
-    if span <= 0:
-        span = 10
+    if vmax - vmin <= 0:
+        vmax = vmin + 10
 
-    # Nice step: 1, 2, 5, 10, 20, 50, ...
-    raw = span / 4.0  # 目标 ~5 圈
-    mag = 10 ** int(np.floor(np.log10(raw))) if raw > 0 else 1
-    r = raw / mag
-    if r < 1.5:       step = mag
-    elif r < 3:        step = 2 * mag
-    elif r < 7:        step = 5 * mag
-    else:              step = 10 * mag
-    step = max(1, int(step))
+    best_ticks = None
+    best_outer_gap = float('inf')
+    for step in [1, 2, 5, 10, 20, 50, 100, 200, 500]:
+        outer = int(np.ceil(vmax / step)) * step
+        inner = int(np.floor(vmin / step)) * step
+        n = (outer - inner) // step + 1
+        if 4 <= n <= 8:  # 4-8 圈理想
+            gap = outer - vmax
+            if gap < best_outer_gap:
+                best_outer_gap = gap
+                best_ticks = list(range(inner, outer + step, step))
+    if best_ticks is None:  # fallback
+        step = max(1, int(round((vmax - vmin) / 5)))
+        inner = int(np.floor(vmin))
+        outer = int(np.ceil(vmax / step)) * step
+        best_ticks = list(range(inner, outer + step, step))
 
-    outer = int(np.ceil(vmax / step)) * step  # 外圈: ≥max 的最小步长倍数
-    r_ticks = list(range(inner, outer + step, step))
-
-    ax.set_ylim(r_ticks[0], r_ticks[-1])
-    ax.set_yticks(r_ticks)
-    ax.set_yticklabels([f"{v}" for v in r_ticks], fontsize=10)
-    ax.set_rlabel_position(15)  # 避开 30° 角度标签
+    ax.set_ylim(best_ticks[0], best_ticks[-1])
+    ax.set_yticks(best_ticks)
+    ax.set_yticklabels([f"{v}" for v in best_ticks], fontsize=10)
+    ax.set_rlabel_position(15)
 
 
 def _detect_freq_gaps(freqs: list, gap_mhz: int = 10) -> list[tuple[int, int]]:
