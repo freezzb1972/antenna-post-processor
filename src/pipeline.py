@@ -427,9 +427,13 @@ def _process_one_frequency(
                 if ccfg.pattern_3d_ephi:
                     extra_patterns["3d_ephi"] = phi_lm
                 extra_patterns = extra_patterns if extra_patterns else None
+                # RHCP/LHCP 增益矩阵 (供方位图)
+                rhcp_db = row.get("_rhcp_gain")
+                lhcp_db = row.get("_lhcp_gain")
                 images = generate_all_for_frequency(
                     theta_deg, phi_angles, gain_dbi,
                     freq, ccfg, ar_linear=ar_lin,
+                    rhcp_db=rhcp_db, lhcp_db=lhcp_db,
                     antenna_name="",
                     azimuth_config=azimuth_config,
                     extra_patterns=extra_patterns,
@@ -442,6 +446,14 @@ def _process_one_frequency(
                 row["_azimuth_theta_deg"] = theta_deg.copy()
             if azimuth_config.cut_azimuth_polar_ar and ar_lin is not None and azimuth_config.azimuth_cut_angles_ar:
                 row["_azimuth_ar_db"] = 20.0 * np.log10(np.maximum(ar_lin, 1e-15))
+                if "_azimuth_theta_deg" not in row:
+                    row["_azimuth_theta_deg"] = theta_deg.copy()
+            if azimuth_config.cut_azimuth_polar_rhcp and rhcp_db is not None and azimuth_config.azimuth_cut_angles_rhcp:
+                row["_azimuth_rhcp_db"] = rhcp_db
+                if "_azimuth_theta_deg" not in row:
+                    row["_azimuth_theta_deg"] = theta_deg.copy()
+            if azimuth_config.cut_azimuth_polar_lhcp and lhcp_db is not None and azimuth_config.azimuth_cut_angles_lhcp:
+                row["_azimuth_lhcp_db"] = lhcp_db
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
         except Exception as e:
@@ -1027,6 +1039,8 @@ def _export_azimuth(
     image_groups: "Dict[str, Dict[float, io.BytesIO]]" = {}
     freq_gain_data: "List[Tuple[float, Dict[float, np.ndarray]]]" = []
     freq_ar_data: "List[Tuple[float, Dict[float, np.ndarray]]]" = []
+    freq_rhcp_data: "List[Tuple[float, Dict[float, np.ndarray]]]" = []
+    freq_lhcp_data: "List[Tuple[float, Dict[float, np.ndarray]]]" = []
 
     import io as _io
 
@@ -1050,6 +1064,8 @@ def _export_azimuth(
             "3d_ar": "3D Axial Ratio Pattern",
             "azimuth_polar": "Gain Azimuth Cut",
             "azimuth_polar_ar": "AR Azimuth Cut",
+            "azimuth_polar_rhcp": "RHCP Azimuth Cut",
+            "azimuth_polar_lhcp": "LHCP Azimuth Cut",
         }
         return known.get(img_key, img_key)
 
@@ -1126,6 +1142,22 @@ def _export_azimuth(
                     nearest = float(theta_deg_arr[idx])
                     ad[nearest] = ar_db_v[:, idx].copy()
                 freq_ar_data.append((freq, ad))
+            rhcp_db_v = row.get("_azimuth_rhcp_db")
+            if rhcp_db_v is not None and theta_deg_arr is not None and azimuth_config and azimuth_config.azimuth_cut_angles_rhcp:
+                rd = {}
+                for angle in azimuth_config.angles_rhcp_sorted:
+                    idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
+                    nearest = float(theta_deg_arr[idx])
+                    rd[nearest] = rhcp_db_v[:, idx].copy()
+                freq_rhcp_data.append((freq, rd))
+            lhcp_db_v = row.get("_azimuth_lhcp_db")
+            if lhcp_db_v is not None and theta_deg_arr is not None and azimuth_config and azimuth_config.azimuth_cut_angles_lhcp:
+                ld = {}
+                for angle in azimuth_config.angles_lhcp_sorted:
+                    idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
+                    nearest = float(theta_deg_arr[idx])
+                    ld[nearest] = lhcp_db_v[:, idx].copy()
+                freq_lhcp_data.append((freq, ld))
 
     # Write Word
     if out_word and image_groups:
@@ -1195,6 +1227,22 @@ def _export_azimuth(
                 _log(log_callback, f"  ✓ AR 数据已保存 ({len(freq_ar_data)} 频点)")
             except Exception as e:
                 _log(log_callback, f"  ✗ AR 数据导出失败: {e}")
+
+    if out_data and freq_rhcp_data:
+        rhcp_path = getattr(azimuth_config, 'data_rhcp_output_path', '') if azimuth_config else ''
+        if not rhcp_path and azimuth_config:
+            # 默认路径: Gain 输出目录 + _RHCP.xlsx
+            gdir = azimuth_config.data_gain_output_dir
+            gfn = azimuth_config.data_gain_output_filename
+            if gdir and gfn:
+                rhcp_path = str(Path(gdir) / gfn.replace('Gain', 'RHCP'))
+        if rhcp_path:
+            _log(log_callback, f"RHCP 中间数据: {rhcp_path}")
+            try:
+                write_azimuth_data(freq_rhcp_data, rhcp_path, "RHCP (dB)")
+                _log(log_callback, f"  ✓ RHCP 数据已保存 ({len(freq_rhcp_data)} 频点)")
+            except Exception as e:
+                _log(log_callback, f"  ✗ RHCP 数据导出失败: {e}")
 
 
 # ---------------------------------------------------------------------------

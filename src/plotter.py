@@ -137,6 +137,17 @@ def generate_azimuth_polar_cut(
 # 批量生成
 # ---------------------------------------------------------------------------
 
+def _build_azimuth_curves(
+    theta_deg: np.ndarray, data_db: np.ndarray,
+    angles: List[float], phi_count: int,
+) -> "List[Tuple[float, np.ndarray]]":
+    """从数据矩阵提取选定 Theta 角度的 phi 切片，构建方位图曲线列表。"""
+    if not angles or phi_count == 0:
+        return []
+    indices = _match_theta_indices(theta_deg, angles)
+    return [(float(theta_deg[i]), data_db[:, i]) for i in indices]
+
+
 def generate_all_for_frequency(
     theta_deg: np.ndarray,
     phi_deg: np.ndarray,
@@ -145,6 +156,8 @@ def generate_all_for_frequency(
     chart_config: ChartConfig,
     *,
     ar_linear: Optional[np.ndarray] = None,
+    rhcp_db: Optional[np.ndarray] = None,
+    lhcp_db: Optional[np.ndarray] = None,
     antenna_name: str = "",
     azimuth_config: Optional[AzimuthReportConfig] = None,
     extra_patterns: Dict[str, np.ndarray] = None,
@@ -157,6 +170,8 @@ def generate_all_for_frequency(
         gain_dbi:     总增益 (dB)，(n_phi, n_theta)
         freq_mhz:     频率 (MHz)
         chart_config: 图形配置
+        rhcp_db:      RHCP 增益 (dB)，(n_phi, n_theta) [可选]
+        lhcp_db:      LHCP 增益 (dB)，(n_phi, n_theta) [可选]
         ar_linear:    轴比线性值，(n_phi, n_theta)，3D AR 需要
         antenna_name: 天线名称
         azimuth_config: 方位面报告配置
@@ -267,35 +282,26 @@ def generate_all_for_frequency(
         az_antenna = azimuth_config.antenna_name or antenna_name
         az_dpi = azimuth_config.dpi or getattr(chart_config, 'dpi', 150)
 
-        if azimuth_config.cut_azimuth_polar:
-            _az_angles = azimuth_config.angles_sorted
-            if _az_angles and len(phi_deg) > 0:
-                theta_indices = _match_theta_indices(theta_deg, _az_angles)
-                curves = [
-                    (float(theta_deg[i]), gain_dbi[:, i])
-                    for i in theta_indices
-                ]
-                if curves:
-                    images["azimuth_polar"] = _renderer.render_azimuth_polar(
-                        phi_deg, curves, freq_mhz,
-                        antenna_name=az_antenna, dpi=az_dpi,
-                        ylabel="Gain (dBi)",
-                    )
+        def _render_azimuth(data_db, angles, image_key, ylabel):
+            curves = _build_azimuth_curves(theta_deg, data_db, angles, len(phi_deg))
+            if curves:
+                images[image_key] = _renderer.render_azimuth_polar(
+                    phi_deg, curves, freq_mhz,
+                    antenna_name=az_antenna, dpi=az_dpi, ylabel=ylabel,
+                )
 
+        if azimuth_config.cut_azimuth_polar:
+            _render_azimuth(gain_dbi, azimuth_config.angles_sorted,
+                           "azimuth_polar", "Gain (dBi)")
         if azimuth_config.cut_azimuth_polar_ar and ar_linear is not None:
-            _az_ar_angles = azimuth_config.angles_ar_sorted
-            if _az_ar_angles and len(phi_deg) > 0:
-                theta_indices = _match_theta_indices(theta_deg, _az_ar_angles)
-                ar_db = 20.0 * np.log10(np.maximum(ar_linear, 1e-15))
-                curves = [
-                    (float(theta_deg[i]), ar_db[:, i])
-                    for i in theta_indices
-                ]
-                if curves:
-                    images["azimuth_polar_ar"] = _renderer.render_azimuth_polar(
-                        phi_deg, curves, freq_mhz,
-                        antenna_name=az_antenna, dpi=az_dpi,
-                        ylabel="AR (dB)",
-                    )
+            ar_db_vals = 20.0 * np.log10(np.maximum(ar_linear, 1e-15))
+            _render_azimuth(ar_db_vals, azimuth_config.angles_ar_sorted,
+                           "azimuth_polar_ar", "AR (dB)")
+        if azimuth_config.cut_azimuth_polar_rhcp and rhcp_db is not None:
+            _render_azimuth(rhcp_db, azimuth_config.angles_rhcp_sorted,
+                           "azimuth_polar_rhcp", "RHCP (dB)")
+        if azimuth_config.cut_azimuth_polar_lhcp and lhcp_db is not None:
+            _render_azimuth(lhcp_db, azimuth_config.angles_lhcp_sorted,
+                           "azimuth_polar_lhcp", "LHCP (dB)")
 
     return images

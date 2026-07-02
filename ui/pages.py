@@ -1221,6 +1221,10 @@ class AntennaParamsPage(QWidget):
             ("xpi_mean", "XPI Mean (dB)"),
             ("xpi_min", "XPI Min (dB)"),
         ]),
+        ("圆极化 (RHCP/LHCP)", [
+            ("rhcp_single", "RHCP Gain @ θ（单角度）"),
+            ("cp_xpi_single", "CP-XPI @ θ（单角度）"),
+        ]),
         ("总效率", [
             ("total_efficiency_pct", "Total Efficiency (%)"),
             ("mismatch_loss_db", "Mismatch Loss (dB)"),
