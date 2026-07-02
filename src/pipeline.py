@@ -12,39 +12,54 @@
 
 from __future__ import annotations
 
+import copy
+import io
+import math
+import os
+import re
 import time
+from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
+from .azimuth_config import AzimuthReportConfig
 from .calculator import (
-    compute_ar_at_angles, compute_ar_range, compute_average_gain_db,
-    compute_average_power_dbm, compute_axial_ratio, compute_beamwidth,
-    compute_boresight, compute_directivity, compute_efficiency,
-    compute_lag_at_angles, compute_lag_ranges, compute_lower_hemisphere_prp,
-    compute_min_power_dbm, compute_nhprp, compute_nhprp_flex,
-    compute_peak_eirp, compute_partial_prp, compute_power_ratios,
-    compute_prp_trp_ratio, compute_total_gain_linear, compute_trp,
+    compute_ar_at_angles,
+    compute_ar_range,
+    compute_average_gain_db,
+    compute_average_power_dbm,
+    compute_axial_ratio,
+    compute_beamwidth,
+    compute_boresight,
+    compute_directivity,
+    compute_efficiency,
+    compute_lag_at_angles,
+    compute_lag_ranges,
+    compute_lower_hemisphere_prp,
+    compute_min_power_dbm,
+    compute_nhprp,
+    compute_nhprp_flex,
+    compute_partial_prp,
+    compute_peak_eirp,
+    compute_phase_center,
+    compute_power_ratios,
+    compute_prp_trp_ratio,
+    compute_total_efficiency,
+    compute_total_gain_linear,
+    compute_trp,
     compute_upper_hemisphere_prp,
     compute_xpi,
-    compute_total_efficiency,
-    compute_phase_center,
 )
-import copy
-import math
-import re
-
+from .chart_config import ChartConfig
 from .datasource import DataSource
 from .excel_reader import ColumnInfo, SheetInfo, read_template
 from .exporter import export_results
 from .lag_config import LagConfig
-from .azimuth_config import AzimuthReportConfig
 from .parser import MergedCSVParser
 from .plot_config import PlotConfig
-from .chart_config import ChartConfig
 from .report_exporter import export_full_report
-
 
 # ---------------------------------------------------------------------------
 # Theta 外推 (pipeline 层)
@@ -54,7 +69,7 @@ def extrapolate_theta(
     theta_deg: np.ndarray,
     data: np.ndarray,  # (n_phi, n_theta)
     method: str = "linear",
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """将 Theta 范围外推到 0-180°。
 
     Args:
@@ -123,7 +138,7 @@ def extrapolate_theta(
 # ---------------------------------------------------------------------------
 
 def _process_one_frequency(
-    raw: Dict[str, Optional[np.ndarray]],
+    raw: dict[str, np.ndarray | None],
     freq: float,
     theta_deg: np.ndarray,
     lag_config: LagConfig,
@@ -132,15 +147,15 @@ def _process_one_frequency(
     robust_peak: bool = False,
     needed_params: set = None,
     extra_params: set = None,
-    chart_config: "ChartConfig" = None,
-    ar_lag_config: "LagConfig" = None,
-    azimuth_config: "AzimuthReportConfig" = None,
-    nh_custom_angles: Optional[List[float]] = None,
+    chart_config: ChartConfig = None,
+    ar_lag_config: LagConfig = None,
+    azimuth_config: AzimuthReportConfig = None,
+    nh_custom_angles: list[float] | None = None,
     ar_output_db: bool = True,
     dir_extrap_method: str = "linear",
     compute_only: bool = False,
     log_cb=None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """处理单个频点。按 needed_params（模板列）+ extra_params（用户额外）计算。"""
     theta_lm = raw["theta_logmag"]
     phi_lm = raw["phi_logmag"]
@@ -157,7 +172,7 @@ def _process_one_frequency(
 
     theta_rad = np.deg2rad(theta_deg)
     gain_linear, peak_dbi = compute_total_gain_linear(theta_lm, phi_lm, robust=robust_peak)
-    row: Dict[str, Any] = {"frequency": freq}
+    row: dict[str, Any] = {"frequency": freq}
 
     # Gain (always include if template has it)
     if "gain" in need or "peak_eirp" in compute_set or not need:
@@ -366,7 +381,7 @@ def _process_one_frequency(
         tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
         if tp is not None and pp is not None:
             try:
-                from .calculator import compute_rhcp_lhcp_gain, compute_cp_xpi
+                from .calculator import compute_cp_xpi, compute_rhcp_lhcp_gain
                 if need_extrap:
                     _, tp = extrapolate_theta(theta_orig, tp, "constant")
                     _, pp = extrapolate_theta(theta_orig, pp, "constant")
@@ -500,7 +515,7 @@ def _process_one_frequency(
 # 查找最近频点
 # ---------------------------------------------------------------------------
 
-def _find_closest_freq(csv_freqs: List[float], target: float, tol=5.0) -> Optional[int]:
+def _find_closest_freq(csv_freqs: list[float], target: float, tol=5.0) -> int | None:
     if not csv_freqs:
         return None
     best_idx = int(np.argmin([abs(f - target) for f in csv_freqs]))
@@ -525,11 +540,11 @@ def _derive_sheet_name(reference_name: str, target_key: str) -> str:
 
 
 def _expand_template_sheets(
-    sheets_info: List[SheetInfo],
-    datasource_map: Dict[str, DataSource],
+    sheets_info: list[SheetInfo],
+    datasource_map: dict[str, DataSource],
     freq_source: str = "datasource",
     use_raw_name: bool = False,
-) -> List[SheetInfo]:
+) -> list[SheetInfo]:
     """当模板工作表数少于数据源数时，用第一个 sheet 为模板克隆其余 sheet。
 
     Args:
@@ -548,7 +563,7 @@ def _expand_template_sheets(
 
     if use_raw_name:
         # 文件名模式：丢弃旧工作表名，为每个数据源创建新工作表
-        expanded: List[SheetInfo] = []
+        expanded: list[SheetInfo] = []
         matched_names: set = set()
     else:
         if len(sheets_info) >= len(datasource_map):
@@ -611,18 +626,18 @@ def _expand_template_sheets(
 # ---------------------------------------------------------------------------
 
 def _collect_tasks(
-    sheets_info: List[Any],
-    datasource: Optional[DataSource],
-    datasource_map: Optional[Dict[str, DataSource]],
+    sheets_info: list[Any],
+    datasource: DataSource | None,
+    datasource_map: dict[str, DataSource] | None,
     freq_source: str = "datasource",
     trim_start: int = 0,
     trim_end: int = 0,
-    sheet_mode_map: Optional[Dict[str, int]] = None,
+    sheet_mode_map: dict[str, int] | None = None,
     log_cb=None,
-) -> List[Tuple[str, float, int, Any, DataSource]]:
+) -> list[tuple[str, float, int, Any, DataSource]]:
     """收集所有 (sheet_name, freq, csv_idx, lag_cfg, ds) 任务。"""
     use_multi = datasource_map is not None
-    tasks: List[Tuple[str, float, int, Any, DataSource]] = []
+    tasks: list[tuple[str, float, int, Any, DataSource]] = []
 
     if use_multi:
         original_sheets = {si.name for si in sheets_info}
@@ -632,7 +647,7 @@ def _collect_tasks(
         expanded_names = set()
 
     for si in sheets_info:
-        ds: Optional[DataSource] = datasource_map.get(si.name) if use_multi else datasource
+        ds: DataSource | None = datasource_map.get(si.name) if use_multi else datasource
         if ds is None:
             if use_multi:
                 _log(log_cb, f"  ⚠ {si.name}: 无匹配数据源 — 跳过")
@@ -677,7 +692,7 @@ def _collect_tasks(
     if trim_start > 0 or trim_end > 0:
         # 按 sheet 分组、按 freq 排序后裁剪首尾
         from collections import OrderedDict
-        grouped: Dict[str, list] = OrderedDict()
+        grouped: dict[str, list] = OrderedDict()
         for t in tasks:
             grouped.setdefault(t[0], []).append(t)
         tasks = []
@@ -697,27 +712,27 @@ def _collect_tasks(
 
 
 def _load_and_compute(
-    tasks: List[Tuple[str, float, int, Any, DataSource]],
-    sheets_info: List[Any],
+    tasks: list[tuple[str, float, int, Any, DataSource]],
+    sheets_info: list[Any],
     extrapolate_theta: bool,
     robust_peak: bool,
     parallel: int,
     extra_params: set = None,
-    chart_config: "ChartConfig" = None,
-    ar_lag_config: "LagConfig" = None,
-    sheet_ar_configs: Dict[str, "LagConfig"] = None,
-    azimuth_config: "AzimuthReportConfig" = None,
-    nh_custom_angles: Optional[List[float]] = None,
+    chart_config: ChartConfig = None,
+    ar_lag_config: LagConfig = None,
+    sheet_ar_configs: dict[str, LagConfig] = None,
+    azimuth_config: AzimuthReportConfig = None,
+    nh_custom_angles: list[float] | None = None,
     ar_output_db: bool = True,
     dir_extrap_method: str = "linear",
     compute_only: bool = False,
     cancel_callback=None,
     progress_callback=None,
     log_callback=None,
-) -> Dict[str, List[Dict[str, Any]]]:
+) -> dict[str, list[dict[str, Any]]]:
     """加载原始数据并执行计算，返回 sheet_results。"""
     total = len(tasks)
-    sheet_results: Dict[str, List[Dict[str, Any]]] = {si.name: [] for si in sheets_info}
+    sheet_results: dict[str, list[dict[str, Any]]] = {si.name: [] for si in sheets_info}
     if total == 0:
         return sheet_results
 
@@ -791,8 +806,8 @@ def _run_compute_serial(
 
 def _close_datasources(
     use_multi: bool,
-    datasource: Optional[DataSource],
-    datasource_map: Optional[Dict[str, DataSource]],
+    datasource: DataSource | None,
+    datasource_map: dict[str, DataSource] | None,
 ):
     """安全关闭所有数据源。"""
     if use_multi and datasource_map:
@@ -810,38 +825,38 @@ def _close_datasources(
 # ---------------------------------------------------------------------------
 
 def run_pipeline(
-    datasource: Optional[DataSource] = None,
+    datasource: DataSource | None = None,
     template_path: str = "",
     output_path: str = "",
     *,
-    datasource_map: Optional[Dict[str, DataSource]] = None,
-    sheet_mode_map: Optional[Dict[str, int]] = None,
-    lag_config_override: Optional[LagConfig] = None,
-    ar_lag_config_override: Optional[LagConfig] = None,
-    plot_config: Optional[PlotConfig] = None,
-    full_report_path: Optional[str] = None,
+    datasource_map: dict[str, DataSource] | None = None,
+    sheet_mode_map: dict[str, int] | None = None,
+    lag_config_override: LagConfig | None = None,
+    ar_lag_config_override: LagConfig | None = None,
+    plot_config: PlotConfig | None = None,
+    full_report_path: str | None = None,
     compute_only: bool = False,  # True → 只计算不导出 (预览模式)
     extrapolate_theta: bool = False,
     freq_source: str = "datasource",
     trim_start: int = 0,
     trim_end: int = 0,
-    chart_config_obj: Optional[ChartConfig] = None,
-    azimuth_config: Optional["AzimuthReportConfig"] = None,
+    chart_config_obj: ChartConfig | None = None,
+    azimuth_config: AzimuthReportConfig | None = None,
     out_excel: bool = True,
     out_word: bool = False,
     out_data: bool = False,
-    word_template_path: Optional[str] = None,  # Word 模板路径 (为空则自动生成)
+    word_template_path: str | None = None,  # Word 模板路径 (为空则自动生成)
     dir_extrap_method: str = "linear",  # Directivity 外推方法: linear|constant|mirror
     robust_peak: bool = False,
-    extra_params: Optional[set] = None,
-    nh_custom_angles: Optional[List[float]] = None,
+    extra_params: set | None = None,
+    nh_custom_angles: list[float] | None = None,
     ar_output_db: bool = True,
     worksheet_naming_mode: int = 0,  # 0=保留模板工作表名, 1=用数据源名
     parallel: int = 1,
-    cancel_callback: Optional[Callable[[], bool]] = None,
-    progress_callback: Optional[Callable[[int, int, str], None]] = None,
-    log_callback: Optional[Callable[[str], None]] = None,
-) -> Dict[str, List[Dict[str, Any]]]:
+    cancel_callback: Callable[[], bool] | None = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+    log_callback: Callable[[str], None] | None = None,
+) -> dict[str, list[dict[str, Any]]]:
     """执行完整处理管线。
 
     Args:
@@ -882,7 +897,7 @@ def run_pipeline(
         _log(log_callback, f"  {si.name}: {len(si.frequencies)} 频点")
 
     # ---- 1.5: 自动扩增工作表 (模板 sheet 数 < 数据源数, 或文件名模式) ----
-    template_sheet_names_to_remove: Optional[List[str]] = None
+    template_sheet_names_to_remove: list[str] | None = None
     if use_multi_ds:
         template_names = {si.name for si in sheets_info}
         ds_names = set(datasource_map.keys())
@@ -907,7 +922,7 @@ def run_pipeline(
         _log(log_callback, "使用用户指定的 LAG 配置")
 
     # ---- 构建 sheet→AR 配置映射 (自动检测或使用覆盖) ----
-    sheet_ar_configs: Dict[str, LagConfig] = {}
+    sheet_ar_configs: dict[str, LagConfig] = {}
     if ar_lag_config_override is not None and not ar_lag_config_override.is_empty():
         # 用户覆盖: 所有 sheet 用同一个 AR 配置
         for si in sheets_info:
@@ -999,7 +1014,7 @@ def run_pipeline(
 # ---------------------------------------------------------------------------
 
 def _collect_report_images(
-    sheet_results: Dict[str, List[Dict[str, Any]]],
+    sheet_results: dict[str, list[dict[str, Any]]],
 ) -> tuple:
     """从处理结果收集图片，按 3D/2D Polar/2D Rect 分类。
 
@@ -1012,9 +1027,9 @@ def _collect_report_images(
         - images_2d_polar:  {sheet_name: {freq: {cut_label: BytesIO}}}
         - images_2d_rect:   {sheet_name: {freq: {cut_label: BytesIO}}}
     """
-    images_3d: Dict[str, Dict[float, io.BytesIO]] = {}
-    images_2d_polar: Dict[str, Dict[float, Dict[str, io.BytesIO]]] = {}
-    images_2d_rect: Dict[str, Dict[float, Dict[str, io.BytesIO]]] = {}
+    images_3d: dict[str, dict[float, io.BytesIO]] = {}
+    images_2d_polar: dict[str, dict[float, dict[str, io.BytesIO]]] = {}
+    images_2d_rect: dict[str, dict[float, dict[str, io.BytesIO]]] = {}
 
     for sheet_name, rows in sheet_results.items():
         for row in rows:
@@ -1044,31 +1059,31 @@ def _collect_report_images(
 # ---------------------------------------------------------------------------
 
 def _export_azimuth(
-    sheet_results: Dict[str, List[Dict[str, Any]]],
-    azimuth_config: "AzimuthReportConfig",
+    sheet_results: dict[str, list[dict[str, Any]]],
+    azimuth_config: AzimuthReportConfig,
     log_callback=None,
     out_word: bool = True,
     out_data: bool = True,
-    word_template_path: Optional[str] = None,
+    word_template_path: str | None = None,
 ):
     """从处理结果中收集方位面图片和中间数据，写入 Word 和 Excel。
 
     当 word_template_path 不为空时，使用 WordReporter 填充模板；
     否则使用 chart_word_writer 自动生成 Word 报告。
     """
-    from .chart_word_writer import write_chart_word_report
-    from .azimuth_data_writer import write_azimuth_data
     from pathlib import Path
 
-    # ── 收集所有图片和中间数据 ──
-    image_groups: "Dict[str, Dict[float, io.BytesIO]]" = {}
-    freq_gain_data: "List[Tuple[float, Dict[float, np.ndarray]]]" = []
-    freq_ar_data: "List[Tuple[float, Dict[float, np.ndarray]]]" = []
-    freq_rhcp_data: "List[Tuple[float, Dict[float, np.ndarray]]]" = []
-    freq_lhcp_data: "List[Tuple[float, Dict[float, np.ndarray]]]" = []
-    freq_gain_vs_theta: "List[Tuple[float, np.ndarray]]" = []  # [(freq, pk070_values_over_phi)]
+    from .azimuth_data_writer import write_azimuth_data
+    from .chart_word_writer import write_chart_word_report
 
-    import io as _io
+    # ── 收集所有图片和中间数据 ──
+    image_groups: dict[str, dict[float, io.BytesIO]] = {}
+    freq_gain_data: list[tuple[float, dict[float, np.ndarray]]] = []
+    freq_ar_data: list[tuple[float, dict[float, np.ndarray]]] = []
+    freq_rhcp_data: list[tuple[float, dict[float, np.ndarray]]] = []
+    freq_lhcp_data: list[tuple[float, dict[float, np.ndarray]]] = []
+    freq_gain_vs_theta: list[tuple[float, np.ndarray]] = []  # [(freq, pk070_values_over_phi)]
+
 
     # 图片类型 → 用户可读组名
     def _label_for_image_key(img_key: str) -> str:
@@ -1249,7 +1264,7 @@ def _export_azimuth(
                 _log(log_callback, f"  ✗ Gain 0-70° Pk 数据导出失败: {e}")
 
     # ── 按频点配对: azimuth_polar + azimuth_polar_pk070 并排 ──
-    freq_pairs: "Dict[float, Dict[str, io.BytesIO]]" = {}
+    freq_pairs: dict[float, dict[str, io.BytesIO]] = {}
     if out_word and azimuth_config and azimuth_config.cut_azimuth_polar \
             and azimuth_config.cut_azimuth_polar_pk070:
         for row in (r for rows in sheet_results.values() for r in rows):
@@ -1287,6 +1302,8 @@ def _export_azimuth(
                     },
                     output_path=word_path,
                     antenna_name=az.antenna_name if az else "",
+                    image_width_cm=getattr(az, 'image_width_cm', 7.5) if az else 7.5,
+                    show_caption=getattr(az, 'show_caption', True) if az else True,
                     extra_groups=extra_groups if extra_groups else None,
                 )
                 total = len(freq_pairs) * 2 + sum(len(v) for v in extra_groups.values())
@@ -1401,8 +1418,8 @@ def _report(cb, cur, tot, msg):
 # ---------------------------------------------------------------------------
 
 def _compute_chunk(
-    compute_tasks: List[Tuple[str, float, Dict[str, Any], Any, List[float], bool]],
-) -> List[Tuple[str, Dict[str, Any]]]:
+    compute_tasks: list[tuple[str, float, dict[str, Any], Any, list[float], bool]],
+) -> list[tuple[str, dict[str, Any]]]:
     """子进程中处理一批频点的纯计算任务。不读文件。
 
     每个任务: (sheet_name, freq, raw_data, lag_cfg, theta_list, extrapolate_theta)

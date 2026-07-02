@@ -2534,6 +2534,27 @@ class ChartSettingsPage(QWidget):
         row_img.addStretch()
         out_layout.addLayout(row_img)
 
+        # ── 题注 + 图片宽度 ──
+        row_cap = QHBoxLayout()
+        self._check_show_caption = QCheckBox(self.tr("显示题注"))
+        self._check_show_caption.setChecked(True)
+        self._check_show_caption.toggled.connect(lambda c: (
+            setattr(getattr(self._mw, '_azimuth_config', None), 'show_caption', c)
+            if self._mw and getattr(self._mw, '_azimuth_config', None) else None
+        ))
+        row_cap.addWidget(self._check_show_caption)
+        row_cap.addWidget(QLabel(self.tr("  图片宽(cm):")))
+        self._spin_img_cm = QDoubleSpinBox()
+        self._spin_img_cm.setRange(3.0, 16.0); self._spin_img_cm.setValue(7.5)
+        self._spin_img_cm.setSingleStep(0.5); self._spin_img_cm.setFixedWidth(70)
+        self._spin_img_cm.valueChanged.connect(lambda v: (
+            setattr(getattr(self._mw, '_azimuth_config', None), 'image_width_cm', v)
+            if self._mw and getattr(self._mw, '_azimuth_config', None) else None
+        ))
+        row_cap.addWidget(self._spin_img_cm)
+        row_cap.addStretch()
+        out_layout.addLayout(row_cap)
+
         # 嵌入/PNG 放在最下方
         row_bottom = QHBoxLayout()
         self._check_embed = QCheckBox(self.tr("嵌入 Excel"))
@@ -2639,6 +2660,10 @@ class ChartSettingsPage(QWidget):
                     self._combo_az_columns.setCurrentIndex(idx2)
             if hasattr(self, '_spin_az_img_pct'):
                 self._spin_az_img_pct.setValue(az.word_image_width_pct if 10 <= az.word_image_width_pct <= 100 else 90)
+            if hasattr(self, '_check_show_caption'):
+                self._check_show_caption.setChecked(getattr(az, 'show_caption', True))
+            if hasattr(self, '_spin_img_cm'):
+                self._spin_img_cm.setValue(getattr(az, 'image_width_cm', 7.5))
 
     def _add_select_all_row(self, target_dict, keys, parent_layout):
         """添加全选/取消全选按钮行到指定布局。"""
@@ -2723,6 +2748,8 @@ class ChartSettingsPage(QWidget):
         azimuth.dpi = self._spin_azimuth_dpi.value() if hasattr(self, '_spin_azimuth_dpi') else 150
         azimuth.word_columns = self._combo_az_columns.currentData() if hasattr(self, '_combo_az_columns') else 2
         azimuth.word_image_width_pct = self._spin_az_img_pct.value() if hasattr(self, '_spin_az_img_pct') else 90
+        azimuth.show_caption = self._check_show_caption.isChecked() if hasattr(self, '_check_show_caption') else True
+        azimuth.image_width_cm = self._spin_img_cm.value() if hasattr(self, '_spin_img_cm') else 7.5
 
         mw._azimuth_config = azimuth
         mw._chart_config_required = required

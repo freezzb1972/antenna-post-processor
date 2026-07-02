@@ -22,16 +22,15 @@ from __future__ import annotations
 
 import io
 import os
-from typing import Dict, List
 
 from docx import Document
-from docx.shared import Cm, Pt, Emu
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Cm, Pt
 
 
 def write_chart_word_report(
-    image_groups: Dict[str, Dict[float, io.BytesIO]],
+    image_groups: dict[str, dict[float, io.BytesIO]],
     output_path: str,
     antenna_name: str = "",
     angles_str: str = "",
@@ -79,26 +78,17 @@ def write_chart_word_report(
 
 
 def write_chart_word_report_by_freq(
-    freq_pairs: Dict[float, Dict[str, io.BytesIO]],
-    pair_order: List[str],
-    pair_labels: Dict[str, str],
+    freq_pairs: dict[float, dict[str, io.BytesIO]],
+    pair_order: list[str],
+    pair_labels: dict[str, str],
     output_path: str,
     antenna_name: str = "",
-    image_width_cm: float = 8.0,
-    extra_groups: Dict[str, Dict[float, io.BytesIO]] = None,
+    image_width_cm: float = 7.5,
+    extra_groups: dict[str, dict[float, io.BytesIO]] = None,
     extra_angles: str = "",
+    show_caption: bool = True,
 ) -> None:
-    """按频点排列图表: 每频点一行 N 张图并排。
-
-    Args:
-        freq_pairs: {freq_mhz: {image_key: BytesIO}}. 如:
-            {1164: {"azimuth_polar": buf, "azimuth_polar_pk070": buf}, ...}
-        pair_order: 图片 key 的输出顺序, 如 ["azimuth_polar", "azimuth_polar_pk070"]
-        pair_labels: {image_key: 题注标签}, 如 {"azimuth_polar": "Gain Azimuth Cut"}
-        output_path: 输出 .docx 路径
-        antenna_name: 天线名
-        image_width_cm: 图片宽度 (cm)
-    """
+    """按频点排列图表: 每频点一行 N 张图并排。"""
     doc = Document()
 
     for section in doc.sections:
@@ -119,18 +109,19 @@ def write_chart_word_report_by_freq(
             key = pair_order[0]
             buf = images.get(key)
             if buf:
-                cap = f"{freq:.0f} MHz — {pair_labels.get(key, key)}"
-                _add_single_image(doc, buf, cap, width=img_width)
+                _add_single_image(doc, buf,
+                    f"{freq:.0f} MHz — {pair_labels.get(key, key)}" if show_caption else "",
+                    width=img_width, show_caption=show_caption)
         else:
             table = doc.add_table(rows=1, cols=n_cols)
             table.alignment = WD_TABLE_ALIGNMENT.CENTER
             for ci, key in enumerate(pair_order):
                 buf = images.get(key)
                 if buf:
-                    cap = f"{freq:.0f} MHz — {pair_labels.get(key, key)}"
-                    _add_cell_image(table.cell(0, ci), buf, cap, width=img_width)
+                    _add_cell_image(table.cell(0, ci), buf,
+                        f"{freq:.0f} MHz — {pair_labels.get(key, key)}" if show_caption else "",
+                        width=img_width, show_caption=show_caption)
 
-    # 追加 B 类或其他图表组
     if extra_groups:
         for group_name, images in extra_groups.items():
             if not images: continue
@@ -158,33 +149,33 @@ def _make_caption(antenna_name: str, freq_mhz: float, group_name: str,
 
 
 def _add_single_image(doc: Document, img_buf: io.BytesIO, caption: str,
-                      width: object = Cm(8.0)) -> None:
+                      width: object = Cm(7.5), show_caption: bool = True) -> None:
     """添加一张带上方题注的居中图片。"""
-    cap_para = doc.add_paragraph()
-    cap_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = cap_para.add_run(caption)
-    run.bold = True
-    run.font.size = Pt(9)
-    cap_para.paragraph_format.space_after = Pt(4)
-
+    if show_caption and caption:
+        cap_para = doc.add_paragraph()
+        cap_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = cap_para.add_run(caption)
+        run.bold = True
+        run.font.size = Pt(9)
+        cap_para.paragraph_format.space_after = Pt(2)
     img_buf.seek(0)
     img_para = doc.add_paragraph()
     img_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run_img = img_para.add_run()
     run_img.add_picture(img_buf, width=width)
-    img_para.paragraph_format.space_after = Pt(12)
+    img_para.paragraph_format.space_after = Pt(4)
 
 
 def _add_cell_image(cell, img_buf: io.BytesIO, caption: str,
-                    width: object = Cm(7.8)) -> None:
+                    width: object = Cm(7.5), show_caption: bool = True) -> None:
     """在表格单元格中添加图片 + 上方题注。"""
-    cap_para = cell.paragraphs[0]
-    cap_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = cap_para.add_run(caption)
-    run.bold = True
-    run.font.size = Pt(7)
-    cap_para.paragraph_format.space_after = Pt(3)
-
+    if show_caption and caption:
+        cap_para = cell.paragraphs[0]
+        cap_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = cap_para.add_run(caption)
+        run.bold = True
+        run.font.size = Pt(7)
+        cap_para.paragraph_format.space_after = Pt(2)
     img_buf.seek(0)
     img_para = cell.add_paragraph()
     img_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -194,8 +185,8 @@ def _add_cell_image(cell, img_buf: io.BytesIO, caption: str,
 
 def _write_image_grid(
     doc: Document,
-    images: Dict[float, io.BytesIO],
-    freqs: List[float],
+    images: dict[float, io.BytesIO],
+    freqs: list[float],
     antenna_name: str,
     group_name: str,
     angles_str: str,

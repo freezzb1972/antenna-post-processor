@@ -7,10 +7,8 @@ AzimuthReportConfig 管理方位面极坐标图的生成选项、
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
 
 
 @dataclass
@@ -26,13 +24,15 @@ class AzimuthReportConfig:
     cut_azimuth_polar_ar: bool = False       # AR   方位面极坐标切面
     cut_azimuth_polar_rhcp: bool = False     # RHCP 方位面极坐标切面
     cut_azimuth_polar_lhcp: bool = False     # LHCP 方位面极坐标切面
-    azimuth_cut_angles: List[float] = field(default_factory=list)      # Gain 选定 Theta 角度 (°)
-    azimuth_cut_angles_ar: List[float] = field(default_factory=list)   # AR  选定 Theta 角度 (°)
-    azimuth_cut_angles_rhcp: List[float] = field(default_factory=list) # RHCP 选定 Theta 角度 (°)
-    azimuth_cut_angles_lhcp: List[float] = field(default_factory=list) # LHCP 选定 Theta 角度 (°)
+    azimuth_cut_angles: list[float] = field(default_factory=list)      # Gain 选定 Theta 角度 (°)
+    azimuth_cut_angles_ar: list[float] = field(default_factory=list)   # AR  选定 Theta 角度 (°)
+    azimuth_cut_angles_rhcp: list[float] = field(default_factory=list) # RHCP 选定 Theta 角度 (°)
+    azimuth_cut_angles_lhcp: list[float] = field(default_factory=list) # LHCP 选定 Theta 角度 (°)
     antenna_name: str = ""                   # 天线名（标题用）
     freq_gap_mhz: int = 10                  # B类频点曲线多段间隔阈值(MHz), 0=不打断
     dual_y_enabled: bool = False            # B类频点曲线启用双Y轴配对
+    show_caption: bool = True               # Word 图片上方是否显示题注
+    image_width_cm: float = 7.5             # Word 图片宽度 (cm)
 
     # ── Word 布局模式 ──
     # "side_by_side": 每频点同行 2 列 (左 Gain 右 AR)
@@ -76,22 +76,22 @@ class AzimuthReportConfig:
         return self.cut_azimuth_polar and self.cut_azimuth_polar_ar
 
     @property
-    def angles_sorted(self) -> List[float]:
+    def angles_sorted(self) -> list[float]:
         """排序去重后的 Gain 选定角度。"""
         return sorted(set(self.azimuth_cut_angles))
 
     @property
-    def angles_ar_sorted(self) -> List[float]:
+    def angles_ar_sorted(self) -> list[float]:
         """排序去重后的 AR 选定角度。"""
         return sorted(set(self.azimuth_cut_angles_ar))
 
     @property
-    def angles_rhcp_sorted(self) -> List[float]:
+    def angles_rhcp_sorted(self) -> list[float]:
         """排序去重后的 RHCP 选定角度。"""
         return sorted(set(self.azimuth_cut_angles_rhcp))
 
     @property
-    def angles_lhcp_sorted(self) -> List[float]:
+    def angles_lhcp_sorted(self) -> list[float]:
         """排序去重后的 LHCP 选定角度。"""
         return sorted(set(self.azimuth_cut_angles_lhcp))
 
@@ -150,10 +150,12 @@ class AzimuthReportConfig:
             "dpi": self.dpi,
             "freq_gap_mhz": self.freq_gap_mhz,
             "dual_y_enabled": self.dual_y_enabled,
+            "show_caption": self.show_caption,
+            "image_width_cm": self.image_width_cm,
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "AzimuthReportConfig":
+    def from_dict(cls, d: dict) -> AzimuthReportConfig:
         """从 dict 反序列化。"""
         return cls(
             cut_azimuth_polar=bool(d.get("cut_azimuth_polar", False)),
@@ -178,13 +180,15 @@ class AzimuthReportConfig:
             dpi=int(d.get("dpi", 150)),
             freq_gap_mhz=int(d.get("freq_gap_mhz", 10)),
             dual_y_enabled=bool(d.get("dual_y_enabled", False)),
+            show_caption=bool(d.get("show_caption", True)),
+            image_width_cm=float(d.get("image_width_cm", 7.5)),
         )
 
     # ═══════════════════════════════════════════════════════════
     # 合并
     # ═══════════════════════════════════════════════════════════
 
-    def merge(self, other: "AzimuthReportConfig") -> "AzimuthReportConfig":
+    def merge(self, other: AzimuthReportConfig) -> AzimuthReportConfig:
         """合并两个配置（OR 逻辑），角度取并集，路径取 self 优先。"""
         return AzimuthReportConfig(
             cut_azimuth_polar=self.cut_azimuth_polar or other.cut_azimuth_polar,
@@ -209,6 +213,8 @@ class AzimuthReportConfig:
             dpi=self.dpi or other.dpi,
             freq_gap_mhz=self.freq_gap_mhz if self.freq_gap_mhz >= 0 else other.freq_gap_mhz,
             dual_y_enabled=self.dual_y_enabled or other.dual_y_enabled,
+            show_caption=self.show_caption and other.show_caption,
+            image_width_cm=self.image_width_cm or other.image_width_cm,
         )
 
     # ═══════════════════════════════════════════════════════════

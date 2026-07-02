@@ -9,15 +9,14 @@ from __future__ import annotations
 
 import io
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Tuple
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
-
 
 # ═══════════════════════════════════════════════════════════════
 # EMQuest 风格色彩映射
@@ -95,7 +94,7 @@ class BaseRenderer(ABC):
     def render_azimuth_polar(
         self,
         phi_deg: np.ndarray,
-        curves: "List[Tuple[float, np.ndarray]]",
+        curves: list[tuple[float, np.ndarray]],
         freq_mhz: float,
         *,
         antenna_name: str = "",
@@ -307,7 +306,7 @@ class MatplotlibRenderer(BaseRenderer):
     def render_azimuth_polar(
         self,
         phi_deg: np.ndarray,
-        curves: "List[Tuple[float, np.ndarray]]",
+        curves: list[tuple[float, np.ndarray]],
         freq_mhz: float,
         *,
         antenna_name: str = "",
@@ -317,17 +316,15 @@ class MatplotlibRenderer(BaseRenderer):
         """方位面极坐标切面图：Phi 角轴 + 多条 Theta 曲线。"""
         phi_rad = np.deg2rad(phi_deg)
 
-        # 颜色 + 线型循环 (颜色优先, 最多 32 种组合)
         colors = ["#E74C3C", "#2980B9", "#27AE60", "#F39C12",
                   "#8E44AD", "#1ABC9C", "#E67E22", "#2C3E50"]
         linestyles = ["-", "--", "-.", ":"]
 
         fig, ax = plt.subplots(subplot_kw={"projection": "polar"},
-                               dpi=dpi, figsize=(8, 7))
+                               dpi=dpi, figsize=(7, 7))
 
         sorted_curves = sorted(curves, key=lambda x: x[0])
 
-        # Pre-allocate closed phi array (same for all curves)
         phi_close = np.empty(len(phi_rad) + 1)
         phi_close[:-1] = phi_rad
         phi_close[-1] = phi_rad[0] + 2 * np.pi
@@ -336,7 +333,6 @@ class MatplotlibRenderer(BaseRenderer):
             color = colors[i % len(colors)]
             ls = linestyles[(i // len(colors)) % len(linestyles)]
             label = f"{ylabel.split()[0]} at θ={theta_angle:.0f}°"
-            # 闭合曲线: 追加起点到终点 (phi=0 → phi=360)
             gain_close = np.empty(len(gain_1d) + 1)
             gain_close[:-1] = gain_1d
             gain_close[-1] = gain_1d[0]
@@ -345,25 +341,34 @@ class MatplotlibRenderer(BaseRenderer):
 
         ax.set_theta_zero_location("N")
         ax.set_theta_direction(-1)
-        ax.set_thetagrids(range(0, 360, 30))
+        # 外圈角度刻度标注
+        ax.set_thetagrids(range(0, 360, 30),
+                          labels=[f"{d}°" for d in range(0, 360, 30)],
+                          fontsize=7)
+        ax.set_rlabel_position(135)  # 径向标签位置避开曲线
 
-        title_parts = []
+        # 标题区: 频率 + ylabel 作为副标题 (避免与图形重叠)
+        title_line = f"{freq_mhz:.0f} MHz"
         if antenna_name:
-            title_parts.append(antenna_name)
-        title_parts.append(f"{freq_mhz:.0f} MHz")
-        # ylabel 区分 Gain / AR
-        cut_type = "Gain" if "Gain" in ylabel else "AR"
-        title_parts.append(f"{cut_type} Azimuth Cut")
-        ax.set_title(" — ".join(title_parts), fontsize=12, pad=18)
+            title_line = f"{antenna_name} — {title_line}"
+        ax.set_title(title_line, fontsize=11, pad=12)
+        # ylabel 放在标题下方, 用 fig.text 避免与极坐标重叠
+        fig.text(0.5, 0.01, ylabel, ha="center", va="bottom",
+                 fontsize=9, color="#555555")
 
-        ax.set_ylabel(ylabel, fontsize=9, labelpad=20)
         ax.grid(True, alpha=0.4)
 
+        # 径向刻度标注
+        ylim = ax.get_ylim()
+        r_ticks = np.linspace(ylim[0], ylim[1], 5)
+        ax.set_yticks(r_ticks)
+        ax.set_yticklabels([f"{v:.0f}" for v in r_ticks], fontsize=6)
+
         if len(sorted_curves) > 1:
-            ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.0),
+            ax.legend(loc="upper right", bbox_to_anchor=(1.35, 1.02),
                       fontsize=7, framealpha=0.8)
 
-        fig.tight_layout(pad=1.5)
+        fig.tight_layout(pad=1.2, rect=[0.02, 0.06, 0.98, 0.94])
         return _fig_to_png_buffer(fig, dpi)
 
     def render_gain_vs_theta(
@@ -403,7 +408,6 @@ class MatplotlibRenderer(BaseRenderer):
         左轴: v1 (蓝色实线), 右轴: v2 (红色虚线).
         自动检测频段间隙 (>gap_mhz): 分段绘制、断线。
         """
-        import math
         n = len(freqs)
         threshold = gap_mhz if gap_mhz > 0 else 999999
         segments = []; seg_start = 0
@@ -451,7 +455,6 @@ class MatplotlibRenderer(BaseRenderer):
         自动检测频段间隙 (>gap_mhz): 分段绘制、断线、x轴标注段边界频率。
         gap_mhz=0 时不打断，用传统单轴。
         """
-        import math
         n = len(freqs)
         threshold = gap_mhz if gap_mhz > 0 else 999999
         # 检测频段间隙
