@@ -361,7 +361,8 @@ class MatplotlibRenderer(BaseRenderer):
         _setup_polar_radial_ticks(ax)
 
         if len(sorted_curves) > 1:
-            ax.legend(loc="upper right", fontsize=10, framealpha=0.7)
+            ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0),
+                      fontsize=8, framealpha=0.8, borderaxespad=0)
 
         fig.tight_layout(pad=1.0)
         return _fig_to_png_buffer(fig, dpi)
