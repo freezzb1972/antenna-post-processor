@@ -2545,7 +2545,7 @@ class ChartSettingsPage(QWidget):
         row_cap.addWidget(self._check_show_caption)
         row_cap.addWidget(QLabel(self.tr("  图片宽(cm):")))
         self._spin_img_cm = QDoubleSpinBox()
-        self._spin_img_cm.setRange(3.0, 16.0); self._spin_img_cm.setValue(7.5)
+        self._spin_img_cm.setRange(3.0, 16.0); self._spin_img_cm.setValue(8.5)
         self._spin_img_cm.setSingleStep(0.5); self._spin_img_cm.setFixedWidth(70)
         self._spin_img_cm.valueChanged.connect(lambda v: (
             setattr(getattr(self._mw, '_azimuth_config', None), 'image_width_cm', v)

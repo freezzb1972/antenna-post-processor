@@ -83,7 +83,7 @@ def write_chart_word_report_by_freq(
     pair_labels: dict[str, str],
     output_path: str,
     antenna_name: str = "",
-    image_width_cm: float = 7.5,
+    image_width_cm: float = 8.5,
     extra_groups: dict[str, dict[float, io.BytesIO]] = None,
     extra_angles: str = "",
     show_caption: bool = True,
