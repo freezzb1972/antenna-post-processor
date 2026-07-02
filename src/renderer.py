@@ -601,6 +601,7 @@ def _setup_polar_radial_ticks(ax):
         best_ticks = list(range(inner, outer + step, step))
 
     ax.set_ylim(best_ticks[0], best_ticks[-1])
+    ax.set_ylim(best_ticks[0], best_ticks[-1])
     ax.set_yticks(best_ticks)
     ax.set_yticklabels([f"{v}" for v in best_ticks], fontsize=10)
     # 确保中心点刻度也显示
