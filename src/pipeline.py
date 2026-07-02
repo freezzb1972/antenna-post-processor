@@ -162,16 +162,29 @@ def _process_one_frequency(
     if "gain" in need or "peak_eirp" in compute_set or not need:
         row["gain"] = round(peak_dbi, 6)
 
-    # Directivity
+    # Directivity (需全球面积分; theta < 175° 时临时外推补全)
     directivity_dbi = None
-    if "directivity" in compute_set or not need:
-        directivity_dbi = compute_directivity(gain_linear, theta_rad)
-        row["directivity"] = round(directivity_dbi, 6)
+    need_dir_or_eff = ("directivity" in compute_set or "efficiency_pct" in need
+                       or "efficiency_db" in compute_set or not need)
+    if need_dir_or_eff:
+        if theta_deg[-1] < 175 and not do_extrapolate:
+            # 外推 LogMag 数据到 180° 仅用于 Directivity, 不覆盖原始数据
+            ext_th, ext_tl = extrapolate_theta(theta_deg, theta_lm, "linear")
+            _, ext_pl = extrapolate_theta(theta_deg, phi_lm, "linear")
+            ext_gl, _ = compute_total_gain_linear(ext_tl, ext_pl)
+            dir_gl = ext_gl
+            dir_theta = np.deg2rad(ext_th)
+        else:
+            dir_gl = gain_linear
+            dir_theta = theta_rad
+        directivity_dbi = compute_directivity(dir_gl, dir_theta)
+        if "directivity" in compute_set or not need:
+            row["directivity"] = round(directivity_dbi, 6)
 
     # Efficiency
     if "efficiency_pct" in need or "efficiency_db" in compute_set or not need:
         if directivity_dbi is None:
-            directivity_dbi = compute_directivity(gain_linear, theta_rad)
+            directivity_dbi = compute_directivity(dir_gl, dir_theta)
         eff_pct, eff_db = compute_efficiency(peak_dbi, directivity_dbi)
         if "efficiency_pct" in compute_set or not need:
             row["efficiency_pct"] = round(eff_pct, 6)

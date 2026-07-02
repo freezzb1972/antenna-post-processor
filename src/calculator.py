@@ -110,15 +110,22 @@ def compute_efficiency(
 
     η = 10^((G - D) / 10) × 100%
 
+    对有源天线 (AMP): G 含放大器增益致 G > D, η > 100% 无物理意义。
+    此时上限制在 99.99%，eff_db(负值)表示超出量。
+
     Args:
         peak_gain_dbi:  峰值增益 (dBi)。
         directivity_dbi: 方向性 (dBi)。
 
     Returns:
         (efficiency_pct, efficiency_db)
+        efficiency_pct 上限 99.99 (有源天线)
     """
     eff_db = peak_gain_dbi - directivity_dbi
     eff_pct = 10.0 ** (eff_db / 10.0) * 100.0
+    if eff_pct > 100.0:
+        eff_pct = 99.99
+        eff_db = -0.001  # 标记为有源天线
     return float(eff_pct), float(eff_db)
 
 

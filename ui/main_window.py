@@ -100,7 +100,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # ---- 状态 ----
         self._lag_config = LagConfig(
-            single_angles=[60, 70, 80, 90],
+            single_angles=[0, 10, 20, 90],
             ranges=[(0, 90), (60, 90)],
         )
         self._thread: Optional[QThread] = None
