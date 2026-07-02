@@ -955,84 +955,56 @@ def _write_cell(
                 cell.value = value
 
 
-def _write_lag_single(
+def _write_lag_single(ws, row, col_map, angle, value):
+    """写入单角度参数到匹配的列 (LAG/RHCP/CP-XPI 共用)。"""
+    _write_typed_single(ws, row, col_map, "lag_single", angle, value)
+
+def _write_rhcp_single(ws, row, col_map, angle, value):
+    _write_typed_single(ws, row, col_map, "rhcp_single", angle, value)
+
+def _write_cp_xpi_single(ws, row, col_map, angle, value):
+    _write_typed_single(ws, row, col_map, "cp_xpi_single", angle, value)
+
+def _write_typed_single(
     ws, row: int, col_map: dict[str, list[ColumnInfo]],
-    angle: float, value: Any,
+    col_type: str, angle: float, value: Any,
 ):
-    """写入单角度 LAG 到匹配的列。"""
-    for cinfo in col_map.get("lag_single", []):
+    """写入单角度参数到匹配的列 (角度匹配, 不跨类型覆盖)。"""
+    for cinfo in col_map.get(col_type, []):
         norm = normalize_header(cinfo.raw_header)
-        m = _RE_LAG_SINGLE.search(norm)
+        m = _RE_LAG_SINGLE.search(norm) or _RE_LAG_SINGLE_NO_PREFIX.search(norm)
         if not m:
-            m = _RE_LAG_SINGLE_NO_PREFIX.search(norm)
-        if not m:
-            # "Gain at Theta=30\nLAG" 格式
             m = re.search(r"theta[= ]*(\d+)", norm, re.IGNORECASE)
+        if not m:
+            m = re.search(r"(\d+\.?\d*)", norm)
         if m and abs(float(m.group(1)) - angle) < 0.01:
             cell = ws.cell(row, cinfo.col_index)
             cell.value = round(value, 6) if isinstance(value, float) else value
             return
 
 
-def _write_lag_range(
+def _write_lag_range(ws, row, col_map, lo, hi, value):
+    """写入范围参数到匹配的列。"""
+    _write_typed_range(ws, row, col_map, "lag_range", lo, hi, value)
+
+def _write_rhcp_range(ws, row, col_map, lo, hi, value):
+    _write_typed_range(ws, row, col_map, "rhcp_range", lo, hi, value)
+
+def _write_cp_xpi_range(ws, row, col_map, lo, hi, value):
+    _write_typed_range(ws, row, col_map, "cp_xpi_range", lo, hi, value)
+
+def _write_typed_range(
     ws, row: int, col_map: dict[str, list[ColumnInfo]],
-    lo: float, hi: float, value: Any,
+    col_type: str, lo: float, hi: float, value: Any,
 ):
-    """写入范围 LAG 到匹配的列。"""
-    for cinfo in col_map.get("lag_range", []):
+    """写入范围参数到匹配的列 (角度匹配, 不跨类型覆盖)。"""
+    for cinfo in col_map.get(col_type, []):
         norm = normalize_header(cinfo.raw_header)
         m = _RE_LAG_RANGE.search(norm) or _RE_LAG_RANGE_NO_PREFIX.search(norm)
         if not m:
-            # "Gain at Theta=0~70 (dB)" 格式
             m = re.search(r"theta[= ]*(\d+)\s*[~\-–—]\s*(\d+)", norm, re.IGNORECASE)
-        if m:
-            clo, chi = float(m.group(1)), float(m.group(2))
-            if abs(clo - lo) < 0.01 and abs(chi - hi) < 0.01:
-                cell = ws.cell(row, cinfo.col_index)
-                cell.value = round(value, 6) if isinstance(value, float) else value
-                return
-
-
-def _write_rhcp_single(ws, row, col_map, angle, value):
-    """写入 RHCP 单角度到匹配的列（独立列类型，不覆盖 LAG）。"""
-    for cinfo in col_map.get("rhcp_single", []):
-        norm = normalize_header(cinfo.raw_header)
-        m = re.search(r"(\d+\.?\d*)", norm)
-        if m and abs(float(m.group(1)) - angle) < 0.01:
-            cell = ws.cell(row, cinfo.col_index)
-            cell.value = round(value, 6) if isinstance(value, float) else value
-            return
-
-
-def _write_rhcp_range(ws, row, col_map, lo, hi, value):
-    """写入 RHCP 范围到匹配的列。"""
-    for cinfo in col_map.get("rhcp_range", []):
-        norm = normalize_header(cinfo.raw_header)
-        m = re.search(r"(\d+)\s*[~\-–—]\s*(\d+)", norm)
-        if m:
-            clo, chi = float(m.group(1)), float(m.group(2))
-            if abs(clo - lo) < 0.01 and abs(chi - hi) < 0.01:
-                cell = ws.cell(row, cinfo.col_index)
-                cell.value = round(value, 6) if isinstance(value, float) else value
-                return
-
-
-def _write_cp_xpi_single(ws, row, col_map, angle, value):
-    """写入 CP-XPI 单角度到匹配的列。"""
-    for cinfo in col_map.get("cp_xpi_single", []):
-        norm = normalize_header(cinfo.raw_header)
-        m = re.search(r"(\d+\.?\d*)", norm)
-        if m and abs(float(m.group(1)) - angle) < 0.01:
-            cell = ws.cell(row, cinfo.col_index)
-            cell.value = round(value, 6) if isinstance(value, float) else value
-            return
-
-
-def _write_cp_xpi_range(ws, row, col_map, lo, hi, value):
-    """写入 CP-XPI 范围到匹配的列。"""
-    for cinfo in col_map.get("cp_xpi_range", []):
-        norm = normalize_header(cinfo.raw_header)
-        m = re.search(r"(\d+)\s*[~\-–—]\s*(\d+)", norm)
+        if not m:
+            m = re.search(r"(\d+)\s*[~\-–—]\s*(\d+)", norm)
         if m:
             clo, chi = float(m.group(1)), float(m.group(2))
             if abs(clo - lo) < 0.01 and abs(chi - hi) < 0.01:
