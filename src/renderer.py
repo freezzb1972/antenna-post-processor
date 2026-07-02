@@ -593,6 +593,11 @@ def _setup_polar_radial_ticks(ax):
     if vmax - vmin <= 0:
         vmax = vmin + 10
 
+    # 负值 backlobe 保护: 用 target 参与步长选择, 实际内圈仍覆盖真 vmin
+    target_min = vmin
+    if vmin < 0 and vmax > abs(vmin) * 3:
+        target_min = max(vmin, -vmax * 0.1)
+
     # 遍历候选步长, 选内外总浪费最小的 (4-7 圈)
     best_ticks = None
     best_waste = float('inf')
@@ -601,7 +606,7 @@ def _setup_polar_radial_ticks(ax):
         inner = int(np.floor(vmin / step)) * step
         n = (outer - inner) // step + 1
         if 4 <= n <= 7:
-            waste = (outer - vmax) + (vmin - inner)
+            waste = (outer - vmax) * 2 + max(0, target_min - inner) * 0.5
             if waste < best_waste:
                 best_waste = waste
                 best_ticks = list(range(inner, outer + step, step))
