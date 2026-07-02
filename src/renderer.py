@@ -361,10 +361,9 @@ class MatplotlibRenderer(BaseRenderer):
         ax.set_yticklabels([f"{v:.0f}" for v in r_ticks], fontsize=6)
 
         if len(sorted_curves) > 1:
-            ax.legend(loc="upper right", bbox_to_anchor=(1.35, 1.02),
-                      fontsize=7, framealpha=0.8)
+            ax.legend(loc="upper right", fontsize=6, framealpha=0.7)
 
-        fig.tight_layout(pad=1.2, rect=[0.02, 0.06, 0.98, 0.94])
+        fig.tight_layout(pad=1.0)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_gain_vs_theta(
