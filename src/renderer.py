@@ -398,115 +398,88 @@ class MatplotlibRenderer(BaseRenderer):
                                 v2: list, label2: str, *,
                                 title: str = "", dpi: int = 150,
                                 gap_mhz: int = 10) -> io.BytesIO:
-        """双Y轴频点曲线 GridSpec 多段双轴 + 连接虚线。"""
-        segments = _detect_freq_gaps(freqs, gap_mhz)
-        has_gap = len(segments) > 1
+        """双Y轴频点曲线: 压缩多段单轴, 线连续。"""
+        threshold = gap_mhz if gap_mhz > 0 else 999999
+        gap_vis = 10.0
+        x = []; xt = []; xl = []; off = 0.0
+        seg_i = 0; seg_start = 0
+        for i in range(1, len(freqs) + 1):
+            if i == len(freqs) or freqs[i] - freqs[i-1] > threshold:
+                ei = i; sf = freqs[seg_start:ei]
+                if seg_i > 0:
+                    off += (freqs[seg_start] - freqs[seg_start-1]) - gap_vis
+                    xt.append(freqs[seg_start-1] - off_prev)
+                    xl.append(f"{freqs[seg_start-1]:.0f}")
+                    xt.append(freqs[seg_start] - off)
+                    xl.append(f"{freqs[seg_start]:.0f}")
+                off_prev = off
+                for f in sf:
+                    x.append(f - off)
+                lo, hi = int(np.ceil(sf[0])), int(np.floor(sf[-1]))
+                span = hi - lo
+                ival = max(1, int(round(span / 4))) if span >= 4 else 1
+                for t in range(lo + ival, hi, ival):
+                    if min(t - sf[0], sf[-1] - t) < ival * 0.5:
+                        continue
+                    xt.append(t - off)
+                    xl.append(f"{t}")
+                seg_i += 1; seg_start = i
 
-        fig = plt.figure(figsize=(8, 4.5))
-        if has_gap:
-            import matplotlib.gridspec as gridspec
-            gs = gridspec.GridSpec(1, len(segments),
-                                   width_ratios=[len(range(s,e)) for s,e in segments],
-                                   wspace=0.08, figure=fig)
-            axes = []
-            for seg_i, (si, ei) in enumerate(segments):
-                ax = fig.add_subplot(gs[seg_i])
-                sf = freqs[si:ei]; sv1 = v1[si:ei]; sv2 = v2[si:ei]
-                _render_dual_y_axes(ax, sf, sv1, label1, sv2, label2)
-                ticks_f = [sf[0], sf[-1]]
-                if len(sf) > 3: ticks_f.insert(1, sf[len(sf)//2])
-                ax.set_xticks(ticks_f)
-                ax.set_xticklabels([f"{f:.0f}" for f in ticks_f], fontsize=10)
-                # 只保留底部 x 轴, 隐藏间隙相邻 spine
-                ax.spines['top'].set_visible(False)
-                ax.spines['right'].set_visible(False)
-                axes.append(ax)
-            for i in range(len(axes)-1):
-                axes[i].spines['right'].set_visible(False)
-                axes[i+1].spines['left'].set_visible(False)
-            # 横坐标断口连接线
-            for i in range(len(axes)-1):
-                bboxL = axes[i].get_position()
-                bboxR = axes[i+1].get_position()
-                fig.lines.append(plt.Line2D([bboxL.x1, bboxR.x0], [bboxL.y0, bboxR.y0],
-                    transform=fig.transFigure, color='gray', linewidth=0.6, linestyle='-', alpha=0.4))
-            fig.supxlabel("Frequency (MHz)", fontsize=10, y=0.03)
-            fig.subplots_adjust(wspace=0.15, left=0.12, right=0.85)
-        else:
-            ax = fig.add_subplot(111)
-            _render_dual_y_axes(ax, freqs, v1, label1, v2, label2)
-            ax.set_xlabel("Frequency (MHz)")
-            fig.tight_layout()
+        fig, ax = plt.subplots(figsize=(8, 4.5), dpi=dpi)
+        _render_dual_y_axes(ax, x, v1, label1, v2, label2)
+        ax.grid(True, alpha=0.3)
+        ax.set_xticks(xt)
+        ax.set_xticklabels(xl, fontsize=10)
+        ax.tick_params(axis='x', rotation=0)
         return _fig_to_png_buffer(fig, dpi)
-
     def render_freq_curve(self, freqs: list, values: list, *,
                           label: str = "", ylabel: str = "",
                           title: str = "", dpi: int = 150,
                           gap_mhz: int = 10) -> io.BytesIO:
-        """渲染频点 vs 参数 Cartesian 线图 (B 类图表 Word 输出)。
-
-        多段频率用 GridSpec 双轴: 每段独立x轴+精确频率刻度,
-        段间用虚线连接示意(不暗示连续数据)。
-        gap_mhz=0 时传统单轴。
-        """
-        segments = _detect_freq_gaps(freqs, gap_mhz)
-        has_gap = len(segments) > 1
-
-        fig = plt.figure(figsize=(8, 4.5))
-        if has_gap:
-            import matplotlib.gridspec as gridspec
-            gs = gridspec.GridSpec(1, len(segments),
-                                   width_ratios=[len(range(s,e)) for s,e in segments],
-                                   wspace=0.08, figure=fig)
-            axes = []
-            for seg_i, (si, ei) in enumerate(segments):
-                ax = fig.add_subplot(gs[seg_i])
+        """B 类频点曲线: 压缩多段到单轴, 线连续, 端点+等差整数刻度。"""
+        threshold = gap_mhz if gap_mhz > 0 else 999999
+        gap_vis = 10.0  # 段间视觉间距
+        x = []; xt = []; xl = []; off = 0.0
+        seg_i = 0; seg_start = 0
+        for i in range(1, len(freqs) + 1):
+            if i == len(freqs) or freqs[i] - freqs[i-1] > threshold:
+                ei = i; sf = freqs[seg_start:ei]
                 if seg_i > 0:
-                    ax.sharey(axes[0])
-                    plt.setp(ax.get_yticklabels(), visible=False)
-                sf = freqs[si:ei]; sv = values[si:ei]
-                ax.plot(sf, sv, "o-", linewidth=1.5, markersize=4, label=label or ylabel)
-                ax.grid(True, alpha=0.3)
-                ticks_f = [sf[0], sf[-1]]
-                if len(sf) > 3: ticks_f.insert(1, sf[len(sf)//2])
-                ax.set_xticks(ticks_f)
-                ax.set_xticklabels([f"{f:.0f}" for f in ticks_f], fontsize=10)
-                # 只保留底部 x 轴, 隐藏其他 spine (避免顶部横线和间隙竖线)
-                ax.spines['top'].set_visible(False)
-                ax.spines['right'].set_visible(False)
-                axes.append(ax)
-            # 隐藏间隙相邻 spine (避免竖直实线)
-            for i in range(len(axes)-1):
-                axes[i].spines['right'].set_visible(False)
-                axes[i+1].spines['left'].set_visible(False)
-            # 横坐标断口连接线 (仅示意x轴连续)
-            for i in range(len(axes)-1):
-                # 左轴右下角 → 右轴左下角, 用 figure 坐标
-                bboxL = axes[i].get_position()
-                bboxR = axes[i+1].get_position()
-                xL = bboxL.x1; yL = bboxL.y0
-                xR = bboxR.x0; yR = bboxR.y0
-                fig.lines.append(plt.Line2D([xL, xR], [yL, yR],
-                    transform=fig.transFigure, color='gray', linewidth=0.6, linestyle='-', alpha=0.4))
-            fig.supxlabel("Frequency (MHz)", fontsize=10, y=0.03)
-            fig.supylabel(ylabel or label, fontsize=10, x=0.04)
-            if label: axes[0].legend(fontsize=10)
-            fig.subplots_adjust(wspace=0.15, left=0.12, right=0.95)
-        else:
-            ax = fig.add_subplot(111)
-            ax.plot(freqs, values, "o-", linewidth=1.5, markersize=4, label=label or ylabel)
-            ax.set_xlabel("Frequency (MHz)"); ax.set_ylabel(ylabel or label)
-            ax.grid(True, alpha=0.3)
-            if values:
-                lo, hi = min(values), max(values)
-                margin = (hi - lo) * 0.1 if hi != lo else 1.0
-                ax.set_ylim(lo - margin, hi + margin)
-            if label: ax.legend(fontsize=10)
-            fig.tight_layout()
+                    off += (freqs[seg_start] - freqs[seg_start-1]) - gap_vis
+                    # 段边界频率
+                    xt.append(freqs[seg_start-1] - off_prev)
+                    xl.append(f"{freqs[seg_start-1]:.0f}")
+                    xt.append(freqs[seg_start] - off)
+                    xl.append(f"{freqs[seg_start]:.0f}")
+                off_prev = off
+                for f in sf:
+                    x.append(f - off)
+                # 段内整数等差刻度, 跳过距边界 < 半步的
+                lo, hi = int(np.ceil(sf[0])), int(np.floor(sf[-1]))
+                span = hi - lo
+                ival = max(1, int(round(span / 4))) if span >= 4 else 1
+                for t in range(lo + ival, hi, ival):
+                    if min(t - sf[0], sf[-1] - t) < ival * 0.5:
+                        continue
+                    xt.append(t - off)
+                    xl.append(f"{t}")
+                seg_i += 1; seg_start = i
+
+        fig, ax = plt.subplots(figsize=(8, 4.5), dpi=dpi)
+        ax.plot(x, values, "o-", linewidth=1.5, markersize=4, label=label or ylabel)
+        ax.set_ylabel(ylabel or label)
+        ax.grid(True, alpha=0.3)
+        ax.set_xticks(xt)
+        ax.set_xticklabels(xl, fontsize=10)
+        ax.tick_params(axis='x', rotation=0)
+        if values:
+            lo, hi = min(values), max(values)
+            m = (hi - lo) * 0.1 if hi != lo else 1.0
+            ax.set_ylim(lo - m, hi + m)
+        if label:
+            ax.legend(fontsize=10)
+        fig.tight_layout()
         return _fig_to_png_buffer(fig, dpi)
-
-
-# ═══════════════════════════════════════════════════════════════
 # Cloud GPU 渲染器（预留接口）
 # ═══════════════════════════════════════════════════════════════
 
