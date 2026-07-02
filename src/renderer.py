@@ -525,6 +525,30 @@ class MatplotlibRenderer(BaseRenderer):
 # ═══════════════════════════════════════════════════════════════
 # 公共双Y轴渲染 (供 viewer + Word 报告共用)
 # ═══════════════════════════════════════════════════════════════
+def _set_cartesian_y_ticks(ax, vmin: float, vmax: float, fontsize: int = 10):
+    """Cartesian Y 轴 nice-step 刻度 (供 B 类曲线双Y轴)。"""
+    span = vmax - vmin
+    if span <= 0: span = 10
+    best_ticks = None
+    best_gap = float('inf')
+    for step in [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000,
+                 10000, 20000, 50000, 100000]:
+        outer = int(np.ceil(vmax / step)) * step
+        inner = int(np.floor(vmin / step)) * step
+        n = (outer - inner) // step + 1
+        if 4 <= n <= 8:
+            gap = outer - vmax
+            if gap < best_gap:
+                best_gap = gap
+                best_ticks = list(range(inner, outer + step, step))
+    if best_ticks is None:
+        step = max(1, int(round(span / 5)))
+        inner = int(np.floor(vmin))
+        outer = int(np.ceil(vmax / step)) * step
+        best_ticks = list(range(inner, outer + step, step))
+    ax.set_yticks(best_ticks)
+    ax.set_yticklabels([f"{v}" for v in best_ticks], fontsize=fontsize)
+
 
 def _render_dual_y_axes(ax, freqs, v1, label1, v2, label2):
     """在给定 axes 上绘制双Y轴频点曲线。
@@ -537,14 +561,14 @@ def _render_dual_y_axes(ax, freqs, v1, label1, v2, label2):
     ax1.plot(freqs, v1, "o-", markersize=4, color="#1f77b4")
     ax1.set_ylabel(label1, color="#1f77b4")
     ax1.tick_params(axis="y", labelcolor="#1f77b4")
-    ax1.yaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True, steps=[1,2,5,10]))
+    _set_cartesian_y_ticks(ax1, min(v1), max(v1))
     ax1.grid(True, alpha=0.3)
 
     ax2 = ax1.twinx()
     ax2.plot(freqs, v2, "s--", markersize=4, color="#d62728")
     ax2.set_ylabel(label2, color="#d62728")
     ax2.tick_params(axis="y", labelcolor="#d62728")
-    ax2.yaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True, steps=[1,2,5,10]))
+    _set_cartesian_y_ticks(ax2, min(v2), max(v2))
     return ax1, ax2
 
 
