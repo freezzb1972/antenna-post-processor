@@ -1135,26 +1135,23 @@ class GraphViewer(QWidget):
             n_pairs = len(pairs)
             for pi, (a, b, need_dual) in enumerate(pairs):
                 ax1 = self._figure.add_subplot(n_pairs, 1, pi + 1)
-                # 曲线1 (左轴)
                 v1 = [freq_data[f].get(a[1]) for f in freqs]
-                ax1.plot(freqs, v1, 'o-', markersize=4, color='#1f77b4')
-                ax1.set_ylabel(a[0], color='#1f77b4')
-                ax1.tick_params(axis='y', labelcolor='#1f77b4')
-                ax1.grid(True, alpha=0.3)
-
-                if b is not None:
-                    if need_dual:
-                        ax2 = ax1.twinx()
-                        v2 = [freq_data[f].get(b[1]) for f in freqs]
-                        ax2.plot(freqs, v2, 's--', markersize=4, color='#d62728')
-                        ax2.set_ylabel(b[0], color='#d62728')
-                        ax2.tick_params(axis='y', labelcolor='#d62728')
-                    else:
-                        v2 = [freq_data[f].get(b[1]) for f in freqs]
-                        ax1.plot(freqs, v2, 's--', markersize=4, color='#d62728')
-                        # 合并图例
-                        lines = ax1.get_lines()
-                        ax1.legend(lines, [a[0], b[0]], fontsize=7)
+                if b is not None and need_dual:
+                    v2 = [freq_data[f].get(b[1]) for f in freqs]
+                    from src.renderer import _render_dual_y_axes
+                    _render_dual_y_axes(ax1, freqs, v1, a[0], v2, b[0])
+                elif b is not None:
+                    v2 = [freq_data[f].get(b[1]) for f in freqs]
+                    ax1.plot(freqs, v1, 'o-', markersize=4, color='#1f77b4')
+                    ax1.plot(freqs, v2, 's--', markersize=4, color='#d62728')
+                    ax1.set_ylabel(a[0])
+                    ax1.grid(True, alpha=0.3)
+                    lines = ax1.get_lines()
+                    ax1.legend(lines, [a[0], b[0]], fontsize=7)
+                else:
+                    ax1.plot(freqs, v1, 'o-', markersize=4, color='#1f77b4')
+                    ax1.set_ylabel(a[0])
+                    ax1.grid(True, alpha=0.3)
 
                 if pi < n_pairs - 1:
                     ax1.tick_params(labelbottom=False)

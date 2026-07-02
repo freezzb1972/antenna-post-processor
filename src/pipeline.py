@@ -1120,6 +1120,36 @@ def _export_azimuth(
                 except Exception:
                     pass
 
+    # ── 双Y轴配对 (B 类) ──
+    _dual_y = getattr(azimuth_config, 'dual_y_enabled', False) if azimuth_config else False
+    if _dual_y and _flat:
+        # 预定义配对: (%类, dB类) → 双Y轴
+        _DUAL_PAIRS = [
+            (("efficiency_pct", "Efficiency (%)"), ("gain", "Peak Gain (dBi)")),
+            (("directivity", "Directivity (dBi)"), ("trp", "TRP (dBm)")),
+        ]
+        gap = getattr(azimuth_config, 'freq_gap_mhz', 10) if azimuth_config else 10
+        for (k1, l1), (k2, l2) in _DUAL_PAIRS:
+            if k1 not in _flat[0] or k2 not in _flat[0]:
+                continue
+            freqs = []; v1 = []; v2 = []
+            for row in _flat:
+                f = row.get("frequency")
+                a = row.get(k1); b = row.get(k2)
+                if f is not None and a is not None and b is not None:
+                    freqs.append(f); v1.append(a); v2.append(b)
+            if len(freqs) > 1:
+                try:
+                    png = _freq_renderer.render_freq_curve_dual(
+                        freqs, v1, l1, v2, l2, gap_mhz=gap,
+                        title=f"{l1} + {l2} vs Frequency")
+                    group = f"B: {l1} + {l2} vs Freq"
+                    if group not in image_groups:
+                        image_groups[group] = {}
+                    image_groups[group][0.0] = png
+                except Exception:
+                    pass
+
     # ── 中间数据收集 ──
     for sheet_name, rows in sheet_results.items():
         for row in rows:

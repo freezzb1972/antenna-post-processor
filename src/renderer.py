@@ -346,6 +346,55 @@ class MatplotlibRenderer(BaseRenderer):
         fig.tight_layout(pad=1.5)
         return _fig_to_png_buffer(fig, dpi)
 
+    def render_freq_curve_dual(self, freqs: list,
+                                v1: list, label1: str,
+                                v2: list, label2: str, *,
+                                title: str = "", dpi: int = 150,
+                                gap_mhz: int = 10) -> io.BytesIO:
+        """渲染双Y轴频点曲线 (B 类图表 Word 输出)。
+
+        左轴: v1 (蓝色实线), 右轴: v2 (红色虚线).
+        自动检测频段间隙 (>gap_mhz): 分段绘制、断线。
+        """
+        import math
+        n = len(freqs)
+        threshold = gap_mhz if gap_mhz > 0 else 999999
+        segments = []; seg_start = 0
+        for i in range(1, n):
+            if freqs[i] - freqs[i-1] > threshold:
+                segments.append((seg_start, i)); seg_start = i
+        segments.append((seg_start, n))
+        has_gap = len(segments) > 1
+
+        fig = plt.figure(figsize=(8, 4.5), constrained_layout=True)
+        if has_gap:
+            import matplotlib.gridspec as gridspec
+            gs = gridspec.GridSpec(1, 2, width_ratios=[1, 1], wspace=0.05, figure=fig)
+            ax_left = fig.add_subplot(gs[0])
+            ax_right = fig.add_subplot(gs[1])
+            for seg_i, (si, ei) in enumerate(segments):
+                ax = ax_left if seg_i == 0 else ax_right
+                sf = freqs[si:ei]; sv1 = v1[si:ei]; sv2 = v2[si:ei]
+                _render_dual_y_axes(ax, sf, sv1, label1, sv2, label2)
+                tick_freqs = [sf[0], sf[-1]]
+                if len(sf) > 3: tick_freqs.insert(1, sf[len(sf)//2])
+                ax.set_xticks(tick_freqs)
+                ax.set_xticklabels([f"{f:.0f}" for f in tick_freqs], fontsize=8)
+            # 断点标记
+            ax_left.spines['right'].set_visible(False)
+            ax_right.spines['left'].set_visible(False)
+            d = 0.015
+            kw = dict(transform=ax_left.transAxes, color='k', clip_on=False, linewidth=1)
+            ax_left.plot((1-d,1+d), (-d,+d), **kw); ax_left.plot((1-d,1+d), (1-d,1+d), **kw)
+            kw.update(transform=ax_right.transAxes)
+            ax_right.plot((-d,+d), (-d,+d), **kw); ax_right.plot((-d,+d), (1-d,1+d), **kw)
+            fig.supxlabel("Frequency (MHz)", fontsize=10, y=0.02)
+        else:
+            ax = fig.add_subplot(111)
+            _render_dual_y_axes(ax, freqs, v1, label1, v2, label2)
+            ax.set_xlabel("Frequency (MHz)")
+        return _fig_to_png_buffer(fig, dpi)
+
     def render_freq_curve(self, freqs: list, values: list, *,
                           label: str = "", ylabel: str = "",
                           title: str = "", dpi: int = 150,
@@ -433,6 +482,29 @@ class MatplotlibRenderer(BaseRenderer):
 # ═══════════════════════════════════════════════════════════════
 # Cloud GPU 渲染器（预留接口）
 # ═══════════════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════════════
+# 公共双Y轴渲染 (供 viewer + Word 报告共用)
+# ═══════════════════════════════════════════════════════════════
+
+def _render_dual_y_axes(ax, freqs, v1, label1, v2, label2):
+    """在给定 axes 上绘制双Y轴频点曲线。
+
+    左轴 (蓝色实线): v1, 右轴 (红色虚线): v2.
+    供 MatplotlibRenderer.render_freq_curve_dual 和 GraphViewer 共用。
+    """
+    ax1 = ax
+    ax1.plot(freqs, v1, "o-", markersize=4, color="#1f77b4")
+    ax1.set_ylabel(label1, color="#1f77b4")
+    ax1.tick_params(axis="y", labelcolor="#1f77b4")
+    ax1.grid(True, alpha=0.3)
+
+    ax2 = ax1.twinx()
+    ax2.plot(freqs, v2, "s--", markersize=4, color="#d62728")
+    ax2.set_ylabel(label2, color="#d62728")
+    ax2.tick_params(axis="y", labelcolor="#d62728")
+    return ax1, ax2
+
 
 class CloudRenderer(BaseRenderer):
     """云端渲染器 — REST API 调用远程 GPU 渲染服务。
