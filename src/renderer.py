@@ -368,11 +368,12 @@ class MatplotlibRenderer(BaseRenderer):
         segments.append((seg_start, n))
         has_gap = len(segments) > 1
 
-        fig = plt.figure(figsize=(8, 4.5))
+        fig = plt.figure(figsize=(8, 4.5), constrained_layout=True)
         if has_gap:
-            # 双轴: 左半 L5, 右半 L1, 中间 gap 压缩为 10MHz
+            # 双轴: 左半 L5, 右半 L1, 中间 gap 压缩
             import matplotlib.gridspec as gridspec
-            gs = gridspec.GridSpec(1, 2, width_ratios=[1, 1], wspace=0.05)
+            gs = gridspec.GridSpec(1, 2, width_ratios=[1, 1], wspace=0.05,
+                                   figure=fig)
             ax_left = fig.add_subplot(gs[0])
             ax_right = fig.add_subplot(gs[1], sharey=ax_left)
 
@@ -426,7 +427,6 @@ class MatplotlibRenderer(BaseRenderer):
             if label:
                 ax.legend(fontsize=8)
 
-        fig.tight_layout(rect=[0.05, 0.08, 1, 0.96])
         return _fig_to_png_buffer(fig, dpi)
 
 
