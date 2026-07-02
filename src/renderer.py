@@ -355,12 +355,10 @@ class MatplotlibRenderer(BaseRenderer):
 
         ax.grid(True, alpha=0.4)
 
-        # 径向刻度标注 — 按步长取整确保等差
-        ylim = ax.get_ylim()
-        step = max(1.0, (ylim[1] - ylim[0]) / 5)
-        r_ticks = np.arange(np.floor(ylim[0]), ylim[1] + step, step)
-        ax.set_yticks(r_ticks)
-        ax.set_yticklabels([f"{v:.0f}" for v in r_ticks], fontsize=6)
+        # 极坐标径向刻度: 用 MaxNLocator 确保等差取整
+        import matplotlib.ticker as ticker
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
+        ax.tick_params(axis='y', labelsize=6)
 
         if len(sorted_curves) > 1:
             ax.legend(loc="upper right", fontsize=6, framealpha=0.7)
