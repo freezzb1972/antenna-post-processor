@@ -436,7 +436,14 @@ class MatplotlibRenderer(BaseRenderer):
                 seg_i += 1; seg_start = i
 
         fig, ax = plt.subplots(figsize=(8, 4.5), dpi=dpi)
-        _render_dual_y_axes(ax, x, v1, label1, v2, label2)
+        # 分段绘制双Y轴, 段间不连线
+        seg_i2 = 0; seg_start2 = 0
+        for i2 in range(1, len(freqs) + 1):
+            if i2 == len(freqs) or freqs[i2] - freqs[i2-1] > (gap_mhz if gap_mhz > 0 else 999999):
+                _render_dual_y_axes(ax, x[seg_start2:i2], v1[seg_start2:i2],
+                                    label1 if seg_i2 == 0 else "", v2[seg_start2:i2],
+                                    label2 if seg_i2 == 0 else "")
+                seg_i2 += 1; seg_start2 = i2
         ax.grid(True, alpha=0.3)
         ax.set_xticks(xt)
         ax.set_xticklabels(xl, fontsize=10)
@@ -486,7 +493,13 @@ class MatplotlibRenderer(BaseRenderer):
                 seg_i += 1; seg_start = i
 
         fig, ax = plt.subplots(figsize=(8, 4.5), dpi=dpi)
-        ax.plot(x, values, "o-", linewidth=1.5, markersize=4, label=label or ylabel)
+        # 分段绘制, 段间不连线
+        seg_i2 = 0; seg_start2 = 0
+        for i2 in range(1, len(freqs) + 1):
+            if i2 == len(freqs) or freqs[i2] - freqs[i2-1] > (gap_mhz if gap_mhz > 0 else 999999):
+                ax.plot(x[seg_start2:i2], values[seg_start2:i2], "o-",
+                        linewidth=1.5, markersize=4, label=(label or ylabel) if seg_i2 == 0 else "")
+                seg_i2 += 1; seg_start2 = i2
         ax.set_ylabel(ylabel or label)
         ax.grid(True, alpha=0.3)
         ax.set_xticks(xt)
