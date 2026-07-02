@@ -254,7 +254,9 @@ class MatplotlibRenderer(BaseRenderer):
 
         ax.set_theta_zero_location("N")
         ax.set_theta_direction(-1)
-        ax.set_thetagrids(range(0, 360, 30))
+        ax.set_thetagrids(range(0, 360, 30),
+                          labels=[f"{d}°" for d in range(0, 360, 30)],
+                          fontsize=7)
 
         title_parts = []
         if antenna_name:
@@ -263,6 +265,16 @@ class MatplotlibRenderer(BaseRenderer):
         if cut_label:
             title_parts.append(cut_label)
         ax.set_title(" — ".join(title_parts), fontsize=12, pad=18)
+
+        # 径向刻度等差取整
+        yl = ax.get_ylim()
+        rmax = yl[1] * 1.05
+        step = max(1.0, round(rmax / 5))
+        r_ticks = list(range(0, int(np.ceil(rmax)) + step, step))
+        if r_ticks[-1] < rmax: r_ticks.append(r_ticks[-1] + step)
+        ax.set_ylim(0, r_ticks[-1])
+        ax.set_yticks(r_ticks)
+        ax.set_yticklabels([f"{v}" for v in r_ticks], fontsize=6)
 
         ax.set_ylabel("Gain (dBi)", fontsize=9, labelpad=20)
         ax.grid(True, alpha=0.4)
