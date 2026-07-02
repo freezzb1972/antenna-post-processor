@@ -355,10 +355,16 @@ class MatplotlibRenderer(BaseRenderer):
 
         ax.grid(True, alpha=0.4)
 
-        # 极坐标径向刻度: 用 MaxNLocator 确保等差取整
-        import matplotlib.ticker as ticker
-        ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
-        ax.tick_params(axis='y', labelsize=6)
+        # 极坐标径向刻度: 等差取整, 每圈都标数值 (含最外圈)
+        yl = ax.get_ylim()
+        rmax = yl[1] * 1.05
+        step = max(1.0, round(rmax / 5))
+        r_ticks = list(range(0, int(np.ceil(rmax)) + step, step))
+        if r_ticks[-1] < rmax:
+            r_ticks.append(r_ticks[-1] + step)
+        ax.set_ylim(0, r_ticks[-1])
+        ax.set_yticks(r_ticks)
+        ax.set_yticklabels([f"{v}" for v in r_ticks], fontsize=6)
 
         if len(sorted_curves) > 1:
             ax.legend(loc="upper right", fontsize=6, framealpha=0.7)
