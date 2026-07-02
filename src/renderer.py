@@ -537,7 +537,7 @@ def _setup_polar_radial_ticks(ax):
     """极坐标径向刻度: 等差取整, 每圈标注, 最外圈覆盖数据。"""
     yl = ax.get_ylim()
     rmax = yl[1] * 1.05
-    step = max(1.0, round(rmax / 5))
+    step = max(1, int(round(rmax / 5)))
     r_ticks = list(range(0, int(np.ceil(rmax)) + step, step))
     if r_ticks[-1] < rmax:
         r_ticks.append(r_ticks[-1] + step)
