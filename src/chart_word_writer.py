@@ -129,7 +129,8 @@ def write_chart_word_report_by_freq(
             heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
             freqs_extra = sorted(images.keys())
             _write_image_grid(doc, images, freqs_extra, antenna_name,
-                              group_name, extra_angles, Cm(image_width_cm), 1)
+                              group_name, extra_angles, Cm(image_width_cm), 1,
+                              show_caption=show_caption)
 
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     doc.save(output_path)
@@ -192,25 +193,23 @@ def _write_image_grid(
     angles_str: str,
     img_width: object,
     columns: int = 2,
+    show_caption: bool = True,
 ) -> None:
     """按频点排列图片，每行 N 列。"""
     if columns == 1:
         for freq in freqs:
-            cap = _make_caption(antenna_name, freq, group_name, angles_str)
-            _add_single_image(doc, images[freq], cap, width=img_width)
+            cap = _make_caption(antenna_name, freq, group_name, angles_str) if show_caption else ""
+            _add_single_image(doc, images[freq], cap, width=img_width, show_caption=show_caption)
     else:
         for i in range(0, len(freqs), columns):
             row_freqs = freqs[i:i + columns]
             if len(row_freqs) == 1:
-                cap = _make_caption(antenna_name, row_freqs[0], group_name,
-                                    angles_str)
-                _add_single_image(doc, images[row_freqs[0]], cap, width=img_width)
+                cap = _make_caption(antenna_name, row_freqs[0], group_name, angles_str) if show_caption else ""
+                _add_single_image(doc, images[row_freqs[0]], cap, width=img_width, show_caption=show_caption)
             else:
                 table = doc.add_table(rows=1, cols=len(row_freqs))
                 table.alignment = WD_TABLE_ALIGNMENT.CENTER
                 for j, freq in enumerate(row_freqs):
-                    cap = _make_caption(antenna_name, freq, group_name,
-                                        angles_str)
-                    _add_cell_image(table.cell(0, j), images[freq], cap,
-                                    width=img_width)
+                    cap = _make_caption(antenna_name, freq, group_name, angles_str) if show_caption else ""
+                    _add_cell_image(table.cell(0, j), images[freq], cap, width=img_width, show_caption=show_caption)
                 # 图片间不加空段 — 紧凑排列
