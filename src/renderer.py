@@ -416,33 +416,49 @@ class MatplotlibRenderer(BaseRenderer):
                                 v2: list, label2: str, *,
                                 title: str = "", dpi: int = 150,
                                 gap_mhz: int = 10) -> io.BytesIO:
-        """渲染双Y轴频点曲线 (B 类图表 Word 输出)。
-
-        多段频率压缩 x 轴, 间隙 10 单位, 线连续。
-        gap_mhz=0 时用真实频率轴。
-        """
+        """双Y轴频点曲线 GridSpec 多段双轴 + 连接虚线。"""
         n = len(freqs)
         threshold = gap_mhz if gap_mhz > 0 else 999999
-        gap_visual = 10.0
-        x = []; ticks = []; tlabels = []; offset = 0.0
-        for i, f in enumerate(freqs):
-            if i > 0 and f - freqs[i-1] > threshold:
-                ticks.append(freqs[i-1] - offset)
-                tlabels.append(f"{freqs[i-1]:.0f}")
-                offset += (f - freqs[i-1]) - gap_visual
-                ticks.append(f - offset)
-                tlabels.append(f"{f:.0f}")
-            x.append(f - offset)
-        last_tick = freqs[-1] - offset
-        if not ticks or abs(last_tick - ticks[-1]) > 1:
-            ticks.append(last_tick); tlabels.append(f"{freqs[-1]:.0f}")
+        segments = []; seg_start = 0
+        for i in range(1, n):
+            if freqs[i] - freqs[i-1] > threshold:
+                segments.append((seg_start, i)); seg_start = i
+        segments.append((seg_start, n))
+        has_gap = len(segments) > 1
 
-        fig, ax = plt.subplots(figsize=(8, 4.5), dpi=dpi)
-        _render_dual_y_axes(ax, x, v1, label1, v2, label2)
-        ax.grid(True, alpha=0.3)
-        ax.set_xticks(ticks)
-        ax.set_xticklabels(tlabels, fontsize=8)
-        ax.set_xlabel("Frequency (MHz)")
+        fig = plt.figure(figsize=(8, 4.5))
+        if has_gap:
+            import matplotlib.gridspec as gridspec
+            gs = gridspec.GridSpec(1, len(segments),
+                                   width_ratios=[len(range(s,e)) for s,e in segments],
+                                   wspace=0.08, figure=fig)
+            axes = []
+            for seg_i, (si, ei) in enumerate(segments):
+                ax = fig.add_subplot(gs[seg_i])
+                sf = freqs[si:ei]; sv1 = v1[si:ei]; sv2 = v2[si:ei]
+                _render_dual_y_axes(ax, sf, sv1, label1, sv2, label2)
+                ticks_f = [sf[0], sf[-1]]
+                if len(sf) > 3: ticks_f.insert(1, sf[len(sf)//2])
+                ax.set_xticks(ticks_f)
+                ax.set_xticklabels([f"{f:.0f}" for f in ticks_f], fontsize=8)
+                axes.append(ax)
+            for i in range(len(axes)-1):
+                axL, axR = axes[i], axes[i+1]
+                segL = segments[i]; segR = segments[i+1]
+                yL1 = v1[segL[1]-1]; yR1 = v1[segR[0]]
+                pL = axL.transData.transform((freqs[segL[1]-1], yL1))
+                pR = axR.transData.transform((freqs[segR[0]], yR1))
+                fL = fig.transFigure.inverted().transform(pL)
+                fR = fig.transFigure.inverted().transform(pR)
+                fig.lines.append(plt.Line2D([fL[0], fR[0]], [fL[1], fR[1]],
+                    transform=fig.transFigure, color='gray', linewidth=0.8, linestyle='--', alpha=0.5))
+            fig.supxlabel("Frequency (MHz)", fontsize=10, y=0.03)
+            fig.subplots_adjust(wspace=0.15, left=0.12, right=0.85)
+        else:
+            ax = fig.add_subplot(111)
+            _render_dual_y_axes(ax, freqs, v1, label1, v2, label2)
+            ax.set_xlabel("Frequency (MHz)")
+            fig.tight_layout()
         return _fig_to_png_buffer(fig, dpi)
 
     def render_freq_curve(self, freqs: list, values: list, *,
@@ -451,39 +467,70 @@ class MatplotlibRenderer(BaseRenderer):
                           gap_mhz: int = 10) -> io.BytesIO:
         """渲染频点 vs 参数 Cartesian 线图 (B 类图表 Word 输出)。
 
-        多段频率用压缩 x 轴: 间隙插入 10 单位, 线连续不断。
-        gap_mhz=0 时不压缩, 用真实频率轴。
+        多段频率用 GridSpec 双轴: 每段独立x轴+精确频率刻度,
+        段间用虚线连接示意(不暗示连续数据)。
+        gap_mhz=0 时传统单轴。
         """
         n = len(freqs)
         threshold = gap_mhz if gap_mhz > 0 else 999999
-        gap_visual = 10.0
-        x = []; ticks = []; tlabels = []; offset = 0.0
-        for i, f in enumerate(freqs):
-            if i > 0 and f - freqs[i-1] > threshold:
-                ticks.append(freqs[i-1] - offset)
-                tlabels.append(f"{freqs[i-1]:.0f}")
-                offset += (f - freqs[i-1]) - gap_visual
-                ticks.append(f - offset)
-                tlabels.append(f"{f:.0f}")
-            x.append(f - offset)
-        last_tick = freqs[-1] - offset
-        if not ticks or abs(last_tick - ticks[-1]) > 1:
-            ticks.append(last_tick); tlabels.append(f"{freqs[-1]:.0f}")
+        segments = []; seg_start = 0
+        for i in range(1, n):
+            if freqs[i] - freqs[i-1] > threshold:
+                segments.append((seg_start, i)); seg_start = i
+        segments.append((seg_start, n))
+        has_gap = len(segments) > 1
 
-        fig, ax = plt.subplots(figsize=(8, 4.5), dpi=dpi)
-        ax.plot(x, values, "o-", linewidth=1.5, markersize=4, label=label or ylabel)
-        ax.set_ylabel(ylabel or label)
-        ax.set_xlabel("Frequency (MHz)")
-        ax.grid(True, alpha=0.3)
-        ax.set_xticks(ticks)
-        ax.set_xticklabels(tlabels, fontsize=8)
-        if values:
-            lo, hi = min(values), max(values)
-            margin = (hi - lo) * 0.1 if hi != lo else 1.0
-            ax.set_ylim(lo - margin, hi + margin)
-        if label:
-            ax.legend(fontsize=8)
-        fig.tight_layout()
+        fig = plt.figure(figsize=(8, 4.5))
+        if has_gap:
+            import matplotlib.gridspec as gridspec
+            gs = gridspec.GridSpec(1, len(segments),
+                                   width_ratios=[len(range(s,e)) for s,e in segments],
+                                   wspace=0.08, figure=fig)
+            axes = []
+            for seg_i, (si, ei) in enumerate(segments):
+                ax = fig.add_subplot(gs[seg_i])
+                if seg_i > 0:
+                    ax.sharey(axes[0])
+                    plt.setp(ax.get_yticklabels(), visible=False)
+                sf = freqs[si:ei]; sv = values[si:ei]
+                ax.plot(sf, sv, "o-", linewidth=1.5, markersize=4, label=label or ylabel)
+                ax.grid(True, alpha=0.3)
+                ticks_f = [sf[0], sf[-1]]
+                if len(sf) > 3: ticks_f.insert(1, sf[len(sf)//2])
+                ax.set_xticks(ticks_f)
+                ax.set_xticklabels([f"{f:.0f}" for f in ticks_f], fontsize=8)
+                axes.append(ax)
+            # 段间虚线连接 (示意非连续)
+            for i in range(len(axes)-1):
+                axL, axR = axes[i], axes[i+1]
+                segL = segments[i]; segR = segments[i+1]
+                xL = freqs[segL[1]-1]; yL = values[segL[1]-1]
+                xR = freqs[segR[0]];   yR = values[segR[0]]
+                # 在左右轴的交界处画虚线
+                line = plt.Line2D([1, 0], [yL, yR], transform=fig.transFigure,
+                                  color='gray', linewidth=0.8, linestyle='--', alpha=0.5)
+                fig.lines.append(line)
+                # 需转换坐标: ax 的 data coords → figure coords
+                pL = axL.transData.transform((xL, yL))
+                pR = axR.transData.transform((xR, yR))
+                fL = fig.transFigure.inverted().transform(pL)
+                fR = fig.transFigure.inverted().transform(pR)
+                fig.lines[-1].set_data([fL[0], fR[0]], [fL[1], fR[1]])
+            fig.supxlabel("Frequency (MHz)", fontsize=10, y=0.03)
+            fig.supylabel(ylabel or label, fontsize=10, x=0.04)
+            if label: axes[0].legend(fontsize=8)
+            fig.subplots_adjust(wspace=0.15, left=0.12, right=0.95)
+        else:
+            ax = fig.add_subplot(111)
+            ax.plot(freqs, values, "o-", linewidth=1.5, markersize=4, label=label or ylabel)
+            ax.set_xlabel("Frequency (MHz)"); ax.set_ylabel(ylabel or label)
+            ax.grid(True, alpha=0.3)
+            if values:
+                lo, hi = min(values), max(values)
+                margin = (hi - lo) * 0.1 if hi != lo else 1.0
+                ax.set_ylim(lo - margin, hi + margin)
+            if label: ax.legend(fontsize=8)
+            fig.tight_layout()
         return _fig_to_png_buffer(fig, dpi)
 
 
