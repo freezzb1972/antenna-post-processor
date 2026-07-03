@@ -361,10 +361,9 @@ class MatplotlibRenderer(BaseRenderer):
         _setup_polar_radial_ticks(ax)
 
         if len(sorted_curves) > 1:
-            ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0),
-                      fontsize=8, framealpha=0.8, borderaxespad=0)
+            ax.legend(loc="upper right", fontsize=7, framealpha=0.5)
 
-        fig.subplots_adjust(left=0.1, right=0.85, top=0.92, bottom=0.08)
+        fig.subplots_adjust(left=0.1, right=0.92, top=0.92, bottom=0.08)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_gain_vs_theta(
@@ -593,14 +592,11 @@ def _setup_polar_radial_ticks(ax):
     if vmax - vmin <= 0:
         vmax = vmin + 10
 
-    # 极坐标 r 轴不小于 0; 步长按正半轴选 (不等比缩放背瓣)
-    vmin_polar = max(0, vmin)
-
-    # Heckbert: 目标 N=5 圈, 但步长只考虑正半轴 (背瓣不应压缩主瓣显示)
+    # Heckbert: 目标 N=5 圈, nice step 优先
     N_target = 5
-    pos_span = vmax - vmin_polar
-    if pos_span <= 0: pos_span = 10
-    raw_step = pos_span / (N_target - 1)
+    raw_step = (vmax - vmin) / (N_target - 1)
+    raw_step = (vmax - vmin) / (N_target - 1)
+    if raw_step <= 0: raw_step = 2
     # nice step 对齐
     mag = 10 ** int(np.floor(np.log10(raw_step))) if raw_step > 0 else 1
     r = raw_step / mag
@@ -611,7 +607,7 @@ def _setup_polar_radial_ticks(ax):
     step = max(1, int(step))
 
     # 对称对齐: inner 向下, outer 向上; 内圈 ≥ 0
-    inner = max(0, int(np.floor(vmin_polar / step)) * step)
+    inner = int(np.floor(vmin / step)) * step
     outer = int(np.ceil(vmax / step)) * step
     n = (outer - inner) // step + 1
 
@@ -620,7 +616,7 @@ def _setup_polar_radial_ticks(ax):
         step = max(1, step // 2 if step > 2 else 1)
     elif n > 8:
         step = step * 2
-    inner = max(0, int(np.floor(vmin_polar / step)) * step)
+    inner = int(np.floor(vmin / step)) * step
     outer = int(np.ceil(vmax / step)) * step
 
     ticks = list(range(inner, outer + step, step))
@@ -817,7 +813,7 @@ def detect_available_renderers() -> dict:
 
 def _fig_to_png_buffer(fig, dpi: int) -> io.BytesIO:
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight",
+    fig.savefig(buf, format="png", dpi=dpi,
                 facecolor="white", edgecolor="none")
     buf.seek(0)
     plt.close(fig)
