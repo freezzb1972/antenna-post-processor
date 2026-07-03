@@ -593,9 +593,12 @@ def _setup_polar_radial_ticks(ax):
     if vmax - vmin <= 0:
         vmax = vmin + 10
 
+    # 极坐标 r 轴不小于 0 (负值被裁)
+    vmin_polar = max(0, vmin)
+
     # Heckbert: 目标 N=5 圈, nice step 优先
     N_target = 5
-    raw_step = (vmax - vmin) / (N_target - 1)
+    raw_step = (vmax - vmin_polar) / (N_target - 1)
     # nice step 对齐
     mag = 10 ** int(np.floor(np.log10(raw_step))) if raw_step > 0 else 1
     r = raw_step / mag
@@ -605,19 +608,17 @@ def _setup_polar_radial_ticks(ax):
     else: step = 10 * mag
     step = max(1, int(step))
 
-    # 对称对齐: inner 向下, outer 向上
-    inner = int(np.floor(vmin / step)) * step
+    # 对称对齐: inner 向下, outer 向上; 内圈 ≥ 0
+    inner = max(0, int(np.floor(vmin_polar / step)) * step)
     outer = int(np.ceil(vmax / step)) * step
     n = (outer - inner) // step + 1
 
     # 若圈数偏离太多, 调整步长
     if n < 4:
-        # 步长太大 → 减半
         step = max(1, step // 2 if step > 2 else 1)
     elif n > 8:
-        # 步长太小 → 翻倍
         step = step * 2
-    inner = int(np.floor(vmin / step)) * step
+    inner = max(0, int(np.floor(vmin_polar / step)) * step)
     outer = int(np.ceil(vmax / step)) * step
 
     ticks = list(range(inner, outer + step, step))
