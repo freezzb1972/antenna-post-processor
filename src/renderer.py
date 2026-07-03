@@ -372,11 +372,12 @@ class MatplotlibRenderer(BaseRenderer):
             _setup_polar_radial_ticks(ax)
 
         if len(sorted_curves) > 1:
-            labels = [f"θ={theta:.0f}°" for (theta, _) in sorted_curves]
-            fig.legend(labels, loc="center right", fontsize=10, framealpha=0.6,
-                       bbox_to_anchor=(1.0, 0.5))
+            # 官方极坐标图例: 用极角偏移放到图外 (45° 方向 = 右上角)
+            angle = np.deg2rad(45)
+            ax.legend(loc="lower left", fontsize=9, framealpha=0.6,
+                      bbox_to_anchor=(.5 + np.cos(angle)/2, .5 + np.sin(angle)/2))
 
-        fig.tight_layout(pad=0.8)
+        fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_gain_vs_theta(
