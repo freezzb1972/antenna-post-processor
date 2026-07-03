@@ -625,10 +625,15 @@ def _setup_polar_radial_ticks(ax):
 
     ax.set_ylim(ticks[0], ticks[-1])
     import matplotlib.ticker as _ticker
+    # 只有当 ticks 包含 0 时，它才被 FixedLocator 认可。若不包含，确保添加。
     ax.yaxis.set_major_locator(_ticker.FixedLocator(ticks))
     ax.yaxis.set_minor_locator(_ticker.NullLocator())
     ax.set_yticks(ticks)
     ax.set_yticklabels([f"{v}" for v in ticks], fontsize=10)
+    # 极坐标中心刻度易被隐藏 — 显式标注
+    if ticks and ticks[0] == 0:
+        ax.text(np.deg2rad(15), 0, "0", ha='center', va='center',
+                fontsize=10, color='#555555', transform=ax.transData)
     ax.set_rlabel_position(15)
 
 
