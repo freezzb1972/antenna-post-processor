@@ -596,6 +596,8 @@ def _setup_polar_radial_ticks(ax):
     """
     yl = ax.get_ylim()
     vmin, vmax = yl[0], yl[1]
+    # 极坐标 r 轴不能为负 → 中心固定 0
+    vmin = max(0, vmin)
     if vmax - vmin <= 0:
         vmax = vmin + 10
 
@@ -616,6 +618,9 @@ def _setup_polar_radial_ticks(ax):
     while ticks[-1] + step <= outer + 1e-9:
         ticks.append(ticks[-1] + step)
     ticks = [round(t, 6) for t in ticks]
+    # 极坐标中心恒为 0，确保在刻度列表中
+    if 0 not in ticks and ticks[0] > 0:
+        ticks = [0] + ticks
 
     ax.set_ylim(ticks[0], ticks[-1])
     import matplotlib.ticker as _ticker
