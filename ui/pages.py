@@ -285,45 +285,17 @@ class FileSettingsPage(QWidget):
         self._check_out_data = QCheckBox(self.tr("中间数据文件 (.xlsx)"))
         out_layout.addWidget(self._check_out_data)
 
-        # Gain
-        row_gain_dir = QHBoxLayout()
-        self._edit_az_gain_dir = QLineEdit()
-        self._edit_az_gain_dir.setPlaceholderText(self.tr("默认: 源文件目录"))
-        row_gain_dir.addWidget(self._edit_az_gain_dir, 1)
-        btn_gain_browse = QPushButton(self.tr("浏览..."))
-        btn_gain_browse.clicked.connect(self._on_browse_az_gain_dir)
-        row_gain_dir.addWidget(btn_gain_browse)
-        out_layout.addLayout(row_gain_dir)
-
-        row_gain_fn = QHBoxLayout()
-        row_gain_fn.addWidget(QLabel(self.tr("Gain 文件名:")))
-        self._edit_az_gain_fn = QLineEdit()
-        self._edit_az_gain_fn.setPlaceholderText(self.tr("默认: 源文件名Gain.xlsx"))
-        row_gain_fn.addWidget(self._edit_az_gain_fn, 1)
-        out_layout.addLayout(row_gain_fn)
-
-        # AR
-        row_ar_dir = QHBoxLayout()
-        self._edit_az_ar_dir = QLineEdit()
-        self._edit_az_ar_dir.setPlaceholderText(self.tr("默认: 源文件目录"))
-        row_ar_dir.addWidget(self._edit_az_ar_dir, 1)
-        btn_ar_browse = QPushButton(self.tr("浏览..."))
-        btn_ar_browse.clicked.connect(self._on_browse_az_ar_dir)
-        row_ar_dir.addWidget(btn_ar_browse)
-        out_layout.addLayout(row_ar_dir)
-
-        row_ar_fn = QHBoxLayout()
-        row_ar_fn.addWidget(QLabel(self.tr("AR 文件名:")))
-        self._edit_az_ar_fn = QLineEdit()
-        self._edit_az_ar_fn.setPlaceholderText(self.tr("默认: 源文件名AR.xlsx"))
-        row_ar_fn.addWidget(self._edit_az_ar_fn, 1)
-        out_layout.addLayout(row_ar_fn)
+        row_data_fn = QHBoxLayout()
+        self._edit_az_data_fn = QLineEdit()
+        self._edit_az_data_fn.setPlaceholderText(self.tr("默认: 源文件名中间数据.xlsx"))
+        row_data_fn.addWidget(self._edit_az_data_fn, 1)
+        btn_data_browse = QPushButton(self.tr("浏览..."))
+        btn_data_browse.clicked.connect(self._on_browse_az_data_dir)
+        row_data_fn.addWidget(btn_data_browse)
+        out_layout.addLayout(row_data_fn)
 
         self._check_out_data.toggled.connect(lambda c: (
-            self._edit_az_gain_dir.setEnabled(c),
-            self._edit_az_gain_fn.setEnabled(c),
-            self._edit_az_ar_dir.setEnabled(c),
-            self._edit_az_ar_fn.setEnabled(c),
+            self._edit_az_data_fn.setEnabled(c),
             self._sync_azimuth_cut_switch(),
         ))
 
@@ -372,14 +344,8 @@ class FileSettingsPage(QWidget):
             self._edit_az_chart_dir.setText(az.chart_output_dir)
         if hasattr(self, '_edit_az_chart_fn'):
             self._edit_az_chart_fn.setText(az.chart_output_filename)
-        if hasattr(self, '_edit_az_gain_dir'):
-            self._edit_az_gain_dir.setText(az.data_gain_output_dir)
-        if hasattr(self, '_edit_az_gain_fn'):
-            self._edit_az_gain_fn.setText(az.data_gain_output_filename)
-        if hasattr(self, '_edit_az_ar_dir'):
-            self._edit_az_ar_dir.setText(az.data_ar_output_dir)
-        if hasattr(self, '_edit_az_ar_fn'):
-            self._edit_az_ar_fn.setText(az.data_ar_output_filename)
+        if hasattr(self, '_edit_az_data_fn'):
+            self._edit_az_data_fn.setText(az.data_output_filename)
 
     def _sync_azimuth_state(self):
         """将输出设置写回 MainWindow。"""
@@ -399,14 +365,8 @@ class FileSettingsPage(QWidget):
             az.chart_output_dir = self._edit_az_chart_dir.text().strip()
         if hasattr(self, '_edit_az_chart_fn'):
             az.chart_output_filename = self._edit_az_chart_fn.text().strip()
-        if hasattr(self, '_edit_az_gain_dir'):
-            az.data_gain_output_dir = self._edit_az_gain_dir.text().strip()
-        if hasattr(self, '_edit_az_gain_fn'):
-            az.data_gain_output_filename = self._edit_az_gain_fn.text().strip()
-        if hasattr(self, '_edit_az_ar_dir'):
-            az.data_ar_output_dir = self._edit_az_ar_dir.text().strip()
-        if hasattr(self, '_edit_az_ar_fn'):
-            az.data_ar_output_filename = self._edit_az_ar_fn.text().strip()
+        if hasattr(self, '_edit_az_data_fn'):
+            az.data_output_filename = self._edit_az_data_fn.text().strip()
 
     def _sync_azimuth_cut_switch(self):
         """勾选 Word 或数据输出时自动开启/关闭方位面开关。"""
@@ -439,18 +399,12 @@ class FileSettingsPage(QWidget):
             self._edit_az_chart_dir.setText(d)
             self._sync_azimuth_state()
 
-    def _on_browse_az_gain_dir(self):
+    def _on_browse_az_data_dir(self):
         from PySide6.QtWidgets import QFileDialog
-        d = QFileDialog.getExistingDirectory(self, self.tr("选择 Gain 数据输出目录"))
-        if d and hasattr(self, '_edit_az_gain_dir'):
-            self._edit_az_gain_dir.setText(d)
-            self._sync_azimuth_state()
-
-    def _on_browse_az_ar_dir(self):
-        from PySide6.QtWidgets import QFileDialog
-        d = QFileDialog.getExistingDirectory(self, self.tr("选择 AR 数据输出目录"))
-        if d and hasattr(self, '_edit_az_ar_dir'):
-            self._edit_az_ar_dir.setText(d)
+        d = QFileDialog.getSaveFileName(self, self.tr("选择中间数据输出文件"),
+                                         "", "Excel 文件 (*.xlsx)")[0]
+        if d and hasattr(self, '_edit_az_data_fn'):
+            self._edit_az_data_fn.setText(os.path.basename(d))
             self._sync_azimuth_state()
         if self._mw:
             from src.config_manager import get_config_manager
@@ -2156,11 +2110,7 @@ class ChartSettingsPage(QWidget):
         self._word_layout_mode: str = "side_by_side"
         self._chart_output_dir: str = ""
         self._chart_output_filename: str = ""
-        self._data_gain_output_dir: str = ""
-        self._data_gain_output_filename: str = ""
-        self._data_ar_output_dir: str = ""
-        self._data_ar_output_filename: str = ""
-
+        self._data_output_filename: str = ""
         self._setup_ui()
         self._load_state()
 
@@ -2188,10 +2138,7 @@ class ChartSettingsPage(QWidget):
         self._word_layout_mode = "side_by_side"
         self._chart_output_dir = ""
         self._chart_output_filename = ""
-        self._data_gain_output_dir = ""
-        self._data_gain_output_filename = ""
-        self._data_ar_output_dir = ""
-        self._data_ar_output_filename = ""
+        self._data_output_filename = ""
 
         # 视角参数
         view_grp = QGroupBox(self.tr("视角参数"))
@@ -2602,10 +2549,7 @@ class ChartSettingsPage(QWidget):
             self._word_layout_mode = az.word_layout_mode
             self._chart_output_dir = az.chart_output_dir
             self._chart_output_filename = az.chart_output_filename
-            self._data_gain_output_dir = az.data_gain_output_dir
-            self._data_gain_output_filename = az.data_gain_output_filename
-            self._data_ar_output_dir = az.data_ar_output_dir
-            self._data_ar_output_filename = az.data_ar_output_filename
+            self._data_output_filename = az.data_output_filename
 
             if hasattr(self, '_edit_antenna_name'):
                 self._edit_antenna_name.setText(az.antenna_name)
@@ -3151,82 +3095,39 @@ class ChartSettingsPage(QWidget):
 
         layout = QVBoxLayout(dlg)
 
-        # Gain 数据
-        gain_grp = QGroupBox(self.tr("Gain 中间数据"))
-        gain_layout = QVBoxLayout(gain_grp)
-        row_gd = QHBoxLayout()
-        row_gd.addWidget(QLabel(self.tr("输出目录:")))
-        edit_gain_dir = QLineEdit(self._data_gain_output_dir)
-        edit_gain_dir.setPlaceholderText(self.tr("默认: 源文件目录"))
-        edit_gain_dir.setMinimumWidth(220)
-        row_gd.addWidget(edit_gain_dir)
-        btn_gain_browse = QPushButton(self.tr("浏览..."))
-        row_gd.addWidget(btn_gain_browse)
-        row_gd.addStretch()
-        gain_layout.addLayout(row_gd)
-
-        row_gf = QHBoxLayout()
-        row_gf.addWidget(QLabel(self.tr("文件名:")))
-        edit_gain_fn = QLineEdit(self._data_gain_output_filename)
-        edit_gain_fn.setPlaceholderText(self.tr("默认: 源文件名Gain.xlsx"))
-        edit_gain_fn.setMinimumWidth(220)
-        row_gf.addWidget(edit_gain_fn)
-        row_gf.addStretch()
-        gain_layout.addLayout(row_gf)
-
-        layout.addWidget(gain_grp)
-
-        # AR 数据
-        ar_grp = QGroupBox(self.tr("AR 中间数据"))
-        ar_layout = QVBoxLayout(ar_grp)
-        row_ad = QHBoxLayout()
-        row_ad.addWidget(QLabel(self.tr("输出目录:")))
-        edit_ar_dir = QLineEdit(self._data_ar_output_dir)
-        edit_ar_dir.setPlaceholderText(self.tr("默认: 源文件目录"))
-        edit_ar_dir.setMinimumWidth(220)
-        row_ad.addWidget(edit_ar_dir)
-        btn_ar_browse = QPushButton(self.tr("浏览..."))
-        row_ad.addWidget(btn_ar_browse)
-        row_ad.addStretch()
-        ar_layout.addLayout(row_ad)
-
-        row_af = QHBoxLayout()
-        row_af.addWidget(QLabel(self.tr("文件名:")))
-        edit_ar_fn = QLineEdit(self._data_ar_output_filename)
-        edit_ar_fn.setPlaceholderText(self.tr("默认: 源文件名AR.xlsx"))
-        edit_ar_fn.setMinimumWidth(220)
-        row_af.addWidget(edit_ar_fn)
-        row_af.addStretch()
-        ar_layout.addLayout(row_af)
-
-        layout.addWidget(ar_grp)
-
+        # 中间数据
+        data_grp = QGroupBox(self.tr("中间数据 (多 sheet 单文件)"))
+        data_layout = QVBoxLayout(data_grp)
+        row_df = QHBoxLayout()
+        row_df.addWidget(QLabel(self.tr("文件名:")))
+        edit_data_fn = QLineEdit(self._data_output_filename)
+        edit_data_fn.setPlaceholderText(self.tr("默认: 源文件名中间数据.xlsx"))
+        edit_data_fn.setMinimumWidth(220)
+        row_df.addWidget(edit_data_fn)
+        btn_data_browse = QPushButton(self.tr("浏览..."))
+        row_df.addWidget(btn_data_browse)
+        row_df.addStretch()
+        data_layout.addLayout(row_df)
+        layout.addWidget(data_grp)
         layout.addStretch()
 
-        # Browse buttons
-        btn_gain_browse.clicked.connect(lambda: _pick_dir(edit_gain_dir, "Gain"))
-        btn_ar_browse.clicked.connect(lambda: _pick_dir(edit_ar_dir, "AR"))
+        btn_data_browse.clicked.connect(lambda: _pick_file(edit_data_fn))
 
-        def _pick_dir(target_edit, label):
+        def _pick_file(target_edit):
             from PySide6.QtWidgets import QFileDialog
-            d = QFileDialog.getExistingDirectory(
-                dlg, self.tr("选择 {} 数据输出目录").format(label))
+            d = QFileDialog.getSaveFileName(
+                dlg, self.tr("选择中间数据输出文件"), "", "Excel (*.xlsx)")[0]
             if d:
-                target_edit.setText(d)
+                target_edit.setText(os.path.basename(d))
 
-        # OK / Cancel
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
-            setattr(self, '_data_gain_output_dir', edit_gain_dir.text().strip()),
-            setattr(self, '_data_gain_output_filename', edit_gain_fn.text().strip()),
-            setattr(self, '_data_ar_output_dir', edit_ar_dir.text().strip()),
-            setattr(self, '_data_ar_output_filename', edit_ar_fn.text().strip()),
+            setattr(self, '_data_output_filename', edit_data_fn.text().strip()),
             dlg.accept(),
             self._sync_to_mw(),
         ))
         btns.rejected.connect(dlg.reject)
         layout.addWidget(btns)
-
         dlg.exec()
 
     # ── 图表输出目录浏览 ──
