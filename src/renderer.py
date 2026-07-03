@@ -361,10 +361,10 @@ class MatplotlibRenderer(BaseRenderer):
         _setup_polar_radial_ticks(ax)
 
         if len(sorted_curves) > 1:
-            leg = ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.08),
-                      fontsize=7, framealpha=0.5, ncol=4, borderaxespad=0)
+            leg = ax.legend(loc="upper left", bbox_to_anchor=(1.0, 1.02),
+                      fontsize=8, framealpha=0.8, borderaxespad=0.3)
 
-        fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.15)
+        fig.subplots_adjust(left=0.08, right=0.78, top=0.92, bottom=0.08)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_gain_vs_theta(
