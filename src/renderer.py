@@ -364,7 +364,7 @@ class MatplotlibRenderer(BaseRenderer):
             ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0),
                       fontsize=8, framealpha=0.8, borderaxespad=0)
 
-        fig.tight_layout(pad=1.0)
+        fig.subplots_adjust(left=0.1, right=0.85, top=0.92, bottom=0.08)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_gain_vs_theta(
