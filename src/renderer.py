@@ -581,56 +581,48 @@ def _render_dual_y_axes(ax, freqs, v1, label1, v2, label2):
     return ax1, ax2
 
 
-def _setup_polar_radial_ticks(ax):
-    """极坐标径向刻度 — Heckbert 算法 (对称对齐, nice step, 5圈)。
 
-    步长优先: nice_step(span/5) → 内外各自对齐步长。
-    每圈标注刻度值, 含中心点。标签 @15° 避开角度数字。
+def _tick_label(v: float) -> str:
+    """格式化刻度标签: 整数用 int, 小数保留 1 位。"""
+    if abs(v - round(v)) < 1e-9:
+        return f"{int(round(v))}"
+    return f"{v:.1f}"
+
+def _setup_polar_radial_ticks(ax):
+    """极坐标径向刻度 — 纯 Heckbert 算法。
+
+    nice_step(span/5) → inner/outer 各自独立对齐步长 (step 可为小数)。
+    每圈标注 + 字体 10pt + 标签 @15°。
     """
     yl = ax.get_ylim()
     vmin, vmax = yl[0], yl[1]
     if vmax - vmin <= 0:
         vmax = vmin + 10
 
-    # Heckbert: 目标 N=5 圈, nice step 优先
-    N_target = 5
-    raw_step = (vmax - vmin) / (N_target - 1)
-    if raw_step <= 0: raw_step = 2
-    # nice step 对齐
+    raw_step = (vmax - vmin) / 5.0
+    if raw_step <= 0:
+        raw_step = 2
     mag = 10 ** int(np.floor(np.log10(raw_step))) if raw_step > 0 else 1
     r = raw_step / mag
     if r <= 1: step = mag
     elif r <= 2: step = 2 * mag
     elif r <= 5: step = 5 * mag
     else: step = 10 * mag
-    step = max(1, int(step))
 
-    # 对称对齐: inner 向下, outer 向上; 内圈 ≥ 0
     inner = int(np.floor(vmin / step)) * step
     outer = int(np.ceil(vmax / step)) * step
-    n = (outer - inner) // step + 1
 
-    # 若圈数不够, 扩展外圈到 ≥4 圈
-    if n < 4:
-        outer = inner + step * 3  # 确保 4 圈
-    elif n > 8:
-        step = step * 2
-        inner = int(np.floor(vmin / step)) * step
-        outer = int(np.ceil(vmax / step)) * step
-
-    ticks = list(range(inner, outer + step, step))
+    ticks = [inner]
+    while ticks[-1] + step <= outer + 1e-9:
+        ticks.append(ticks[-1] + step)
+    ticks = [round(t, 6) for t in ticks]
 
     ax.set_ylim(ticks[0], ticks[-1])
     import matplotlib.ticker as _ticker
-    # 只有当 ticks 包含 0 时，它才被 FixedLocator 认可。若不包含，确保添加。
     ax.yaxis.set_major_locator(_ticker.FixedLocator(ticks))
     ax.yaxis.set_minor_locator(_ticker.NullLocator())
     ax.set_yticks(ticks)
-    ax.set_yticklabels([f"{v}" for v in ticks], fontsize=10)
-    # 极坐标中心刻度易被隐藏 — 显式标注
-    if ticks and ticks[0] == 0:
-        ax.text(np.deg2rad(15), 0, "0", ha='center', va='center',
-                fontsize=10, color='#555555', transform=ax.transData)
+    ax.set_yticklabels([_tick_label(v) for v in ticks], fontsize=10)
     ax.set_rlabel_position(15)
 
 
