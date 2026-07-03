@@ -2127,6 +2127,8 @@ class ChartSettingsPage(QWidget):
         # 方位面极坐标切面
         self._azimuth_angles: List[float] = []
         self._azimuth_angles_ar: List[float] = []
+        self._azimuth_angles_rhcp: List[float] = []
+        self._azimuth_angles_lhcp: List[float] = []
         self._antenna_name: str = ""
         self._word_layout_mode: str = "side_by_side"
         self._chart_output_dir: str = ""
@@ -2155,6 +2157,8 @@ class ChartSettingsPage(QWidget):
 
         self._azimuth_angles = []
         self._azimuth_angles_ar = []
+        self._azimuth_angles_rhcp: List[float] = []
+        self._azimuth_angles_lhcp: List[float] = []
         self._cut_2d_phi_angles: List[float] = []
         self._view_angle_pairs: List[Tuple[float, float]] = []
         self._antenna_name = ""
@@ -2316,6 +2320,19 @@ class ChartSettingsPage(QWidget):
                 self._chart_required["cut_azimuth_polar_pk070"] = cb_az_pk
                 row_az_pk.addStretch()
                 left_layout.addLayout(row_az_pk)
+
+                # RHCP azimuth
+                row_az_rhcp = QHBoxLayout()
+                cb_az_rhcp = QCheckBox(self.tr("RHCP 方位面极坐标"))
+                cb_az_rhcp.toggled.connect(lambda: self._sync_to_mw())
+                row_az_rhcp.addWidget(cb_az_rhcp)
+                self._chart_required["cut_azimuth_polar_rhcp"] = cb_az_rhcp
+                btn_az_rhcp = QPushButton("⚙ " + self.tr("角度..."))
+                btn_az_rhcp.setFixedWidth(80)
+                btn_az_rhcp.clicked.connect(lambda checked: self._show_azimuth_angle_popup("rhcp"))
+                row_az_rhcp.addWidget(btn_az_rhcp)
+                row_az_rhcp.addStretch()
+                left_layout.addLayout(row_az_rhcp)
 
                 # ── DPI ──
                 row_dpi = QHBoxLayout()
@@ -2556,6 +2573,8 @@ class ChartSettingsPage(QWidget):
 
             self._azimuth_angles = list(az.azimuth_cut_angles)
             self._azimuth_angles_ar = list(az.azimuth_cut_angles_ar)
+            self._azimuth_angles_rhcp = list(az.azimuth_cut_angles_rhcp)
+            self._azimuth_angles_lhcp = list(az.azimuth_cut_angles_lhcp)
             self._antenna_name = az.antenna_name
             self._word_layout_mode = az.word_layout_mode
             self._chart_output_dir = az.chart_output_dir
@@ -2742,6 +2761,8 @@ class ChartSettingsPage(QWidget):
         azimuth.cut_azimuth_polar_pk070 = self._chart_required.get("cut_azimuth_polar_pk070", QCheckBox()).isChecked()
         azimuth.azimuth_cut_angles = list(self._azimuth_angles)
         azimuth.azimuth_cut_angles_ar = list(self._azimuth_angles_ar)
+        azimuth.azimuth_cut_angles_rhcp = list(self._azimuth_angles_rhcp)
+        azimuth.azimuth_cut_angles_lhcp = list(self._azimuth_angles_lhcp)
         azimuth.antenna_name = self._edit_antenna_name.text().strip() if hasattr(self, '_edit_antenna_name') else ""
         azimuth.word_layout_mode = self._word_layout_mode if hasattr(self, '_word_layout_mode') else "side_by_side"
         azimuth.dpi = self._spin_azimuth_dpi.value() if hasattr(self, '_spin_azimuth_dpi') else 150
@@ -2948,16 +2969,24 @@ class ChartSettingsPage(QWidget):
         """弹出方位面切图 Theta 角度选择窗口。
 
         Args:
-            chart_type: "gain" 或 "ar"，决定编辑哪个角度列表。
+            chart_type: "gain" | "ar" | "rhcp" | "lhcp"，决定编辑哪个角度列表。
         """
         is_ar = (chart_type == "ar")
-        label_text = "AR" if is_ar else "Gain"
+        is_rhcp = (chart_type == "rhcp")
+        is_lhcp = (chart_type == "lhcp")
+        label_map = {"gain": "Gain", "ar": "AR", "rhcp": "RHCP", "lhcp": "LHCP"}
+        label_text = label_map.get(chart_type, chart_type)
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("选择方位面切图角度 — {}").format(label_text))
         dlg.setMinimumSize(480, 400)
 
         import copy
-        src_angles = self._azimuth_angles_ar if is_ar else self._azimuth_angles
+        if is_rhcp:
+            src_angles = self._azimuth_angles_rhcp
+        elif is_lhcp:
+            src_angles = self._azimuth_angles_lhcp
+        else:
+            src_angles = self._azimuth_angles_ar if is_ar else self._azimuth_angles
         _target = src_angles  # 直接引用，OK 时写回
         _singles: List[float] = copy.deepcopy(_target)
 
