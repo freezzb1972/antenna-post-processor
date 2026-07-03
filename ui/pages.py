@@ -1699,6 +1699,27 @@ class AntennaParamsPage(QWidget):
                 btn = QPushButton(self.tr("🔄 AR 角度设置..."))
                 btn.clicked.connect(lambda: self._show_angle_popup("ar"))
                 gl.addWidget(btn)
+            elif grp_name == "Directivity":
+                row_de = QHBoxLayout()
+                row_de.addWidget(QLabel(self.tr("外推:")))
+                cmb_de = QComboBox()
+                cmb_de.addItem(self.tr("线性"), "linear")
+                cmb_de.addItem(self.tr("常数"), "constant")
+                cmb_de.addItem(self.tr("镜像"), "mirror")
+                cmb_de.setToolTip(self.tr("Directivity 外推算法"))
+                cmb_de.setCurrentIndex(0)
+                cmb_de.currentIndexChanged.connect(lambda: self._sync_to_mw())
+                # 读取当前值
+                mw = getattr(self, '_mw', None)
+                if mw:
+                    cur = getattr(mw, '_dir_extrap_method', 'linear')
+                    idx = cmb_de.findData(cur)
+                    if idx >= 0: cmb_de.setCurrentIndex(idx)
+                row_de.addWidget(cmb_de)
+                row_de.addStretch()
+                gl.addLayout(row_de)
+                # 存入引用供 _sync_to_mw 使用
+                setattr(self, '_cmb_dir_extrap_de', cmb_de)
             left_layout.addWidget(grp)
         left_layout.addStretch()
         hbox.addWidget(left_box, 1)
@@ -1922,6 +1943,8 @@ class AntennaParamsPage(QWidget):
         mw._required_params = required
         mw._extra_params = extra
         mw._nh_custom_angles = list(self._nh_custom_angles)
+        if hasattr(self, '_cmb_dir_extrap_de'):
+            mw._dir_extrap_method = self._cmb_dir_extrap_de.currentData()
 
         if hasattr(mw, '_cmb_freq_source') and mw._cmb_freq_source:
             data = self._cmb_freq_src.currentData()

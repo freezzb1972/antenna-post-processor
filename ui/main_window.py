@@ -130,6 +130,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 以下 widget 由 FileSettingsPage 统一管理，MainWindow 通过 @property 代理访问
         self._required_params: set = set()   # 用户确认的报告必需参数
         self._extra_params: set = set()      # 用户额外选择的计算参数
+        self._dir_extrap_method: str = "linear"  # Directivity 外推算法
         self._test_mode: int = 0             # 0=passive, 1=TRP, 2=TIS
         self._worksheet_naming_mode: int = 0  # 0=保留原模板工作表名, 1=用数据源名命名
         self._mode_states = [{}, {}, {}]     # 三种测试模式独立参数状态
@@ -363,19 +364,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._check_extrapolate.setChecked(False)
         algo_vbox.addWidget(self._check_extrapolate)
 
-        # Directivity 外推方法
-        row_dir = QHBoxLayout()
-        row_dir.addWidget(QLabel(self.tr("方向性外推算法:")))
-        self._cmb_dir_extrap = QComboBox()
-        self._cmb_dir_extrap.addItem(self.tr("线性 (默认)"), "linear")
-        self._cmb_dir_extrap.addItem(self.tr("常数填充"), "constant")
-        self._cmb_dir_extrap.addItem(self.tr("镜像"), "mirror")
-        self._cmb_dir_extrap.setToolTip(self.tr(
-            "Directivity 计算时若 theta<175° 自动外推补全球面。\n"
-            "linear: 线性衰减; constant: 末值填充; mirror: 镜像反射"))
-        row_dir.addWidget(self._cmb_dir_extrap)
-        row_dir.addStretch()
-        algo_vbox.addLayout(row_dir)
 
         self._check_robust_peak = QCheckBox(
             self.tr("Robust peak detection (替代 np.max)"))
@@ -2114,7 +2102,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 从 MainWindow widget 读取（天线参数 dialog 通过 _sync_to_mw 写入此处）
         extrapolate_theta = self._check_extrapolate.isChecked()
-        dir_extrap = self._cmb_dir_extrap.currentData() if hasattr(self, '_cmb_dir_extrap') else "linear"
+        dir_extrap = getattr(self, '_dir_extrap_method', 'linear')
         freq_source = self._cmb_freq_source.currentData() or "datasource"
         trim_start = self._spin_trim_start.value()
         trim_end = self._spin_trim_end.value()
