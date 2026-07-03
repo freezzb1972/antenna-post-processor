@@ -48,11 +48,9 @@ class AzimuthReportConfig:
     chart_output_dir: str = ""               # 图表输出目录
     chart_output_filename: str = ""          # 图表输出文件名
 
-    # ── 输出路径 — 中间数据 ──
-    data_gain_output_dir: str = ""
-    data_gain_output_filename: str = ""
-    data_ar_output_dir: str = ""
-    data_ar_output_filename: str = ""
+    # ── 输出路径 — 中间数据 (多 sheet 单文件) ──
+    data_output_dir: str = ""
+    data_output_filename: str = ""
 
     # ── 渲染 ──
     dpi: int = 150
@@ -109,17 +107,10 @@ class AzimuthReportConfig:
         return ""
 
     @property
-    def data_gain_output_path(self) -> str:
-        """Gain 中间数据完整输出路径。"""
-        if self.data_gain_output_dir and self.data_gain_output_filename:
-            return str(Path(self.data_gain_output_dir) / self.data_gain_output_filename)
-        return ""
-
-    @property
-    def data_ar_output_path(self) -> str:
-        """AR 中间数据完整输出路径。"""
-        if self.data_ar_output_dir and self.data_ar_output_filename:
-            return str(Path(self.data_ar_output_dir) / self.data_ar_output_filename)
+    def data_output_path(self) -> str:
+        """中间数据完整输出路径。"""
+        if self.data_output_dir and self.data_output_filename:
+            return str(Path(self.data_output_dir) / self.data_output_filename)
         return ""
 
     # ═══════════════════════════════════════════════════════════
@@ -144,10 +135,8 @@ class AzimuthReportConfig:
             "word_image_width_pct": self.word_image_width_pct,
             "chart_output_dir": self.chart_output_dir,
             "chart_output_filename": self.chart_output_filename,
-            "data_gain_output_dir": self.data_gain_output_dir,
-            "data_gain_output_filename": self.data_gain_output_filename,
-            "data_ar_output_dir": self.data_ar_output_dir,
-            "data_ar_output_filename": self.data_ar_output_filename,
+            "data_output_dir": self.data_output_dir,
+            "data_output_filename": self.data_output_filename,
             "dpi": self.dpi,
             "freq_gap_mhz": self.freq_gap_mhz,
             "dual_y_enabled": self.dual_y_enabled,
@@ -175,10 +164,8 @@ class AzimuthReportConfig:
             word_image_width_pct=int(d.get("word_image_width_pct", 90)),
             chart_output_dir=str(d.get("chart_output_dir", "")),
             chart_output_filename=str(d.get("chart_output_filename", "")),
-            data_gain_output_dir=str(d.get("data_gain_output_dir", "")),
-            data_gain_output_filename=str(d.get("data_gain_output_filename", "")),
-            data_ar_output_dir=str(d.get("data_ar_output_dir", "")),
-            data_ar_output_filename=str(d.get("data_ar_output_filename", "")),
+            data_output_dir=str(d.get("data_output_dir", "")),
+            data_output_filename=str(d.get("data_output_filename", "")),
             dpi=int(d.get("dpi", 150)),
             freq_gap_mhz=int(d.get("freq_gap_mhz", 10)),
             dual_y_enabled=bool(d.get("dual_y_enabled", False)),
@@ -209,10 +196,8 @@ class AzimuthReportConfig:
             word_image_width_pct=self.word_image_width_pct or other.word_image_width_pct,
             chart_output_dir=self.chart_output_dir or other.chart_output_dir,
             chart_output_filename=self.chart_output_filename or other.chart_output_filename,
-            data_gain_output_dir=self.data_gain_output_dir or other.data_gain_output_dir,
-            data_gain_output_filename=self.data_gain_output_filename or other.data_gain_output_filename,
-            data_ar_output_dir=self.data_ar_output_dir or other.data_ar_output_dir,
-            data_ar_output_filename=self.data_ar_output_filename or other.data_ar_output_filename,
+            data_output_dir=self.data_output_dir or other.data_output_dir,
+            data_output_filename=self.data_output_filename or other.data_output_filename,
             dpi=self.dpi or other.dpi,
             freq_gap_mhz=self.freq_gap_mhz if self.freq_gap_mhz >= 0 else other.freq_gap_mhz,
             dual_y_enabled=self.dual_y_enabled or other.dual_y_enabled,
@@ -236,7 +221,5 @@ class AzimuthReportConfig:
 
         self.chart_output_dir = source_dir
         self.chart_output_filename = f"{source_stem}图表报告.docx"
-        self.data_gain_output_dir = source_dir
-        self.data_gain_output_filename = f"{source_stem}Gain.xlsx"
-        self.data_ar_output_dir = source_dir
-        self.data_ar_output_filename = f"{source_stem}AR.xlsx"
+        self.data_output_dir = source_dir
+        self.data_output_filename = f"{source_stem}中间数据.xlsx"

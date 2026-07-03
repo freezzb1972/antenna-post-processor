@@ -1235,33 +1235,6 @@ def _export_azimuth(
             if pk070_db is not None and freq is not None:
                 freq_gain_vs_theta.append((freq, pk070_db.copy()))
 
-    # Write Gain 0-70° Pk intermediate data (Phi × Freq 矩阵)
-    if out_data and freq_gain_vs_theta:
-        gvt_path = ""
-        if azimuth_config:
-            gdir = azimuth_config.data_gain_output_dir
-            gfn = azimuth_config.data_gain_output_filename
-            if gdir and gfn:
-                gvt_path = str(Path(gdir) / gfn.replace('Gain', 'GainPk070'))
-        if gvt_path:
-            _log(log_callback, f"Gain 0-70° Pk 中间数据: {gvt_path}")
-            try:
-                import openpyxl as _xl
-                wb = _xl.Workbook(); wb.remove(wb.active)
-                ws = wb.create_sheet("Gain 0-70° Pk")
-                # 表头: Phi | Freq1 | Freq2 | ...
-                ws.cell(1, 1, "Phi (°)")
-                for ci, (f, _) in enumerate(freq_gain_vs_theta):
-                    ws.cell(1, ci + 2, f"{f:.1f} MHz")
-                n_phi = len(freq_gain_vs_theta[0][1])
-                for pi in range(n_phi):
-                    ws.cell(pi + 2, 1, pi)  # phi index
-                    for ci, (_, vals) in enumerate(freq_gain_vs_theta):
-                        ws.cell(pi + 2, ci + 2, round(float(vals[pi]), 6))
-                wb.save(gvt_path); wb.close()
-                _log(log_callback, f"  ✓ Gain 0-70° Pk 数据已保存 ({len(freq_gain_vs_theta)} 频点 × {n_phi} phi)")
-            except Exception as e:
-                _log(log_callback, f"  ✗ Gain 0-70° Pk 数据导出失败: {e}")
 
     # ── 按频点配对: azimuth_polar + azimuth_polar_pk070 并排 ──
     freq_pairs: dict[float, dict[str, io.BytesIO]] = {}
@@ -1329,42 +1302,77 @@ def _export_azimuth(
             except Exception as e:
                 _log(log_callback, f"  ✗ Word 报告生成失败: {e}")
 
-    # Write intermediate data
-    if out_data and freq_gain_data:
-        gain_path = azimuth_config.data_gain_output_path if azimuth_config else ""
-        if gain_path:
-            _log(log_callback, f"Gain 中间数据: {gain_path}")
-            try:
-                write_azimuth_data(freq_gain_data, gain_path, "Gain (dBi)")
-                _log(log_callback, f"  ✓ Gain 数据已保存 ({len(freq_gain_data)} 频点)")
-            except Exception as e:
-                _log(log_callback, f"  ✗ Gain 数据导出失败: {e}")
 
-    if out_data and freq_ar_data:
-        ar_path = azimuth_config.data_ar_output_path if azimuth_config else ""
-        if ar_path:
-            _log(log_callback, f"AR 中间数据: {ar_path}")
-            try:
-                write_azimuth_data(freq_ar_data, ar_path, "AR (dB)")
-                _log(log_callback, f"  ✓ AR 数据已保存 ({len(freq_ar_data)} 频点)")
-            except Exception as e:
-                _log(log_callback, f"  ✗ AR 数据导出失败: {e}")
+    # ── 中间数据: 单文件多 sheet (按启用的图表类型) ──
+    if out_data:
+        data_path = azimuth_config.data_output_path if azimuth_config else ""
+        if not data_path:
+            data_path = ""
+        # 收集启用的图表类型 → 数据映射
+        data_sheets = {}  # {sheet_name: [(freq, {theta: values}), ...]}
+        if azimuth_config:
+    def _write_data_sheet(wb, sheet_name, freq_data):
+        """在 workbook 中添加一个数据 sheet (每频点一个 block)。"""
+        ws = wb.create_sheet(sheet_name[:31])
+        for freq_mhz, theta_data in freq_data:
+            sorted_thetas = sorted(theta_data.keys())
+            n_phi = len(next(iter(theta_data.values())))
+            ws.cell(row=ws.max_row + 1 if ws.max_row else 1, column=1,
+                    value=f"Frequency: {freq_mhz:.1f} MHz")
+            r0 = ws.max_row + 1
+            ws.cell(r0, 1, "Phi (°)")
+            for ti, theta in enumerate(sorted_thetas):
+                ws.cell(r0, ti + 2, f"{theta:.0f}°")
+            for pi in range(n_phi):
+                r = r0 + 1 + pi
+                ws.cell(r, 1, pi)
+                for ti, theta in enumerate(sorted_thetas):
+                    v = theta_data[theta][pi]
+                    if np.isfinite(v):
+                        ws.cell(r, ti + 2, round(float(v), 6))
+            ws.max_row  # force update
 
-    if out_data and freq_rhcp_data:
-        rhcp_path = getattr(azimuth_config, 'data_rhcp_output_path', '') if azimuth_config else ''
-        if not rhcp_path and azimuth_config:
-            # 默认路径: Gain 输出目录 + _RHCP.xlsx
-            gdir = azimuth_config.data_gain_output_dir
-            gfn = azimuth_config.data_gain_output_filename
-            if gdir and gfn:
-                rhcp_path = str(Path(gdir) / gfn.replace('Gain', 'RHCP'))
-        if rhcp_path:
-            _log(log_callback, f"RHCP 中间数据: {rhcp_path}")
-            try:
-                write_azimuth_data(freq_rhcp_data, rhcp_path, "RHCP (dB)")
-                _log(log_callback, f"  ✓ RHCP 数据已保存 ({len(freq_rhcp_data)} 频点)")
-            except Exception as e:
-                _log(log_callback, f"  ✗ RHCP 数据导出失败: {e}")
+            if azimuth_config.cut_azimuth_polar and freq_gain_data:
+                data_sheets["Gain Azimuth"] = freq_gain_data
+            if azimuth_config.cut_azimuth_polar_ar and freq_ar_data:
+                data_sheets["AR Azimuth"] = freq_ar_data
+            if azimuth_config.cut_azimuth_polar_rhcp and freq_rhcp_data:
+                data_sheets["RHCP Azimuth"] = freq_rhcp_data
+            if azimuth_config.cut_azimuth_polar_lhcp and freq_lhcp_data:
+                data_sheets["LHCP Azimuth"] = freq_lhcp_data
+            if azimuth_config.cut_azimuth_polar_pk070 and freq_gain_vs_theta:
+                data_sheets["Gain 0-70 Pk"] = [("phi_matrix", freq_gain_vs_theta)]
+        if data_sheets:
+            # 生成路径
+            if not data_path:
+                gdir = getattr(azimuth_config, 'data_output_dir', '') if azimuth_config else ''
+                gfn = getattr(azimuth_config, 'data_output_filename', '') if azimuth_config else ''
+                if gdir and gfn:
+                    data_path = str(Path(gdir) / gfn)
+            if data_path:
+                _log(log_callback, f"中间数据: {data_path}")
+                try:
+                    import openpyxl as _xl
+                    wb = _xl.Workbook(); wb.remove(wb.active)
+                    for sheet_name, fd in data_sheets.items():
+                        if not fd: continue
+                        if sheet_name == "Gain 0-70 Pk":
+                            ws = wb.create_sheet(sheet_name)
+                            _, pk_data = fd[0]
+                            ws.cell(1, 1, "Phi (°)")
+                            for ci, (f, _) in enumerate(pk_data):
+                                ws.cell(1, ci + 2, f"{f:.1f} MHz")
+                            n_phi = len(pk_data[0][1])
+                            for pi in range(n_phi):
+                                ws.cell(pi + 2, 1, pi)
+                                for ci, (_, vals) in enumerate(pk_data):
+                                    ws.cell(pi + 2, ci + 2, round(float(vals[pi]), 6))
+                        else:
+                            _write_data_sheet(wb, sheet_name, fd)
+                    wb.save(data_path); wb.close()
+                    _log(log_callback, f"  ✓ 中间数据已保存 ({len(data_sheets)} sheets)")
+                except Exception as e:
+                    _log(log_callback, f"  ✗ 中间数据导出失败: {e}")
 
 
 # ---------------------------------------------------------------------------

@@ -2084,14 +2084,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     az.chart_output_dir = src_dir
                 if not az.chart_output_filename:
                     az.chart_output_filename = f"{src_stem}图表报告.docx"
-                if not az.data_gain_output_dir:
-                    az.data_gain_output_dir = src_dir
-                if not az.data_gain_output_filename:
-                    az.data_gain_output_filename = f"{src_stem}Gain.xlsx"
-                if not az.data_ar_output_dir:
-                    az.data_ar_output_dir = src_dir
-                if not az.data_ar_output_filename:
-                    az.data_ar_output_filename = f"{src_stem}AR.xlsx"
+                if not az.data_output_dir:
+                    az.data_output_dir = src_dir
+                if not az.data_output_filename:
+                    az.data_output_filename = f"{src_stem}_中间数据.xlsx"
             # 角度自动加载 (仅首次，之后用户手动管理)
                 if not az._angles_initialized:
                     if not az.azimuth_cut_angles:
