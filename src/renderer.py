@@ -583,50 +583,51 @@ def _render_dual_y_axes(ax, freqs, v1, label1, v2, label2):
 
 
 def _setup_polar_radial_ticks(ax):
-    """极坐标径向刻度: 动态范围, 整数等差, 外圈紧贴数据, 标签@15°。
+    """极坐标径向刻度 — Heckbert 算法 (对称对齐, nice step, 5圈)。
 
-    遍历 nice steps (1,2,5,10,20,50,100...), 选 4-8 圈且外圈最贴近 max 的方案。
-    中心 = 最低数据向下取整 (可为负数)。
+    步长优先: nice_step(span/5) → 内外各自对齐步长。
+    每圈标注刻度值, 含中心点。标签 @15° 避开角度数字。
     """
     yl = ax.get_ylim()
     vmin, vmax = yl[0], yl[1]
     if vmax - vmin <= 0:
         vmax = vmin + 10
 
-    # 负值 backlobe 保护: 用 target 参与步长选择, 实际内圈仍覆盖真 vmin
-    target_min = vmin
-    if vmin < 0 and vmax > abs(vmin) * 3:
-        target_min = max(vmin, -vmax * 0.1)
+    # Heckbert: 目标 N=5 圈, nice step 优先
+    N_target = 5
+    raw_step = (vmax - vmin) / (N_target - 1)
+    # nice step 对齐
+    mag = 10 ** int(np.floor(np.log10(raw_step))) if raw_step > 0 else 1
+    r = raw_step / mag
+    if r <= 1: step = mag
+    elif r <= 2: step = 2 * mag
+    elif r <= 5: step = 5 * mag
+    else: step = 10 * mag
+    step = max(1, int(step))
 
-    # 遍历候选步长, 选内外总浪费最小的 (4-7 圈)
-    best_ticks = None
-    best_waste = float('inf')
-    for step in [1, 2, 5, 10, 20, 50, 100, 200, 500]:
-        outer = int(np.ceil(vmax / step)) * step
-        inner = int(np.floor(vmin / step)) * step
-        n = (outer - inner) // step + 1
-        if 4 <= n <= 7:
-            waste = (outer - vmax) * 2 + max(0, target_min - inner) * 0.5
-            if waste < best_waste:
-                best_waste = waste
-                best_ticks = list(range(inner, outer + step, step))
-    if best_ticks is None:  # fallback
-        step = max(1, int(round((vmax - vmin) / 5)))
-        inner = int(np.floor(vmin))
-        outer = int(np.ceil(vmax / step)) * step
-        best_ticks = list(range(inner, outer + step, step))
+    # 对称对齐: inner 向下, outer 向上
+    inner = int(np.floor(vmin / step)) * step
+    outer = int(np.ceil(vmax / step)) * step
+    n = (outer - inner) // step + 1
 
-    ax.set_ylim(best_ticks[0], best_ticks[-1])
-    ax.set_ylim(best_ticks[0], best_ticks[-1])
-    ax.set_yticks(best_ticks)
-    ax.set_yticklabels([f"{v}" for v in best_ticks], fontsize=10)
+    # 若圈数偏离太多, 调整步长
+    if n < 4:
+        # 步长太大 → 减半
+        step = max(1, step // 2 if step > 2 else 1)
+    elif n > 8:
+        # 步长太小 → 翻倍
+        step = step * 2
+    inner = int(np.floor(vmin / step)) * step
+    outer = int(np.ceil(vmax / step)) * step
+
+    ticks = list(range(inner, outer + step, step))
+
+    ax.set_ylim(ticks[0], ticks[-1])
     import matplotlib.ticker as _ticker
-    ax.yaxis.set_major_locator(_ticker.FixedLocator(best_ticks))
+    ax.yaxis.set_major_locator(_ticker.FixedLocator(ticks))
     ax.yaxis.set_minor_locator(_ticker.NullLocator())
-    # 确保所有刻度标签可见 (含中心点)
-    for t in ax.yaxis.get_major_ticks():
-        t.set_visible(True)
-        t.label1.set_visible(True)
+    ax.set_yticks(ticks)
+    ax.set_yticklabels([f"{v}" for v in ticks], fontsize=10)
     ax.set_rlabel_position(15)
 
 
