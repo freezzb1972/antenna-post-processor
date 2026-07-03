@@ -354,81 +354,6 @@ class FileSettingsPage(QWidget):
         self._cfg = get_config_manager()
         self._load_azimuth_state()
 
-    def _show_word_layout_dialog(self):
-        """Word 输出布局设置子对话框: 批量模式 + 图表排序。"""
-        dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("Word 输出布局设置"))
-        dlg.setMinimumSize(550, 400)
-        layout = QVBoxLayout(dlg)
-
-        # 批量模式
-        mode_grp = QGroupBox(self.tr("批量输出模式"))
-        mode_layout = QVBoxLayout(mode_grp)
-        self._radio_by_freq = QRadioButton(self.tr("按频点: 每频点全部图 → 下一频点"))
-        self._radio_by_type = QRadioButton(self.tr("按图表类型: 每类图全频点 → 下一类"))
-        self._radio_by_freq.setChecked(True)
-        mode_layout.addWidget(self._radio_by_freq)
-        mode_layout.addWidget(self._radio_by_type)
-        layout.addWidget(mode_grp)
-
-        # 图表排序列表
-        sort_grp = QGroupBox(self.tr("图表顺序 (上移/下移调整)"))
-        sort_layout = QVBoxLayout(sort_grp)
-        self._word_chart_list = QListWidget()
-        self._word_chart_list.setDragDropMode(QAbstractItemView.InternalMove)
-        self._word_chart_list.setSelectionMode(QAbstractItemView.SingleSelection)
-        # 默认图表类型列表
-        default_items = [
-            self.tr("3D Gain Pattern"),
-            self.tr("3D E_θ Pattern"),
-            self.tr("3D E_φ Pattern"),
-            self.tr("3D AR Pattern"),
-            self.tr("Gain Azimuth Cut"),
-            self.tr("AR Azimuth Cut"),
-            self.tr("2D Polar Cuts"),
-            self.tr("2D Rectangular Cuts"),
-            self.tr("Efficiency vs Freq"),
-            self.tr("Peak Gain vs Freq"),
-            self.tr("Directivity vs Freq"),
-            self.tr("TRP vs Freq"),
-            self.tr("AR vs Freq"),
-            self.tr("LAG vs Freq"),
-        ]
-        for item in default_items:
-            self._word_chart_list.addItem(item)
-        sort_layout.addWidget(self._word_chart_list)
-
-        btn_row = QHBoxLayout()
-        btn_up = QPushButton(self.tr("↑ 上移"))
-        btn_down = QPushButton(self.tr("↓ 下移"))
-        btn_reset = QPushButton(self.tr("恢复默认"))
-        btn_up.clicked.connect(lambda: _move_item(-1))
-        btn_down.clicked.connect(lambda: _move_item(1))
-        btn_reset.clicked.connect(lambda: (
-            self._word_chart_list.clear(),
-            [self._word_chart_list.addItem(item) for item in default_items]
-        ))
-        btn_row.addWidget(btn_up)
-        btn_row.addWidget(btn_down)
-        btn_row.addWidget(btn_reset)
-        btn_row.addStretch()
-        sort_layout.addLayout(btn_row)
-        layout.addWidget(sort_grp)
-
-        def _move_item(direction):
-            row = self._word_chart_list.currentRow()
-            if 0 <= row < self._word_chart_list.count():
-                item = self._word_chart_list.takeItem(row)
-                new_row = max(0, min(self._word_chart_list.count(), row + direction))
-                self._word_chart_list.insertItem(new_row, item)
-                self._word_chart_list.setCurrentRow(new_row)
-
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        btns.accepted.connect(dlg.accept)
-        btns.rejected.connect(dlg.reject)
-        layout.addWidget(btns)
-        dlg.exec()
-
     def _load_azimuth_state(self):
         """从 MainWindow 加载输出设置。"""
         if not self._mw:
@@ -1961,83 +1886,6 @@ class AntennaParamsPage(QWidget):
 
     # ── 同步到 MainWindow ──
 
-    def _show_word_layout_dialog(self):
-        """Word 输出布局设置子对话框: 批量模式 + 图表排序。"""
-        dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("Word 输出布局设置"))
-        dlg.setMinimumSize(550, 400)
-        layout = QVBoxLayout(dlg)
-
-        # 批量模式
-        mode_grp = QGroupBox(self.tr("批量输出模式"))
-        mode_layout = QVBoxLayout(mode_grp)
-        self._radio_by_freq = QRadioButton(self.tr("按频点: 每频点全部图 → 下一频点"))
-        self._radio_by_type = QRadioButton(self.tr("按图表类型: 每类图全频点 → 下一类"))
-        self._radio_by_freq.setChecked(True)
-        mode_layout.addWidget(self._radio_by_freq)
-        mode_layout.addWidget(self._radio_by_type)
-        layout.addWidget(mode_grp)
-
-        # 图表排序列表
-        sort_grp = QGroupBox(self.tr("图表顺序 (上移/下移调整)"))
-        sort_layout = QVBoxLayout(sort_grp)
-        self._word_chart_list = QListWidget()
-        self._word_chart_list.setDragDropMode(QAbstractItemView.InternalMove)
-        self._word_chart_list.setSelectionMode(QAbstractItemView.SingleSelection)
-        # 默认图表类型列表
-        default_items = [
-            self.tr("3D Gain Pattern"),
-            self.tr("3D E_θ Pattern"),
-            self.tr("3D E_φ Pattern"),
-            self.tr("3D AR Pattern"),
-            self.tr("Gain Azimuth Cut"),
-            self.tr("AR Azimuth Cut"),
-            self.tr("2D Polar Cuts"),
-            self.tr("2D Rectangular Cuts"),
-            self.tr("Efficiency vs Freq"),
-            self.tr("Peak Gain vs Freq"),
-            self.tr("Directivity vs Freq"),
-            self.tr("TRP vs Freq"),
-            self.tr("AR vs Freq"),
-            self.tr("LAG vs Freq"),
-        ]
-        for item in default_items:
-            self._word_chart_list.addItem(item)
-        sort_layout.addWidget(self._word_chart_list)
-
-        btn_row = QHBoxLayout()
-        btn_up = QPushButton(self.tr("↑ 上移"))
-        btn_down = QPushButton(self.tr("↓ 下移"))
-        btn_reset = QPushButton(self.tr("恢复默认"))
-        btn_up.clicked.connect(lambda: _move_item(-1))
-        btn_down.clicked.connect(lambda: _move_item(1))
-        btn_reset.clicked.connect(lambda: (
-            self._word_chart_list.clear(),
-            [self._word_chart_list.addItem(item) for item in default_items]
-        ))
-        btn_row.addWidget(btn_up)
-        btn_row.addWidget(btn_down)
-        btn_row.addWidget(btn_reset)
-        btn_row.addStretch()
-        sort_layout.addLayout(btn_row)
-        layout.addWidget(sort_grp)
-
-        def _move_item(direction):
-            row = self._word_chart_list.currentRow()
-            if 0 <= row < self._word_chart_list.count():
-                item = self._word_chart_list.takeItem(row)
-                new_row = max(0, min(self._word_chart_list.count(), row + direction))
-                self._word_chart_list.insertItem(new_row, item)
-                self._word_chart_list.setCurrentRow(new_row)
-
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        btns.accepted.connect(dlg.accept)
-        btns.rejected.connect(dlg.reject)
-        layout.addWidget(btns)
-        dlg.exec()
-
-
-
     def _sync_to_mw(self):
         """将当前页面状态同步到 MainWindow 属性。"""
         if not self._mw:
@@ -2469,6 +2317,19 @@ class ChartSettingsPage(QWidget):
                 row_az_pk.addStretch()
                 left_layout.addLayout(row_az_pk)
 
+                # ── DPI ──
+                row_dpi = QHBoxLayout()
+                row_dpi.addWidget(QLabel(self.tr("方位图 DPI:")))
+                self._spin_azimuth_dpi = QSpinBox()
+                self._spin_azimuth_dpi.setRange(150, 1000)
+                self._spin_azimuth_dpi.setValue(150)
+                self._spin_azimuth_dpi.setSingleStep(50)
+                self._spin_azimuth_dpi.setFixedWidth(70)
+                self._spin_azimuth_dpi.valueChanged.connect(lambda: self._sync_to_mw())
+                row_dpi.addWidget(self._spin_azimuth_dpi)
+                row_dpi.addStretch()
+                left_layout.addLayout(row_dpi)
+
                 # ── 方位面图表参数 ──
                 sep_az = QFrame()
                 sep_az.setFrameShape(QFrame.HLine)
@@ -2571,17 +2432,8 @@ class ChartSettingsPage(QWidget):
         row_bf.addStretch()
         out_layout.addLayout(row_bf)
 
-        # ── 方位面 DPI / 列数 / 图片宽 ──
+        # ── 列数 / 图片宽 ──
         row_img = QHBoxLayout()
-        row_img.addWidget(QLabel(self.tr("方位图 DPI:")))
-        self._spin_azimuth_dpi = QSpinBox()
-        self._spin_azimuth_dpi.setRange(150, 1000)
-        self._spin_azimuth_dpi.setValue(150)
-        self._spin_azimuth_dpi.setSingleStep(50)
-        self._spin_azimuth_dpi.setFixedWidth(70)
-        self._spin_azimuth_dpi.valueChanged.connect(lambda: self._sync_to_mw())
-        row_img.addWidget(self._spin_azimuth_dpi)
-
         row_img.addWidget(QLabel(self.tr(" 列数:")))
         self._combo_az_columns = QComboBox()
         self._combo_az_columns.addItem(self.tr("单列"), 1)
