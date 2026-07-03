@@ -628,6 +628,9 @@ def _setup_polar_radial_ticks(ax):
     ax.yaxis.set_minor_locator(_ticker.NullLocator())
     ax.set_yticks(ticks)
     ax.set_yticklabels([_tick_label(v) for v in ticks], fontsize=10)
+    # 极坐标中心 0 刻度被默认隐藏 → 显式标注
+    ax.annotate("0", xy=(np.deg2rad(15), 0), fontsize=10,
+                ha='center', va='center', color='#555555')
     ax.set_rlabel_position(15)
 
 
