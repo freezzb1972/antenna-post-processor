@@ -279,13 +279,6 @@ class FileSettingsPage(QWidget):
             self._sync_azimuth_cut_switch(),
         ))
 
-        row_word_settings = QHBoxLayout()
-        btn_word_layout = QPushButton(self.tr("Word 输出布局设置..."))
-        btn_word_layout.clicked.connect(self._show_word_layout_dialog)
-        row_word_settings.addWidget(btn_word_layout)
-        row_word_settings.addStretch()
-        out_layout.addLayout(row_word_settings)
-
         out_layout.addWidget(_make_hsep())
 
         # 3) 中间数据文件 (.xlsx)
@@ -1968,6 +1961,83 @@ class AntennaParamsPage(QWidget):
 
     # ── 同步到 MainWindow ──
 
+    def _show_word_layout_dialog(self):
+        """Word 输出布局设置子对话框: 批量模式 + 图表排序。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("Word 输出布局设置"))
+        dlg.setMinimumSize(550, 400)
+        layout = QVBoxLayout(dlg)
+
+        # 批量模式
+        mode_grp = QGroupBox(self.tr("批量输出模式"))
+        mode_layout = QVBoxLayout(mode_grp)
+        self._radio_by_freq = QRadioButton(self.tr("按频点: 每频点全部图 → 下一频点"))
+        self._radio_by_type = QRadioButton(self.tr("按图表类型: 每类图全频点 → 下一类"))
+        self._radio_by_freq.setChecked(True)
+        mode_layout.addWidget(self._radio_by_freq)
+        mode_layout.addWidget(self._radio_by_type)
+        layout.addWidget(mode_grp)
+
+        # 图表排序列表
+        sort_grp = QGroupBox(self.tr("图表顺序 (上移/下移调整)"))
+        sort_layout = QVBoxLayout(sort_grp)
+        self._word_chart_list = QListWidget()
+        self._word_chart_list.setDragDropMode(QAbstractItemView.InternalMove)
+        self._word_chart_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        # 默认图表类型列表
+        default_items = [
+            self.tr("3D Gain Pattern"),
+            self.tr("3D E_θ Pattern"),
+            self.tr("3D E_φ Pattern"),
+            self.tr("3D AR Pattern"),
+            self.tr("Gain Azimuth Cut"),
+            self.tr("AR Azimuth Cut"),
+            self.tr("2D Polar Cuts"),
+            self.tr("2D Rectangular Cuts"),
+            self.tr("Efficiency vs Freq"),
+            self.tr("Peak Gain vs Freq"),
+            self.tr("Directivity vs Freq"),
+            self.tr("TRP vs Freq"),
+            self.tr("AR vs Freq"),
+            self.tr("LAG vs Freq"),
+        ]
+        for item in default_items:
+            self._word_chart_list.addItem(item)
+        sort_layout.addWidget(self._word_chart_list)
+
+        btn_row = QHBoxLayout()
+        btn_up = QPushButton(self.tr("↑ 上移"))
+        btn_down = QPushButton(self.tr("↓ 下移"))
+        btn_reset = QPushButton(self.tr("恢复默认"))
+        btn_up.clicked.connect(lambda: _move_item(-1))
+        btn_down.clicked.connect(lambda: _move_item(1))
+        btn_reset.clicked.connect(lambda: (
+            self._word_chart_list.clear(),
+            [self._word_chart_list.addItem(item) for item in default_items]
+        ))
+        btn_row.addWidget(btn_up)
+        btn_row.addWidget(btn_down)
+        btn_row.addWidget(btn_reset)
+        btn_row.addStretch()
+        sort_layout.addLayout(btn_row)
+        layout.addWidget(sort_grp)
+
+        def _move_item(direction):
+            row = self._word_chart_list.currentRow()
+            if 0 <= row < self._word_chart_list.count():
+                item = self._word_chart_list.takeItem(row)
+                new_row = max(0, min(self._word_chart_list.count(), row + direction))
+                self._word_chart_list.insertItem(new_row, item)
+                self._word_chart_list.setCurrentRow(new_row)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
+
+
+
     def _sync_to_mw(self):
         """将当前页面状态同步到 MainWindow 属性。"""
         if not self._mw:
@@ -2472,12 +2542,9 @@ class ChartSettingsPage(QWidget):
 
         # ── Word 布局 ──
         row_wl = QHBoxLayout()
-        row_wl.addWidget(QLabel(self.tr("Word 布局:")))
-        self._combo_word_layout = QComboBox()
-        self._combo_word_layout.addItem(self.tr("并排(Gain左AR右)"), "side_by_side")
-        self._combo_word_layout.addItem(self.tr("先后(Gain全部→AR全部)"), "sequential")
-        self._combo_word_layout.currentIndexChanged.connect(lambda: self._sync_to_mw())
-        row_wl.addWidget(self._combo_word_layout)
+        btn_word_layout = QPushButton(self.tr("Word 输出布局设置..."))
+        btn_word_layout.clicked.connect(self._show_word_layout_dialog)
+        row_wl.addWidget(btn_word_layout)
         row_wl.addStretch()
         out_layout.addLayout(row_wl)
 
@@ -2648,10 +2715,7 @@ class ChartSettingsPage(QWidget):
 
             if hasattr(self, '_edit_antenna_name'):
                 self._edit_antenna_name.setText(az.antenna_name)
-            if hasattr(self, '_combo_word_layout'):
-                idx = self._combo_word_layout.findData(az.word_layout_mode)
-                if idx >= 0:
-                    self._combo_word_layout.setCurrentIndex(idx)
+
             if hasattr(self, '_spin_azimuth_dpi'):
                 self._spin_azimuth_dpi.setValue(az.dpi if az.dpi >= 150 else 150)
             if hasattr(self, '_combo_az_columns'):
@@ -2664,6 +2728,8 @@ class ChartSettingsPage(QWidget):
                 self._check_show_caption.setChecked(getattr(az, 'show_caption', True))
             if hasattr(self, '_spin_img_cm'):
                 self._spin_img_cm.setValue(getattr(az, 'image_width_cm', 7.5))
+            if hasattr(self, '_check_share_ticks'):
+                self._check_share_ticks.setChecked(getattr(az, 'share_radial_ticks', False))
 
     def _add_select_all_row(self, target_dict, keys, parent_layout):
         """添加全选/取消全选按钮行到指定布局。"""
@@ -2685,6 +2751,67 @@ class ChartSettingsPage(QWidget):
         btn_row.addWidget(des)
         btn_row.addStretch()
         parent_layout.addLayout(btn_row)
+
+
+    # ── Word 输出布局子对话框 ──
+
+    def _show_word_layout_dialog(self):
+        """Word 输出布局设置子对话框: 批量模式 + 图表排序。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("Word 输出布局设置"))
+        dlg.setMinimumSize(550, 400)
+        layout = QVBoxLayout(dlg)
+        mode_grp = QGroupBox(self.tr("批量输出模式"))
+        mode_layout = QVBoxLayout(mode_grp)
+        self._radio_by_freq = QRadioButton(self.tr("按频点: 每频点全部图 → 下一频点"))
+        self._radio_by_type = QRadioButton(self.tr("按图表类型: 每类图全频点 → 下一类"))
+        self._radio_by_freq.setChecked(True)
+        mode_layout.addWidget(self._radio_by_freq)
+        mode_layout.addWidget(self._radio_by_type)
+        layout.addWidget(mode_grp)
+        sort_grp = QGroupBox(self.tr("图表顺序 (上移/下移调整)"))
+        sort_layout = QVBoxLayout(sort_grp)
+        self._word_chart_list = QListWidget()
+        self._word_chart_list.setDragDropMode(QAbstractItemView.InternalMove)
+        self._word_chart_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        default_items = [
+            self.tr("3D Gain Pattern"), self.tr("3D E\u03b8 Pattern"),
+            self.tr("3D E\u03c6 Pattern"), self.tr("3D AR Pattern"),
+            self.tr("Gain Azimuth Cut"), self.tr("AR Azimuth Cut"),
+            self.tr("2D Polar Cuts"), self.tr("2D Rectangular Cuts"),
+            self.tr("Efficiency vs Freq"), self.tr("Peak Gain vs Freq"),
+            self.tr("Directivity vs Freq"), self.tr("TRP vs Freq"),
+            self.tr("AR vs Freq"), self.tr("LAG vs Freq"),
+        ]
+        for item in default_items:
+            self._word_chart_list.addItem(item)
+        sort_layout.addWidget(self._word_chart_list)
+        btn_row = QHBoxLayout()
+        btn_up = QPushButton(self.tr("\u2191 \u4e0a\u79fb"))
+        btn_down = QPushButton(self.tr("\u2193 \u4e0b\u79fb"))
+        btn_reset = QPushButton(self.tr("\u6062\u590d\u9ed8\u8ba4"))
+        def _move_item(direction):
+            row = self._word_chart_list.currentRow()
+            if 0 <= row < self._word_chart_list.count():
+                item = self._word_chart_list.takeItem(row)
+                new_row = max(0, min(self._word_chart_list.count(), row + direction))
+                self._word_chart_list.insertItem(new_row, item)
+                self._word_chart_list.setCurrentRow(new_row)
+        btn_up.clicked.connect(lambda: _move_item(-1))
+        btn_down.clicked.connect(lambda: _move_item(1))
+        btn_reset.clicked.connect(lambda: (
+            self._word_chart_list.clear(),
+            [self._word_chart_list.addItem(item) for item in default_items]
+        ))
+        btn_row.addWidget(btn_up); btn_row.addWidget(btn_down)
+        btn_row.addWidget(btn_reset); btn_row.addStretch()
+        sort_layout.addLayout(btn_row)
+        layout.addWidget(sort_grp)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
 
     def _sync_to_mw(self):
         """同步当前配置到 MainWindow。"""
@@ -2744,12 +2871,13 @@ class ChartSettingsPage(QWidget):
         azimuth.azimuth_cut_angles = list(self._azimuth_angles)
         azimuth.azimuth_cut_angles_ar = list(self._azimuth_angles_ar)
         azimuth.antenna_name = self._edit_antenna_name.text().strip() if hasattr(self, '_edit_antenna_name') else ""
-        azimuth.word_layout_mode = self._combo_word_layout.currentData() if hasattr(self, '_combo_word_layout') else "side_by_side"
+        azimuth.word_layout_mode = self._word_layout_mode if hasattr(self, '_word_layout_mode') else "side_by_side"
         azimuth.dpi = self._spin_azimuth_dpi.value() if hasattr(self, '_spin_azimuth_dpi') else 150
         azimuth.word_columns = self._combo_az_columns.currentData() if hasattr(self, '_combo_az_columns') else 2
         azimuth.word_image_width_pct = self._spin_az_img_pct.value() if hasattr(self, '_spin_az_img_pct') else 90
         azimuth.show_caption = self._check_show_caption.isChecked() if hasattr(self, '_check_show_caption') else True
         azimuth.image_width_cm = self._spin_img_cm.value() if hasattr(self, '_spin_img_cm') else 7.5
+        azimuth.share_radial_ticks = self._check_share_ticks.isChecked() if hasattr(self, '_check_share_ticks') else False
 
         mw._azimuth_config = azimuth
         mw._chart_config_required = required
