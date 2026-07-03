@@ -79,6 +79,11 @@ class ThemeManager:
                     background: {accent};
                     border-color: {accent};
                 }}
+                QMenu::separator {{
+                    height: 2px;
+                    background: #555;
+                    margin: 4px 8px;
+                }}
             """)
         else:
             app.setStyleSheet("")  # 亮色主题使用系统原生指示器
