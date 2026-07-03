@@ -327,7 +327,7 @@ class MatplotlibRenderer(BaseRenderer):
         linestyles = ["-", "--", "-.", ":"]
 
         fig, ax = plt.subplots(subplot_kw={"projection": "polar"},
-                               dpi=dpi, figsize=(9, 7))
+                               dpi=dpi, figsize=(7, 7))
 
         sorted_curves = sorted(curves, key=lambda x: x[0])
 
@@ -373,10 +373,10 @@ class MatplotlibRenderer(BaseRenderer):
 
         if len(sorted_curves) > 1:
             labels = [f"θ={theta:.0f}°" for (theta, _) in sorted_curves]
-            fig.legend(labels, loc="upper left", fontsize=10, framealpha=0.8,
-                       bbox_to_anchor=(1.0, 1.0), borderaxespad=0.5)
+            fig.legend(labels, loc="center right", fontsize=10, framealpha=0.6,
+                       bbox_to_anchor=(1.0, 0.5))
 
-        fig.tight_layout(pad=0.8, rect=[0, 0, 0.78, 1])
+        fig.tight_layout(pad=0.8)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_gain_vs_theta(
