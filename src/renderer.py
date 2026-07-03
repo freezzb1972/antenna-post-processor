@@ -595,7 +595,6 @@ def _setup_polar_radial_ticks(ax):
     # Heckbert: 目标 N=5 圈, nice step 优先
     N_target = 5
     raw_step = (vmax - vmin) / (N_target - 1)
-    raw_step = (vmax - vmin) / (N_target - 1)
     if raw_step <= 0: raw_step = 2
     # nice step 对齐
     mag = 10 ** int(np.floor(np.log10(raw_step))) if raw_step > 0 else 1
@@ -611,13 +610,13 @@ def _setup_polar_radial_ticks(ax):
     outer = int(np.ceil(vmax / step)) * step
     n = (outer - inner) // step + 1
 
-    # 若圈数偏离太多, 调整步长
+    # 若圈数不够, 扩展外圈到 ≥4 圈
     if n < 4:
-        step = max(1, step // 2 if step > 2 else 1)
+        outer = inner + step * 3  # 确保 4 圈
     elif n > 8:
         step = step * 2
-    inner = int(np.floor(vmin / step)) * step
-    outer = int(np.ceil(vmax / step)) * step
+        inner = int(np.floor(vmin / step)) * step
+        outer = int(np.ceil(vmax / step)) * step
 
     ticks = list(range(inner, outer + step, step))
 
