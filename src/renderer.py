@@ -317,6 +317,7 @@ class MatplotlibRenderer(BaseRenderer):
         dpi: int = 150,
         ylabel: str = "Gain (dBi)",
         title: str = "",
+        ticks_override: list = None,  # 共享刻度时传入
     ) -> io.BytesIO:
         """方位面极坐标切面图：Phi 角轴 + 多条 Theta 曲线。"""
         phi_rad = np.deg2rad(phi_deg)
@@ -358,12 +359,24 @@ class MatplotlibRenderer(BaseRenderer):
 
         ax.grid(True, alpha=0.4)
 
-        _setup_polar_radial_ticks(ax)
+        if ticks_override is not None:
+            # 共享刻度: 使用预计算值
+            ax.set_ylim(ticks_override[0], ticks_override[-1])
+            ax.set_yticks(ticks_override)
+            ax.set_yticklabels([_tick_label(v) for v in ticks_override], fontsize=10)
+            ax.set_rlabel_position(15)
+            ax.annotate(_tick_label(ticks_override[0]),
+                        xy=(np.deg2rad(15), ticks_override[0]),
+                        fontsize=10, ha='center', va='center', color='#555555')
+        else:
+            _setup_polar_radial_ticks(ax)
 
         if len(sorted_curves) > 1:
-            ax.legend(loc="upper right", fontsize=10, framealpha=0.5)
+            labels = [f"θ={theta:.0f}°" for (theta, _) in sorted_curves]
+            fig.legend(labels, loc="center right", fontsize=10, framealpha=0.5,
+                       bbox_to_anchor=(0.98, 0.5), borderaxespad=0)
 
-        fig.tight_layout(pad=1.0)
+        fig.tight_layout(pad=1.0, rect=[0, 0, 0.82, 1])
         return _fig_to_png_buffer(fig, dpi)
 
     def render_gain_vs_theta(

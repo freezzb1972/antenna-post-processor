@@ -313,6 +313,24 @@ def generate_all_for_frequency(
                     title=title or f"{freq_mhz:.0f}MHz - {ylabel}",
                 )
 
+        # 共享刻度: 预计算 combined ticks
+        shared_ticks = None
+        if (azimuth_config.cut_azimuth_polar and azimuth_config.cut_azimuth_polar_pk070
+                and azimuth_config.share_radial_ticks):
+            mask070 = theta_deg <= 70.1
+            pk_070 = np.max(gain_dbi[:, mask070], axis=1)
+            vmin = min(np.min(gain_dbi[:, mask070]), np.min(pk_070))
+            vmax = max(np.max(gain_dbi[:, mask070]), np.max(pk_070))
+            # 调用 Heckbert 算刻度
+            from .renderer import _setup_polar_radial_ticks
+            import matplotlib; matplotlib.use('Agg')
+            import matplotlib.pyplot as _plt
+            _fig, _ax = _plt.subplots(subplot_kw={"projection": "polar"})
+            _ax.set_ylim(vmin, vmax)
+            _setup_polar_radial_ticks(_ax)
+            shared_ticks = list(_ax.get_yticks())
+            _plt.close(_fig)
+
         if azimuth_config.cut_azimuth_polar:
             _render_azimuth(gain_dbi, azimuth_config.angles_sorted,
                            "azimuth_polar", "Gain (dBi)",
@@ -330,6 +348,20 @@ def generate_all_for_frequency(
                 )
             except Exception:
                 pass
+        # 应用共享刻度
+        if shared_ticks and "azimuth_polar" in images and "azimuth_polar_pk070" in images:
+            from io import BytesIO
+            for key in ("azimuth_polar", "azimuth_polar_pk070"):
+                curves_src = (_build_azimuth_curves(theta_deg, gain_dbi,
+                    azimuth_config.angles_sorted, len(phi_deg))
+                    if key == "azimuth_polar" else [(70.0, np.max(gain_dbi[:, theta_deg <= 70.1], axis=1))])
+                label = "Gain (dBi)"
+                t = f"{freq_mhz:.0f}MHz - Gain (dBi)" + (" Theta 0°-70° (step=1°)" if key == "azimuth_polar_pk070" else "")
+                images[key] = _renderer.render_azimuth_polar(
+                    phi_deg, curves_src, freq_mhz,
+                    antenna_name=az_antenna, dpi=az_dpi, ylabel=label,
+                    title=t, ticks_override=shared_ticks,
+                )
         if azimuth_config.cut_azimuth_polar_ar and ar_linear is not None:
             ar_db_vals = 20.0 * np.log10(np.maximum(ar_linear, 1e-15))
             _render_azimuth(ar_db_vals, azimuth_config.angles_ar_sorted,
