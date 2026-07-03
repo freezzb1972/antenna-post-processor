@@ -2626,16 +2626,36 @@ class ChartSettingsPage(QWidget):
         self._word_chart_list = QListWidget()
         self._word_chart_list.setDragDropMode(QAbstractItemView.InternalMove)
         self._word_chart_list.setSelectionMode(QAbstractItemView.SingleSelection)
-        default_items = [
-            self.tr("3D Gain Pattern"), self.tr("3D E\u03b8 Pattern"),
-            self.tr("3D E\u03c6 Pattern"), self.tr("3D AR Pattern"),
-            self.tr("Gain Azimuth Cut"), self.tr("AR Azimuth Cut"),
-            self.tr("2D Polar Cuts"), self.tr("2D Rectangular Cuts"),
-            self.tr("Efficiency vs Freq"), self.tr("Peak Gain vs Freq"),
-            self.tr("Directivity vs Freq"), self.tr("TRP vs Freq"),
-            self.tr("AR vs Freq"), self.tr("LAG vs Freq"),
-        ]
-        for item in default_items:
+        # \u4ec5\u5217\u51fa\u5df2\u9009\u4e2d\u7684\u56fe\u8868 (\u4ece _chart_required + _chart_extra + azimuth flags)
+        from src.chart_config import ChartConfig
+        labels = ChartConfig.chart_labels()
+        categories = ChartConfig.chart_categories()
+        active_labels = []
+        for key, cb in self._chart_required.items():
+            if cb.isChecked():
+                active_labels.append(labels.get(key, key))
+        for key, cb in self._chart_extra.items():
+            if cb.isChecked():
+                active_labels.append(labels.get(key, key))
+        # azimuth \u56fe
+        az = getattr(self._mw, '_azimuth_config', None) if self._mw else None
+        if az:
+            if az.cut_azimuth_polar: active_labels.append("Gain Azimuth Cut")
+            if az.cut_azimuth_polar_pk070: active_labels.append("Gain 0-70\u00b0 Pk Azimuth")
+            if az.cut_azimuth_polar_ar: active_labels.append("AR Azimuth Cut")
+            if az.cut_azimuth_polar_rhcp: active_labels.append("RHCP Azimuth Cut")
+            if az.cut_azimuth_polar_lhcp: active_labels.append("LHCP Azimuth Cut")
+        # B \u7c7b\u66f2\u7ebf
+        b_map = {"efficiency_pct": "Efficiency vs Freq", "gain": "Peak Gain vs Freq",
+                 "directivity": "Directivity vs Freq", "trp": "TRP vs Freq",
+                 "peak_eirp": "Peak EIRP vs Freq", "avg_gain": "Average Gain vs Freq"}
+        for key, cb in self._chart_required.items():
+            if cb.isChecked() and key in b_map:
+                if b_map[key] not in active_labels:
+                    active_labels.append(b_map[key])
+        if not active_labels:
+            active_labels = [self.tr("(\u672a\u9009\u62e9\u4efb\u4f55\u56fe\u8868)")]
+        for item in active_labels:
             self._word_chart_list.addItem(item)
         sort_layout.addWidget(self._word_chart_list)
         btn_row = QHBoxLayout()
@@ -2653,7 +2673,7 @@ class ChartSettingsPage(QWidget):
         btn_down.clicked.connect(lambda: _move_item(1))
         btn_reset.clicked.connect(lambda: (
             self._word_chart_list.clear(),
-            [self._word_chart_list.addItem(item) for item in default_items]
+            [self._word_chart_list.addItem(item) for item in active_labels]
         ))
         btn_row.addWidget(btn_up); btn_row.addWidget(btn_down)
         btn_row.addWidget(btn_reset); btn_row.addStretch()
