@@ -87,6 +87,16 @@
           }
         ],
         "description": "测试运行计数：pytest 运行后更新统计"
+      },
+      {
+        "matcher": "tool == \"Write\" && path.match(/ui\\//)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/skills/gui-audit/audit.py 2>&1 | head -10 || echo 'gui-audit: no audit.py, run SKILL.md checklist'"
+          }
+        ],
+        "description": "UI 文件修改后自动运行 GUI 审计"
       }
     ],
     "PreCompact": [
