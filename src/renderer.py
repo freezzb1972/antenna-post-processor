@@ -593,12 +593,14 @@ def _setup_polar_radial_ticks(ax):
     if vmax - vmin <= 0:
         vmax = vmin + 10
 
-    # 极坐标 r 轴不小于 0 (负值被裁)
+    # 极坐标 r 轴不小于 0; 步长按正半轴选 (不等比缩放背瓣)
     vmin_polar = max(0, vmin)
 
-    # Heckbert: 目标 N=5 圈, nice step 优先
+    # Heckbert: 目标 N=5 圈, 但步长只考虑正半轴 (背瓣不应压缩主瓣显示)
     N_target = 5
-    raw_step = (vmax - vmin_polar) / (N_target - 1)
+    pos_span = vmax - vmin_polar
+    if pos_span <= 0: pos_span = 10
+    raw_step = pos_span / (N_target - 1)
     # nice step 对齐
     mag = 10 ** int(np.floor(np.log10(raw_step))) if raw_step > 0 else 1
     r = raw_step / mag
