@@ -160,31 +160,46 @@ class FileSettingsPage(QWidget):
         tpl_grp = QGroupBox(self.tr("报告模版"))
         tpl_layout = QVBoxLayout(tpl_grp)
         tpl_layout.setSpacing(4)
-        # 第一行：预设下拉 + 按钮
+        # 第一行：Excel 参数模版
         row1 = QHBoxLayout()
         self._tpl_row = TemplateSourceRow(
             on_browse=self._on_browse_template,
             on_preview=self._on_preview_report,
         )
-        # 从 TemplateSourceRow 提取内部控件重组布局
-        # TemplateSourceRow 有: _cmb_preset, 两个按钮, _lbl_path
-        # 直接用其内部布局
         if self._mw and hasattr(self._mw, '_tm'):
             presets = self._mw._tm.get_all_templates()
+            # Populate Word preset dropdown
+            for p in presets:
+                if p.word_template_path:
+                    label = f"{p.manufacturer} - {p.name}" if p.manufacturer else p.name
+                    self._cmb_word_preset.addItem(label, p.word_template_path)
             presets_list = [
                 {"manufacturer": t.manufacturer, "name": t.name, "path": t.path}
                 for t in presets
             ]
             self._tpl_row.populate_presets(presets_list)
         self._tpl_row.template_changed.connect(self._on_preset_template_selected)
+        self._tpl_row.template_pair_changed.connect(self._on_preset_word_loaded)
+        self._tpl_row.template_pair_changed.connect(lambda e, w: self._check_excel_word_consistency())
         tpl_layout.addWidget(self._tpl_row)
 
-        # 第二行：模版路径单独显示, 与 TemplateSourceRow._lbl_path 同步
+        # Mod 行：Excel 模版路径
         self._tpl_path_label = QLineEdit()
         self._tpl_row.template_changed.connect(self._tpl_path_label.setText)
         self._tpl_path_label.setReadOnly(True)
-        self._tpl_path_label.setPlaceholderText(self.tr("(未选择模版)"))
+        self._tpl_path_label.setPlaceholderText(self.tr("(未选择 Excel 参数模版)"))
         tpl_layout.addWidget(self._tpl_path_label)
+
+        # 测试报告模版 (.docx Word 模板)
+        word_row = QHBoxLayout()
+        word_row.addWidget(QLabel(self.tr("报告模版:")))
+        self._edit_word_report_tpl = QLineEdit()
+        self._edit_word_report_tpl.setPlaceholderText(self.tr("选择 Word 报告模板 (.docx, 含 SDT tag)..."))
+        word_row.addWidget(self._edit_word_report_tpl, 1)
+        btn_browse_wr = QPushButton(self.tr("浏览..."))
+        btn_browse_wr.clicked.connect(self._on_browse_word_template)
+        word_row.addWidget(btn_browse_wr)
+        tpl_layout.addLayout(word_row)
 
         v_splitter.addWidget(tpl_grp)
 
@@ -197,6 +212,14 @@ class FileSettingsPage(QWidget):
         ds.btn_clear_all.clicked.connect(self._on_clear_all_files)
         ds.btn_auto_match.clicked.connect(self._on_auto_match)
         ds.cmb_naming_mode.currentIndexChanged.connect(self._on_naming_mode_changed)
+
+        # 多天线确认按钮
+        ds.btn_multi_antenna = QPushButton(self.tr("📡 多天线确认..."))
+        ds.btn_multi_antenna.setToolTip(self.tr("为多个源文件配置天线标识/图表参数/Word模板"))
+        ds.btn_multi_antenna.clicked.connect(self._on_multi_antenna_confirm)
+        ds.btn_multi_antenna.setVisible(False)
+        # 添加到 DataFileSelector 的主 layout 末尾
+        ds.layout().addWidget(ds.btn_multi_antenna)
 
         # 公开属性别名 (保持旧代码兼容)
         self._btn_add_files = ds.btn_add_files
@@ -254,7 +277,7 @@ class FileSettingsPage(QWidget):
         out_layout.addWidget(_make_hsep())
 
         # 2) 图表报告 (.docx)
-        self._check_out_word = QCheckBox(self.tr("图表报告 (.docx)"))
+        self._check_out_word = QCheckBox(self.tr("测试报告 (.docx)"))
         out_layout.addWidget(self._check_out_word)
 
         row_word_dir = QHBoxLayout()
@@ -276,7 +299,6 @@ class FileSettingsPage(QWidget):
         self._check_out_word.toggled.connect(lambda c: (
             self._edit_az_chart_dir.setEnabled(c),
             self._edit_az_chart_fn.setEnabled(c),
-            self._edit_word_tpl.setEnabled(c),
             self._sync_azimuth_cut_switch(),
         ))
 
@@ -285,7 +307,6 @@ class FileSettingsPage(QWidget):
         row_word_tpl.addWidget(QLabel(self.tr("Word 模板:")))
         self._edit_word_tpl = QLineEdit()
         self._edit_word_tpl.setPlaceholderText(self.tr("选择带 SDT tag 的 .docx 模板 (可选)"))
-        self._edit_word_tpl.setEnabled(False)
         row_word_tpl.addWidget(self._edit_word_tpl, 1)
         btn_word_tpl = QPushButton(self.tr("浏览..."))
         btn_word_tpl.clicked.connect(self._on_browse_word_template)
@@ -428,11 +449,13 @@ class FileSettingsPage(QWidget):
         """选择带 SDT tag 的 Word 模板。"""
         from PySide6.QtWidgets import QFileDialog
         from pathlib import Path
-        start = self._edit_word_tpl.text() or str(Path.cwd())
+        w = getattr(self, '_edit_word_report_tpl', None)
+        start = w.text() if w else str(Path.cwd())
         d, _ = QFileDialog.getOpenFileName(self, self.tr("选择 Word 模板"), start,
                                             self.tr("Word 文档 (*.docx)"))
-        if d and hasattr(self, '_edit_word_tpl'):
-            self._edit_word_tpl.setText(d)
+        if d:
+            w.setText(d)
+            self._on_preview_word()
 
     def _on_browse_az_data_dir(self):
         from PySide6.QtWidgets import QFileDialog
@@ -533,6 +556,88 @@ class FileSettingsPage(QWidget):
         self._lbl_match_status.setText("")
         if self._data_file_paths:
             self._on_auto_match()
+
+    def _check_excel_word_consistency(self):
+        """检查 Excel 参数模板与 Word SDT tag 的一致性。"""
+        excel_path = self._tpl_path_label.text().strip()
+        word_path = self._edit_word_report_tpl.text().strip() if hasattr(self, '_edit_word_report_tpl') else ""
+        if not excel_path or not word_path or not Path(excel_path).exists() or not Path(word_path).exists():
+            return
+        try:
+            from src.excel_reader import read_template
+            from src.docx_exporter import DocxTemplateFiller
+            sheets = read_template(excel_path)
+            excel_params = set()
+            for s in sheets:
+                for col in s.columns:
+                    excel_params.add(col.col_type)
+            filler = DocxTemplateFiller(word_path)
+            word_tags = set(filler.list_tags())
+            # 提取 Word 中隐含的参数需求 (table_data → 数据表, 所有 data_* tag)
+            word_params = set()
+            for t in word_tags:
+                if t.startswith("data_"):
+                    word_params.add(t.replace("data_", ""))
+                elif t.startswith("table_data"):
+                    word_params.add("table")  # 表自动识别, 不做细粒度检查
+
+            # 计算差异
+            in_excel_not_word = excel_params - word_params - {"frequency", "unknown"}
+            in_word_not_excel = word_params - excel_params - {"table"}
+
+            if in_excel_not_word:
+                self._mw._log(f"⚠ Excel 中有但 Word SDT 未覆盖的参数: {sorted(in_excel_not_word)}", level="warning")
+            if in_word_not_excel:
+                self._mw._log(f"⚠ Word SDT 中有但 Excel 未定义的参数: {sorted(in_word_not_excel)}", level="warning")
+            if not in_excel_not_word and not in_word_not_excel:
+                self._mw._log("✓ Excel 参数与 Word SDT tag 一致")
+        except Exception as e:
+            self._mw._log(f"⚠ Excel/Word 一致性检查失败: {e}", level="warning")
+
+    def _on_word_preset_selected(self, idx: int):
+        """Word 预设选中 → 更新路径。"""
+        path = self._cmb_word_preset.currentData()
+        if path and hasattr(self, '_edit_word_report_tpl'):
+            self._edit_word_report_tpl.setText(path)
+
+    def _on_preview_word(self):
+        """预览 Word 模板的 SDT tag 结构。"""
+        w = getattr(self, '_edit_word_report_tpl', None)
+        if w is None:
+            return
+        path = w.text().strip()
+        if not path or not Path(path).exists():
+            # 打开文件对话框
+            from PySide6.QtWidgets import QFileDialog
+            d, _ = QFileDialog.getOpenFileName(self, self.tr("选择 Word 模板"), "",
+                                                self.tr("Word 文档 (*.docx)"))
+            if d:
+                w.setText(d)
+                path = d
+            else:
+                return
+        try:
+            from src.docx_exporter import DocxTemplateFiller
+            filler = DocxTemplateFiller(path)
+            tags = filler.list_tags()
+            msg = self.tr("SDT Tags ({0} 个):").format(len(tags))
+            for t in sorted(tags):
+                valid, desc = DocxTemplateFiller.validate_tag(t)
+                icon = "✓" if valid else "⚠"
+                msg += f"\n  {icon} {t}"
+            QMessageBox.information(self, self.tr("Word 模版预览"), msg)
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("预览失败"), str(e))
+
+    def _on_preset_word_loaded(self, excel_path: str, word_path: str):
+        """预设选中时，同时加载 Word 模板路径。"""
+        if word_path and hasattr(self, '_edit_word_report_tpl'):
+            self._edit_word_report_tpl.setText(word_path)
+            # 更新 Word 预设下拉选中项
+            if hasattr(self, '_cmb_word_preset'):
+                idx = self._cmb_word_preset.findData(word_path)
+                if idx >= 0:
+                    self._cmb_word_preset.setCurrentIndex(idx)
 
     def _on_preset_template_selected(self, path: str):
         """内置预设被选中 → 更新模板路径并触发自动匹配。"""
@@ -1216,6 +1321,34 @@ class FileSettingsPage(QWidget):
             self._mw._cached_template_params = set()
             self._mw._auto_apply_template_params()
 
+    def _on_multi_antenna_confirm(self):
+        """打开多天线确认对话框 (预填已加载的文件)。"""
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout
+        from ui.multi_antenna_page import MultiAntennaPage
+        from src.multi_antenna import extract_antenna_name
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("多天线配置确认"))
+        dlg.resize(950, 680)
+        layout = QVBoxLayout(dlg)
+        page = MultiAntennaPage(dlg, self._mw if self._mw else None)
+        files = self._data_file_paths if hasattr(self, '_data_file_paths') else []
+        if files:
+            for fp in files:
+                ant = page._config.add_antenna(extract_antenna_name(fp), [fp])
+                page._antenna_list.addItem(ant.name)
+            page._antenna_list.setCurrentRow(0)
+        if hasattr(self, '_edit_word_tpl'):
+            word_path = self._edit_word_tpl.text().strip()
+            if word_path:
+                page._edit_word_tpl.setText(word_path)
+        layout.addWidget(page)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            setattr(self._mw, '_multi_antenna_config', page.get_config()) if self._mw else None,
+            dlg.accept()))
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
     def get_lag_checkboxes(self):
         """返回 {效率曲线, 增益曲线} 勾选状态。"""
         return {
@@ -3088,12 +3221,13 @@ class ChartSettingsPage(QWidget):
         # ── 列数 / 图片宽 ──
         row_img = QHBoxLayout()
         row_img.addWidget(QLabel(self.tr(" 列数:")))
-        self._combo_az_columns = QComboBox()
-        self._combo_az_columns.addItem(self.tr("单列"), 1)
-        self._combo_az_columns.addItem(self.tr("双列"), 2)
-        self._combo_az_columns.setCurrentIndex(1)
-        self._combo_az_columns.currentIndexChanged.connect(lambda: self._sync_to_mw())
-        row_img.addWidget(self._combo_az_columns)
+        self._spin_az_columns = QSpinBox()
+        self._spin_az_columns.setRange(1, 6)
+        self._spin_az_columns.setValue(2)
+        self._spin_az_columns.setPrefix(self.tr("每行 "))
+        self._spin_az_columns.setSuffix(self.tr(" 列"))
+        self._spin_az_columns.valueChanged.connect(lambda: self._sync_to_mw())
+        row_img.addWidget(self._spin_az_columns)
 
         row_img.addWidget(QLabel(self.tr(" 宽:")))
         self._spin_az_img_pct = QSpinBox()
@@ -3225,9 +3359,9 @@ class ChartSettingsPage(QWidget):
             if hasattr(self, '_spin_azimuth_dpi'):
                 self._spin_azimuth_dpi.setValue(az.dpi if az.dpi >= 150 else 150)
             if hasattr(self, '_combo_az_columns'):
-                idx2 = self._combo_az_columns.findData(az.word_columns if az.word_columns in (1, 2) else 2)
+                idx2 = self._spin_az_columns.findData(az.word_columns if az.word_columns in (1, 2) else 2)
                 if idx2 >= 0:
-                    self._combo_az_columns.setCurrentIndex(idx2)
+                    self._spin_az_columns.setCurrentIndex(idx2)
             if hasattr(self, '_spin_az_img_pct'):
                 self._spin_az_img_pct.setValue(az.word_image_width_pct if 10 <= az.word_image_width_pct <= 100 else 90)
             if hasattr(self, '_check_show_caption'):
@@ -3271,7 +3405,8 @@ class ChartSettingsPage(QWidget):
         mode_layout = QVBoxLayout(mode_grp)
         self._radio_by_freq = QRadioButton(self.tr("按频点: 每频点全部图 → 下一频点"))
         self._radio_by_type = QRadioButton(self.tr("按图表类型: 每类图全频点 → 下一类"))
-        self._radio_by_freq.setChecked(True)
+        self._radio_by_freq.setChecked(self._word_layout_mode != "by_type")
+        self._radio_by_type.setChecked(self._word_layout_mode == "by_type")
         mode_layout.addWidget(self._radio_by_freq)
         mode_layout.addWidget(self._radio_by_type)
         layout.addWidget(mode_grp)
@@ -3335,7 +3470,11 @@ class ChartSettingsPage(QWidget):
         sort_layout.addLayout(btn_row)
         layout.addWidget(sort_grp)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        btns.accepted.connect(dlg.accept)
+        def _on_accept_layout():
+            self._word_layout_mode = "by_type" if self._radio_by_type.isChecked() else "by_freq"
+            self._sync_to_mw()
+            dlg.accept()
+        btns.accepted.connect(_on_accept_layout)
         btns.rejected.connect(dlg.reject)
         layout.addWidget(btns)
         dlg.exec()
@@ -3407,7 +3546,7 @@ class ChartSettingsPage(QWidget):
         azimuth.antenna_name = self._edit_antenna_name.text().strip() if hasattr(self, '_edit_antenna_name') else ""
         azimuth.word_layout_mode = self._word_layout_mode if hasattr(self, '_word_layout_mode') else "side_by_side"
         azimuth.dpi = self._spin_azimuth_dpi.value() if hasattr(self, '_spin_azimuth_dpi') else 150
-        azimuth.word_columns = self._combo_az_columns.currentData() if hasattr(self, '_combo_az_columns') else 2
+        azimuth.word_columns = self._spin_az_columns.currentData() if hasattr(self, '_combo_az_columns') else 2
         azimuth.word_image_width_pct = self._spin_az_img_pct.value() if hasattr(self, '_spin_az_img_pct') else 90
         azimuth.show_caption = self._check_show_caption.isChecked() if hasattr(self, '_check_show_caption') else True
         azimuth.image_width_cm = self._spin_img_cm.value() if hasattr(self, '_spin_img_cm') else 7.5

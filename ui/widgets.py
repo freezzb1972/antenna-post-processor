@@ -240,6 +240,7 @@ class TemplateSourceRow(QWidget):
     """
 
     template_changed = Signal(str)
+    template_pair_changed = Signal(str, str)
 
     def __init__(self, parent=None, on_browse=None, on_preview=None):
         super().__init__(parent)
@@ -276,13 +277,16 @@ class TemplateSourceRow(QWidget):
         layout.addStretch()
 
     def populate_presets(self, presets: List[dict]):
-        """填充内置模板下拉列表。"""
+        """填充内置模板下拉列表。每个预设包含 Excel path + Word path。"""
         self._cmb_preset.blockSignals(True)
         self._cmb_preset.clear()
         self._cmb_preset.addItem("", "")
         for p in presets:
             label = f"{p.get('manufacturer', '')} - {p.get('name', '')}"
-            self._cmb_preset.addItem(label.strip(" - "), p.get("path", ""))
+            self._cmb_preset.addItem(label.strip(" - "), json.dumps({
+                "excel": p.get("path", ""),
+                "word": p.get("word_template_path", ""),
+            }))
         self._cmb_preset.blockSignals(False)
 
     def set_path(self, path: str):
@@ -293,10 +297,19 @@ class TemplateSourceRow(QWidget):
         return self._path
 
     def _on_preset_selected(self, index: int):
-        path = self._cmb_preset.currentData()
-        if path:
-            self._path = path
-            self.template_changed.emit(path)
+        data = self._cmb_preset.currentData()
+        if data:
+            try:
+                d = json.loads(data)
+                excel = d.get("excel", "")
+                word = d.get("word", "")
+            except Exception:
+                excel = data
+                word = ""
+            self._path = excel
+            self.template_changed.emit(excel)
+            if word:
+                self.template_pair_changed.emit(excel, word)
 
     def _on_browse(self):
         path, _ = QFileDialog.getOpenFileName(

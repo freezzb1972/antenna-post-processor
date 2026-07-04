@@ -523,6 +523,109 @@ class DocxTemplateFiller:
         drawing = etree.SubElement(r, qn('w:drawing'))
         drawing.append(inline_shape)
 
+    # ── 模式 D: 图片组循环 ──
+
+    def fill_image_group(self, tag_start: str, tag_end: str,
+                         images: list[tuple[str, bytes]],
+                         layout: str = "by_freq",
+                         width_cm: float = 8.0,
+                         cols_per_row: int = 2):
+        """图片组循环填充: 按频点或按类型批量生成图片。
+
+        Args:
+            tag_start: 图片组起始 SDT tag (如 "img_group_start")
+            tag_end:   图片组结束 SDT tag
+            images:    [(label, png_bytes), ...] 图片列表
+            layout:    "by_freq" = 每频点全图→下一频点
+                       "by_type" = 每类图全频点→下一类
+            width_cm:  每张图片宽度
+            cols_per_row: 每行图片数
+        """
+        sdt_start = self._sdt_map.get(tag_start)
+        sdt_end = self._sdt_map.get(tag_end)
+
+        if sdt_start is None or sdt_end is None:
+            self._warnings.append(f"Image group markers '{tag_start}'/'{tag_end}' not found")
+            return
+
+        if not images:
+            return
+
+        # 找到起始和结束 SDT 之间的所有元素
+        body = self.doc.element.body
+        body_children = list(body)
+        start_idx = body_children.index(sdt_start) if sdt_start in body_children else -1
+        end_idx = body_children.index(sdt_end) if sdt_end in body_children else -1
+
+        if start_idx < 0 or end_idx < 0 or start_idx >= end_idx:
+            self._warnings.append("Image group markers not found at the same level")
+            return
+
+        # 模板组 = start_idx+1 到 end_idx 之间的元素 (不含 markers)
+        template_elements = body_children[start_idx+1:end_idx]
+
+        # 删除所有中间元素和 end marker
+        for elem in template_elements:
+            body.remove(elem)
+        body.remove(sdt_end)
+
+        # 按频点/类型分组图片
+        if layout == "by_type":
+            # Group by image label prefix
+            groups = {}
+            for label, data in images:
+                prefix = label.rsplit('_', 1)[0] if '_' in label else label
+                groups.setdefault(prefix, []).append((label, data))
+            image_groups = list(groups.items())
+        else:
+            # by_freq: each image is its own group
+            image_groups = [([(l, d)],) for l, d in images]
+
+        # 循环生成
+        for group_idx, group_data in enumerate(image_groups):
+            if layout == "by_type":
+                group_label, group_images = group_data
+            else:
+                group_label, group_images = group_data[0][0], group_data[0]
+
+            # 复制模板元素
+            for elem in template_elements:
+                new_elem = etree.fromstring(etree.tostring(elem))
+
+                # 替换其中的图片 SDT
+                img_tags = new_elem.findall(f'.//{{{NS_W}}}sdt')
+                for gi, img_sdt in enumerate(img_tags):
+                    sdt_pr = img_sdt.find(f'{{{NS_W}}}sdtPr')
+                    if sdt_pr is None:
+                        continue
+                    tag_el = sdt_pr.find(f'{{{NS_W}}}tag')
+                    if tag_el is None or not tag_el.get(f'{{{NS_W}}}val', '').startswith('img_'):
+                        continue
+                    if gi < len(group_images):
+                        label, img_bytes = group_images[gi]
+                        # Replace SDT content with the actual image
+                        content = img_sdt.find(f'{{{NS_W}}}sdtContent')
+                        if content is not None:
+                            for child in list(content):
+                                content.remove(child)
+                            self._insert_image_into_sdt(content, img_bytes, label, width_cm)
+
+                body.insert(end_idx, new_elem)
+                end_idx += 1
+
+        # Add end marker back
+        body.insert(end_idx, sdt_end)
+
+    def _insert_image_into_sdt(self, content, img_bytes, label, width_cm):
+        """在 SDT content 中插入图片。"""
+        from docx.shared import Cm
+        image_descriptor = io.BytesIO(img_bytes)
+        inline_shape = self.doc.part.new_pic_inline(image_descriptor, width=Cm(width_cm))
+        p = etree.SubElement(content, qn('w:p'))
+        r = etree.SubElement(p, qn('w:r'))
+        drawing = etree.SubElement(r, qn('w:drawing'))
+        drawing.append(inline_shape)
+
     # ── 输出 ──
 
     def save(self, output_path: str | Path):

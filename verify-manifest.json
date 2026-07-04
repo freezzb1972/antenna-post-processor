@@ -282,7 +282,9 @@
       "docx_exporter.py",
       "project_db.py",
       "docx_sdt_inserter.py",
-      "llm_tagger.py"
+      "llm_tagger.py",
+      "multi_antenna.py",
+      "multi_antenna_page.py"
     ]
   },
   "tests": {
@@ -1039,6 +1041,13 @@
       "status": "verified",
       "widgets": [
         "ui/project_manager.py"
+      ]
+    },
+    {
+      "name": "multi-antenna-config",
+      "status": "verified",
+      "widgets": [
+        "ui/multi_antenna_page.py"
       ]
     }
   ]

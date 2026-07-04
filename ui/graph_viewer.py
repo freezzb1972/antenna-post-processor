@@ -308,12 +308,18 @@ class GraphViewer(QWidget):
 
         angle_row.addWidget(QLabel("  数据源:"))
         self._cmb_2d_data = QComboBox()
+        self._cmb_2d_data.setEditable(True)
+        self._cmb_2d_data.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_2d_data.lineEdit().setPlaceholderText("搜索...")
         self._cmb_2d_data.addItems(["Gain", "AR", "E_θ", "E_φ", "RHCP", "LHCP", "CP-XPI"])
         self._cmb_2d_data.currentIndexChanged.connect(self._on_2d_cuts_update)
         angle_row.addWidget(self._cmb_2d_data)
 
         angle_row.addWidget(QLabel("类型:"))
         self._cmb_2d_type = QComboBox()
+        self._cmb_2d_type.setEditable(True)
+        self._cmb_2d_type.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_2d_type.lineEdit().setPlaceholderText("搜索...")
         self._cmb_2d_type.addItems(["Polar", "Rectangular"])
         self._cmb_2d_type.currentIndexChanged.connect(self._on_2d_cuts_update)
         angle_row.addWidget(self._cmb_2d_type)
@@ -445,6 +451,9 @@ class GraphViewer(QWidget):
         # ── 视图模式 ──
         lay.addWidget(QLabel("视图:"))
         self._cmb_view_mode = QComboBox()
+        self._cmb_view_mode.setEditable(True)
+        self._cmb_view_mode.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_view_mode.lineEdit().setPlaceholderText("搜索...")
         self._cmb_view_mode.addItems(["3D Pattern", "Freq Curves", "2D Cuts"])
         self._cmb_view_mode.currentIndexChanged.connect(self._on_view_mode_changed)
         lay.addWidget(self._cmb_view_mode)
@@ -460,6 +469,9 @@ class GraphViewer(QWidget):
 
         # ── 双Y轴 (自动/手动) ──
         self._cmb_dual_y = QComboBox()
+        self._cmb_dual_y.setEditable(True)
+        self._cmb_dual_y.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_dual_y.lineEdit().setPlaceholderText("搜索...")
         self._cmb_dual_y.addItems(["单Y轴", "双Y轴(自动)", "双Y轴(强制)"])
         self._cmb_dual_y.setToolTip(
             "双Y轴模式: 曲线单位/量级差异大时自动或强制启用左右双Y轴")
@@ -589,6 +601,9 @@ class GraphViewer(QWidget):
         ctrl = QHBoxLayout()
         ctrl.addWidget(QLabel("视图:"))
         self._cmb_view_mode = QComboBox()
+        self._cmb_view_mode.setEditable(True)
+        self._cmb_view_mode.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_view_mode.lineEdit().setPlaceholderText("搜索...")
         self._cmb_view_mode.addItems(["3D Pattern", "Freq Curves"])
         self._cmb_view_mode.currentIndexChanged.connect(self._on_view_mode_changed)
         ctrl.addWidget(self._cmb_view_mode)

@@ -138,6 +138,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._ar_lag_config = LagConfig()     # AR 独立角度配置
         self._rhcp_lag_config = LagConfig()  # RHCP 独立角度配置
         self._cpxpi_lag_config = LagConfig() # CP-XPI 独立角度配置
+        self._multi_antenna_config = None     # 多天线配置
         self._nh_custom_angles: List[float] = []  # NHPRP/NHPIS 自定义角度列表
         self._ar_output_db: bool = True     # AR 默认输出 dB
         self._chart_config_required = None   # ChartConfig: 报告需要
@@ -506,6 +507,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._btn_export.clicked.connect(self._on_export)
         self._btn_export.setEnabled(False)
         self.ui.hButtons.addWidget(self._btn_export)
+
+        self._btn_one_click = QPushButton(self.tr("🚀 一键出报告"))
+        self._btn_one_click.setMinimumSize(120, 32)
+        self._btn_one_click.clicked.connect(self._on_one_click)
+        self._btn_one_click.setEnabled(False)
+        self.ui.hButtons.addWidget(self._btn_one_click)
         btn_row.addWidget(btn_wrap)
         left_layout.addLayout(btn_row)
 
@@ -616,6 +623,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 预设管理组
         tm.addAction(self.tr("模板预设管理..."), self._on_tool_template_recognizer)
         tm.addAction(self.tr("Docx SDT 工具箱..."), self._on_tool_docx_sdt)
+
         tm.addAction(self.tr("校准预设管理..."), self._on_show_rsp_presets)
         tm.addSeparator()
         # 导入导出组
@@ -1635,6 +1643,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         name_edit.setText(default_name)
         form.addRow(self.tr("厂商:"), mfr_combo)
         form.addRow(self.tr("模板名:"), name_edit)
+        # 显示关联的 Word 模板 (如有)
+        word_tpl = ""
+        if hasattr(self, '_file_settings_page'):
+            fp = self._file_settings_page
+            if hasattr(fp, '_edit_word_report_tpl'):
+                word_tpl = fp._edit_word_report_tpl.text().strip()
+        if word_tpl:
+            word_lbl = QLabel(Path(word_tpl).name)
+            word_lbl.setToolTip(word_tpl)
+            form.addRow(self.tr("Word 模板:"), word_lbl)
         layout.addLayout(form)
         btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btn_box.accepted.connect(dlg.accept)
@@ -1644,7 +1662,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         mfr = mfr_combo.currentText().strip()
         tpl_name = name_edit.text().strip()
         if not mfr or not tpl_name: return
-        self._tm.add_template(mfr, tpl_name, template_path, output_dir)
+        # 同时保存 Word 模板路径
+        word_tpl = ""
+        if hasattr(self, '_file_settings_page'):
+            fp = self._file_settings_page
+            if hasattr(fp, '_edit_word_report_tpl'):
+                word_tpl = fp._edit_word_report_tpl.text().strip()
+        self._tm.add_template(mfr, tpl_name, template_path, output_dir, word_tpl)
         self._log(f"✓ 模板预设已保存: {mfr} → {tpl_name}")
 
     def _save_template_path(self, path: str):
@@ -1980,6 +2004,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             return
         self._enter_exporting()
         self._do_run(compute_only=False, reuse_datasource=True)
+
+    def _on_one_click(self):
+        """一键出报告: 直接 compute_only=False, 不要求先预览。"""
+        self._enter_exporting()
+        self._do_run(compute_only=False, reuse_datasource=False)
 
     def _do_run(self, compute_only: bool = False, reuse_datasource: bool = False):
         """统一执行入口（预览/出报告共用）。"""
@@ -2384,6 +2413,62 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 自动切到结果Tab
         self.ui.tabConfig.setCurrentIndex(0)
 
+
+    def _process_antennas_parallel(self, antennas):
+        """并行处理多个天线 (自动检测 CPU 核数)。"""
+        import os
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        n_cpu = os.cpu_count() or 4
+        workers = 1 if n_cpu <= 4 else (2 if n_cpu <= 8 else min(len(antennas), n_cpu // 2))
+        self._log(f"  并行处理: {workers} 线程 (CPU={n_cpu}核)")
+        results = {}
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(self._run_single_antenna, ant): ant for ant in antennas if ant.data_files}
+            for f in as_completed(futures):
+                ant = futures[f]
+                try:
+                    r, imgs = f.result()
+                    results[ant.name] = (r, imgs)
+                    self._log(f"  \u2713 {ant.name}: {sum(len(v) for v in r.values())} rows")
+                except Exception as e:
+                    self._log(f"  \u2717 {ant.name}: {e}")
+        return results
+
+    def _run_single_antenna(self, ant):
+        """运行单个天线的管线计算。"""
+        from src.datasource import DataSource
+        from src.pipeline import run_pipeline
+        from src.graph_data import extract_graph_data
+        from src.renderer import MatplotlibRenderer
+        results = {}
+        images = {}
+        for fp in ant.data_files:
+            if not Path(fp).exists():
+                continue
+            ds = DataSource.from_path(fp)
+            res = run_pipeline(
+                datasource=ds,
+                template_path=self.ui.editTemplatePath.text().strip() or "/tmp/minimal_template.xlsx",
+                output_path="/tmp/dummy.xlsx",
+                lag_config_override=ant.lag_config if not ant.lag_config.is_empty() else self._lag_config,
+                ar_lag_config_override=ant.ar_lag_config if not ant.ar_lag_config.is_empty() else self._ar_lag_config,
+                theta_extrap_method=getattr(self, '_cmb_extrapolate', None) and self._cmb_extrapolate.currentData() if hasattr(self, '_cmb_extrapolate') else None,
+                compute_only=True,
+            )
+            results.update(res)
+            # 生成前几频点图
+            gd = extract_graph_data(res, step_deg=5.0)
+            renderer = MatplotlibRenderer()
+            for freq, d in sorted(gd.items())[:3]:
+                gain = d.get("gain_db")
+                theta = d.get("theta")
+                phi = d.get("phi")
+                if gain is not None and theta is not None:
+                    buf = renderer.render_3d_pattern(theta, phi, gain, freq, elev=30, azim=-60, dpi=60, title="Gain")
+                    images.setdefault(ant.name, []).append((f"gain_{freq:.0f}", buf.getvalue()))
+        return results, images
+
+
     def _fill_docx_template(self, template_path: str, results: dict, images: dict,
                              file_page=None):
         """使用 SDT Tag 填充 Word 模板。"""
@@ -2392,6 +2477,30 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         filler = DocxTemplateFiller(template_path)
         tags = filler.list_tags()
         self._log(f"  Word 模板: {len(tags)} 个 SDT tag")
+
+        # ── 多天线模式 ──
+        multi_cfg = getattr(self, '_multi_antenna_config', None)
+        if multi_cfg and multi_cfg.antennas and len(multi_cfg.antennas) > 1:
+            for ant in multi_cfg.antennas:
+                sfx = ant.sdt_suffix
+                ant_results = results.get(ant.name, {})
+                if not ant_results:
+                    continue
+                # 数据表
+                for tag in tags:
+                    if tag.startswith("table_data") and (not sfx or sfx in tag):
+                        try: filler.auto_fill_table(tag, ant_results)
+                        except Exception as e: self._log(f"  \u26a0 {tag}: {e}")
+                # 图片
+                imgs_for_tag = [t for t in tags if t.startswith("img_") and sfx in t]
+                all_imgs = []
+                for ilist in images.values():
+                    if isinstance(ilist, list): all_imgs.extend(ilist)
+                for i, t in enumerate(imgs_for_tag):
+                    if i < len(all_imgs):
+                        try: filler.fill_image(t, all_imgs[i][1], width_cm=8.0)
+                        except Exception: pass
+            return
 
         # ── 元数据 ──
         from src.config_manager import get_config_manager

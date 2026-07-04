@@ -107,19 +107,7 @@
     "nhpis225_ratio": "NHPIS22.5 / TIS"
   },
   "table": {
-    "gain": "Gain 数据表 (含 PKGain + LAG 单角度 + LAG 范围)",
-    "ar": "AR 数据表 (含 AR 单角度)",
-    "efficiency": "效率表 (含 Efficiency + Gain)",
-    "directivity": "方向性表",
-    "trp": "TRP 表 (含 TRP + Peak EIRP + NHPRP)",
-    "tis": "TIS 表 (含 TIS + NHPIS)",
-    "lag": "LAG 表 (纯 LAG 角度)",
-    "xpi": "XPI 表",
-    "power_stats": "功率统计表 (含 max/min/avg + 比率)",
-    "beam_params": "波束参数表 (含 Boresight + Beamwidth + F/B)",
-    "rhcp_lhcp": "RHCP/LHCP 表 (含 CP-XPI)",
-    "phase_center": "相位中心表",
-    "auto": "自动识别 — 系统按列头自动匹配参数"
+    "data": "数据表 (通用) — 列头自动识别 Gain/AR/Efficiency/TRP 等参数"
   },
   "chart": {
     "gain_vs_freq": "Gain vs 频率曲线",
@@ -138,12 +126,18 @@
     "3d_gain": "3D 球面 Gain 方向图",
     "3d_ar": "3D 球面 AR 方向图",
     "3d_directivity": "3D 球面 Directivity 方向图",
-    "azimuth_gain": "方位面极坐标 Gain 切面",
-    "azimuth_ar": "方位面极坐标 AR 切面",
-    "azimuth_rhcp": "方位面极坐标 RHCP 切面",
-    "azimuth_lhcp": "方位面极坐标 LHCP 切面",
+    "azimuth_gain": "方位面极坐标 Gain 切面 (多θ曲线)",
+    "azimuth_ar": "方位面极坐标 AR 切面 (多θ曲线)",
+    "efficiency_vs_freq": "效率 vs 频率曲线",
+    "gain_vs_freq": "Gain vs 频率曲线",
+    "directivity_vs_freq": "Directivity vs 频率曲线",
+    "trp_vs_freq": "TRP vs 频率曲线",
+    "ar_vs_freq": "AR vs 频率曲线",
     "dut_photo_1": "被测件照片 1",
-    "dut_photo_2": "被测件照片 2",
-    "test_setup": "测试设置照片"
+    "dut_photo_2": "被测件照片 2"
+  },
+  "img_group": {
+    "start": "图片组开始 — 程序循环复制此标记后的内容 (每组=1频点全部图)",
+    "end": "图片组结束"
   }
 }

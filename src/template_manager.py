@@ -18,17 +18,19 @@ class TemplatePreset:
     """单个模板预设。"""
 
     def __init__(self, name: str, path: str, default_output_dir: str = "",
-                 manufacturer: str = ""):
+                 manufacturer: str = "", word_template_path: str = ""):
         self.name = name
         self.path = path
         self.default_output_dir = default_output_dir
         self.manufacturer = manufacturer
+        self.word_template_path = word_template_path
 
     def to_dict(self) -> dict[str, str]:
         return {
             "name": self.name,
             "path": self.path,
             "default_output_dir": self.default_output_dir,
+            "word_template_path": self.word_template_path,
         }
 
 
@@ -66,6 +68,7 @@ class TemplateManager:
                         path=t["path"],
                         default_output_dir=t.get("default_output_dir", ""),
                         manufacturer=manufacturer,
+                        word_template_path=t.get("word_template_path", ""),
                     )
                     for t in m.get("templates", [])
                 ]
@@ -80,11 +83,12 @@ class TemplateManager:
                     path=t["path"],
                     default_output_dir=t.get("default_output_dir", ""),
                     manufacturer=m["name"],
+                    word_template_path=t.get("word_template_path", ""),
                 ))
         return result
 
     def add_template(self, manufacturer: str, name: str, path: str,
-                     default_output_dir: str = ""):
+                     default_output_dir: str = "", word_template_path: str = ""):
         """添加或更新模板预设。"""
         # 找或创建厂商
         mf = None
@@ -101,6 +105,7 @@ class TemplateManager:
             if t["name"] == name:
                 t["path"] = path
                 t["default_output_dir"] = default_output_dir
+                t["word_template_path"] = word_template_path
                 self.save()
                 return
 
@@ -108,6 +113,7 @@ class TemplateManager:
             "name": name,
             "path": path,
             "default_output_dir": default_output_dir,
+            "word_template_path": word_template_path,
         })
         self.save()
 

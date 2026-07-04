@@ -16,7 +16,8 @@ import openpyxl
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
+    QColor, QComboBox, QDialog, QDialogButtonBox,
+    QTreeWidget, QTreeWidgetItem, QFileDialog, QFormLayout,
     QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox,
     QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout,
 )
@@ -493,25 +494,71 @@ class DocxTemplateToolbox(QDialog):
         gr.addWidget(btn_scan)
         layout.addWidget(grp)
 
-        self._table = QTableWidget()
-        self._table.setColumnCount(6)
-        self._table.setHorizontalHeaderLabels([
-            self.tr("#"), self.tr("位置"), self.tr("类型"), self.tr("示例文本"),
-            self.tr("推荐 Tag"), self.tr("确认 Tag"),
-        ])
-        self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
-        self._table.setColumnWidth(0, 40)
-        self._table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
-        self._table.setColumnWidth(1, 150)
-        self._table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
-        self._table.setColumnWidth(2, 70)
-        self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
-        self._table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Fixed)
-        self._table.setColumnWidth(4, 160)
-        self._table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Fixed)
-        self._table.setColumnWidth(5, 160)
-        self._table.setAlternatingRowColors(True)
-        layout.addWidget(self._table, 1)
+        # 左右分栏: 文档结构树 + 标签配置面板
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.setChildrenCollapsible(False)
+
+        # 左栏: 文档结构树
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        self._tree = QTreeWidget()
+        self._tree.setHeaderLabels([self.tr("文档结构")])
+        self._tree.setAlternatingRowColors(True)
+        self._tree.currentItemChanged.connect(self._on_tree_item_selected)
+        left_layout.addWidget(self._tree)
+        splitter.addWidget(left_widget)
+
+        # 右栏: SDT 配置面板
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(4, 0, 0, 0)
+
+        self._lbl_detail = QLabel(self.tr("选择左侧项目查看详情"))
+        self._lbl_detail.setWordWrap(True)
+        right_layout.addWidget(self._lbl_detail)
+
+        self._lbl_tag_status = QLabel("")
+        right_layout.addWidget(self._lbl_tag_status)
+
+        tag_form = QFormLayout()
+        self._cmb_tag = QComboBox()
+        self._cmb_tag.setEditable(True)
+        self._cmb_tag.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_tag.lineEdit().setPlaceholderText(self.tr("搜索或输入 tag..."))
+        tag_form.addRow(self.tr("确认 Tag:"), self._cmb_tag)
+        btn_browse_registry = QPushButton(self.tr("浏览注册表..."))
+        btn_browse_registry.clicked.connect(self._browse_registry)
+        tag_form.addRow("", btn_browse_registry)
+        btn_clear_tag = QPushButton(self.tr("清除"))
+        btn_clear_tag.clicked.connect(self._clear_tag)
+        tag_form.addRow("", btn_clear_tag)
+        right_layout.addLayout(tag_form)
+        right_layout.addStretch()
+        splitter.addWidget(right_widget)
+        splitter.setSizes([400, 300])
+
+        layout.addWidget(splitter, 1)
+
+        # ── 筛选 + 搜索 ──
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(QLabel(self.tr("筛选类型:")))
+        self._cmb_filter = QComboBox()
+        self._cmb_filter.addItem(self.tr("全部"), "")
+        self._cmb_filter.addItem(self.tr("表格-数据表"), "table_")
+        self._cmb_filter.addItem(self.tr("表格-元数据"), "meta_")
+        self._cmb_filter.addItem(self.tr("图片"), "img_")
+        self._cmb_filter.addItem(self.tr("未标记"), "unset")
+        self._cmb_filter.currentIndexChanged.connect(self._apply_filter)
+        filter_row.addWidget(self._cmb_filter)
+        filter_row.addWidget(QLabel(self.tr(" 搜索:")))
+        self._edit_search = QLineEdit()
+        self._edit_search.setPlaceholderText(self.tr("关键字或字母..."))
+        self._edit_search.textChanged.connect(self._apply_filter)
+        filter_row.addWidget(self._edit_search, 1)
+        self._lbl_filtered = QLabel("")
+        filter_row.addWidget(self._lbl_filtered)
+        layout.addLayout(filter_row)
 
         self._lbl_summary = QLabel("")
         layout.addWidget(self._lbl_summary)
@@ -556,21 +603,132 @@ class DocxTemplateToolbox(QDialog):
         except Exception as e:
             QMessageBox.warning(self, self.tr("扫描失败"), str(e))
             return
-        self._populate_table()
+        self._populate_tree()
         tables = sum(1 for p in self._positions if "table" in p.pos_type)
         images = sum(1 for p in self._positions if p.pos_type == "image")
         self._lbl_summary.setText(
             self.tr("共 {} 个表格, {} 张图片").format(tables, images))
 
+    def _populate_tree(self):
+        self._tree.clear()
+        # 按类型分顶级节点
+        categories = {"table_data": self.tr("数据表"), "table_meta": self.tr("元数据表"),
+                      "table": self.tr("其他表"), "image": self.tr("图片")}
+        nodes = {}
+        for cat_name in categories.values():
+            node = QTreeWidgetItem(self._tree, [cat_name])
+            node.setExpanded(True)
+            nodes[cat_name] = node
+
+        for p in self._positions:
+            cat = "image" if p.pos_type == "image" else ("table_data" if "data" in p.pos_type else ("table_meta" if "meta" in p.pos_type else "table"))
+            parent = nodes.get(categories.get(cat, self.tr("其他表")), list(nodes.values())[0])
+            item = QTreeWidgetItem(parent)
+            tag_display = f" [{p.suggested_tag}]" if p.suggested_tag else ""
+            item.setText(0, f"{p.location}{tag_display}")
+            item.setData(0, Qt.UserRole, p.index)
+            # 颜色标记
+            if p.suggested_tag:
+                item.setForeground(0, QColor("#1a73e8"))
+            elif p.pos_type == "table_data":
+                item.setForeground(0, QColor("#e37400"))
+
+    def _on_tree_item_selected(self, current, previous):
+        """树节点选中 → 右侧面板显示详情。"""
+        if not current:
+            return
+        idx = current.data(0, Qt.UserRole)
+        if idx is None or idx >= len(self._positions):
+            # 顶级节点
+            return
+        p = self._positions[idx]
+        self._lbl_detail.setText(
+            self.tr("类型: {0}\n位置: {1}\n内容: {2}").format(p.pos_type, p.location, p.sample_text[:200]))
+        self._lbl_tag_status.setText(
+            self.tr("推荐: {0}").format(p.suggested_tag) if p.suggested_tag else self.tr("(无推荐)"))
+        # 更新 tag 下拉
+        self._cmb_tag.blockSignals(True)
+        self._cmb_tag.clear()
+        self._cmb_tag.addItem("", "")
+        for t in DocxTemplateFiller.get_all_tags():
+            if t.startswith("table_") or t.startswith("img_") or t.startswith("meta_") or t.startswith("config_"):
+                self._cmb_tag.addItem(t, t)
+        if p.confirmed_tag:
+            idx2 = self._cmb_tag.findData(p.confirmed_tag)
+            if idx2 >= 0: self._cmb_tag.setCurrentIndex(idx2)
+            else: self._cmb_tag.setCurrentText(p.confirmed_tag)
+        elif p.suggested_tag:
+            idx2 = self._cmb_tag.findData(p.suggested_tag)
+            if idx2 >= 0: self._cmb_tag.setCurrentIndex(idx2)
+            else: self._cmb_tag.setCurrentText(p.suggested_tag)
+        self._cmb_tag.blockSignals(False)
+        self._current_item_idx = idx
+
+    def _browse_registry(self):
+        """打开 SDT tag 注册表查看。"""
+        from src.docx_exporter import DocxTemplateFiller
+        reg = DocxTemplateFiller.load_registry()
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("SDT Tag 注册表"))
+        dlg.setMinimumSize(500, 400)
+        layout = QVBoxLayout(dlg)
+        table = QTableWidget()
+        table.setColumnCount(3)
+        table.setHorizontalHeaderLabels([self.tr("类别"), self.tr("Tag"), self.tr("说明")])
+        cats = {'meta': self.tr("元数据"), 'config': self.tr("配置"), 'data': self.tr("数据"),
+                'table': self.tr("表格"), 'chart': self.tr("图表"), 'img': self.tr("图片"),
+                'img_group': self.tr("图片组")}
+        items = []
+        for cat_name, cat_dict in reg.items():
+            if cat_name.startswith("_"): continue
+            for key, desc in cat_dict.items():
+                items.append((cats.get(cat_name, cat_name), key, desc))
+        table.setRowCount(len(items))
+        for i, (c, k, d) in enumerate(items):
+            table.setItem(i, 0, QTableWidgetItem(c))
+            table.setItem(i, 1, QTableWidgetItem(k))
+            table.setItem(i, 2, QTableWidgetItem(d))
+        table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(table)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok)
+        btns.accepted.connect(dlg.accept)
+        layout.addWidget(btns)
+        dlg.exec()
+
+    def _clear_tag(self):
+        if hasattr(self, '_current_item_idx') and self._current_item_idx < len(self._positions):
+            self._positions[self._current_item_idx].confirmed_tag = ""
+            self._cmb_tag.setCurrentIndex(0)
+            self._populate_tree()
+
     def _populate_table(self):
-        self._table.setRowCount(len(self._positions))
-        for i, p in enumerate(self._positions):
-            self._table.setItem(i, 0, QTableWidgetItem(str(p.index + 1)))
-            self._table.setItem(i, 1, QTableWidgetItem(p.location))
-            self._table.setItem(i, 2, QTableWidgetItem(p.pos_type))
-            self._table.setItem(i, 3, QTableWidgetItem(p.sample_text[:80]))
-            self._table.setItem(i, 4, QTableWidgetItem(p.suggested_tag))
-            self._table.setItem(i, 5, QTableWidgetItem(p.confirmed_tag))
+        """兼容旧接口 — 委托给 tree。"""
+        self._populate_tree()
+
+    def _apply_filter(self):
+        filter_type = self._cmb_filter.currentData() or ""
+        search = self._edit_search.text().strip().lower()
+        visible = 0
+        for i in range(self._table.rowCount()):
+            pos_type = self._table.item(i, 2).text() if self._table.item(i, 2) else ""
+            tag_text = ""
+            cmb = self._table.cellWidget(i, 5)
+            if cmb: tag_text = cmb.currentText().lower()
+            item4 = self._table.item(i, 4)
+            if item4: tag_text += " " + (item4.text() or "").lower()
+            location = self._table.item(i, 1).text() if self._table.item(i, 1) else ""
+            sample = self._table.item(i, 3).text() if self._table.item(i, 3) else ""
+
+            show = True
+            if filter_type == "unset":
+                show = not bool(tag_text.strip())
+            elif filter_type:
+                show = pos_type.startswith(filter_type)
+            if search:
+                show = show and (search in tag_text or search in location.lower() or search in sample.lower())
+            # tree-based filter not needed(i, not show)
+            if show: visible += 1
+        self._lbl_filtered.setText(f"显示 {visible}/{self._table.rowCount()}")
 
     def _rule_match(self):
         try:
@@ -579,7 +737,7 @@ class DocxTemplateToolbox(QDialog):
         except Exception as e:
             QMessageBox.warning(self, self.tr("匹配失败"), str(e))
             return
-        self._populate_table()
+        self._populate_tree()
         self._lbl_summary.setText(
             self.tr("规则匹配: {}/{} 个已推荐").format(n, len(self._positions)))
 
@@ -606,15 +764,16 @@ class DocxTemplateToolbox(QDialog):
         except Exception as e:
             QMessageBox.warning(self, self.tr("LLM 失败"), str(e))
             return
-        self._populate_table()
+        self._populate_tree()
         self._lbl_summary.setText(self.tr("LLM: {} 个新推荐").format(n))
 
     def _insert_and_save(self):
         for i in range(self._table.rowCount()):
-            item5 = self._table.item(i, 5)
-            if item5 and item5.text().strip():
-                self._positions[i].confirmed_tag = item5.text().strip()
-            else:
+            cmb = self._table.cellWidget(i, 5)
+            if cmb:
+                val = cmb.currentText().strip()
+                if val: self._positions[i].confirmed_tag = val
+            if not self._positions[i].confirmed_tag:
                 item4 = self._table.item(i, 4)
                 if item4 and item4.text().strip():
                     self._positions[i].confirmed_tag = item4.text().strip()

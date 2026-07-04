@@ -150,6 +150,9 @@ class DataSourceDialog(QDialog):
         name_row = QHBoxLayout(grp_name)
         name_row.addWidget(QLabel("多数据源时工作表命名方式:"))
         self._cmb_naming_mode = QComboBox()
+        self._cmb_naming_mode.setEditable(True)
+        self._cmb_naming_mode.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_naming_mode.lineEdit().setPlaceholderText("搜索...")
         self._cmb_naming_mode.addItem("保留原模板工作表名", 0)
         self._cmb_naming_mode.addItem("用数据源文件名替换", 1)
         self._cmb_naming_mode.setToolTip("保留模板原名 或 用数据源文件名命名工作表")
@@ -2201,6 +2204,9 @@ class RAGSettingsDialog(QDialog):
 
         self._cmb_model = QComboBox()
         self._cmb_model.setEditable(True)
+        self._cmb_model.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_model.lineEdit().setPlaceholderText("搜索...")
+        self._cmb_model.setEditable(True)
         for m in ["claude-sonnet-4-6", "claude-opus-4-8", "gpt-4o", "gpt-4o-mini", "deepseek-chat"]:
             self._cmb_model.addItem(m)
         if self.settings.model:
@@ -2295,6 +2301,9 @@ class SystemSettingsDialog(QDialog):
         theme_grp = QGroupBox("主题")
         theme_layout = QHBoxLayout(theme_grp)
         self._cmb_theme = QComboBox()
+        self._cmb_theme.setEditable(True)
+        self._cmb_theme.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_theme.lineEdit().setPlaceholderText("搜索...")
         self._cmb_theme.setMinimumWidth(200)
         theme_layout.addWidget(QLabel("主题:"))
         theme_layout.addWidget(self._cmb_theme)
@@ -2372,6 +2381,9 @@ class SystemSettingsDialog(QDialog):
         rsp_layout.addRow("预设名称:", self._cmb_rsp_name)
 
         self._cmb_rsp_mode = QComboBox()
+        self._cmb_rsp_mode.setEditable(True)
+        self._cmb_rsp_mode.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_rsp_mode.lineEdit().setPlaceholderText("搜索...")
         self._cmb_rsp_mode.addItem("通用 (任意模式)", -1)
         self._cmb_rsp_mode.addItem("无源天线", 0)
         self._cmb_rsp_mode.addItem("有源发射 TRP", 1)
@@ -2416,14 +2428,23 @@ class SystemSettingsDialog(QDialog):
         defaults_layout.setSpacing(4)
 
         self._cmb_default_passive = QComboBox()
+        self._cmb_default_passive.setEditable(True)
+        self._cmb_default_passive.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_default_passive.lineEdit().setPlaceholderText("搜索...")
         self._cmb_default_passive.addItem("(未设置)", "")
         defaults_layout.addRow("无源天线:", self._cmb_default_passive)
 
         self._cmb_default_trp = QComboBox()
+        self._cmb_default_trp.setEditable(True)
+        self._cmb_default_trp.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_default_trp.lineEdit().setPlaceholderText("搜索...")
         self._cmb_default_trp.addItem("(未设置)", "")
         defaults_layout.addRow("有源 TRP:", self._cmb_default_trp)
 
         self._cmb_default_tis = QComboBox()
+        self._cmb_default_tis.setEditable(True)
+        self._cmb_default_tis.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_default_tis.lineEdit().setPlaceholderText("搜索...")
         self._cmb_default_tis.addItem("(未设置)", "")
         defaults_layout.addRow("有源 TIS:", self._cmb_default_tis)
 
@@ -2466,6 +2487,9 @@ class SystemSettingsDialog(QDialog):
 
         self._cmb_model = QComboBox()
         self._cmb_model.setEditable(True)
+        self._cmb_model.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_model.lineEdit().setPlaceholderText("搜索...")
+        self._cmb_model.setEditable(True)
         for m in ["claude-sonnet-4-6", "claude-opus-4-8", "gpt-4o", "gpt-4o-mini", "deepseek-chat"]:
             self._cmb_model.addItem(m)
         llm_layout.addRow("Model:", self._cmb_model)
@@ -2493,6 +2517,9 @@ class SystemSettingsDialog(QDialog):
         ai_layout.addRow("", self._check_ai)
 
         self._cmb_ai_mode = QComboBox()
+        self._cmb_ai_mode.setEditable(True)
+        self._cmb_ai_mode.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_ai_mode.lineEdit().setPlaceholderText("搜索...")
         self._cmb_ai_mode.addItems(["cloud", "local"])
         self._cmb_ai_mode.currentIndexChanged.connect(self._on_ai_mode_changed)
         ai_layout.addRow("AI 模式:", self._cmb_ai_mode)
