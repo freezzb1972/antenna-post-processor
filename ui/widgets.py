@@ -252,60 +252,73 @@ class TemplateSourceRow(QWidget):
     def _setup_ui(self):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(6)
+        layout.setSpacing(4)
 
-        layout.addWidget(QLabel(self.tr("模板:")))
+        # 厂商下拉 (搜索)
+        self._cmb_mfr = QComboBox()
+        self._cmb_mfr.setEditable(True)
+        self._cmb_mfr.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_mfr.lineEdit().setPlaceholderText(self.tr("厂商..."))
+        self._cmb_mfr.setMinimumWidth(100)
+        self._cmb_mfr.currentIndexChanged.connect(self._on_mfr_changed)
+        layout.addWidget(self._cmb_mfr)
 
-        # 内置模板下拉
-        self._cmb_preset = QComboBox()
-        self._cmb_preset.setEditable(True)
-        self._cmb_preset.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_preset.lineEdit().setPlaceholderText(self.tr("搜索预设模板..."))
-        self._cmb_preset.setMinimumWidth(180)
-        self._cmb_preset.currentIndexChanged.connect(self._on_preset_selected)
-        layout.addWidget(self._cmb_preset)
+        # 模板名下拉 (搜索, 根据厂商联动)
+        self._cmb_tpl = QComboBox()
+        self._cmb_tpl.setEditable(True)
+        self._cmb_tpl.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_tpl.lineEdit().setPlaceholderText(self.tr("模板..."))
+        self._cmb_tpl.setMinimumWidth(120)
+        self._cmb_tpl.currentIndexChanged.connect(self._on_tpl_selected)
+        layout.addWidget(self._cmb_tpl)
 
-        # 从电脑选择
         btn_browse = QPushButton(self.tr("从电脑选择..."))
         btn_browse.clicked.connect(self._on_browse_cb if self._on_browse_cb else self._on_browse)
         layout.addWidget(btn_browse)
 
-        # 预览报告
         btn_preview = QPushButton(self.tr("📋 预览报告"))
         btn_preview.clicked.connect(self._on_preview_cb if self._on_preview_cb else self._on_preview)
         layout.addWidget(btn_preview)
         layout.addStretch()
 
     def populate_presets(self, presets: List[dict]):
-        """填充内置模板下拉列表。每个预设包含 Excel path + Word path。"""
-        self._cmb_preset.blockSignals(True)
-        self._cmb_preset.clear()
-        self._cmb_preset.addItem("", "")
-        for p in presets:
-            label = f"{p.get('manufacturer', '')} - {p.get('name', '')}"
-            self._cmb_preset.addItem(label.strip(" - "), json.dumps({
+        """填充厂商和模板两级下拉。每个预设含 Excel path + Word path。"""
+        self._all_presets = presets
+        self._cmb_mfr.blockSignals(True)
+        self._cmb_mfr.clear()
+        self._cmb_mfr.addItem("", "")
+        mfrs = sorted(set(p.get('manufacturer', '') for p in presets if p.get('manufacturer')))
+        for m in mfrs:
+            self._cmb_mfr.addItem(m, m)
+        self._cmb_mfr.blockSignals(False)
+        self._populate_templates("")
+
+    def _populate_templates(self, mfr_filter: str):
+        self._cmb_tpl.blockSignals(True)
+        self._cmb_tpl.clear()
+        self._cmb_tpl.addItem("", "")
+        for p in self._all_presets:
+            if mfr_filter and p.get('manufacturer', '') != mfr_filter:
+                continue
+            label = p.get('name', '')
+            self._cmb_tpl.addItem(label, json.dumps({
                 "excel": p.get("path", ""),
                 "word": p.get("word_template_path", ""),
             }))
-        self._cmb_preset.blockSignals(False)
+        self._cmb_tpl.blockSignals(False)
 
-    def set_path(self, path: str):
-        """外部设置模板路径（不触发 signal）。"""
-        self._path = path
+    def _on_mfr_changed(self, idx: int):
+        mfr = self._cmb_mfr.currentData() or ""
+        self._populate_templates(mfr)
 
-    def get_path(self) -> str:
-        return self._path
-
-    def _on_preset_selected(self, index: int):
-        data = self._cmb_preset.currentData()
+    def _on_tpl_selected(self, idx: int):
+        data = self._cmb_tpl.currentData()
         if data:
             try:
                 d = json.loads(data)
-                excel = d.get("excel", "")
-                word = d.get("word", "")
+                excel = d.get("excel", ""); word = d.get("word", "")
             except Exception:
-                excel = data
-                word = ""
+                excel = data; word = ""
             self._path = excel
             self.template_changed.emit(excel)
             if word:

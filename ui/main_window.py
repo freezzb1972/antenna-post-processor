@@ -2178,6 +2178,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 合并图表配置: 报告需要的 + 额外 + GUI checkbox 状态
         # GUI checkbox 优先级最高, 确保用户关闭图表后不会因默认值重新打开
         full_chart_config = ChartConfig()
+        # 切面角度默认从 Gain 角度配置读取 (统一)
+        if hasattr(self, '_lag_config') and not full_chart_config.cut_2d_phi_angles:
+            full_chart_config.cut_2d_phi_angles = self._lag_config.singles_sorted
         if self._chart_config_required is not None or self._chart_config_extra is not None:
             req = self._chart_config_required or ChartConfig()
             xtr = self._chart_config_extra or ChartConfig()
@@ -2209,7 +2212,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     az.data_output_filename = f"{src_stem}_中间数据.xlsx"
             # 角度自动加载 (仅首次，之后用户手动管理)
                 if not az._angles_initialized:
+                    az.azimuth_cut_angles = self._lag_config.singles_sorted
+                    az.azimuth_cut_angles_ar = self._lag_config.singles_sorted
                     if not az.azimuth_cut_angles:
+                        pass  # already handled
                         az.azimuth_cut_angles = list(self._lag_config.singles_sorted)
                     if not az.azimuth_cut_angles_ar:
                         az.azimuth_cut_angles_ar = list(self._lag_config.singles_sorted)

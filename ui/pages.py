@@ -46,6 +46,9 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QAbstractItemView,
+    QTextBrowser,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -156,52 +159,52 @@ class FileSettingsPage(QWidget):
 
         v_splitter = ThinSplitter(Qt.Vertical)
 
-        # 报告模版组
-        tpl_grp = QGroupBox(self.tr("报告模版"))
-        tpl_layout = QVBoxLayout(tpl_grp)
-        tpl_layout.setSpacing(4)
-        # 第一行：Excel 参数模版
-        row1 = QHBoxLayout()
+        # Excel 模版组
+        excel_grp = QGroupBox(self.tr("Excel 参数模版"))
+        excel_layout = QVBoxLayout(excel_grp)
+        excel_layout.setSpacing(4)
         self._tpl_row = TemplateSourceRow(
             on_browse=self._on_browse_template,
             on_preview=self._on_preview_report,
         )
         if self._mw and hasattr(self._mw, '_tm'):
             presets = self._mw._tm.get_all_templates()
-            # Populate Word preset dropdown
-            for p in presets:
-                if p.word_template_path:
-                    label = f"{p.manufacturer} - {p.name}" if p.manufacturer else p.name
-                    self._cmb_word_preset.addItem(label, p.word_template_path)
-            presets_list = [
-                {"manufacturer": t.manufacturer, "name": t.name, "path": t.path}
-                for t in presets
-            ]
+            presets_list = []
+            for t in presets:
+                presets_list.append({"manufacturer": t.manufacturer, "name": t.name, "path": t.path,
+                    "word_template_path": t.word_template_path})
+                if t.word_template_path:
+                    label = f"{t.manufacturer} - {t.name}" if t.manufacturer else t.name
+                    self._cmb_word_preset.addItem(label, t.word_template_path)
             self._tpl_row.populate_presets(presets_list)
         self._tpl_row.template_changed.connect(self._on_preset_template_selected)
-        self._tpl_row.template_pair_changed.connect(self._on_preset_word_loaded)
-        self._tpl_row.template_pair_changed.connect(lambda e, w: self._check_excel_word_consistency())
-        tpl_layout.addWidget(self._tpl_row)
-
-        # Mod 行：Excel 模版路径
+        excel_layout.addWidget(self._tpl_row)
         self._tpl_path_label = QLineEdit()
         self._tpl_row.template_changed.connect(self._tpl_path_label.setText)
         self._tpl_path_label.setReadOnly(True)
         self._tpl_path_label.setPlaceholderText(self.tr("(未选择 Excel 参数模版)"))
-        tpl_layout.addWidget(self._tpl_path_label)
+        excel_layout.addWidget(self._tpl_path_label)
+        v_splitter.addWidget(excel_grp)
 
-        # 测试报告模版 (.docx Word 模板)
-        word_row = QHBoxLayout()
-        word_row.addWidget(QLabel(self.tr("报告模版:")))
+        # Word 报告模版组 (与 Excel 同款布局，复用 TemplateSourceRow)
+        word_grp = QGroupBox(self.tr("Word 报告模版"))
+        word_layout = QVBoxLayout(word_grp)
+        word_layout.setSpacing(4)
+        self._word_tpl_row = TemplateSourceRow(
+            on_browse=self._on_browse_word_template,
+            on_preview=self._on_preview_word,
+        )
+        if self._mw and hasattr(self._mw, '_tm'):
+            self._word_tpl_row.populate_presets(self._mw._tm.get_all_templates())
+        self._word_tpl_row.template_changed.connect(self._on_word_tpl_path_set)
+        self._word_tpl_row.template_pair_changed.connect(self._on_word_preset_excel_load)
+        word_layout.addWidget(self._word_tpl_row)
         self._edit_word_report_tpl = QLineEdit()
-        self._edit_word_report_tpl.setPlaceholderText(self.tr("选择 Word 报告模板 (.docx, 含 SDT tag)..."))
-        word_row.addWidget(self._edit_word_report_tpl, 1)
-        btn_browse_wr = QPushButton(self.tr("浏览..."))
-        btn_browse_wr.clicked.connect(self._on_browse_word_template)
-        word_row.addWidget(btn_browse_wr)
-        tpl_layout.addLayout(word_row)
-
-        v_splitter.addWidget(tpl_grp)
+        self._edit_word_report_tpl.setReadOnly(True)
+        self._edit_word_report_tpl.setPlaceholderText(self.tr("(未选择 Word 报告模版)"))
+        self._word_tpl_row.template_changed.connect(self._edit_word_report_tpl.setText)
+        word_layout.addWidget(self._edit_word_report_tpl)
+        v_splitter.addWidget(word_grp)
 
         # 数据文件选择器 (widgets.DataFileSelector)
         from ui.widgets import DataFileSelector
@@ -446,16 +449,14 @@ class FileSettingsPage(QWidget):
             self._sync_azimuth_state()
 
     def _on_browse_word_template(self):
-        """选择带 SDT tag 的 Word 模板。"""
+        """选择带 SDT tag 的 Word 模板（不自动预览）。"""
         from PySide6.QtWidgets import QFileDialog
         from pathlib import Path
-        w = getattr(self, '_edit_word_report_tpl', None)
-        start = w.text() if w else str(Path.cwd())
+        start = self._edit_word_report_tpl.text() or str(Path.cwd())
         d, _ = QFileDialog.getOpenFileName(self, self.tr("选择 Word 模板"), start,
                                             self.tr("Word 文档 (*.docx)"))
         if d:
-            w.setText(d)
-            self._on_preview_word()
+            self._edit_word_report_tpl.setText(d)
 
     def _on_browse_az_data_dir(self):
         from PySide6.QtWidgets import QFileDialog
@@ -594,38 +595,50 @@ class FileSettingsPage(QWidget):
         except Exception as e:
             self._mw._log(f"⚠ Excel/Word 一致性检查失败: {e}", level="warning")
 
+    def _on_word_tpl_path_set(self, path: str):
+        """Word 模板预设选中 → 更新路径。"""
+        if path:
+            self._edit_word_report_tpl.setText(path)
+
+    def _on_word_preset_excel_load(self, excel_path: str, word_path: str):
+        """Word 预设选中 → 同步加载对应 Excel 模板。"""
+        if excel_path and Path(excel_path).exists():
+            self._tpl_row.set_path(excel_path)
+            self._tpl_path_label.setText(excel_path)
+            self._template_path = excel_path
+            if self._mw:
+                self._mw.ui.editTemplatePath.setText(excel_path)
+
     def _on_word_preset_selected(self, idx: int):
+        """(已废弃 — 使用 TemplateSourceRow 替代)"""
+        pass
         """Word 预设选中 → 更新路径。"""
         path = self._cmb_word_preset.currentData()
         if path and hasattr(self, '_edit_word_report_tpl'):
             self._edit_word_report_tpl.setText(path)
 
     def _on_preview_word(self):
-        """预览 Word 模板的 SDT tag 结构。"""
+        """预览 Word 模板: 分屏视图 — 文档 + SDT tag 树。"""
         w = getattr(self, '_edit_word_report_tpl', None)
-        if w is None:
-            return
+        if w is None: return
         path = w.text().strip()
         if not path or not Path(path).exists():
-            # 打开文件对话框
             from PySide6.QtWidgets import QFileDialog
             d, _ = QFileDialog.getOpenFileName(self, self.tr("选择 Word 模板"), "",
                                                 self.tr("Word 文档 (*.docx)"))
-            if d:
-                w.setText(d)
-                path = d
-            else:
-                return
+            if d: w.setText(d); path = d
+            else: return
         try:
             from src.docx_exporter import DocxTemplateFiller
+            from src.docx_sdt_inserter import scan_docx
+            from src.llm_tagger import rule_based_suggest
             filler = DocxTemplateFiller(path)
-            tags = filler.list_tags()
-            msg = self.tr("SDT Tags ({0} 个):").format(len(tags))
-            for t in sorted(tags):
-                valid, desc = DocxTemplateFiller.validate_tag(t)
-                icon = "✓" if valid else "⚠"
-                msg += f"\n  {icon} {t}"
-            QMessageBox.information(self, self.tr("Word 模版预览"), msg)
+            existing = set(filler.list_tags())
+            positions = scan_docx(path)
+            rule_based_suggest(positions)
+            multi_cfg = getattr(self._mw, '_multi_antenna_config', None) if self._mw else None
+            dlg = WordTemplatePreviewDialog(self, path, existing, positions, multi_cfg)
+            dlg.exec()
         except Exception as e:
             QMessageBox.warning(self, self.tr("预览失败"), str(e))
 
@@ -634,10 +647,9 @@ class FileSettingsPage(QWidget):
         if word_path and hasattr(self, '_edit_word_report_tpl'):
             self._edit_word_report_tpl.setText(word_path)
             # 更新 Word 预设下拉选中项
-            if hasattr(self, '_cmb_word_preset'):
-                idx = self._cmb_word_preset.findData(word_path)
-                if idx >= 0:
-                    self._cmb_word_preset.setCurrentIndex(idx)
+            # Word 预设同步到 TemplateSourceRow
+            if hasattr(self, '_word_tpl_row') and word_path:
+                existing = self._word_tpl_row._all_presets if hasattr(self._word_tpl_row, '_all_presets') else []
 
     def _on_preset_template_selected(self, path: str):
         """内置预设被选中 → 更新模板路径并触发自动匹配。"""
@@ -3868,3 +3880,453 @@ class ChartSettingsPage(QWidget):
     def update_ui(self):
         """由外部触发刷新 UI 状态。"""
         self._load_state()
+
+# ═══════════════════════════════════════════════════════════════
+# Docx 模板 SDT 工具箱
+# ═══════════════════════════════════════════════════════════════
+
+class DocxTemplateToolbox(QDialog):
+    """.docx 模板分析 + SDT tag 推荐 + 插入。"""
+
+    def __init__(self, parent=None, docx_path=""):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Docx 模板 SDT 工具箱"))
+        self.resize(1000, 700)
+        self.setMinimumSize(800, 550)
+        self._docx_path = docx_path
+        self._positions = []
+        self._setup_ui()
+        if docx_path and Path(docx_path).exists():
+            self._edit_path.setText(docx_path)
+            self._scan()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(8)
+
+        grp = QGroupBox(self.tr("Word 模板"))
+        gr = QHBoxLayout(grp)
+        self._edit_path = QLineEdit()
+        self._edit_path.setPlaceholderText(self.tr("选择 .docx 模板文件..."))
+        gr.addWidget(self._edit_path, 1)
+        btn_browse = QPushButton(self.tr("浏览..."))
+        btn_browse.clicked.connect(self._browse)
+        gr.addWidget(btn_browse)
+        btn_scan = QPushButton(self.tr("扫描"))
+        btn_scan.clicked.connect(self._scan)
+        gr.addWidget(btn_scan)
+        layout.addWidget(grp)
+
+        self._table = QTableWidget()
+        self._table.setColumnCount(6)
+        self._table.setHorizontalHeaderLabels([
+            self.tr("#"), self.tr("位置"), self.tr("类型"), self.tr("示例文本"),
+            self.tr("推荐 Tag"), self.tr("确认 Tag"),
+        ])
+        self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self._table.setColumnWidth(0, 40)
+        self._table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        self._table.setColumnWidth(1, 150)
+        self._table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+        self._table.setColumnWidth(2, 70)
+        self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        self._table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Fixed)
+        self._table.setColumnWidth(4, 160)
+        self._table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Fixed)
+        self._table.setColumnWidth(5, 160)
+        self._table.setAlternatingRowColors(True)
+        layout.addWidget(self._table, 1)
+
+        self._lbl_summary = QLabel("")
+        layout.addWidget(self._lbl_summary)
+
+        btn_row = QHBoxLayout()
+        btn_rule = QPushButton(self.tr("规则自动匹配"))
+        btn_rule.clicked.connect(self._rule_match)
+        btn_row.addWidget(btn_rule)
+        btn_llm = QPushButton(self.tr("LLM 智能推荐"))
+        btn_llm.clicked.connect(self._llm_suggest)
+        btn_row.addWidget(btn_llm)
+        btn_row.addStretch()
+        btn_insert = QPushButton(self.tr("插入 SDT 并保存"))
+        btn_insert.setStyleSheet("font-weight:bold;")
+        btn_insert.clicked.connect(self._insert_and_save)
+        btn_row.addWidget(btn_insert)
+        btn_close = QPushButton(self.tr("关闭"))
+        btn_close.clicked.connect(self.accept)
+        btn_row.addWidget(btn_close)
+        layout.addLayout(btn_row)
+
+    def _browse(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("选择 Word 模板"), "",
+            self.tr("Word 文档 (*.docx)"))
+        if path:
+            if path.lower().endswith('.doc') and not path.lower().endswith('.docx'):
+                QMessageBox.warning(self, self.tr("格式不支持"),
+                    self.tr("不支持 .doc 格式。请用 Word 另存为 .docx 后再使用。"))
+                return
+            self._edit_path.setText(path)
+            self._docx_path = path
+            self._scan()
+
+    def _scan(self):
+        path = self._edit_path.text().strip()
+        if not path or not Path(path).exists():
+            return
+        try:
+            from src.docx_sdt_inserter import scan_docx
+            self._positions = scan_docx(path)
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("扫描失败"), str(e))
+            return
+        self._populate_table()
+        tables = sum(1 for p in self._positions if "table" in p.pos_type)
+        images = sum(1 for p in self._positions if p.pos_type == "image")
+        self._lbl_summary.setText(
+            self.tr("共 {} 个表格, {} 张图片").format(tables, images))
+
+    def _populate_table(self):
+        self._table.setRowCount(len(self._positions))
+        for i, p in enumerate(self._positions):
+            self._table.setItem(i, 0, QTableWidgetItem(str(p.index + 1)))
+            self._table.setItem(i, 1, QTableWidgetItem(p.location))
+            self._table.setItem(i, 2, QTableWidgetItem(p.pos_type))
+            self._table.setItem(i, 3, QTableWidgetItem(p.sample_text[:80]))
+            self._table.setItem(i, 4, QTableWidgetItem(p.suggested_tag))
+            self._table.setItem(i, 5, QTableWidgetItem(p.confirmed_tag))
+
+    def _rule_match(self):
+        try:
+            from src.llm_tagger import rule_based_suggest
+            n = rule_based_suggest(self._positions)
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("匹配失败"), str(e))
+            return
+        self._populate_table()
+        self._lbl_summary.setText(
+            self.tr("规则匹配: {}/{} 个已推荐").format(n, len(self._positions)))
+
+    def _llm_suggest(self):
+        from src.config_manager import get_config_manager
+        cfg = get_config_manager()
+        llm = getattr(cfg.config, 'llm', None)
+        if not llm or not llm.enabled:
+            reply = QMessageBox.question(self, self.tr("LLM 未配置"),
+                self.tr("尚未配置 AI API。是否打开系统设置？"),
+                QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                p = self.parent()
+                while p and not hasattr(p, '_data_file_paths'):
+                    p = p.parent()
+                from ui.dialogs import SystemSettingsDialog
+                SystemSettingsDialog(p).exec()
+            return
+        try:
+            from src.llm_tagger import suggest_tags_with_llm
+            n = suggest_tags_with_llm(
+                self._positions, llm.api_base,
+                getattr(llm, '_api_key', ''), llm.model)
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("LLM 失败"), str(e))
+            return
+        self._populate_table()
+        self._lbl_summary.setText(self.tr("LLM: {} 个新推荐").format(n))
+
+    def _insert_and_save(self):
+        for i in range(self._table.rowCount()):
+            item5 = self._table.item(i, 5)
+            if item5 and item5.text().strip():
+                self._positions[i].confirmed_tag = item5.text().strip()
+            else:
+                item4 = self._table.item(i, 4)
+                if item4 and item4.text().strip():
+                    self._positions[i].confirmed_tag = item4.text().strip()
+        confirmed = [p for p in self._positions if p.confirmed_tag.strip()]
+        if not confirmed:
+            QMessageBox.information(self, self.tr("提示"),
+                self.tr("请先确认至少一个 SDT tag。"))
+            return
+        out_path, _ = QFileDialog.getSaveFileName(
+            self, self.tr("保存带 SDT 的模板"),
+            str(Path(self._docx_path).parent /
+                (Path(self._docx_path).stem + "_SDT.docx")),
+            self.tr("Word 文档 (*.docx)"))
+        if not out_path:
+            return
+        try:
+            from src.docx_sdt_inserter import insert_sdt_tags
+            insert_sdt_tags(self._docx_path, self._positions, out_path)
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("插入失败"), str(e))
+            return
+        msg = self.tr("已插入 {} 个 SDT tag 到:").format(len(confirmed))
+        QMessageBox.information(self, self.tr("完成"), msg + "\n" + out_path)
+
+# ═══════════════════════════════════════════════════════════════
+# Word 模板分屏预览对话框
+# ═══════════════════════════════════════════════════════════════
+
+class WordTemplatePreviewDialog(QDialog):
+    """Word 模板分屏预览: 左=文档 + 右=SDT Tag 树。"""
+
+    def __init__(self, parent, path: str, existing_tags: set, positions: list,
+                 multi_antenna_cfg=None):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Word 模板预览 — SDT 标注与配置"))
+        self.resize(1000, 700)
+        self.setMinimumSize(800, 500)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint)
+        self._path = path
+        self._existing_tags = existing_tags
+        self._positions = positions
+        self._multi_cfg = multi_antenna_cfg
+        self._custom_tags = self._load_custom_tags()
+        self._setup_ui()
+        self._build_document_view()
+        self._build_tag_tree()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self); layout.setSpacing(6)
+        hdr = QHBoxLayout()
+        hdr.addWidget(QLabel(f"📄 {Path(self._path).name}"))
+        hdr.addStretch()
+        n_sugg = len([p for p in self._positions if p.suggested_tag])
+        self._lbl_summary = QLabel(self.tr("已设定:{0} | 建议:{1}").format(len(self._existing_tags), n_sugg))
+        hdr.addWidget(self._lbl_summary)
+        layout.addLayout(hdr)
+        splitter = QSplitter(Qt.Horizontal); splitter.setChildrenCollapsible(False)
+        self._doc_browser = QTextBrowser(); self._doc_browser.setOpenExternalLinks(False)
+        self._doc_browser.setObjectName("wordPreviewBrowser")
+        # 跟随系统主题
+        from src.config_manager import get_config_manager
+        cfg = get_config_manager()
+        is_dark = cfg.config.theme == "dark"
+        bg = "#1e1e1e" if is_dark else "#ffffff"
+        fg = "#d4d4d4" if is_dark else "#000000"
+        self._doc_browser.setStyleSheet(f"QTextBrowser {{ background-color: {bg}; color: {fg}; border: none; }}")
+        self._theme_bg = bg
+        self._theme_fg = fg
+        splitter.addWidget(self._doc_browser)
+        right = QWidget(); rl = QVBoxLayout(right); rl.setContentsMargins(4,0,0,0); rl.setSpacing(4)
+        ant_row = QHBoxLayout()
+        ant_row.addWidget(QLabel(self.tr("当前天线:")))
+        self._cmb_antenna = QComboBox(); self._cmb_antenna.addItem("", "")
+        if self._multi_cfg:
+            for ant in self._multi_cfg.antennas:
+                self._cmb_antenna.addItem(f"{ant.name} ({['无源','有源发射','有源接收'][ant.test_mode]})", ant.name)
+        self._cmb_antenna.currentIndexChanged.connect(self._on_antenna_changed)
+        ant_row.addWidget(self._cmb_antenna, 1); rl.addLayout(ant_row)
+        self._edit_search = QLineEdit(); self._edit_search.setPlaceholderText(self.tr("搜索 tag..."))
+        self._edit_search.textChanged.connect(self._on_search); rl.addWidget(self._edit_search)
+        self._tag_tree = QTreeWidget(); self._tag_tree.setHeaderLabels([self.tr("SDT Tag")])
+        self._tag_tree.setAlternatingRowColors(True)
+        self._tag_tree.itemDoubleClicked.connect(self._on_tag_double_clicked)
+        rl.addWidget(self._tag_tree, 1)
+        apply_row = QHBoxLayout()
+        btn_apply = QPushButton("✅ " + self.tr("应用选中 Tag"))
+        btn_apply.setStyleSheet("font-weight:bold;color:#2e7d32;")
+        btn_apply.clicked.connect(self._on_apply_selected_tag)
+        apply_row.addWidget(btn_apply)
+        btn_clear = QPushButton(self.tr("清除"))
+        btn_clear.clicked.connect(self._on_clear_tag)
+        apply_row.addWidget(btn_clear)
+        rl.addLayout(apply_row)
+        btn_add = QPushButton("+ " + self.tr("添加自定义字段...")); btn_add.clicked.connect(self._add_custom_tag)
+        rl.addWidget(btn_add)
+        self._lbl_selected = QLabel(self.tr("提示: 双击右侧 Tag 应用到文档")); self._lbl_selected.setStyleSheet("color:#666;font-size:9pt;")
+        rl.addWidget(self._lbl_selected)
+        splitter.addWidget(right); splitter.setSizes([550, 350]); layout.addWidget(splitter, 1)
+        btn_row = QHBoxLayout()
+        btn_rule = QPushButton(self.tr("🤖 规则自动匹配")); btn_rule.clicked.connect(self._rule_match)
+        btn_row.addWidget(btn_rule)
+        btn_save = QPushButton(self.tr("💾 保存到文件")); btn_save.setStyleSheet("font-weight:bold;")
+        btn_save.clicked.connect(self._save); btn_row.addWidget(btn_save)
+        btn_row.addStretch()
+        btns = QDialogButtonBox(QDialogButtonBox.Close); btns.rejected.connect(self.close); btn_row.addWidget(btns)
+        layout.addLayout(btn_row)
+
+    def _build_document_view(self):
+        """用 mammoth 将 docx 完整转为 HTML (保留 Word 原格式), 没安装时 fallback。"""
+        try:
+            try:
+                import mammoth
+                with open(self._path, 'rb') as f:
+                    result = mammoth.convert_to_html(f)
+                html = result.value
+            except ImportError:
+                html = self._build_document_view_fallback()
+            bg = getattr(self, '_theme_bg', '#ffffff')
+            header = '<div style="color:#888;font-size:9pt;margin-bottom:8px;">'
+            header += '📄 ' + Path(self._path).name + ' — ' + str(len(self._existing_tags)) + ' SDT'
+            header += ' <span style="color:#e65100;">(pip install mammoth 获得更好渲染)</span></div>'
+            full = '<html><head><meta charset=utf-8><style>'
+            full += 'body{font-family:Calibri,sans-serif;font-size:11pt;background:' + bg + ';color:inherit;}'
+            full += '</style></head><body>' + header + html + '</body></html>'
+            self._doc_browser.setHtml(full)
+        except Exception as e:
+            self._doc_browser.setPlainText("加载失败: " + str(e))
+
+    def _build_document_view_fallback(self) -> str:
+        """无 mammoth 时的简化 HTML 渲染。"""
+        import zipfile; from lxml import etree
+        NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        with zipfile.ZipFile(self._path, 'r') as zf:
+            doc_xml = etree.parse(zf.open('word/document.xml'))
+        body = doc_xml.getroot().find(f"{{{NS_W}}}body")
+        if body is None: return "<p>无法解析</p>"
+        parts = []
+        tbl_idx = 0
+        for child in body:
+            tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+            if tag == 'p':
+                text = "".join(child.itertext()).strip()
+                if text:
+                    sdt = self._get_sdt_tag(child)
+                    lbl = '<b>[' + sdt + ']</b> ' if sdt else ''
+                    parts.append('<p>' + lbl + text + '</p>')
+            elif tag == 'tbl':
+                rows = list(child.iter(f"{{{NS_W}}}tr"))
+                sdt = self._get_sdt_tag(child)
+                suggestion = next((p.suggested_tag for p in self._positions if p.pos_type.startswith("table") and p.index==tbl_idx), "")
+                tl = sdt or suggestion or "未设置"
+                parts.append('<p>📊 <b>[' + tl + ']</b> — ' + str(len(rows)) + '行</p>')
+                if rows:
+                    cells = ["".join(c.itertext()).strip()[:20] for c in rows[0].iter(f"{{{NS_W}}}tc")]
+                    parts.append('<p style="font-size:9pt;color:#888;">' + " | ".join(cells[:5]) + '</p>')
+                tbl_idx += 1
+        return '\n'.join(parts)
+
+    def _get_sdt_tag(self, element):
+        NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        p = element.getparent()
+        if p is not None and p.tag == f"{{{NS_W}}}sdtContent":
+            sdt_pr = p.getparent().find(f"{{{NS_W}}}sdtPr")
+            if sdt_pr is not None:
+                tag_el = sdt_pr.find(f"{{{NS_W}}}tag")
+                if tag_el is not None: return tag_el.get(f"{{{NS_W}}}val")
+        return None
+
+    def _build_tag_tree(self):
+        self._tag_tree.clear()
+        from src.docx_exporter import DocxTemplateFiller
+        reg = DocxTemplateFiller.load_registry()
+        ant_name = self._cmb_antenna.currentData() or ""
+        mode = 0
+        if self._multi_cfg and ant_name:
+            ac = self._multi_cfg.get_antenna(ant_name)
+            if ac: mode = ac.test_mode
+        chart_keys = set()
+        if self._multi_cfg and ant_name:
+            ac = self._multi_cfg.get_antenna(ant_name)
+            if ac: chart_keys = set(ac.chart_keys)
+        self._add_cat(self.tr("📋 项目信息"), reg.get("meta", {}))
+        self._add_cat(self.tr("📊 数据表格"), reg.get("table", {}))
+        self._add_cat(self.tr("🖼 图片"), reg.get("img", {}), chart_keys)
+        self._add_cat(self.tr("🔄 循环组"), reg.get("img_group", {}))
+        self._add_cat(self.tr("⚙ 测试配置"), reg.get("config", {}))
+        cust = self._load_custom_tags()
+        if cust: self._add_cat(self.tr("📝 自定义"), cust, set(), True)
+
+    def _add_cat(self, name, items, filter_keys=None, is_custom=False):
+        node = QTreeWidgetItem(self._tag_tree, [name]); node.setExpanded(True)
+        node.setForeground(0, QColor("#1F4E79"))
+        for key, desc in items.items():
+            if filter_keys is not None and key not in filter_keys: continue
+            it = QTreeWidgetItem(node)
+            it.setText(0, f"📝 {key}" if is_custom else f"{key} — {desc}" if desc else key)
+            it.setData(0, Qt.UserRole, key); it.setToolTip(0, desc)
+
+    def _load_custom_tags(self):
+        import json
+        p = Path(__file__).parent.parent / "config" / "user_patterns.json"
+        if p.exists():
+            try: return json.loads(p.read_text(encoding='utf-8')).get("params", {})
+            except: pass
+        return {}
+
+    def _on_antenna_changed(self, idx): self._build_tag_tree()
+
+    def _on_search(self, text):
+        for i in range(self._tag_tree.topLevelItemCount()):
+            top = self._tag_tree.topLevelItem(i); visible = False
+            for j in range(top.childCount()):
+                c = top.child(j); show = not text or text.lower() in c.text(0).lower()
+                c.setHidden(not show)
+                if show: visible = True
+            top.setHidden(not visible)
+
+    def _on_tag_double_clicked(self, item, col):
+        self._apply_tag(item)
+
+    def _on_apply_selected_tag(self):
+        """应用当前在树中选中的 Tag。"""
+        items = self._tag_tree.selectedItems()
+        if items:
+            self._apply_tag(items[0])
+
+    def _apply_tag(self, item):
+        tag = item.data(0, Qt.UserRole)
+        if not tag: return
+        applied = 0
+        for p in self._positions:
+            if p.suggested_tag == tag or not p.confirmed_tag:
+                p.confirmed_tag = tag
+                applied += 1
+        if applied:
+            self._build_document_view()
+        self._lbl_selected.setText(self.tr("✅ 已应用: {0} ({1} 处)").format(tag, applied))
+
+    def _on_clear_tag(self):
+        """清除所有通过双击/应用临时设置的 tag, 恢复建议状态。"""
+        for p in self._positions:
+            if p.confirmed_tag and not self._get_sdt_tag_for_position(p):
+                p.confirmed_tag = ""
+        self._build_document_view()
+        self._lbl_selected.setText(self.tr("已清除临时标记, 恢复为建议状态"))
+
+    def _get_sdt_tag_for_position(self, pos) -> str:
+        import zipfile; from lxml import etree
+        NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        try:
+            with zipfile.ZipFile(self._path, 'r') as zf:
+                doc_xml = etree.parse(zf.open('word/document.xml'))
+            tables = list(doc_xml.getroot().iter(f"{{{NS_W}}}tbl"))
+            if pos.index < len(tables):
+                return self._get_sdt_tag(tables[pos.index])
+        except Exception:
+            pass
+        return ""
+
+    def _rule_match(self):
+        from src.llm_tagger import rule_based_suggest
+        n = rule_based_suggest(self._positions)
+        self._build_document_view()
+        self._lbl_summary.setText(self.tr("已设定:{0} | 建议:{1}").format(len(self._existing_tags), n))
+
+    def _add_custom_tag(self):
+        from PySide6.QtWidgets import QInputDialog, QLineEdit
+        key, ok = QInputDialog.getText(self, self.tr("添加自定义字段"), self.tr("SDT Tag 名称 (如 meta_car_model):"), QLineEdit.Normal, "")
+        if not ok or not key.strip(): return
+        desc, ok2 = QInputDialog.getText(self, self.tr("字段描述"), self.tr("描述 (如 车型):"), QLineEdit.Normal, "")
+        if not ok2: return
+        import json
+        p = Path(__file__).parent.parent / "config" / "user_patterns.json"
+        data = {}
+        if p.exists():
+            try: data = json.loads(p.read_text(encoding='utf-8'))
+            except: pass
+        data.setdefault("params", {})[key.strip()] = desc.strip()
+        p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+        self._custom_tags = self._load_custom_tags()
+        self._build_tag_tree()
+
+    def _save(self):
+        for p in self._positions:
+            if p.suggested_tag:
+                p.confirmed_tag = p.suggested_tag
+        from src.docx_sdt_inserter import insert_sdt_tags
+        out = str(Path(self._path).parent / (Path(self._path).stem + "_SDT.docx"))
+        insert_sdt_tags(self._path, self._positions, out)
+        QMessageBox.information(self, self.tr("已保存"), self.tr("已应用 {0} 个 SDT tag 到:\n{1}").format(
+            len([p for p in self._positions if p.confirmed_tag]), out))

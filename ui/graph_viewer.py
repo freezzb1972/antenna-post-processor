@@ -1168,12 +1168,13 @@ class GraphViewer(QWidget):
             self._plot_2d_cuts()
 
     def _plot_2d_cuts(self):
-        """2D Cuts 主绘制: 多频点 × 多角度 × 多数据源。"""
+        """2D Cuts 主绘制: 多频点 × 多角度 × 多数据源 × 两种切面方向。"""
         freqs = self._2d_freqs if self._2d_freqs else list(self._graph_data.keys())[:1]
         theta_angles = self._2d_theta_angles if self._2d_theta_angles else [0]
         phi_angles = self._2d_phi_angles if self._2d_phi_angles else [0]
         source_key = self._cmb_2d_data.currentText()
         is_polar = self._cmb_2d_type.currentText() == "Polar"
+        is_theta_cut = hasattr(self, '_cmb_2d_dir') and "Theta" in self._cmb_2d_dir.currentText()
 
         # 数据源映射
         data_map = {
@@ -1201,24 +1202,42 @@ class GraphViewer(QWidget):
             if cut_data is None:
                 continue
 
-            for th in theta_angles:
-                th_idx = int(np.argmin(np.abs(theta_arr - th)))
-                nearest_th = float(theta_arr[th_idx])
-                cut = cut_data[:, th_idx]
-                if source_key == "AR":
-                    cut = 20.0 * np.log10(np.maximum(cut, 1e-15))
-
-                color = colors[ci % len(colors)] if colors is not None else None
-                label = f"{freq:.0f}MHz θ={nearest_th:.0f}°"
-
-                if is_polar:
-                    phi_rad = np.deg2rad(phi_arr)
-                    ax.plot(phi_rad, cut, label=label, color=color)
-                    ax.set_theta_zero_location("N"); ax.set_theta_direction(-1)
-                else:
-                    ax.plot(phi_arr, cut, label=label, color=color)
-                    ax.set_xlabel("φ (°)")
-                ci += 1
+            if is_theta_cut:
+                # Theta切面: 固定θ, 扫描φ — 需要绘制多条θ曲线
+                for th in theta_angles:
+                    th_idx = int(np.argmin(np.abs(theta_arr - th)))
+                    nearest_th = float(theta_arr[th_idx])
+                    cut = cut_data[:, th_idx]
+                    if source_key == "AR":
+                        cut = 20.0 * np.log10(np.maximum(cut, 1e-15))
+                    color = colors[ci % len(colors)] if colors is not None else None
+                    label = f"{freq:.0f}MHz θ={nearest_th:.0f}°"
+                    if is_polar:
+                        phi_rad = np.deg2rad(phi_arr)
+                        ax.plot(phi_rad, cut, label=label, color=color)
+                        ax.set_theta_zero_location("N"); ax.set_theta_direction(-1)
+                    else:
+                        ax.plot(phi_arr, cut, label=label, color=color)
+                        ax.set_xlabel("φ (°)")
+                    ci += 1
+            else:
+                # Phi切面: 固定φ, 扫描θ
+                for ph in phi_angles:
+                    ph_idx = int(np.argmin(np.abs(phi_arr - ph)))
+                    nearest_ph = float(phi_arr[ph_idx])
+                    cut = cut_data[ph_idx, :]
+                    if source_key == "AR":
+                        cut = 20.0 * np.log10(np.maximum(cut, 1e-15))
+                    color = colors[ci % len(colors)] if colors is not None else None
+                    label = f"{freq:.0f}MHz φ={nearest_ph:.0f}°"
+                    if is_polar:
+                        theta_rad = np.deg2rad(theta_arr)
+                        ax.plot(theta_rad, cut, label=label, color=color)
+                        ax.set_theta_zero_location("N"); ax.set_theta_direction(-1)
+                    else:
+                        ax.plot(theta_arr, cut, label=label, color=color)
+                        ax.set_xlabel("θ (°)")
+                    ci += 1
 
         ax.set_title(f"{source_key} — 2D Cut", fontsize=9)
         if ci > 1:
