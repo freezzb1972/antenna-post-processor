@@ -430,40 +430,44 @@ def _col_index_to_letter(idx: int) -> str:
 # 列类型显示标签
 # ═══════════════════════════════════════════════════════════════
 
-ALL_COL_TYPE_LABELS = [
-    ("frequency",           "频率"),
-    ("directivity",         "方向性"),
-    ("total_efficiency_pct","总效率(%)"),
-    ("total_efficiency_db", "总效率(dB)"),
-    ("efficiency_pct",      "效率(%)"),
-    ("efficiency_db",       "效率(dB)"),
-    ("gain",                "峰值增益"),
-    ("trp",                 "TRP"),
-    ("nhprp_45",            "NHPRP ±45°"),
-    ("nhprp_30",            "NHPRP ±30°"),
-    ("nhprp_225",           "NHPRP ±22.5°"),
-    ("peak_eirp",           "Peak EIRP"),
-    ("ar_single",           "AR 单角度"),
-    ("ar_range",            "AR 范围"),
-    ("uh_prp",              "上半球 PRP"),
-    ("lh_prp",              "下半球 PRP"),
-    ("boresight_phi",       "Boresight Phi"),
-    ("boresight_theta",     "Boresight Theta"),
-    ("max_power",           "最大功率"),
-    ("min_power",           "最小功率"),
-    ("avg_gain",            "平均增益"),
-    ("avg_power",           "平均功率"),
-    ("xpi_boresight",       "XPI Boresight"),
-    ("xpi_mean",            "XPI Mean"),
-    ("xpi_min",             "XPI Min"),
-    ("mismatch_loss_db",    "Mismatch Loss"),
-    ("pc_theta_mm",         "Phase Center θ"),
-    ("pc_phi_mm",           "Phase Center φ"),
-    ("rhcp_single",         "RHCP Gain 单角度"),
-    ("rhcp_range",          "RHCP Gain 范围"),
-    ("cp_xpi_single",       "CP-XPI 单角度"),
-    ("cp_xpi_range",        "CP-XPI 范围"),
-    ("lag_single",          "LAG (单角度)"),
-    ("lag_range",           "LAG (范围)"),
-    ("unknown",             "未知"),
-]
+# ── 合并键 → 列头级子键展开 ──
+_MERGED_EXPANSIONS = {
+    "gain": [("lag_single", "LAG 单角度"), ("lag_range", "LAG 范围")],
+    "ar":   [("ar_single", "AR 单角度"), ("ar_range", "AR 范围")],
+    "total_efficiency_pct": [("total_efficiency_pct", "总效率(%)")],
+}
+
+
+def get_col_type_labels(mode: int = 0) -> list[tuple[str, str]]:
+    """返回指定测试模式的列类型下拉列表。
+
+    数据源: AntennaParamsPage 参数定义 (单一数据源)。
+
+    Args:
+        mode: 0=无源天线, 1=有源发射(TRP), 2=有源接收(TIS)
+    """
+    from ui.pages import AntennaParamsPage
+
+    result = [("frequency", "频率"), ("unknown", "未知")]
+
+    if mode == 0:
+        params = list(AntennaParamsPage._COMMON_PARAMS)
+    elif mode == 1:
+        no_ar = [(g, plist) for g, plist in AntennaParamsPage._COMMON_PARAMS
+                 if g not in ("Axial Ratio",)]
+        params = no_ar + list(AntennaParamsPage._TRP_PARAMS)
+    else:
+        params = list(AntennaParamsPage._TIS_PARAMS)
+
+    for group_name, items in params:
+        for key, label in items:
+            # 合并键展开为模板列头级子键 (gain → lag_single + lag_range)
+            if key in _MERGED_EXPANSIONS:
+                result.extend(_MERGED_EXPANSIONS[key])
+            else:
+                result.append((key, label))
+    return result
+
+
+# 向后兼容 (无源模式)
+ALL_COL_TYPE_LABELS = get_col_type_labels(0)

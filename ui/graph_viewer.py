@@ -15,10 +15,10 @@ from typing import Dict, List
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
-    QFrame, QGroupBox, QHBoxLayout, QLabel, QPushButton,
-    QSlider, QSpinBox, QSplitter, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
+    QFileDialog, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+    QPushButton, QScrollArea, QSlider, QSpinBox, QSplitter,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 import matplotlib
 matplotlib.use("QtAgg")
@@ -30,6 +30,7 @@ except Exception:
     pass
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
 
 # 方向图数据 key → 显示名称
 PATTERN_DATA_MAP = {
@@ -54,17 +55,37 @@ PLOT_TYPES = ["Spherical 3D", "Polar 2D", "Cartesian 3D"]
 # match_mode "exact": 精确匹配 row key
 #          "prefix": 匹配 row key 前缀 (如 lag_range_0_90)
 FREQ_CURVE_DEFS = [
+    # 共用 (所有测试类型)
     ("Efficiency vs Freq",        "efficiency_pct", "exact"),
     ("Peak Gain vs Freq",         "gain",           "exact"),
     ("Directivity vs Freq",       "directivity",    "exact"),
+    ("Gain @θ vs Freq",           "lag_range",      "prefix"),
+    ("Average Gain vs Freq",      "avg_gain",       "exact"),
+    # 仅无源
+    ("AR vs Freq",                "ar_single",      "exact"),
+    # 仅有源发射
     ("TRP vs Freq",               "trp",            "exact"),
     ("NHPRP ±45° vs Freq",        "nhprp_45",       "exact"),
     ("NHPRP ±30° vs Freq",        "nhprp_30",       "exact"),
     ("Peak EIRP vs Freq",         "peak_eirp",      "exact"),
-    ("AR vs Freq",                "ar_single",      "exact"),
-    ("Gain @θ vs Freq",           "lag_range",      "prefix"),
-    ("Average Gain vs Freq",      "avg_gain",       "exact"),
 ]
+
+# 模式过滤: 哪些曲线在哪个测试模式下显示
+_FREQ_CURVE_MODE_FILTER = {
+    "AR vs Freq":           {0},           # 仅无源
+    "TRP vs Freq":          {1},           # 仅有源发射
+    "NHPRP ±45° vs Freq":   {1},
+    "NHPRP ±30° vs Freq":   {1},
+    "Peak EIRP vs Freq":    {1},
+    # 未列出的为所有模式可用
+}
+
+def get_freq_curves_for_mode(mode: int) -> list:
+    """返回当前测试模式可用的频率曲线定义。"""
+    return [
+        d for d in FREQ_CURVE_DEFS
+        if mode in _FREQ_CURVE_MODE_FILTER.get(d[0], {0, 1, 2})
+    ]
 
 
 class SubPlotPanel:
@@ -202,6 +223,18 @@ class GraphViewer(QWidget):
         self._setup_ui()
         self._canvas.mpl_connect("button_release_event", self._on_mouse_release)
 
+    def update_mode_display(self):
+        """根据当前测试模式更新模式标签和可选曲线。"""
+        if not hasattr(self, '_mw') or not self._mw:
+            return
+        mode = getattr(self._mw, '_test_mode', 0)
+        names = {0: "无源天线", 1: "有源发射 TRP", 2: "有源接收 TIS"}
+        if hasattr(self, '_lbl_mode'):
+            self._lbl_mode.setText(f"测试类型: {names.get(mode, '')}")
+
+    def get_mode(self) -> int:
+        return getattr(self._mw, '_test_mode', 0) if hasattr(self, '_mw') and self._mw else 0
+
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -215,43 +248,176 @@ class GraphViewer(QWidget):
         layout.addWidget(self._splitter, stretch=1)
 
     def _build_2d_cuts_bar(self) -> QWidget:
-        """2D Cuts 模式工具栏: Phi滑块 + 数据源 + Polar/Rect + 应用角度按钮。"""
+        """2D Cuts 模式工具栏: 频点范围+自定义 + θ角度 + 数据源 + 类型。"""
         w = QWidget()
         w.setObjectName("cuts2dBar")
         w.setVisible(False)
         self._cuts2d_bar = w
-        lay = QHBoxLayout(w)
+        lay = QVBoxLayout(w)
         lay.setContentsMargins(4, 2, 4, 2)
-        lay.setSpacing(6)
+        lay.setSpacing(4)
 
-        lay.addWidget(QLabel("φ:"))
-        self._slider_2d_phi = QSpinBox()
-        self._slider_2d_phi.setRange(0, 355)
-        self._slider_2d_phi.setSuffix("°")
-        self._slider_2d_phi.setSingleStep(5)
-        self._slider_2d_phi.setRange(0, 360)  # 0° ≡ 360°, 但360°与0°闭合更方便
-        self._slider_2d_phi.valueChanged.connect(self._on_2d_cuts_update)
-        lay.addWidget(self._slider_2d_phi)
+        # Row 1: 频点选择 (范围滑块 + 自定义)
+        freq_row = QHBoxLayout()
+        freq_row.addWidget(QLabel("频点:"))
+        self._spin_freq_from = QSpinBox()
+        self._spin_freq_from.setRange(0, 20000); self._spin_freq_from.setSuffix(" MHz")
+        self._spin_freq_from.setFixedWidth(100)
+        self._spin_freq_from.valueChanged.connect(self._on_freq_range_changed)
+        freq_row.addWidget(self._spin_freq_from)
+        freq_row.addWidget(QLabel("–"))
+        self._spin_freq_to = QSpinBox()
+        self._spin_freq_to.setRange(0, 20000); self._spin_freq_to.setSuffix(" MHz")
+        self._spin_freq_to.setFixedWidth(100)
+        self._spin_freq_to.valueChanged.connect(self._on_freq_range_changed)
+        freq_row.addWidget(self._spin_freq_to)
+        self._spin_step_freq = QSpinBox()
+        self._spin_step_freq.setRange(1, 1000); self._spin_step_freq.setValue(1)
+        self._spin_step_freq.setPrefix("步:"); self._spin_step_freq.setSuffix("MHz")
+        self._spin_step_freq.setFixedWidth(80)
+        self._spin_step_freq.valueChanged.connect(self._on_freq_range_changed)
+        freq_row.addWidget(self._spin_step_freq)
+        btn_custom_freq = QPushButton("自定义...")
+        btn_custom_freq.setFixedWidth(70)
+        btn_custom_freq.clicked.connect(self._show_freq_picker)
+        freq_row.addWidget(btn_custom_freq)
+        self._lbl_freq_count = QLabel("")
+        freq_row.addWidget(self._lbl_freq_count)
+        freq_row.addStretch()
+        lay.addLayout(freq_row)
 
-        lay.addWidget(QLabel("数据源:"))
+        # Row 2: 角度选择 + 数据源 + 类型
+        angle_row = QHBoxLayout()
+        angle_row.addWidget(QLabel("θ:"))
+        btn_theta = QPushButton("⚙ 角度...")
+        btn_theta.setFixedWidth(80)
+        btn_theta.clicked.connect(lambda: self._show_2d_angle_picker("theta"))
+        angle_row.addWidget(btn_theta)
+        self._lbl_theta_angles = QLabel("")
+        self._lbl_theta_angles.setStyleSheet("color: #4472C4;")
+        angle_row.addWidget(self._lbl_theta_angles)
+
+        angle_row.addWidget(QLabel("  φ:"))
+        btn_phi = QPushButton("⚙ 角度...")
+        btn_phi.setFixedWidth(80)
+        btn_phi.clicked.connect(lambda: self._show_2d_angle_picker("phi"))
+        angle_row.addWidget(btn_phi)
+        self._lbl_phi_angles = QLabel("")
+        self._lbl_phi_angles.setStyleSheet("color: #4472C4;")
+        angle_row.addWidget(self._lbl_phi_angles)
+
+        angle_row.addWidget(QLabel("  数据源:"))
         self._cmb_2d_data = QComboBox()
-        self._cmb_2d_data.addItems(["Gain", "AR", "E_θ", "E_φ"])
+        self._cmb_2d_data.addItems(["Gain", "AR", "E_θ", "E_φ", "RHCP", "LHCP", "CP-XPI"])
         self._cmb_2d_data.currentIndexChanged.connect(self._on_2d_cuts_update)
-        lay.addWidget(self._cmb_2d_data)
+        angle_row.addWidget(self._cmb_2d_data)
 
-        lay.addWidget(QLabel("类型:"))
+        angle_row.addWidget(QLabel("类型:"))
         self._cmb_2d_type = QComboBox()
         self._cmb_2d_type.addItems(["Polar", "Rectangular"])
         self._cmb_2d_type.currentIndexChanged.connect(self._on_2d_cuts_update)
-        lay.addWidget(self._cmb_2d_type)
+        angle_row.addWidget(self._cmb_2d_type)
+        angle_row.addStretch()
+        lay.addLayout(angle_row)
 
-        self._btn_apply_angle = QPushButton("📐 应用当前角度到图表配置")
-        self._btn_apply_angle.setToolTip("将当前 Phi 角写入 ChartConfig 切面角度列表")
-        self._btn_apply_angle.clicked.connect(self._on_apply_angles_to_config)
-        lay.addWidget(self._btn_apply_angle)
+        # 2D cuts state
+        self._2d_freqs: list[float] = []
+        self._2d_theta_angles: list[float] = []
+        self._2d_phi_angles: list[float] = [0]  # default
 
-        lay.addStretch()
         return w
+
+    def _on_freq_range_changed(self):
+        """Range slider → rebuild frequency list."""
+        f0, f1 = self._spin_freq_from.value(), self._spin_freq_to.value()
+        step = self._spin_step_freq.value()
+        if f0 <= f1 and step > 0:
+            self._2d_freqs = list(range(f0, f1 + 1, step))
+            self._lbl_freq_count.setText(f"({len(self._2d_freqs)}个)")
+            self._on_2d_cuts_update()
+
+    def _show_freq_picker(self):
+        """弹出频点勾选对话框。"""
+        if not self._graph_data:
+            return
+        all_freqs = sorted(self._graph_data.keys())
+        dlg = QDialog(self)
+        dlg.setWindowTitle("选择频点")
+        dlg.setMinimumSize(300, 400)
+        layout = QVBoxLayout(dlg)
+        search = QLineEdit(); search.setPlaceholderText("搜索频点..."); layout.addWidget(search)
+        checks = {}
+        scroll = QScrollArea(); scroll.setWidgetResizable(True)
+        cw = QWidget(); cl = QVBoxLayout(cw)
+        for f in all_freqs:
+            cb = QCheckBox(f"{f:.0f} MHz")
+            cb.setChecked(f in self._2d_freqs)
+            cl.addWidget(cb); checks[f] = cb
+        scroll.setWidget(cw); layout.addWidget(scroll)
+        search.textChanged.connect(lambda t: [cb.setVisible(t in cb.text()) for cb in checks.values()])
+
+        btn_row = QHBoxLayout()
+        btn_all = QPushButton("全选"); btn_all.clicked.connect(lambda: [cb.setChecked(True) for cb in checks.values()])
+        btn_none = QPushButton("清空"); btn_none.clicked.connect(lambda: [cb.setChecked(False) for cb in checks.values()])
+        btn_row.addWidget(btn_all); btn_row.addWidget(btn_none); btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            self._2d_freqs.clear(),
+            [self._2d_freqs.append(f) for f in all_freqs if checks[f].isChecked()],
+            self._lbl_freq_count.setText(f"({len(self._2d_freqs)}个)"),
+            self._on_2d_cuts_update(),
+            dlg.accept()))
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
+
+    def _show_2d_angle_picker(self, axis: str):
+        """弹出 AnglePicker 选择 theta 或 phi 角度。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"选择 {axis.upper()} 角度")
+        dlg.setMinimumSize(400, 300)
+        layout = QVBoxLayout(dlg)
+        spin = QDoubleSpinBox(); spin.setRange(0, 360); spin.setValue(0); spin.setSuffix("°")
+        add_btn = QPushButton("+ 添加")
+        angles = list(self._2d_theta_angles if axis == "theta" else self._2d_phi_angles)
+        tags_layout = QHBoxLayout()
+
+        def _refresh_tags():
+            while tags_layout.count():
+                item = tags_layout.takeAt(0)
+                if item.widget(): item.widget().deleteLater()
+            for a in sorted(set(angles)):
+                tag = QWidget()
+                tl = QHBoxLayout(tag); tl.setContentsMargins(2,1,2,1)
+                tl.addWidget(QLabel(f"{a:.0f}°"))
+                btn_del = QPushButton("×"); btn_del.setFixedSize(18,18)
+                btn_del.clicked.connect(lambda checked, v=a: (angles.remove(v), _refresh_tags()))
+                tl.addWidget(btn_del); tags_layout.addWidget(tag)
+            tags_layout.addStretch()
+
+        row = QHBoxLayout(); row.addWidget(spin); row.addWidget(add_btn)
+        add_btn.clicked.connect(lambda: (angles.append(spin.value()), _refresh_tags()))
+        layout.addLayout(row); layout.addLayout(tags_layout)
+        _refresh_tags()
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            (self._2d_theta_angles if axis == "theta" else self._2d_phi_angles).clear(),
+            (self._2d_theta_angles if axis == "theta" else self._2d_phi_angles).extend(sorted(set(angles))),
+            self._update_angle_labels(),
+            self._on_2d_cuts_update(),
+            dlg.accept()))
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
+
+    def _update_angle_labels(self):
+        self._lbl_theta_angles.setText(", ".join(f"{a:.0f}°" for a in self._2d_theta_angles[:5])
+                                       + (f" +{len(self._2d_theta_angles)-5}" if len(self._2d_theta_angles) > 5 else ""))
+        self._lbl_phi_angles.setText(", ".join(f"{a:.0f}°" for a in self._2d_phi_angles[:5])
+                                     + (f" +{len(self._2d_phi_angles)-5}" if len(self._2d_phi_angles) > 5 else ""))
 
     def _build_advanced_toolbar(self) -> QWidget:
         """单行主工具栏：视角预设 + 视图模式 + 频点选择 + ⚙ 设置。"""
@@ -283,9 +449,12 @@ class GraphViewer(QWidget):
         self._cmb_view_mode.currentIndexChanged.connect(self._on_view_mode_changed)
         lay.addWidget(self._cmb_view_mode)
 
-        # ── 频点选择 ──
+        # ── 频点选择 (可输入搜索) ──
         lay.addWidget(QLabel("频点:"))
         self._cmb_freq = QComboBox()
+        self._cmb_freq.setEditable(True)
+        self._cmb_freq.setInsertPolicy(QComboBox.NoInsert)
+        self._cmb_freq.lineEdit().setPlaceholderText("搜索或选择频点...")
         self._cmb_freq.currentIndexChanged.connect(self._on_update)
         lay.addWidget(self._cmb_freq)
 
@@ -304,6 +473,11 @@ class GraphViewer(QWidget):
         btn_settings.setToolTip("图形显示设置: 色图/导出/布局/精度/类型/切面/动画")
         btn_settings.clicked.connect(self._show_viewer_settings)
         lay.addWidget(btn_settings)
+
+        # ── 测试模式标签 ──
+        self._lbl_mode = QLabel("")
+        self._lbl_mode.setStyleSheet("color: #888; font-style: italic;")
+        lay.addWidget(self._lbl_mode)
 
         # ── 右侧信息 ──
         lay.addStretch()
@@ -935,6 +1109,20 @@ class GraphViewer(QWidget):
         if self._cmb_freq.count() > 0:
             self._cmb_freq.setCurrentIndex(0)
         self._cmb_freq.blockSignals(False)
+        # 初始化 2D Cuts 频点范围和 θ 角度
+        freqs = sorted(self._graph_data.keys())
+        if freqs:
+            self._spin_freq_from.setValue(int(freqs[0]))
+            self._spin_freq_to.setValue(int(freqs[-1]))
+            self._2d_freqs = list(freqs)
+            self._lbl_freq_count.setText(f"({len(freqs)}个)")
+        # 默认 θ = 0°, φ = 0°
+        if not self._2d_theta_angles:
+            self._2d_theta_angles = [0.0]
+        if not self._2d_phi_angles:
+            self._2d_phi_angles = [0.0]
+        self._update_angle_labels()
+
         self._rebuild_subplots()
         self._on_update()
 
@@ -965,70 +1153,62 @@ class GraphViewer(QWidget):
             self._plot_2d_cuts()
 
     def _plot_2d_cuts(self):
-        """2D Cuts 主绘制: 俯仰面 Elevation Cut。"""
-        freq = self._cmb_freq.currentData()
-        if freq is None or freq not in self._graph_data:
-            return
-        d = self._graph_data[freq]
-        theta = d.get("theta"); phi = d.get("phi")
-        if theta is None or phi is None:
-            return
-
-        # 找最近的 phi 角
-        target_phi = self._slider_2d_phi.value()
-        phi_idx = int(np.argmin(np.abs(phi - target_phi)))
-        nearest_phi = float(phi[phi_idx])
-
-        # 数据源
+        """2D Cuts 主绘制: 多频点 × 多角度 × 多数据源。"""
+        freqs = self._2d_freqs if self._2d_freqs else list(self._graph_data.keys())[:1]
+        theta_angles = self._2d_theta_angles if self._2d_theta_angles else [0]
+        phi_angles = self._2d_phi_angles if self._2d_phi_angles else [0]
         source_key = self._cmb_2d_data.currentText()
-        data_map = {"Gain": "gain_db", "AR": "ar_linear", "E_θ": "theta_db", "E_φ": "phi_db"}
-        data_key = data_map.get(source_key, "gain_db")
-        cut_data = d.get(data_key)
-
-        if cut_data is None:
-            cut_data = d.get("gain_db")
-        if cut_data is None:
-            return
-        cut = cut_data[phi_idx, :]
-        # AR 转 dB
-        if source_key == "AR":
-            cut = 20.0 * np.log10(np.maximum(cut, 1e-15))
-
         is_polar = self._cmb_2d_type.currentText() == "Polar"
-        self._draw_elevation_cut(theta, cut, freq, nearest_phi, source_key, is_polar)
 
-    def _draw_elevation_cut(self, theta, cut, freq, phi_val, source, is_polar):
-        """绘制俯仰面切面图 (Elevation Cut)。"""
+        # 数据源映射
+        data_map = {
+            "Gain": "gain_db", "AR": "ar_linear", "E_θ": "theta_db", "E_φ": "phi_db",
+            "RHCP": "rhcp_db", "LHCP": "lhcp_db", "CP-XPI": "cpxpi_db",
+        }
+        data_key = data_map.get(source_key, "gain_db")
+
+        # 清除旧图
         for ax in list(self._figure.axes):
             self._figure.delaxes(ax)
-        ax = self._figure.add_subplot(111, projection="polar" if is_polar else None)
-        label = f"φ={phi_val:.0f}°"
-        if is_polar:
-            theta_rad = np.deg2rad(theta)
-            ax.plot(theta_rad, np.maximum(cut, -60), linewidth=1.2)
-            ax.set_theta_zero_location("N")
-            ax.set_theta_direction(-1)
-            ax.set_thetagrids([0, 45, 90, 135, 180, 225, 270, 315])
-        else:
-            ax.plot(theta, cut, linewidth=1.2)
-            ax.set_xlabel("Theta (°)")
-            ax.set_ylabel(f"{source} ({'dB' if source != 'AR' else 'dB'})")
-            ax.grid(True)
-        ax.set_title(f"{source} Elevation Cut @ {label} ({freq:.1f} MHz)")
-        self._canvas.draw()
-        self._lbl_info.setText(f"φ={phi_val:.0f}° | θ={len(theta)}点 | {source}")
 
-    def _on_apply_angles_to_config(self):
-        """将当前 Phi 角写入 ChartConfig。"""
-        if not self._mw:
-            return
-        phi = self._slider_2d_phi.value()
-        if hasattr(self._mw, '_chart_config_required') and self._mw._chart_config_required:
-            cfg = self._mw._chart_config_required
-            if phi not in cfg.cut_2d_phi_angles:
-                cfg.cut_2d_phi_angles.append(phi)
-                if hasattr(self._mw, '_chart_settings_page'):
-                    self._mw._chart_settings_page.load_state_from_mw()
+        ax = self._figure.add_subplot(111, projection="polar" if is_polar else None)
+        colors = plt.cm.tab10.colors if hasattr(plt, 'cm') else None
+
+        ci = 0
+        for freq in freqs:
+            if freq not in self._graph_data:
+                continue
+            d = self._graph_data[freq]
+            theta_arr = d.get("theta"); phi_arr = d.get("phi")
+            if theta_arr is None or phi_arr is None:
+                continue
+            cut_data = d.get(data_key, d.get("gain_db"))
+            if cut_data is None:
+                continue
+
+            for th in theta_angles:
+                th_idx = int(np.argmin(np.abs(theta_arr - th)))
+                nearest_th = float(theta_arr[th_idx])
+                cut = cut_data[:, th_idx]
+                if source_key == "AR":
+                    cut = 20.0 * np.log10(np.maximum(cut, 1e-15))
+
+                color = colors[ci % len(colors)] if colors is not None else None
+                label = f"{freq:.0f}MHz θ={nearest_th:.0f}°"
+
+                if is_polar:
+                    phi_rad = np.deg2rad(phi_arr)
+                    ax.plot(phi_rad, cut, label=label, color=color)
+                    ax.set_theta_zero_location("N"); ax.set_theta_direction(-1)
+                else:
+                    ax.plot(phi_arr, cut, label=label, color=color)
+                    ax.set_xlabel("φ (°)")
+                ci += 1
+
+        ax.set_title(f"{source_key} — 2D Cut", fontsize=9)
+        if ci > 1:
+            ax.legend(fontsize=7, loc='upper right')
+        self._canvas.draw()
 
     def _get_available_freq_curves(self):
         """返回可用的频率曲线列表: [(label, actual_key), ...]."""
@@ -1039,8 +1219,10 @@ class GraphViewer(QWidget):
             for row in rows:
                 all_keys.update(row.keys())
 
+        mode = self.get_mode()
+        curves = get_freq_curves_for_mode(mode)
         available = []
-        for label, key_prefix, match_mode in FREQ_CURVE_DEFS:
+        for label, key_prefix, match_mode in curves:
             if match_mode == "prefix":
                 found = [k for k in all_keys if k.startswith(key_prefix)]
                 if found:

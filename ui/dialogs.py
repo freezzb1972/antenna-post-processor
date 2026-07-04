@@ -9,12 +9,18 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from src.lag_config import LagConfig  # noqa: F401
 
 import numpy as np
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QRadioButton,
+    QTabWidget,  # noqa: F401
+
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox,
     QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox,
@@ -227,7 +233,7 @@ class DataSourceDialog(QDialog):
             QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择模板文件。"))
             return
         try:
-            from src.column_mapping import detect_columns_from_template, ALL_COL_TYPE_LABELS
+            from src.column_mapping import detect_columns_from_template, get_col_type_labels
             mappings = detect_columns_from_template(path)
 
             dlg = QDialog(self)
@@ -244,7 +250,7 @@ class DataSourceDialog(QDialog):
                 table.setItem(ri, 0, QTableWidgetItem(m.col_letter))
                 table.setItem(ri, 1, QTableWidgetItem(m.raw_header))
                 cmb = QComboBox()
-                for ct, label in ALL_COL_TYPE_LABELS:
+                for ct, label in get_col_type_labels(0):
                     cmb.addItem(f"{label} ({ct})", ct)
                 idx = cmb.findData(m.detected_type)
                 if idx >= 0:
@@ -2428,6 +2434,15 @@ class SystemSettingsDialog(QDialog):
         rsp_layout.addRow(defaults_grp)
         layout.addWidget(rsp_grp)
 
+        # ── 默认保存目录 ──
+        dirs_grp = QGroupBox("默认保存目录")
+        dirs_layout = QFormLayout(dirs_grp)
+        dirs_layout.setSpacing(4)
+        btn_default_dirs = QPushButton("设置默认保存目录...")
+        btn_default_dirs.clicked.connect(self._show_default_dirs)
+        dirs_layout.addRow(btn_default_dirs)
+        layout.addWidget(dirs_grp)
+
         # ── LLM API ──
         llm_grp = QGroupBox("LLM API (RAG 问答)")
         llm_layout = QFormLayout(llm_grp)
@@ -2510,7 +2525,7 @@ class SystemSettingsDialog(QDialog):
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(self._on_accept)
         btns.rejected.connect(self.reject)
-        wrap_in_scroll(self, [font_grp, theme_grp, lang_grp, tpl_grp, rsp_grp, llm_grp, self._ai_grp], btns)
+        wrap_in_scroll(self, [font_grp, theme_grp, lang_grp, tpl_grp, dirs_grp, rsp_grp, llm_grp, self._ai_grp], btns)
 
         # 限制高度不超过屏幕 90%, 允许手动调整
         screen = QApplication.primaryScreen().availableGeometry()
@@ -2820,6 +2835,323 @@ class SystemSettingsDialog(QDialog):
         """滚动到「智能识别 (AI 辅助)」设置区域。"""
         if self._ai_scroll_area is not None and self._ai_grp is not None:
             self._ai_scroll_area.ensureWidgetVisible(self._ai_grp)
+
+    def _show_default_dirs(self):
+        """打开默认保存目录设置对话框。"""
+        dlg = DefaultDirsDialog(self)
+        dlg.exec()
+
+
+# ═══════════════════════════════════════════════════════════════
+# 默认保存目录对话框
+# ═══════════════════════════════════════════════════════════════
+
+class DefaultDirsDialog(QDialog):
+    """为四类输出文件设置默认保存目录。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("默认保存目录"))
+        self.setMinimumWidth(600)
+        from src.config_manager import get_config_manager
+        self._cfg = get_config_manager()
+        self._setup_ui()
+        self._load()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        info = QLabel(self.tr("以下目录将作为各类文件的默认保存位置。\n"
+                               "新建任务时自动使用此处设置的目录，可随时在界面中临时修改。"))
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        form = QFormLayout()
+        form.setSpacing(8)
+
+        # 1) 天线参数测试报告 (.xlsx)
+        self._edit_excel = QLineEdit()
+        self._edit_excel.setPlaceholderText(self.tr("默认: 源文件目录"))
+        form.addRow(self.tr("天线参数报告 (.xlsx):"), self._make_dir_row(self._edit_excel))
+
+        # 2) 图表报告 (.docx)
+        self._edit_word = QLineEdit()
+        self._edit_word.setPlaceholderText(self.tr("默认: 源文件目录"))
+        form.addRow(self.tr("Word 图表报告 (.docx):"), self._make_dir_row(self._edit_word))
+
+        # 3) 中间数据 (.xlsx)
+        self._edit_data = QLineEdit()
+        self._edit_data.setPlaceholderText(self.tr("默认: 源文件目录"))
+        form.addRow(self.tr("中间数据 (.xlsx):"), self._make_dir_row(self._edit_data))
+
+        # 4) 任务包 (.ant)
+        self._edit_ant = QLineEdit()
+        self._edit_ant.setPlaceholderText(self.tr("默认: 源文件目录"))
+        form.addRow(self.tr("任务包 (.ant):"), self._make_dir_row(self._edit_ant))
+
+        layout.addLayout(form)
+        layout.addStretch()
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(self._on_save)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _make_dir_row(self, edit):
+        row = QHBoxLayout()
+        row.addWidget(edit, 1)
+        btn = QPushButton(self.tr("浏览..."))
+        btn.clicked.connect(lambda: self._browse_dir(edit))
+        row.addWidget(btn)
+        return row
+
+    def _browse_dir(self, edit):
+        start = edit.text() or str(Path.cwd())
+        path = QFileDialog.getExistingDirectory(self, self.tr("选择目录"), start)
+        if path:
+            edit.setText(path)
+
+    def _load(self):
+        dd = getattr(self._cfg.config, 'default_dirs', None) or {}
+        self._edit_excel.setText(dd.get('excel', ''))
+        self._edit_word.setText(dd.get('word', ''))
+        self._edit_data.setText(dd.get('data', ''))
+        self._edit_ant.setText(dd.get('ant', ''))
+
+    def _on_save(self):
+        dd = {
+            'excel': self._edit_excel.text().strip(),
+            'word': self._edit_word.text().strip(),
+            'data': self._edit_data.text().strip(),
+            'ant': self._edit_ant.text().strip(),
+        }
+        self._cfg.config.default_dirs = dd
+        self._cfg._dirty = True
+        self._cfg._save()
+        self.accept()
+
+
+# ═══════════════════════════════════════════════════════════════
+# 报告元数据编辑对话框
+# ═══════════════════════════════════════════════════════════════
+
+class ReportMetadataDialog(QDialog):
+    """编辑测试报告元数据: 客户信息、项目信息、测试配置等。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("报告元数据"))
+        self.setMinimumSize(600, 500)
+        from src.config_manager import get_config_manager
+        self._cfg = get_config_manager()
+        self._setup_ui()
+        self._load()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        info = QLabel(self.tr("以下信息将填入 Word 测试报告模板的 SDT Tag 中。"))
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        tabs = QTabWidget()
+
+        # Tab 1: 项目信息
+        tab1 = QWidget()
+        form1 = QFormLayout(tab1)
+        form1.setSpacing(6)
+        self._fields = {}
+        fields_tab1 = [
+            ('customer',       '客户名称'),
+            ('project',        '项目名称'),
+            ('contract_no',    '合同号'),
+            ('antenna_model',  '天线型号'),
+            ('report_no',      '报告编号'),
+            ('test_standard',  '测试标准'),
+        ]
+        for key, label in fields_tab1:
+            edit = QLineEdit()
+            edit.setPlaceholderText(label)
+            form1.addRow(label + ":", edit)
+            self._fields[key] = edit
+        tabs.addTab(tab1, self.tr("项目信息"))
+
+        # Tab 2: 测试信息
+        tab2 = QWidget()
+        form2 = QFormLayout(tab2)
+        form2.setSpacing(6)
+        fields_tab2 = [
+            ('test_lab',        '测试实验室'),
+            ('test_lab_addr',   '实验室地址'),
+            ('test_engineer',   '测试工程师'),
+            ('reviewer',        '审核人'),
+            ('test_start_date', '测试开始日期'),
+            ('test_end_date',   '测试结束日期'),
+            ('test_plan_no',    '测试计划编号'),
+            ('test_plan_ver',   '测试计划版本'),
+        ]
+        for key, label in fields_tab2:
+            edit = QLineEdit()
+            edit.setPlaceholderText(label)
+            form2.addRow(label + ":", edit)
+            self._fields[key] = edit
+        tabs.addTab(tab2, self.tr("测试信息"))
+
+        # Tab 3: 备注
+        tab3 = QWidget()
+        form3 = QVBoxLayout(tab3)
+        self._edit_notes = QPlainTextEdit()
+        self._edit_notes.setPlaceholderText(self.tr("备注信息（可选）"))
+        form3.addWidget(self._edit_notes)
+        tabs.addTab(tab3, self.tr("备注"))
+
+        layout.addWidget(tabs)
+
+        # 按钮栏
+        btn_row = QHBoxLayout()
+        btn_extract = QPushButton(self.tr("🔍 从数据源提取"))
+        btn_extract.setToolTip(self.tr("从当前加载的 JSON/CSV 数据源中自动提取元数据"))
+        btn_extract.clicked.connect(self._extract_from_datasource)
+        btn_row.addWidget(btn_extract)
+        btn_import = QPushButton(self.tr("📥 从 Excel 导入..."))
+        btn_import.clicked.connect(self._import_excel)
+        btn_row.addWidget(btn_import)
+        btn_row.addStretch()
+        self._lbl_source = QLabel("")
+        self._lbl_source.setStyleSheet("color: gray; font-style: italic;")
+        btn_row.addWidget(self._lbl_source)
+        layout.addLayout(btn_row)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(self._on_save)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _load(self):
+        md = getattr(self._cfg.config, 'metadata', None) or {}
+        for key, edit in self._fields.items():
+            edit.setText(md.get(key, ''))
+        self._edit_notes.setPlainText(md.get('notes', ''))
+
+    def _on_save(self):
+        md = {key: edit.text().strip() for key, edit in self._fields.items()}
+        md['notes'] = self._edit_notes.toPlainText().strip()
+        self._cfg.config.metadata = md
+        self._cfg._dirty = True
+        self._cfg._save()
+        self.accept()
+
+    def _extract_from_datasource(self):
+        """从当前数据源 (JSON/CSV) 自动提取元数据。"""
+        parent_widget = self.parent()
+        mw = None
+        # 向上查找 MainWindow
+        while parent_widget:
+            if hasattr(parent_widget, '_data_file_paths'):
+                mw = parent_widget
+                break
+            parent_widget = parent_widget.parent()
+
+        if not mw or not getattr(mw, '_data_file_paths', None):
+            QMessageBox.warning(self, self.tr("无数据源"), self.tr("请先在系统设置中添加数据文件。"))
+            return
+
+        # 查找 JSON 文件
+        json_paths = [p for p in mw._data_file_paths if p.lower().endswith('.json')]
+        if not json_paths:
+            QMessageBox.information(self, self.tr("无 JSON 数据源"),
+                self.tr("当前数据源中无 JSON 文件。\n"
+                        "JSON 文件由 EMQuest 导出，包含被测件型号、操作员、测试时间等元数据。"))
+            return
+
+        extracted = {}
+        for jp in json_paths:
+            try:
+                from src.json_reader import JsonDataSource
+                ds = JsonDataSource(jp)
+                md = ds.get_metadata()
+                extracted.update(md)
+                self._lbl_source.setText(self.tr("已从 {n} 个 JSON 提取").format(n=len(json_paths)))
+                break  # 取第一个成功的
+            except Exception as e:
+                continue
+
+        if not extracted:
+            QMessageBox.warning(self, self.tr("提取失败"), self.tr("无法从 JSON 文件中提取元数据。"))
+            return
+
+        # 映射 JSON 字段 → 表单字段
+        field_map = {
+            'model': 'antenna_model',
+            'manufacturer': 'customer',
+            'serialno': 'contract_no',
+            'operator': 'test_engineer',
+            'test_method': 'test_standard',
+            'test_time': 'test_start_date',
+            'test_end_time': 'test_end_date',
+        }
+        filled = 0
+        for src_key, field_key in field_map.items():
+            if src_key in extracted and field_key in self._fields:
+                self._fields[field_key].setText(str(extracted[src_key]))
+                filled += 1
+
+        # 备注: 合并额外信息
+        notes_parts = []
+        for k in ('opcomments', 'parm_file', 'app_version', 'freq_range', 'data_format'):
+            if k in extracted:
+                notes_parts.append(f"{k}: {extracted[k]}")
+        if notes_parts:
+            self._edit_notes.setPlainText('\n'.join(notes_parts))
+
+        # User Defined 字段追加到备注
+        for i in range(1, 13):
+            uk = f'user_{i}'
+            if uk in extracted:
+                label = extracted.get(f'user_{i}_label', '')
+                existing = self._edit_notes.toPlainText()
+                self._edit_notes.setPlainText(
+                    existing + f"\n{label}: {extracted[uk]}")
+
+        self._lbl_source.setText(
+            self.tr("已提取 {f} 项").format(f=filled))
+
+    def _import_excel(self):
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("选择元数据 Excel"), "",
+            self.tr("Excel 文件 (*.xlsx *.xls)"))
+        if not path:
+            return
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(path, data_only=True)
+            if '项目信息' in wb.sheetnames:
+                ws = wb['项目信息']
+                # 读取键值对 (A=key, B=value, C=key, D=value)
+                mapping = {
+                    '合同号': 'contract_no', '客户名称': 'customer',
+                    '项目名称': 'project', '天线型号': 'antenna_model',
+                    '测试标准': 'test_standard', '报告编号': 'report_no',
+                    '测试实验室': 'test_lab', '实验室地址': 'test_lab_addr',
+                    '测试工程师': 'test_engineer', '审核人': 'reviewer',
+                    '测试开始日期': 'test_start_date', '测试结束日期': 'test_end_date',
+                    '测试计划编号': 'test_plan_no', '测试计划版本': 'test_plan_ver',
+                }
+                for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+                    for col_pair in [(0, 1), (2, 3)]:
+                        key_cell = row[col_pair[0]].value
+                        val_cell = row[col_pair[1]].value
+                        if key_cell and key_cell in mapping:
+                            field_key = mapping[key_cell]
+                            if field_key in self._fields:
+                                self._fields[field_key].setText(str(val_cell) if val_cell else '')
+            wb.close()
+            QMessageBox.information(self, self.tr("导入完成"), self.tr("元数据已从 Excel 导入。"))
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("导入失败"), str(e))
 
 
 # ═══════════════════════════════════════════════════════════════

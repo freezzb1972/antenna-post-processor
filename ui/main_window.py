@@ -16,6 +16,7 @@ Qt Designer 编译 UI + 信号/槽逻辑。
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional
@@ -134,7 +135,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._test_mode: int = 0             # 0=passive, 1=TRP, 2=TIS
         self._worksheet_naming_mode: int = 0  # 0=保留原模板工作表名, 1=用数据源名命名
         self._mode_states = [{}, {}, {}]     # 三种测试模式独立参数状态
-        self._ar_lag_config = LagConfig()    # AR 独立角度配置
+        self._ar_lag_config = LagConfig()     # AR 独立角度配置
+        self._rhcp_lag_config = LagConfig()  # RHCP 独立角度配置
+        self._cpxpi_lag_config = LagConfig() # CP-XPI 独立角度配置
         self._nh_custom_angles: List[float] = []  # NHPRP/NHPIS 自定义角度列表
         self._ar_output_db: bool = True     # AR 默认输出 dB
         self._chart_config_required = None   # ChartConfig: 报告需要
@@ -359,10 +362,18 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         algo_vbox = QVBoxLayout(group_algo)
         algo_vbox.setSpacing(6)
 
-        self._check_extrapolate = QCheckBox(
-            self.tr("Theta 外推到 180°"))
-        self._check_extrapolate.setChecked(False)
-        algo_vbox.addWidget(self._check_extrapolate)
+        row_theta_extrap = QHBoxLayout()
+        row_theta_extrap.addWidget(QLabel(self.tr("Theta 外推:")))
+        self._cmb_extrapolate = QComboBox()
+        self._cmb_extrapolate.addItem(self.tr("不外推"), None)
+        self._cmb_extrapolate.addItem(self.tr("线性"), "linear")
+        self._cmb_extrapolate.addItem(self.tr("常数"), "constant")
+        self._cmb_extrapolate.addItem(self.tr("镜像"), "mirror")
+        self._cmb_extrapolate.setCurrentIndex(0)
+        self._cmb_extrapolate.setToolTip(self.tr("除 Directivity 外所有参数的 Theta 外推算法"))
+        row_theta_extrap.addWidget(self._cmb_extrapolate)
+        row_theta_extrap.addStretch()
+        algo_vbox.addLayout(row_theta_extrap)
 
 
         self._check_robust_peak = QCheckBox(
@@ -576,11 +587,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         fm.addSeparator()
         fm.addAction(self.tr("打印..."), self._on_print, QKeySequence("Ctrl+P"))
         fm.addSeparator()
-        fm.addAction(self.tr("导出报告..."), self._on_browse_output)
-        fm.addSeparator()
         fm.addAction(self.tr("系统设置..."), self._show_system_settings)
         fm.addSeparator()
         fm.addAction(self.tr("退出"), QApplication.instance().quit, QKeySequence("Ctrl+Q"))
+
+        # ── 项目管理 ──
+        pm = menubar.addMenu(self.tr("项目(&P)"))
+        pm.addAction(self.tr("📂 打开项目管理..."), self._on_project_manager)
+        pm.addAction(self.tr("📋 从 JSON 导入..."), self._on_project_import_json)
+        self._menu_recent_projects = pm.addMenu(self.tr("📄 最近项目"))
+        self._menu_recent_projects.aboutToShow.connect(self._on_refresh_recent_menu)
 
         # ── 窗口 ──
         self._menu_window = menubar.addMenu(self.tr("&窗口"))
@@ -595,10 +611,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         tm.addAction(self.tr("路径损耗补偿..."), self._on_tool_calibrate)
         tm.addAction(self.tr("数据合并 (多段拼接)..."), self._on_tool_merge)
         tm.addAction(self.tr("步进重采样..."), self._on_tool_resample)
-        tm.addAction(self.tr("数据修复 (插值)"), self._on_tool_quality_repair)
+        tm.addAction(self.tr("数据修复 (插值)..."), self._on_tool_quality_repair)
         tm.addSeparator()
         # 预设管理组
         tm.addAction(self.tr("模板预设管理..."), self._on_tool_template_recognizer)
+        tm.addAction(self.tr("Docx SDT 工具箱..."), self._on_tool_docx_sdt)
         tm.addAction(self.tr("校准预设管理..."), self._on_show_rsp_presets)
         tm.addSeparator()
         # 导入导出组
@@ -755,6 +772,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             "lag_ranges": self._lag_config.ranges_sorted,
             "ar_singles": self._ar_lag_config.singles_sorted if hasattr(self, '_ar_lag_config') else [],
             "ar_ranges": self._ar_lag_config.ranges_sorted if hasattr(self, '_ar_lag_config') else [],
+            "rhcp_singles": self._rhcp_lag_config.singles_sorted if hasattr(self, '_rhcp_lag_config') else [],
+            "rhcp_ranges": self._rhcp_lag_config.ranges_sorted if hasattr(self, '_rhcp_lag_config') else [],
+            "cpxpi_singles": self._cpxpi_lag_config.singles_sorted if hasattr(self, '_cpxpi_lag_config') else [],
+            "cpxpi_ranges": self._cpxpi_lag_config.ranges_sorted if hasattr(self, '_cpxpi_lag_config') else [],
         }
         save_task_package(ant_path, tpl_name,
             data_file_paths=list(self._data_file_paths),
@@ -779,6 +800,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             "lag_ranges": self._lag_config.ranges_sorted,
             "ar_singles": self._ar_lag_config.singles_sorted if hasattr(self, '_ar_lag_config') else [],
             "ar_ranges": self._ar_lag_config.ranges_sorted if hasattr(self, '_ar_lag_config') else [],
+            "rhcp_singles": self._rhcp_lag_config.singles_sorted if hasattr(self, '_rhcp_lag_config') else [],
+            "rhcp_ranges": self._rhcp_lag_config.ranges_sorted if hasattr(self, '_rhcp_lag_config') else [],
+            "cpxpi_singles": self._cpxpi_lag_config.singles_sorted if hasattr(self, '_cpxpi_lag_config') else [],
+            "cpxpi_ranges": self._cpxpi_lag_config.ranges_sorted if hasattr(self, '_cpxpi_lag_config') else [],
         }
         save_task_package(path, tpl_name,
             data_file_paths=list(self._data_file_paths),
@@ -802,6 +827,59 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         dlg = HelpDialog(self)
         dlg.exec()
 
+    # ── 项目管理 ──
+
+    def _on_project_manager(self):
+        from ui.project_manager import ProjectManagerDialog
+        dlg = ProjectManagerDialog(self)
+        dlg.exec()
+
+    def _on_project_import_json(self):
+        from ui.project_manager import ImportFromJSONDialog
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("选择 EMQuest JSON 文件"), "",
+            self.tr("JSON 文件 (*.json)"))
+        if path:
+            dlg = ImportFromJSONDialog(self, path)
+            dlg.exec()
+
+    def _on_refresh_recent_menu(self):
+        self._menu_recent_projects.clear()
+        try:
+            from src.project_db import get_db
+            db = get_db()
+            tests = db.get_recent_tests(5)
+            if not tests:
+                self._menu_recent_projects.addAction(self.tr("(无)")).setEnabled(False)
+            for t in tests:
+                name = f"{t.get('customer_name','')} — {t.get('model','')} ({t.get('test_date','')[:10]})"
+                action = self._menu_recent_projects.addAction(name)
+                action.setData(t.get('id'))
+                action.triggered.connect(lambda checked, tid=t.get('id'): self._on_open_recent(tid))
+        except Exception:
+            self._menu_recent_projects.addAction(self.tr("(数据库不可用)")).setEnabled(False)
+
+    def _on_open_recent(self, tid: int):
+        from src.project_db import get_db
+        db = get_db()
+        t = db.get_test_by_id(tid)
+        if t:
+            files = t.get('data_files', [])
+            if files:
+                self._data_file_paths = [f for f in files if Path(f).exists()]
+            tpl = t.get('template_path', '')
+            if tpl and Path(tpl).exists():
+                self.ui.editTemplatePath.setText(tpl)
+            out = t.get('output_dir', '')
+            if out and Path(out).exists():
+                self.ui.editOutputDir.setText(out)
+            from src.config_manager import get_config_manager
+            cfg = get_config_manager()
+            cfg.config.metadata = t.get('metadata', {})
+            cfg._dirty = True
+            cfg._save()
+            self._log(f"✓ 已加载项目: {t.get('customer_name')} — {t.get('model')}")
+
     def _on_tool_batch_check(self):
         from ui.dialogs import BatchCalibrateDialog
         BatchCalibrateDialog(self).exec()
@@ -821,6 +899,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _on_tool_resample(self):
         from ui.dialogs import ResampleDialog
         ResampleDialog(self).exec()
+
+    def _on_tool_docx_sdt(self):
+        """Docx SDT 工具箱: 分析 Word 模板，自动推荐 SDT tag，插入并保存。"""
+        from ui.template_recognizer import DocxTemplateToolbox
+        path = self.ui.editTemplatePath.text().strip() if hasattr(self, 'ui') else ""
+        dlg = DocxTemplateToolbox(self, path if path and Path(path).exists() else "")
+        dlg.exec()
 
     def _on_tool_template_recognizer(self):
         """模板预设管理: 加载模板 Excel，显示列头检测，支持手动修正并保存。"""
@@ -1463,6 +1548,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self.tr("所有支持格式 (*.xlsx *.xls *.csv *.docx);;Excel 新版 (*.xlsx);;Excel 旧版 (*.xls);;CSV (*.csv);;Word (*.docx);;所有文件 (*)")
         )
         if path:
+            if path.lower().endswith('.doc') and not path.lower().endswith('.docx'):
+                QMessageBox.warning(self, self.tr("格式不支持"),
+                    self.tr("不支持 .doc 格式。\n请用 Word 打开该文件，另存为 .docx 后再使用。"))
+                return
             self.ui.editTemplatePath.setText(path)
             self._cfg.config.last_template_path = path
             self._cfg._dirty = True
@@ -1528,6 +1617,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
     def _show_save_preset_dialog(self, template_path: str, output_dir: str):
         """弹出保存模板预设对话框 (公共方法, SystemSettingsDialog 也调用)。"""
+        from PySide6.QtWidgets import QLineEdit, QDialogButtonBox
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("保存模板预设"))
         dlg.setMinimumWidth(350)
@@ -2097,7 +2187,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     az._angles_initialized = True
 
         # 从 MainWindow widget 读取（天线参数 dialog 通过 _sync_to_mw 写入此处）
-        extrapolate_theta = self._check_extrapolate.isChecked()
+        extrapolate_theta = self._cmb_extrapolate.currentData()
         dir_extrap = getattr(self, '_dir_extrap_method', 'linear')
         freq_source = self._cmb_freq_source.currentData() or "datasource"
         trim_start = self._spin_trim_start.value()
@@ -2118,7 +2208,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             lag_config=self._lag_config,
             plot_config=plot_config,
             full_report_path=full_report_path,
-            extrapolate_theta=extrapolate_theta,
+            theta_extrap_method=extrapolate_theta,
             freq_source=freq_source,
             trim_start=trim_start,
             trim_end=trim_end,
@@ -2244,7 +2334,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     "lag_ranges": self._lag_config.ranges_sorted,
                     "ar_singles": self._ar_lag_config.singles_sorted if hasattr(self, '_ar_lag_config') else [],
                     "ar_ranges": self._ar_lag_config.ranges_sorted if hasattr(self, '_ar_lag_config') else [],
-                    "extrapolate": self._check_extrapolate.isChecked() if hasattr(self, '_check_extrapolate') else False,
+                    "extrapolate": self._cmb_extrapolate.currentData() if hasattr(self, '_cmb_extrapolate') else None,
                 }
                 save_task_package(
                     ant_path, tpl_name,
@@ -2275,10 +2365,92 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._populate_results_table(results)
         # 生成图形展示
         self._populate_charts(results)
+        # 更新图形查看器模式标签
+        if self._graph_viewer:
+            self._graph_viewer.update_mode_display()
         # 生成图形数据表
         self._populate_graph_data(results)
+        # ── Word 模板填充 ──
+        if file_page and hasattr(file_page, '_edit_word_tpl'):
+            word_tpl = file_page._edit_word_tpl.text().strip()
+            if word_tpl and Path(word_tpl).exists() and results:
+                try:
+                    self.ui.lblProgressMsg.setText(self.tr("📝 正在填充 Word 模板..."))
+                    QApplication.processEvents()
+                    self._fill_docx_template(word_tpl, results, images, file_page)
+                except Exception as e:
+                    self._log(f"⚠ Word 模板填充失败: {e}")
+
         # 自动切到结果Tab
         self.ui.tabConfig.setCurrentIndex(0)
+
+    def _fill_docx_template(self, template_path: str, results: dict, images: dict,
+                             file_page=None):
+        """使用 SDT Tag 填充 Word 模板。"""
+        from src.docx_exporter import DocxTemplateFiller
+
+        filler = DocxTemplateFiller(template_path)
+        tags = filler.list_tags()
+        self._log(f"  Word 模板: {len(tags)} 个 SDT tag")
+
+        # ── 元数据 ──
+        from src.config_manager import get_config_manager
+        cfg = get_config_manager()
+        metadata = getattr(cfg.config, 'metadata', {}) or {}
+        meta_tags = {
+            'meta_customer': metadata.get('customer', ''),
+            'meta_project': metadata.get('project', ''),
+            'meta_contract_no': metadata.get('contract_no', ''),
+            'meta_antenna_model': metadata.get('antenna_model', ''),
+            'meta_report_no': metadata.get('report_no', ''),
+            'meta_test_standard': metadata.get('test_standard', ''),
+            'meta_test_lab': metadata.get('test_lab', ''),
+            'meta_test_lab_addr': metadata.get('test_lab_addr', ''),
+            'meta_test_engineer': metadata.get('test_engineer', ''),
+            'meta_reviewer': metadata.get('reviewer', ''),
+            'meta_test_start_date': metadata.get('test_start_date', ''),
+            'meta_test_end_date': metadata.get('test_end_date', ''),
+            'meta_test_plan_no': metadata.get('test_plan_no', ''),
+            'meta_test_plan_ver': metadata.get('test_plan_ver', ''),
+            'meta_notes': metadata.get('notes', ''),
+        }
+        filler.fill_batch(meta_tags)
+
+        # ── 数据表 ──
+        for tag in tags:
+            if tag.startswith("table_"):
+                filler.auto_fill_table(tag, results)
+
+        # ── 单值 ──
+        flat_data = {}
+        for sheet_results in results.values():
+            for row in sheet_results:
+                for key, val in row.items():
+                    if key.startswith("_") or isinstance(val, (list, dict)):
+                        continue
+                    flat_data[f"data_{key}"] = val
+        filler.fill_batch(flat_data)
+
+        # ── 图片 ──
+        img_tags = [t for t in tags if t.startswith("img_")]
+        all_images = []
+        for img_list in images.values():
+            all_images.extend(img_list)
+        for i, (title, img_bytes) in enumerate(all_images):
+            if i < len(img_tags):
+                try:
+                    filler.fill_image(img_tags[i], img_bytes, width_cm=8.0)
+                except Exception:
+                    pass
+
+        # ── 保存 ──
+        output_dir = self.ui.editOutputDir.text().strip() or "."
+        src_stem = Path(self._data_file_paths[0]).stem if self._data_file_paths else "report"
+        out_path = str(Path(output_dir) / f"{src_stem}_测试报告.docx")
+        filler.save(out_path)
+        self._log(f"  ✓ Word 报告已生成: {Path(out_path).name}")
+        if filler.warn_count():
+            self._log(f"  ⚠ {filler.warn_count()} 个 tag 未填充")
 
     def _make_readable_label(self, key: str) -> str:
         """将内部 key 转换为短可读标签。
@@ -2447,7 +2619,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         ar_s = ar_cfg.singles_sorted if ar_cfg else []
         ar_r = ar_cfg.ranges_sorted if ar_cfg else []
         freq = self._cmb_freq_source.currentText() if hasattr(self, '_cmb_freq_source') else "—"
-        extrap = hasattr(self, '_check_extrapolate') and self._check_extrapolate.isChecked()
+        extrap = self._cmb_extrapolate.currentText() if hasattr(self, '_cmb_extrapolate') else "不外推"
         robust = hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked()
 
         # ── 上方参数面板 ──

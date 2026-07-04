@@ -45,7 +45,7 @@ MIN_SIZE_REQUIREMENTS = [
 # G7: 动态创建的 widget 必须存在
 DYNAMIC_WIDGETS_REQUIRED = [
     "_file_list_widget", "_match_table", "_btn_add_files",
-    "_btn_auto_match", "_check_extrapolate",
+    "_btn_auto_match", "_cmb_extrapolate",
     "_btn_export",  # Phase 3: 出报告按钮
 ]
 

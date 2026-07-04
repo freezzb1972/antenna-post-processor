@@ -117,7 +117,6 @@
       "_btn_clear_selected",
       "_check_chart_eff",
       "_check_chart_lag",
-      "_check_extrapolate",
       "_cmb_dir_extrap",
       "_check_robust_peak",
       "_cmb_freq_source",
@@ -138,7 +137,8 @@
       "_btn_preview",
       "_btn_export",
       "_mode_freq_label",
-      "_params_display"
+      "_params_display",
+      "_cmb_extrapolate"
     ],
     "methods": [
       "__init__",
@@ -278,7 +278,11 @@
       "task_package.py",
       "ui_utils.py",
       "word_reporter.py",
-      "fs_to_csv.py"
+      "fs_to_csv.py",
+      "docx_exporter.py",
+      "project_db.py",
+      "docx_sdt_inserter.py",
+      "llm_tagger.py"
     ]
   },
   "tests": {
@@ -1021,6 +1025,21 @@
       "tests": [],
       "e2e_verified": false,
       "status": "verified"
+    },
+    {
+      "name": "theta-extrapolation",
+      "description": "Theta extrapolation method combo box",
+      "status": "verified",
+      "widgets": [
+        "_cmb_extrapolate"
+      ]
+    },
+    {
+      "name": "project-management",
+      "status": "verified",
+      "widgets": [
+        "ui/project_manager.py"
+      ]
     }
   ]
 }

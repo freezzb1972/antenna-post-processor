@@ -300,6 +300,10 @@ class AppConfig:
     ai: AIConfig = field(default_factory=AIConfig)
     # 窗口
     window_geometry: str = ""
+    # 默认保存目录
+    default_dirs: dict = field(default_factory=dict)
+    # 报告元数据 (客户/项目/天线/测试信息等)
+    metadata: dict = field(default_factory=dict)
     # 许可
     license: LicenseConfig = field(default_factory=LicenseConfig)
 
@@ -738,6 +742,8 @@ class ConfigManager:
             last_csv_paths=raw.get('last_csv_paths', []),
             last_rsp_preset_name=raw.get('last_rsp_preset_name', ''),
             window_geometry=str(raw.get('window_geometry', '')),
+            default_dirs=raw.get('default_dirs', {}),
+            metadata=raw.get('metadata', {}),
         )
         # LLM
         llm = raw.get('llm', {})

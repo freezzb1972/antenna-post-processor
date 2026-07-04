@@ -101,7 +101,7 @@ class ProcessingWorker(QObject):
         lag_config: LagConfig | None = None,
         plot_config: PlotConfig | None = None,
         full_report_path: str | None = None,
-        extrapolate_theta: bool = False,
+        theta_extrap_method: str | None = None,
         freq_source: str = "datasource",
         trim_start: int = 0,
         trim_end: int = 0,
@@ -136,7 +136,7 @@ class ProcessingWorker(QObject):
         self.ar_lag_config = ar_lag_config
         self.plot_config = plot_config or PlotConfig()
         self.full_report_path = full_report_path
-        self.extrapolate_theta = extrapolate_theta
+        self.theta_extrap_method = theta_extrap_method
         self.freq_source = freq_source
         self.trim_start = trim_start
         self.trim_end = trim_end
@@ -179,7 +179,7 @@ class ProcessingWorker(QObject):
                 sheet_mode_map=self.sheet_mode_map,
                 plot_config=self.plot_config,
                 full_report_path=self.full_report_path,
-                extrapolate_theta=self.extrapolate_theta,
+                theta_extrap_method=self.theta_extrap_method,
                 freq_source=self.freq_source,
                 trim_start=self.trim_start,
                 trim_end=self.trim_end,

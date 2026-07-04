@@ -61,20 +61,41 @@ class JsonDataSource(DataSource):
         with open(self._path, encoding="utf-8") as f:
             self._parsed = json.load(f)
 
-        # 提取 Final Data
-        final = (
-            self._parsed.get("Data", {})
-            .get("DataSetType", {})
-            .get("Final Data", {})
-            .get("Format", {})
-        )
-        if not final:
-            raise ValueError(f"JSON 文件缺少 Final Data: {self._path}")
+        data_root = self._parsed.get("Data", {})
 
-        # 从第一个可用 section 提取频率列表
+        # 检测数据格式
+        if "DataSetType" in data_root:
+            # v1.18+: Data → DataSetType → Final Data → Format
+            final = data_root["DataSetType"].get("Final Data", {}).get("Format", {})
+            if not final:
+                raise ValueError(f"JSON v18+ 文件缺少 Final Data: {self._path}")
+            tl_section = final.get("Theta Log Magnitude", {}).get("Frequency  (MHz)", {})
+            if not tl_section:
+                raise ValueError("JSON 文件缺少 Theta Log Magnitude 数据")
+        elif "Polarization" in data_root:
+            # v1.12: Data → Polarization → Horizontal1/Vertical1/Total
+            # 旧版无频率列表 — 从 Frequency Range 推导单频点
+            freq_info = self._parsed.get("Test Information", {}).get("Frequency Range", {})
+            start = freq_info.get("dStartFreqMHz")
+            stop = freq_info.get("dStopFreqMHz")
+            if start and stop:
+                # 单频点或窄带扫描 — 取中心频率
+                self._frequencies = [float(start)]
+            else:
+                self._frequencies = [0.0]
+            # 从 Polarization 数据提取 theta/phi 角度
+            pol = data_root["Polarization"]
+            first_pol = pol.get("Horizontal1") or pol.get("Vertical1") or {}
+            theta_keys = [k for k in first_pol.keys() if _is_numeric_key(k)]
+            self._theta_angles = sorted([float(k) for k in theta_keys])
+            self._phi_angles = [0.0]  # 单轴测量，无 phi 维度
+            self._indexed = True
+            return
+        else:
+            raise ValueError(f"JSON 文件格式不支持: {self._path}")
+
+        # v1.18+ 流程
         tl_section = final.get("Theta Log Magnitude", {}).get("Frequency  (MHz)", {})
-        if not tl_section:
-            raise ValueError("JSON 文件缺少 Theta Log Magnitude 数据")
 
         self._frequencies = sorted([float(k) for k in tl_section.keys()])
 
@@ -204,46 +225,100 @@ class JsonDataSource(DataSource):
     # ------------------------------------------------------------------
 
     def get_metadata(self) -> dict:
-        """提取测试元数据: 方法、时间、设备、参数等。"""
+        """提取测试元数据: 方法、时间、设备、参数、用户字段等。
+
+        兼容 EMQuest v1.12 (Polarization) 和 v1.18+ (DataSetType) 两种数据格式。
+        """
         self._ensure_loaded()
         ti = self._parsed.get("Test Information", {})
+        md = {}
 
+        # ── 基础 ──
         params = ti.get("Parameters", {})
         op = ti.get("Operator/Comments", {})
         equip = ti.get("paEquipmentList", {})
+        freq_range = ti.get("Frequency Range", {})
 
-        return {
-            "test_method": ti.get("szTestMethod", ""),
-            "app_version": ti.get("szAppVersion", ""),
-            "parm_file": ti.get("szParmFileName", ""),
-            "test_time": op.get("szTestTime", ""),
-            "test_end_time": op.get("szTestEndTime", ""),
-            "elapsed_time": op.get("szTestElapsedTime", ""),
-            "operator": op.get("szOperator", ""),
-            "temperature": op.get("szTemperature", ""),
-            "humidity": op.get("szHumidity", ""),
-            "iut_manufacturer": equip.get("szIUTManufacturer", ""),
-            "iut_model": equip.get("szIUTModel", ""),
-            "iut_serial": equip.get("szIUTSerialNo", ""),
-            "iut_type": equip.get("szIUTType", ""),
-            "iut_frame": equip.get("szIUTFrame", ""),
-            # 测试参数
-            "phi_range": (
-                params.get("dLowerLimit", ""),
-                params.get("dUpperLimit", ""),
-            ),
-            "phi_step": params.get("dStepSize", ""),
-            "theta_range": (
-                params.get("dLowerLimit2", ""),
-                params.get("dUpperLimit2", ""),
-            ),
-            "theta_step": params.get("dStepSize2", ""),
-            "polarization": params.get("iChannelPolarization", ""),
-            "pattern_type": params.get("iPatternType", ""),
-            "frequency_count": len(self._frequencies),
-            "theta_count": len(self._theta_angles),
-            "phi_count": len(self._phi_angles),
-        }
+        # ── 被测件 ──
+        for k in ("szIUTManufacturer", "szIUTModel", "szIUTSerialNo", "szIUTType", "szIUTFrame"):
+            v = equip.get(k, "").strip()
+            if v:
+                md[k[3:].lower()] = v  # → manufacturer, model, serialno, type, frame
+
+        # ── 操作员/时间 ──
+        for k in ("szOperator", "szOpComments", "szTestTime", "szTestEndTime",
+                  "szTestElapsedTime", "szTemperature", "szHumidity"):
+            v = op.get(k, "").strip()
+            if v:
+                key = k[2:].lower() if k.startswith("sz") else k.lower()
+                md[key] = v
+
+        # ── 测试方法 ──
+        for k in ("szTestMethod", "szAppVersion", "szParmFileName"):
+            v = ti.get(k, "").strip()
+            if v:
+                md["test_method" if k == "szTestMethod" else
+                   "app_version" if k == "szAppVersion" else "parm_file"] = v
+
+        # ── 频率范围 ──
+        fs = freq_range.get("dStartFreqMHz")
+        fe = freq_range.get("dStopFreqMHz")
+        if fs is not None and fe is not None:
+            try:
+                md["freq_start_mhz"] = float(fs)
+                md["freq_stop_mhz"] = float(fe)
+                md["freq_range"] = f"{fs} - {fe} MHz"
+            except (ValueError, TypeError):
+                pass
+        fc = freq_range.get("Frequency List(MHz)")
+        if isinstance(fc, list) and fc:
+            md["freq_list"] = fc
+
+        # ── 测试参数 ──
+        for k in ("dLowerLimit", "dUpperLimit", "dStepSize",
+                  "dLowerLimit2", "dUpperLimit2", "dStepSize2"):
+            v = params.get(k)
+            if v is not None:
+                md[k] = v
+        for k in ("iChannelPolarization", "iPatternType"):
+            v = params.get(k, "").strip()
+            if v:
+                md[k] = v
+
+        # ── 设备 ──
+        eq = ti.get("Equipment", {})
+        if isinstance(eq, dict):
+            for k in ("szPositioner1", "szPositioner2", "szEquipSelect"):
+                v = eq.get(k, "").strip()
+                if v:
+                    md[k[2:].lower()] = v
+
+        # ── User Defined 1-12 ──
+        ud = ti.get("User Defined", {})
+        if isinstance(ud, dict):
+            labels_str = ud.get("szUserDefinedLabels", "")
+            labels = [l.strip() for l in labels_str.split("|")] if labels_str else []
+            for i in range(1, 13):
+                key = f"szUserDefString_{i:02d}"
+                val = ud.get(key, "").strip()
+                if val:
+                    label = labels[i-1] if i-1 < len(labels) else f"UF{i}"
+                    md[f"user_{i}"] = val
+                    md[f"user_{i}_label"] = label
+
+        # ── 数据格式 ──
+        data = self._parsed.get("Data", {})
+        if "DataSetType" in data:
+            md["data_format"] = "v18+"
+        elif "Polarization" in data:
+            md["data_format"] = "v12"
+
+        # ── 频点/角度计数 ──
+        md["frequency_count"] = len(self._frequencies)
+        md["theta_count"] = len(self._theta_angles)
+        md["phi_count"] = len(self._phi_angles)
+
+        return {k: v for k, v in md.items() if v not in (None, "", 0)}
 
 
 # ------------------------------------------------------------------
@@ -280,3 +355,4 @@ def _phi_key(phi: float) -> str:
     # 也尝试带一位小数的格式 (如 '349.0')
     key_float = f"{phi:.1f}" if phi == int(phi) else str(phi)
     return key_int  # 返回首选键，调用方需处理 fallback
+

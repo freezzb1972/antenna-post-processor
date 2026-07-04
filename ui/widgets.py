@@ -311,7 +311,7 @@ class TemplateSourceRow(QWidget):
         path = self._path
         if not path or not os.path.exists(path):
             return
-        from src.column_mapping import detect_columns_from_template, ALL_COL_TYPE_LABELS
+        from src.column_mapping import detect_columns_from_template, get_col_type_labels
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QComboBox, QHeaderView, QPushButton, QMessageBox
 
         mappings = detect_columns_from_template(path)
@@ -330,7 +330,7 @@ class TemplateSourceRow(QWidget):
             table.setItem(ri, 0, QTableWidgetItem(m.col_letter))
             table.setItem(ri, 1, QTableWidgetItem(m.raw_header))
             cmb = QComboBox()
-            for ct, label in ALL_COL_TYPE_LABELS:
+            for ct, label in get_col_type_labels(0):
                 cmb.addItem(label, ct)
             idx = cmb.findData(m.detected_type)
             if idx >= 0:

@@ -143,12 +143,14 @@ def _process_one_frequency(
     theta_deg: np.ndarray,
     lag_config: LagConfig,
     *,
-    do_extrapolate: bool = False,
+    theta_extrap_method: str | None = None,
     robust_peak: bool = False,
     needed_params: set = None,
     extra_params: set = None,
     chart_config: ChartConfig = None,
     ar_lag_config: LagConfig = None,
+    rhcp_lag_config: LagConfig = None,
+    cpxpi_lag_config: LagConfig = None,
     azimuth_config: AzimuthReportConfig = None,
     nh_custom_angles: list[float] | None = None,
     ar_output_db: bool = True,
@@ -163,11 +165,11 @@ def _process_one_frequency(
     extra = extra_params or set()
     compute_set = need | extra  # 实际计算: 模板需求 + 用户额外
 
-    need_extrap = do_extrapolate and theta_deg[-1] < 175
+    need_extrap = theta_extrap_method is not None and theta_deg[-1] < 175
     if need_extrap:
         theta_orig = theta_deg.copy()
-        new_theta, theta_lm = extrapolate_theta(theta_deg, theta_lm, "linear")
-        _, phi_lm = extrapolate_theta(theta_deg, phi_lm, "linear")
+        new_theta, theta_lm = extrapolate_theta(theta_deg, theta_lm, theta_extrap_method)
+        _, phi_lm = extrapolate_theta(theta_deg, phi_lm, theta_extrap_method)
         theta_deg = new_theta
 
     theta_rad = np.deg2rad(theta_deg)
@@ -183,7 +185,7 @@ def _process_one_frequency(
     need_dir_or_eff = ("directivity" in compute_set or "efficiency_pct" in need
                        or "efficiency_db" in compute_set or not need)
     if need_dir_or_eff:
-        if theta_deg[-1] < 175 and not do_extrapolate:
+        if theta_deg[-1] < 175 and theta_extrap_method is None:
             # 外推 LogMag 数据到 180° 仅用于 Directivity, 不覆盖原始数据
             ext_th, ext_tl = extrapolate_theta(theta_deg, theta_lm, dir_extrap_method)
             _, ext_pl = extrapolate_theta(theta_deg, phi_lm, dir_extrap_method)
@@ -390,23 +392,26 @@ def _process_one_frequency(
 
                 if True:  # RHCP single always computed
                     for angle, val in compute_lag_at_angles(
-                        rhcp_g, theta_deg, lag_config.singles_sorted
+                        rhcp_g, theta_deg,
+                        (rhcp_lag_config if rhcp_lag_config and not rhcp_lag_config.is_empty() else lag_config).singles_sorted
                     ).items():
                         row[f"rhcp_single_{angle}"] = round(val, 6)
-                if lag_config.ranges_sorted:
+                if (rhcp_lag_config if rhcp_lag_config and not rhcp_lag_config.is_empty() else lag_config).ranges_sorted:
                     for (lo, hi), val in compute_lag_ranges(
-                        rhcp_g, theta_deg, lag_config.ranges_sorted
+                        rhcp_g, theta_deg,
+                        (rhcp_lag_config if rhcp_lag_config and not rhcp_lag_config.is_empty() else lag_config).ranges_sorted
                     ).items():
                         row[f"rhcp_range_{lo}_{hi}"] = round(val, 6)
 
-                if True:
+                cp_cfg = cpxpi_lag_config if cpxpi_lag_config and not cpxpi_lag_config.is_empty() else lag_config
+                if cp_cfg.singles_sorted:
                     for angle, val in compute_lag_at_angles(
-                        cp_xpi, theta_deg, lag_config.singles_sorted
+                        cp_xpi, theta_deg, cp_cfg.singles_sorted
                     ).items():
                         row[f"cp_xpi_single_{angle}"] = round(val, 6)
-                if True:
+                if cp_cfg.ranges_sorted:
                     for (lo, hi), val in compute_lag_ranges(
-                        cp_xpi, theta_deg, lag_config.ranges_sorted
+                        cp_xpi, theta_deg, cp_cfg.ranges_sorted
                     ).items():
                         row[f"cp_xpi_range_{lo}_{hi}"] = round(val, 6)
             except Exception as e:
@@ -714,7 +719,7 @@ def _collect_tasks(
 def _load_and_compute(
     tasks: list[tuple[str, float, int, Any, DataSource]],
     sheets_info: list[Any],
-    extrapolate_theta: bool,
+    theta_extrap_method: str | None,
     robust_peak: bool,
     parallel: int,
     extra_params: set = None,
@@ -751,7 +756,7 @@ def _load_and_compute(
         raw = task_ds.read_sections(csv_idx)
         theta_list = list(task_ds.theta_angles)
         ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, extrapolate_theta, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, azimuth_config, compute_only))
+        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, theta_extrap_method, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, azimuth_config, compute_only))
         _report(progress_callback, i + 1, progress_max, f"📂 加载数据 ({i+1}/{total})")
 
     data_done = len(compute_tasks)
@@ -795,7 +800,7 @@ def _run_compute_serial(
             break
         try:
             theta_arr = np.array(theta_list)
-            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, dir_extrap_method=dir_extrap_method, compute_only=co, log_cb=log_cb)
+            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, dir_extrap_method=dir_extrap_method, compute_only=co, log_cb=log_cb)
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
@@ -836,7 +841,7 @@ def run_pipeline(
     plot_config: PlotConfig | None = None,
     full_report_path: str | None = None,
     compute_only: bool = False,  # True → 只计算不导出 (预览模式)
-    extrapolate_theta: bool = False,
+    theta_extrap_method: str | None = None,
     freq_source: str = "datasource",
     trim_start: int = 0,
     trim_end: int = 0,
@@ -868,7 +873,7 @@ def run_pipeline(
         lag_config_override: LAG 配置覆盖。
         plot_config:         3D 图配置 (默认: 不生成图)。
         full_report_path:    完整报告路径。
-        extrapolate_theta:   Theta 外推开关。
+        theta_extrap_method: Theta 外推算法 (None=不外推, linear/constant/mirror)。
         freq_source:         "datasource" 或 "template"。
                              当模板 sheet 数<数据源数时，新 sheet 的频点来源。
         parallel:            (保留参数，当前仅串行)。
@@ -941,7 +946,7 @@ def run_pipeline(
     tasks = _collect_tasks(sheets_info, datasource, datasource_map, freq_source, trim_start, trim_end, sheet_mode_map, log_callback)
     try:
         sheet_results = _load_and_compute(
-            tasks, sheets_info, extrapolate_theta, robust_peak, parallel,
+            tasks, sheets_info, theta_extrap_method, robust_peak, parallel,
             extra_params=extra_params, chart_config=chart_config_obj,
             ar_lag_config=ar_lag_config_override,
             sheet_ar_configs=sheet_ar_configs,
@@ -1346,12 +1351,13 @@ def _export_azimuth(
                                 for ci, (_, vals) in enumerate(pk_data):
                                     ws.cell(pi + 2, ci + 2, round(float(vals[pi]), 6))
                         else:
-                            _write_data_sheet(wb, sheet_name, fd)
+                            _write_data_sheet(wb, sheet_name, fd)  # noqa: F821
                     wb.save(data_path); wb.close()
                     _log(log_callback, f"  ✓ 中间数据已保存 ({len(data_sheets)} sheets)")
                 except Exception as e:
                     _log(log_callback, f"  ✗ 中间数据导出失败: {e}")
 
+    # _write_data_sheet defined here (called above — module-level, valid at runtime)
     def _write_data_sheet(wb, sheet_name, freq_data):
         """在 workbook 中添加一个数据 sheet (每频点一个 block)。"""
         ws = wb.create_sheet(sheet_name[:31])
@@ -1409,7 +1415,7 @@ def _export_azimuth(
                                 for ci, (_, vals) in enumerate(pk_data):
                                     ws.cell(pi + 2, ci + 2, round(float(vals[pi]), 6))
                         else:
-                            _write_data_sheet(wb, sheet_name, fd)
+                            _write_data_sheet(wb, sheet_name, fd)  # noqa: F821
                     wb.save(data_path); wb.close()
                     _log(log_callback, f"  ✓ 中间数据已保存 ({len(data_sheets)} sheets)")
                 except Exception as e:
@@ -1428,7 +1434,7 @@ def run_batch_pipeline(
     lag_config_override=None,
     plot_config=None,
     full_report_path=None,
-    extrapolate_theta: bool = False,
+    theta_extrap_method: str | None = None,
     cancel_callback=None,
     progress_callback=None,
     log_callback=None,
@@ -1442,7 +1448,7 @@ def run_batch_pipeline(
         lag_config_override=lag_config_override,
         plot_config=plot_config,
         full_report_path=full_report_path,
-        extrapolate_theta=extrapolate_theta,
+        theta_extrap_method=theta_extrap_method,
         cancel_callback=cancel_callback,
         progress_callback=progress_callback,
         log_callback=log_callback,
@@ -1479,7 +1485,7 @@ def _compute_chunk(
         try:
             theta_raw = np.array(theta_list)
             row = _process_one_frequency(raw, freq, theta_raw, lag_cfg,
-                                         do_extrapolate=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co,
+                                         theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co,
                                          log_cb=None)
             results.append((sheet_name, row))
         except Exception as e:

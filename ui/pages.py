@@ -276,8 +276,21 @@ class FileSettingsPage(QWidget):
         self._check_out_word.toggled.connect(lambda c: (
             self._edit_az_chart_dir.setEnabled(c),
             self._edit_az_chart_fn.setEnabled(c),
+            self._edit_word_tpl.setEnabled(c),
             self._sync_azimuth_cut_switch(),
         ))
+
+        # Word 模板 (含 SDT Tag 的 .docx)
+        row_word_tpl = QHBoxLayout()
+        row_word_tpl.addWidget(QLabel(self.tr("Word 模板:")))
+        self._edit_word_tpl = QLineEdit()
+        self._edit_word_tpl.setPlaceholderText(self.tr("选择带 SDT tag 的 .docx 模板 (可选)"))
+        self._edit_word_tpl.setEnabled(False)
+        row_word_tpl.addWidget(self._edit_word_tpl, 1)
+        btn_word_tpl = QPushButton(self.tr("浏览..."))
+        btn_word_tpl.clicked.connect(self._on_browse_word_template)
+        row_word_tpl.addWidget(btn_word_tpl)
+        out_layout.addLayout(row_word_tpl)
 
         out_layout.addWidget(_make_hsep())
 
@@ -307,6 +320,18 @@ class FileSettingsPage(QWidget):
         self._check_save_task.setToolTip(
             self.tr("保存为 .ant 任务包后，下次双击即可直接查看结果，无需重新计算。"))
         right_layout.addWidget(self._check_save_task)
+
+        right_layout.addWidget(_make_hsep())
+
+        btn_metadata = QPushButton(self.tr("📝 编辑报告元数据..."))
+        btn_metadata.setToolTip(self.tr("客户名称、项目信息、测试参数等，将填入 Word 报告模板"))
+        btn_metadata.clicked.connect(self._show_metadata_editor)
+        right_layout.addWidget(btn_metadata)
+
+        btn_pattern_mgr = QPushButton(self.tr("📋 管理列识别规则..."))
+        btn_pattern_mgr.setToolTip(self.tr("编辑 config/column_patterns.json — 控制模板列头自动识别"))
+        btn_pattern_mgr.clicked.connect(self._show_pattern_manager)
+        right_layout.addWidget(btn_pattern_mgr)
         right_layout.addStretch()
 
         h_splitter.addWidget(right_widget)
@@ -398,6 +423,16 @@ class FileSettingsPage(QWidget):
         if d and hasattr(self, '_edit_az_chart_dir'):
             self._edit_az_chart_dir.setText(d)
             self._sync_azimuth_state()
+
+    def _on_browse_word_template(self):
+        """选择带 SDT tag 的 Word 模板。"""
+        from PySide6.QtWidgets import QFileDialog
+        from pathlib import Path
+        start = self._edit_word_tpl.text() or str(Path.cwd())
+        d, _ = QFileDialog.getOpenFileName(self, self.tr("选择 Word 模板"), start,
+                                            self.tr("Word 文档 (*.docx)"))
+        if d and hasattr(self, '_edit_word_tpl'):
+            self._edit_word_tpl.setText(d)
 
     def _on_browse_az_data_dir(self):
         from PySide6.QtWidgets import QFileDialog
@@ -535,7 +570,7 @@ class FileSettingsPage(QWidget):
             return
 
         try:
-            from src.column_mapping import detect_columns_from_template, ALL_COL_TYPE_LABELS, TemplatePreset, save_preset
+            from src.column_mapping import detect_columns_from_template, TemplatePreset, save_preset
             mappings = detect_columns_from_template(tpl_path)
         except Exception as e:
             QMessageBox.warning(self, self.tr("检测失败"), self.tr(f"列头检测失败:\n{e}"))
@@ -568,6 +603,68 @@ class FileSettingsPage(QWidget):
         dlg.setWindowFlags(dlg.windowFlags() | Qt.WindowMaximizeButtonHint)
         layout = QVBoxLayout(dlg)
 
+        # ── 测试模式选择 (双向同步天线参数页) ──
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("<b>" + self.tr("测试类型:") + "</b>"))
+        cmb_mode = QComboBox()
+        cmb_mode.addItem("📡 " + self.tr("无源天线"), 0)
+        cmb_mode.addItem("📶 " + self.tr("有源发射 TRP"), 1)
+        cmb_mode.addItem("📻 " + self.tr("有源接收 TIS"), 2)
+        # 自动检测模式: 扫描检测到的列类型
+        detected_types = {m.detected_type for m in mappings}
+        if any(t in detected_types for t in ("trp", "nhprp_45", "nhprp_30", "nhprp_225", "peak_eirp")):
+            auto_mode = 1  # 有源发射
+        elif any(t in detected_types for t in ("tis", "nhpis_45", "nhpis_30", "nhpis_225")):
+            auto_mode = 2  # 有源接收
+        else:
+            auto_mode = 0  # 无源天线
+        # 优先用天线参数页当前模式，其次用自动检测
+        cur_mode = self._mw._test_mode if self._mw and hasattr(self._mw, '_test_mode') else auto_mode
+        cmb_mode.setCurrentIndex(cur_mode if cur_mode in (0, 1, 2) else auto_mode)
+        def _on_mode_changed(idx):
+            new_mode = cmb_mode.currentData()
+            if self._mw:
+                self._mw._test_mode = new_mode
+            self._rebuild_preview_types(mode=new_mode)
+        cmb_mode.currentIndexChanged.connect(_on_mode_changed)
+        mode_row.addWidget(cmb_mode)
+        mode_row.addStretch()
+        layout.addLayout(mode_row)
+
+        # ── 重建类型下拉 (按模式过滤) ──
+        def _build_type_combo(col, ctype):
+            from src.column_mapping import get_col_type_labels
+            cur_mode = cmb_mode.currentData() or 0
+            labels = get_col_type_labels(cur_mode)
+            cmb = QComboBox()
+            for t, label in labels:
+                cmb.addItem(label, t)
+            idx = cmb.findData(ctype)
+            if idx >= 0:
+                cmb.setCurrentIndex(idx)
+            return cmb
+
+        dlg._rebuild_types = lambda mode: _rebuild_preview_types(mode)
+
+        def _rebuild_preview_types(mode: int):
+            """模式变更 → 重建所有修正类型下拉列表，保留已选值。"""
+            from src.column_mapping import get_col_type_labels
+            labels = get_col_type_labels(mode)
+            for ci in range(table.columnCount()):
+                old_cmb = table.cellWidget(4, ci)
+                old_val = old_cmb.currentData() if old_cmb else None
+                new_cmb = QComboBox()
+                for ct, label in labels:
+                    new_cmb.addItem(label, ct)
+                idx = new_cmb.findData(old_val)
+                if idx >= 0:
+                    new_cmb.setCurrentIndex(idx)
+                # 重连信号
+                new_cmb.currentIndexChanged.connect(
+                    lambda _i, c=ci, cb=new_cmb, ep=None:
+                    self._on_preview_type_changed(c, cb, table, mappings[c].raw_header if c < len(mappings) else ""))
+                table.setCellWidget(4, ci, new_cmb)
+
         # 转置表: 每列=模版一列, 行=属性
         n = len(mappings)
         table = QTableWidget()
@@ -585,19 +682,36 @@ class FileSettingsPage(QWidget):
             table.setItem(2, ci, QTableWidgetItem(m.detected_type))
             angle_val = _extract_angle(m.raw_header, m.detected_type)
             table.setItem(3, ci, QTableWidgetItem(angle_val))
-            # 修正类型下拉
+            # 修正类型下拉 (按当前模式过滤)
             cmb = QComboBox()
-            for ct, label in ALL_COL_TYPE_LABELS:
+            from src.column_mapping import get_col_type_labels
+            for ct, label in get_col_type_labels(cur_mode):
                 cmb.addItem(label, ct)
             idx = cmb.findData(m.detected_type)
             if idx >= 0:
                 cmb.setCurrentIndex(idx)
             table.setCellWidget(4, ci, cmb)
-            # 修正参数输入（角度/参数值）
+            # 修正参数输入（角度/参数值）+ ⚙ 快捷打开角度配置
+            param_widget = QWidget()
+            param_layout = QHBoxLayout(param_widget)
+            param_layout.setContentsMargins(0, 0, 0, 0)
+            param_layout.setSpacing(2)
             edit_param = QLineEdit()
             edit_param.setPlaceholderText(self.tr("输入参数值"))
             edit_param.setText(angle_val)
-            table.setCellWidget(5, ci, edit_param)
+            param_layout.addWidget(edit_param, 1)
+            btn_angle_popup = QPushButton("⚙")
+            btn_angle_popup.setFixedWidth(30)
+            btn_angle_popup.setToolTip(self.tr("打开角度配置对话框"))
+            btn_angle_popup.clicked.connect(
+                lambda checked, ci=ci, cb=cmb, ep=edit_param:
+                self._on_preview_open_angle_popup(ci, cb, ep))
+            param_layout.addWidget(btn_angle_popup)
+            table.setCellWidget(5, ci, param_widget)
+            # 类型变更 → 自动填充角度参数
+            cmb.currentIndexChanged.connect(
+                lambda _i, c=ci, cb=cmb, ep=edit_param, rh=m.raw_header:
+                self._on_preview_type_changed(c, cb, table, rh, ep))
             # 修改按钮（所有类型可用）
             btn_mod = QPushButton(self.tr("应用"))
             btn_mod.setFixedWidth(50)
@@ -616,12 +730,18 @@ class FileSettingsPage(QWidget):
                 len(mappings), detected, len(mappings) - detected))
         summary.setStyleSheet("")
         layout.addWidget(summary)
+        dlg._summary_label = summary  # 供 _on_preview_apply_all 更新
 
         # 按钮
         btn_row = QHBoxLayout()
         btn_save = QPushButton(self.tr("💾 保存为模板预设"))
+        btn_apply_all = QPushButton(self.tr("✅ 全部应用"))
+        btn_apply_all.setStyleSheet("font-weight:bold;")
+        btn_apply_all.setToolTip(self.tr("批量应用所有列的修正参数，不弹窗确认"))
+        btn_apply_all.clicked.connect(lambda: self._on_preview_apply_all(dlg, table, n, mappings))
         btn_close = QPushButton(self.tr("关闭"))
         btn_row.addWidget(btn_save)
+        btn_row.addWidget(btn_apply_all)
         btn_row.addStretch()
         btn_row.addWidget(btn_close)
         btn_close.clicked.connect(dlg.accept)
@@ -658,11 +778,13 @@ class FileSettingsPage(QWidget):
     def _on_preview_apply(self, parent_dlg, col: int, ctype: str, table):
         """应用修正: 读取修正类型+参数值，更新检测类型并同步到计算参数。"""
         cmb = table.cellWidget(4, col)
-        edit_param = table.cellWidget(5, col)
-        if not cmb or not edit_param:
+        param_widget = table.cellWidget(5, col)
+        if not cmb or not param_widget:
             return
+        # edit_param is QLineEdit inside the param_widget
+        edit_param = param_widget.findChild(QLineEdit) if hasattr(param_widget, 'findChild') else param_widget
         new_type = cmb.currentData() or ctype
-        param_val = edit_param.text().strip()
+        param_val = edit_param.text().strip() if hasattr(edit_param, 'text') else ""
         # 更新检测类型显示
         table.item(2, col).setText(new_type)
         table.item(3, col).setText(param_val)
@@ -694,9 +816,163 @@ class FileSettingsPage(QWidget):
                         parts = param_val.replace("°", "").split("–")
                         if len(parts) == 2:
                             self._mw._ar_lag_config.add_range(float(parts[0]), float(parts[1]))
+            elif new_type == "rhcp_single":
+                try:
+                    val = float(param_val.replace("°", ""))
+                except ValueError:
+                    val = None
+                if val is not None and hasattr(self._mw, '_rhcp_lag_config'):
+                    self._mw._rhcp_lag_config.add_single(val)
+            elif new_type == "cp_xpi_single":
+                try:
+                    val = float(param_val.replace("°", ""))
+                except ValueError:
+                    val = None
+                if val is not None and hasattr(self._mw, '_cpxpi_lag_config'):
+                    self._mw._cpxpi_lag_config.add_single(val)
             self._mw._log(f"✓ 已应用: {new_type} = {param_val}")
-        QMessageBox.information(parent_dlg, self.tr("已应用"),
-            self.tr(f"已更新参数: {new_type} = {param_val}"))
+
+    def _on_preview_type_changed(self, col: int, cmb: QComboBox, table, raw_header: str,
+                                  edit_param=None):
+        """修正类型变更 → 从天线参数配置自动填充角度值。"""
+        if edit_param is None:
+            pw = table.cellWidget(5, col)
+            edit_param = pw.findChild(QLineEdit) if pw and hasattr(pw, 'findChild') else pw
+        if edit_param is None:
+            return
+        new_type = cmb.currentData()
+        if not new_type:
+            return
+
+        # 从列头提取角度
+        import re
+        from src.lag_config import _RE_LAG_SINGLE, _RE_LAG_RANGE
+        _RE_AR_S = re.compile(
+            r"(?:AR|Axial\s*Ratio)\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)", re.IGNORECASE)
+        _RE_AR_R = re.compile(
+            r"(?:AR|Axial\s*Ratio)\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)\s*[-–—~]\s*(\d+\.?\d*)", re.IGNORECASE)
+
+        angle_val = ""
+        if new_type in ("lag_single", "ar_single"):
+            rx = _RE_LAG_SINGLE if new_type == "lag_single" else _RE_AR_S
+            m = rx.search(raw_header)
+            if m:
+                angle_val = f"{m.group(1)}°"
+
+        elif new_type in ("lag_range", "ar_range"):
+            rx = _RE_LAG_RANGE if new_type == "lag_range" else _RE_AR_R
+            m = rx.search(raw_header)
+            if m:
+                angle_val = f"{m.group(1)}–{m.group(2)}°"
+
+        # 列头未提取到 → 从天线参数 AnglePicker 配置读取
+        if not angle_val and self._mw:
+            lag_cfg = getattr(self._mw, '_lag_config', None)
+            ar_cfg = getattr(self._mw, '_ar_lag_config', None)
+
+            if new_type in ("lag_single",) and lag_cfg:
+                singles = lag_cfg.singles_sorted
+                if singles:
+                    angle_val = ", ".join(f"{a}°" for a in singles[:3])
+            elif new_type in ("lag_range",) and lag_cfg:
+                ranges = lag_cfg.ranges_sorted
+                if ranges:
+                    lo, hi = ranges[0]
+                    angle_val = f"{lo}–{hi}°"
+            elif new_type in ("ar_single",) and ar_cfg:
+                singles = ar_cfg.singles_sorted
+                if singles:
+                    angle_val = ", ".join(f"{a}°" for a in singles[:3])
+            elif new_type in ("ar_range",) and ar_cfg:
+                ranges = ar_cfg.ranges_sorted
+                if ranges:
+                    lo, hi = ranges[0]
+                    angle_val = f"{lo}–{hi}°"
+            elif new_type == "rhcp_single":
+                rhcp_cfg = getattr(self._mw, '_rhcp_lag_config', None) or lag_cfg
+                singles = rhcp_cfg.singles_sorted if rhcp_cfg else []
+                if singles:
+                    angle_val = ", ".join(f"{a}°" for a in singles[:3])
+            elif new_type == "cp_xpi_single":
+                cp_cfg = getattr(self._mw, '_cpxpi_lag_config', None) or lag_cfg
+                singles = cp_cfg.singles_sorted if cp_cfg else []
+                if singles:
+                    angle_val = ", ".join(f"{a}°" for a in singles[:3])
+
+        if angle_val:
+            edit_param.setText(angle_val)
+
+    def _on_preview_open_angle_popup(self, col: int, cmb: QComboBox, edit_param: QLineEdit):
+        """预览中点击 ⚙ → 打开角度配置弹窗，批量填充所有同 target 列。"""
+        ctype = cmb.currentData()
+        if not ctype:
+            return
+        type_to_target = {
+            "lag_single": "gain", "lag_range": "gain",
+            "ar_single": "ar", "ar_range": "ar",
+            "rhcp_single": "rhcp", "cp_xpi_single": "cpxpi",
+        }
+        target = type_to_target.get(ctype)
+        if not target:
+            return
+        self._show_angle_popup(target)
+        if not self._mw:
+            return
+        config_attrs = {
+            "gain": "_lag_config", "ar": "_ar_lag_config",
+            "rhcp": "_rhcp_lag_config", "cpxpi": "_cpxpi_lag_config",
+        }
+        cfg = getattr(self._mw, config_attrs.get(target, "_lag_config"), None)
+        if not cfg:
+            return
+
+        # 扫描表所有列，批量填充同 target 的参数
+        all_same_target = {t for t, tg in type_to_target.items() if tg == target}
+        pw_parent = edit_param.parent()  # param_widget
+        table = pw_parent.parent().parent() if pw_parent else None
+        if not isinstance(table, QTableWidget):
+            return
+        n = table.columnCount()
+        for ci in range(n):
+            cell_cmb = table.cellWidget(4, ci)
+            if not cell_cmb:
+                continue
+            cell_ctype = cell_cmb.currentData()
+            if cell_ctype not in all_same_target:
+                continue
+            pw = table.cellWidget(5, ci)
+            cell_edit = pw.findChild(QLineEdit) if pw and hasattr(pw, 'findChild') else pw
+            if not cell_edit:
+                continue
+            singles = cfg.singles_sorted
+            ranges = cfg.ranges_sorted
+            if cell_ctype.endswith("_single") and singles:
+                cell_edit.setText(", ".join(f"{a}°" for a in singles[:5]))
+            elif cell_ctype.endswith("_range") and ranges:
+                lo, hi = ranges[0]
+                cell_edit.setText(f"{lo}–{hi}°")
+
+    def _on_preview_apply_all(self, dlg, table, n_cols, mappings):
+        """批量应用所有列的修正参数。"""
+        applied = 0
+        for ci in range(n_cols):
+            cmb = table.cellWidget(4, ci)
+            if not cmb:
+                continue
+            new_type = cmb.currentData()
+            orig_type = mappings[ci].detected_type if ci < len(mappings) else "unknown"
+            if new_type == orig_type:
+                continue  # 未修改，跳过
+            pw = table.cellWidget(5, ci)
+            if not pw:
+                continue
+            edit_param = pw.findChild(QLineEdit) if hasattr(pw, 'findChild') else pw
+            self._on_preview_apply(dlg, ci, orig_type, table)
+            applied += 1
+        # 更新摘要
+        sl = getattr(dlg, '_summary_label', None)
+        if sl:
+            sl.setText(self.tr("已批量应用 {} 项修正").format(applied))
 
     def _on_add_data_files(self):
         if not self._cfg:
@@ -1021,6 +1297,22 @@ class FileSettingsPage(QWidget):
                 sheet_mode_map[sn] = getattr(self._mw, '_test_mode', 0) if self._mw else 0
         return sheet_mode_map
 
+    def _show_metadata_editor(self):
+        """打开报告元数据编辑对话框。"""
+        from ui.dialogs import ReportMetadataDialog
+        dlg = ReportMetadataDialog(self._mw if self._mw else self)
+        dlg.exec()
+
+    def _show_pattern_manager(self):
+        """打开列识别规则管理对话框。"""
+        dlg = PatternManagerDialog(self._mw if self._mw else self)
+        dlg.exec()
+        try:
+            from src.excel_reader import reload_column_patterns
+            reload_column_patterns()
+        except ImportError:
+            pass
+
 
 # ═══════════════════════════════════════════════════════════════
 # AntennaParamsPage — 天线参数
@@ -1041,20 +1333,19 @@ class AntennaParamsPage(QWidget):
     # ── 参数定义（来自 CalcParamsDialog） ──
     _COMMON_PARAMS = [
         ("Gain", [
-            ("gain", "Peak Gain"),
-            ("lag_single", "Gain @ θ（单角度）"),
-            ("lag_range", "Gain @ θ Range（范围）"),
+            ("gain", "Gain (Peak / 单角度 / 范围)"),
         ]),
         ("Directivity", [
             ("directivity", "Directivity (dBi)"),
         ]),
-        ("Efficiency", [
+        ("Efficiency / 总效率", [
             ("efficiency_pct", "Efficiency (%)"),
             ("efficiency_db", "Efficiency (dB)"),
+            ("total_efficiency_pct", "Total Efficiency (%)"),
+            ("mismatch_loss_db", "Mismatch Loss (dB)"),
         ]),
         ("Axial Ratio", [
-            ("ar_single", "AR @ θ（单角度）"),
-            ("ar_range", "AR @ θ Range（范围）"),
+            ("ar", "Axial Ratio (单角度 / 范围)"),
         ]),
         ("波束参数", [
             ("boresight_theta", "Boresight θ"),
@@ -1081,10 +1372,7 @@ class AntennaParamsPage(QWidget):
             ("rhcp_single", "RHCP Gain @ θ（单角度）"),
             ("cp_xpi_single", "CP-XPI @ θ（单角度）"),
         ]),
-        ("总效率", [
-            ("total_efficiency_pct", "Total Efficiency (%)"),
-            ("mismatch_loss_db", "Mismatch Loss (dB)"),
-        ]),
+
         ("相位中心", [
             ("pc_theta_mm", "PC Theta (mm)"),
             ("pc_phi_mm", "PC Phi (mm)"),
@@ -1102,6 +1390,7 @@ class AntennaParamsPage(QWidget):
             ("nhprp_225", "NHPRP ±22.5° (Pi/8)"),
             ("nhprp_custom", "NHPRP 自定义角度"),
         ]),
+        # 注意: NHPRP/NHPIS 角度使用 AnglePicker 配置 (天线参数页 — Gain ⚙)
         ("半球 PRP", [
             ("uh_prp", "Upper Hemisphere PRP"),
             ("lh_prp", "Lower Hemisphere PRP"),
@@ -1166,6 +1455,8 @@ class AntennaParamsPage(QWidget):
 
         self._gain_angle_widget: Optional[AnglePickerWidget] = None
         self._ar_angle_widget: Optional[AnglePickerWidget] = None
+        self._rhcp_angle_widget: Optional[AnglePickerWidget] = None
+        self._cpxpi_angle_widget: Optional[AnglePickerWidget] = None
         self._nh_custom_angles: List[float] = []
         self._extrapolate: bool = False
         self._robust_peak: bool = False
@@ -1178,6 +1469,7 @@ class AntennaParamsPage(QWidget):
 
         self._setup_ui()
         self._load_state()
+        self._current_mode = getattr(self._mw, '_test_mode', 0) if self._mw else 0
         self._rebuild_param_columns()
 
     # _required_params / _extra_params 代理到 MainWindow (单一数据源)
@@ -1279,9 +1571,14 @@ class AntennaParamsPage(QWidget):
         trim_row.addWidget(self._spin_trim_end)
         algo_layout.addLayout(trim_row)
 
-        self._check_extrap = QCheckBox(self.tr("Theta 外推 180°"))
-        self._check_extrap.toggled.connect(lambda: self._sync_to_mw())
-        algo_layout.addWidget(self._check_extrap)
+        row_extrap = QHBoxLayout()
+        row_extrap.addWidget(QLabel(self.tr("Theta 外推:")))
+        self._cmb_extrap = self._make_extrap_combo(include_none=True)
+        self._cmb_extrap.setToolTip(self.tr("除 Directivity 外所有参数的 Theta 外推算法"))
+        self._cmb_extrap.currentIndexChanged.connect(lambda: self._sync_to_mw())
+        row_extrap.addWidget(self._cmb_extrap)
+        row_extrap.addStretch()
+        algo_layout.addLayout(row_extrap)
         self._check_robust = QCheckBox(self.tr("Robust peak"))
         self._check_robust.toggled.connect(lambda: self._sync_to_mw())
         algo_layout.addWidget(self._check_robust)
@@ -1389,19 +1686,24 @@ class AntennaParamsPage(QWidget):
 
     def _show_angle_popup(self, target: str):
         """角度配置弹窗：加自定义角度+步进生成+汇总列表(可删)。"""
-        is_ar = (target == "ar")
         # 从现有配置加载
-        if is_ar and hasattr(self, '_ar_angle_widget') and self._ar_angle_widget:
-            src_cfg = self._ar_angle_widget.get_config()
-        elif not is_ar and hasattr(self, '_gain_angle_widget') and self._gain_angle_widget:
-            src_cfg = self._gain_angle_widget.get_config()
+        target_widgets = {
+            "gain":  ("_gain_angle_widget",  "Gain"),
+            "ar":    ("_ar_angle_widget",    "AR"),
+            "rhcp":  ("_rhcp_angle_widget",  "RHCP Gain"),
+            "cpxpi": ("_cpxpi_angle_widget", "CP-XPI"),
+        }
+        attr, label = target_widgets.get(target, ("_gain_angle_widget", "Gain"))
+        widget = getattr(self, attr, None)
+        if widget and hasattr(widget, 'get_config'):
+            src_cfg = widget.get_config()
         else:
             src_cfg = LagConfig()
         singles = list(src_cfg.single_angles)
         ranges = list(src_cfg.ranges)
 
         dlg = QDialog(self)
-        dlg.setWindowTitle(f"{'AR' if is_ar else 'Gain'} " + self.tr("角度配置"))
+        dlg.setWindowTitle(label + " " + self.tr("角度配置"))
         dlg.setMinimumSize(520, 460)
         layout = QVBoxLayout(dlg)
 
@@ -1518,8 +1820,8 @@ class AntennaParamsPage(QWidget):
         splitter.addWidget(bottom)
         layout.addWidget(splitter)
 
-        # AR 输出单位
-        if is_ar:
+        # AR 输出单位（仅 AR 需要）
+        if target == "ar":
             ar_row = QHBoxLayout()
             ar_row.addWidget(QLabel(self.tr("AR 输出单位:")))
             cmb_ar_out = QComboBox()
@@ -1540,18 +1842,18 @@ class AntennaParamsPage(QWidget):
         layout.addLayout(btn_row)
 
         def on_accept():
+            from ui.widgets import AnglePickerWidget
             new_cfg = LagConfig(single_angles=singles, ranges=ranges)
-            if is_ar:
-                if not self._ar_angle_widget:
-                    from ui.widgets import AnglePickerWidget
-                    self._ar_angle_widget = AnglePickerWidget()
-                self._ar_angle_widget.set_config(new_cfg)
+            widget_attrs = {
+                "gain": "_gain_angle_widget", "ar": "_ar_angle_widget",
+                "rhcp": "_rhcp_angle_widget", "cpxpi": "_cpxpi_angle_widget",
+            }
+            attr = widget_attrs.get(target, "_gain_angle_widget")
+            if not getattr(self, attr, None):
+                setattr(self, attr, AnglePickerWidget())
+            getattr(self, attr).set_config(new_cfg)
+            if target == "ar":
                 self._cmb_ar_output.setCurrentIndex(cmb_ar_out.currentIndex())
-            else:
-                if not self._gain_angle_widget:
-                    from ui.widgets import AnglePickerWidget
-                    self._gain_angle_widget = AnglePickerWidget()
-                self._gain_angle_widget.set_config(new_cfg)
             self._on_angle_changed(target)
             dlg.accept()
 
@@ -1580,8 +1882,14 @@ class AntennaParamsPage(QWidget):
         ar_cfg = self._ar_angle_widget.get_config() if self._ar_angle_widget else LagConfig()
         s["ar_singles"] = list(ar_cfg.single_angles)
         s["ar_ranges"] = list(ar_cfg.ranges)
+        rhcp_cfg = self._rhcp_angle_widget.get_config() if self._rhcp_angle_widget else LagConfig()
+        s["rhcp_singles"] = list(rhcp_cfg.single_angles)
+        s["rhcp_ranges"] = list(rhcp_cfg.ranges)
+        cpxpi_cfg = self._cpxpi_angle_widget.get_config() if self._cpxpi_angle_widget else LagConfig()
+        s["cpxpi_singles"] = list(cpxpi_cfg.single_angles)
+        s["cpxpi_ranges"] = list(cpxpi_cfg.ranges)
         s["nh_custom_angles"] = list(self._nh_custom_angles)
-        s["extrapolate"] = self._check_extrap.isChecked()
+        s["extrapolate"] = self._cmb_extrap.currentData()
         s["robust_peak"] = self._check_robust.isChecked()
         s["ar_output_db"] = self._cmb_ar_output.currentData()
         s["freq_source"] = self._cmb_freq_src.currentData()
@@ -1605,9 +1913,27 @@ class AntennaParamsPage(QWidget):
         )
         if self._ar_angle_widget:
             self._ar_angle_widget.set_config(ar_cfg)
+        rhcp_cfg = LagConfig(
+            single_angles=list(s.get("rhcp_singles", [])),
+            ranges=list(s.get("rhcp_ranges", [])),
+        )
+        if self._rhcp_angle_widget:
+            self._rhcp_angle_widget.set_config(rhcp_cfg)
+        cpxpi_cfg = LagConfig(
+            single_angles=list(s.get("cpxpi_singles", [])),
+            ranges=list(s.get("cpxpi_ranges", [])),
+        )
+        if self._cpxpi_angle_widget:
+            self._cpxpi_angle_widget.set_config(cpxpi_cfg)
         self._nh_custom_angles = list(s.get("nh_custom_angles", []))
         self._sync_nh_angle_display()
-        self._check_extrap.setChecked(s["extrapolate"])
+        cur = s.get("extrapolate")
+        if isinstance(cur, bool):
+            # 兼容旧版 bool 状态: True → "linear", False → None
+            cur = "linear" if cur else None
+        idx = self._cmb_extrap.findData(cur)
+        if idx >= 0:
+            self._cmb_extrap.setCurrentIndex(idx)
         self._check_robust.setChecked(s["robust_peak"])
         self._cmb_ar_output.setCurrentIndex(0 if s.get("ar_output_db", True) else 1)
         idx = self._cmb_freq_src.findData(s["freq_source"])
@@ -1643,27 +1969,48 @@ class AntennaParamsPage(QWidget):
                 cb = QCheckBox(label)
                 self._left_checkboxes[key] = cb
                 cb.toggled.connect(lambda checked, k=key: self._sync_to_mw())
-                cb.setChecked(key in self._template_params)
+                # 反向联动: 子参数 → 主 checkbox
+                tpl = self._template_params
+                cascade_up = (key == "gain" and ("lag_single" in tpl or "lag_range" in tpl)) or                              (key == "ar" and ("ar_single" in tpl or "ar_range" in tpl))
+                cb.setChecked(key in self._template_params or cascade_up)
                 gl.addWidget(cb)
             if grp_name == "Gain":
-                btn = QPushButton(self.tr("📡 Gain 角度设置..."))
+                btn = QPushButton(self.tr("⚙ 角度"))
+                btn.setFixedWidth(60)
                 btn.clicked.connect(lambda: self._show_angle_popup("gain"))
                 gl.addWidget(btn)
+            elif grp_name == "Efficiency / 总效率":
+                pass  # 无角度设置
             elif grp_name == "Axial Ratio":
-                btn = QPushButton(self.tr("🔄 AR 角度设置..."))
+                btn = QPushButton(self.tr("⚙ 角度"))
+                btn.setFixedWidth(60)
                 btn.clicked.connect(lambda: self._show_angle_popup("ar"))
                 gl.addWidget(btn)
+            elif grp_name == "圆极化 (RHCP/LHCP)":
+                row_rhcp = QHBoxLayout()
+                row_rhcp.addWidget(QLabel(self.tr("  ⤷ RHCP:")))
+                btn_rhcp = QPushButton(self.tr("⚙ 角度"))
+                btn_rhcp.setFixedWidth(60)
+                btn_rhcp.setToolTip(self.tr("RHCP Gain 角度配置"))
+                btn_rhcp.clicked.connect(lambda: self._show_angle_popup("rhcp"))
+                row_rhcp.addWidget(btn_rhcp)
+                row_rhcp.addStretch()
+                gl.addLayout(row_rhcp)
+                row_cp = QHBoxLayout()
+                row_cp.addWidget(QLabel(self.tr("  ⤷ CP-XPI:")))
+                btn_cp = QPushButton(self.tr("⚙ 角度"))
+                btn_cp.setFixedWidth(60)
+                btn_cp.setToolTip(self.tr("CP-XPI 角度配置"))
+                btn_cp.clicked.connect(lambda: self._show_angle_popup("cpxpi"))
+                row_cp.addWidget(btn_cp)
+                row_cp.addStretch()
+                gl.addLayout(row_cp)
             elif grp_name == "Directivity":
                 row_de = QHBoxLayout()
                 row_de.addWidget(QLabel(self.tr("外推:")))
-                cmb_de = QComboBox()
-                cmb_de.addItem(self.tr("线性"), "linear")
-                cmb_de.addItem(self.tr("常数"), "constant")
-                cmb_de.addItem(self.tr("镜像"), "mirror")
+                cmb_de = self._make_extrap_combo(include_none=False)
                 cmb_de.setToolTip(self.tr("Directivity 外推算法"))
-                cmb_de.setCurrentIndex(0)
                 cmb_de.currentIndexChanged.connect(lambda: self._sync_to_mw())
-                # 读取当前值
                 mw = getattr(self, '_mw', None)
                 if mw:
                     cur = getattr(mw, '_dir_extrap_method', 'linear')
@@ -1672,7 +2019,6 @@ class AntennaParamsPage(QWidget):
                 row_de.addWidget(cmb_de)
                 row_de.addStretch()
                 gl.addLayout(row_de)
-                # 存入引用供 _sync_to_mw 使用
                 setattr(self, '_cmb_dir_extrap_de', cmb_de)
             left_layout.addWidget(grp)
         left_layout.addStretch()
@@ -1693,13 +2039,49 @@ class AntennaParamsPage(QWidget):
                 cb.setChecked(False)
                 gl.addWidget(cb)
             if grp_name == "Gain":
-                btn = QPushButton(self.tr("📡 Gain 角度设置..."))
+                btn = QPushButton(self.tr("⚙ 角度"))
+                btn.setFixedWidth(60)
                 btn.clicked.connect(lambda: self._show_angle_popup("gain"))
                 gl.addWidget(btn)
             elif grp_name == "Axial Ratio":
-                btn = QPushButton(self.tr("🔄 AR 角度设置..."))
+                btn = QPushButton(self.tr("⚙ 角度"))
+                btn.setFixedWidth(60)
                 btn.clicked.connect(lambda: self._show_angle_popup("ar"))
                 gl.addWidget(btn)
+            elif grp_name == "圆极化 (RHCP/LHCP)":
+                row_rhcp = QHBoxLayout()
+                row_rhcp.addWidget(QLabel(self.tr("  ⤷ RHCP:")))
+                btn_rhcp = QPushButton(self.tr("⚙ 角度"))
+                btn_rhcp.setFixedWidth(60)
+                btn_rhcp.setToolTip(self.tr("RHCP Gain 角度配置"))
+                btn_rhcp.clicked.connect(lambda: self._show_angle_popup("rhcp"))
+                row_rhcp.addWidget(btn_rhcp)
+                row_rhcp.addStretch()
+                gl.addLayout(row_rhcp)
+                row_cp = QHBoxLayout()
+                row_cp.addWidget(QLabel(self.tr("  ⤷ CP-XPI:")))
+                btn_cp = QPushButton(self.tr("⚙ 角度"))
+                btn_cp.setFixedWidth(60)
+                btn_cp.setToolTip(self.tr("CP-XPI 角度配置"))
+                btn_cp.clicked.connect(lambda: self._show_angle_popup("cpxpi"))
+                row_cp.addWidget(btn_cp)
+                row_cp.addStretch()
+                gl.addLayout(row_cp)
+            elif grp_name == "Directivity":
+                row_de = QHBoxLayout()
+                row_de.addWidget(QLabel(self.tr("外推:")))
+                cmb_de = self._make_extrap_combo(include_none=False)
+                cmb_de.setToolTip(self.tr("Directivity 外推算法"))
+                mw = getattr(self, '_mw', None)
+                if mw:
+                    cur = getattr(mw, '_dir_extrap_method', 'linear')
+                    idx = cmb_de.findData(cur)
+                    if idx >= 0: cmb_de.setCurrentIndex(idx)
+                cmb_de.currentIndexChanged.connect(lambda: self._on_dir_extrap_xtr_changed(cmb_de))
+                row_de.addWidget(cmb_de)
+                row_de.addStretch()
+                gl.addLayout(row_de)
+                setattr(self, '_cmb_dir_extrap_de_xtr', cmb_de)
             right_layout.addWidget(grp)
         right_layout.addStretch()
         hbox.addWidget(right_box, 1)
@@ -1851,6 +2233,17 @@ class AntennaParamsPage(QWidget):
 
     # ── 摘要 ──
 
+    def _make_extrap_combo(self, include_none: bool = True):
+        """创建外推算法下拉框。include_none=True 时首项为"不外推"。"""
+        cmb = QComboBox()
+        if include_none:
+            cmb.addItem(self.tr("不外推"), None)
+        cmb.addItem(self.tr("线性"), "linear")
+        cmb.addItem(self.tr("常数"), "constant")
+        cmb.addItem(self.tr("镜像"), "mirror")
+        cmb.setCurrentIndex(0)
+        return cmb
+
     @staticmethod
     def _get_checked_keys(checkbox_dict: dict) -> set:
         return {k for k, cb in checkbox_dict.items() if cb.isChecked()}
@@ -1891,14 +2284,54 @@ class AntennaParamsPage(QWidget):
 
         _sync_widget(self._gain_angle_widget, '_lag_config', has_ui=True)
         _sync_widget(self._ar_angle_widget, '_ar_lag_config')
+        _sync_widget(self._rhcp_angle_widget, '_rhcp_lag_config')
+        _sync_widget(self._cpxpi_angle_widget, '_cpxpi_lag_config')
 
         required = set(k for k, cb in self._left_checkboxes.items() if cb.isChecked())
         extra = set(k for k, cb in self._right_checkboxes.items() if cb.isChecked())
+
+        # Gain 联动: 勾选 Gain → 自动包含 lag_single + lag_range
+        if "gain" in required:
+            required.add("lag_single")
+            required.add("lag_range")
+        if "gain" in extra:
+            extra.add("lag_single")
+            extra.add("lag_range")
+
+        # AR 联动: 勾选 AR → 自动包含 ar_single + ar_range
+        if "ar" in required:
+            required.add("ar_single")
+            required.add("ar_range")
+        if "ar" in extra:
+            extra.add("ar_single")
+            extra.add("ar_range")
         mw._required_params = required
         mw._extra_params = extra
         mw._nh_custom_angles = list(self._nh_custom_angles)
         if hasattr(self, '_cmb_dir_extrap_de'):
-            mw._dir_extrap_method = self._cmb_dir_extrap_de.currentData()
+            cur = self._cmb_dir_extrap_de.currentData()
+            mw._dir_extrap_method = cur
+            # 同步到右侧 full_report 的独立下拉框
+            if hasattr(self, '_cmb_dir_extrap_de_xtr'):
+                self._cmb_dir_extrap_de_xtr.blockSignals(True)
+                idx = self._cmb_dir_extrap_de_xtr.findData(cur)
+                if idx >= 0:
+                    self._cmb_dir_extrap_de_xtr.setCurrentIndex(idx)
+                self._cmb_dir_extrap_de_xtr.blockSignals(False)
+
+    def _on_dir_extrap_xtr_changed(self, cmb: QComboBox):
+        """右侧 full_report 栏 Directivity 外推下拉变更 → 同步到左侧 + MainWindow。"""
+        cur = cmb.currentData()
+        mw = getattr(self, '_mw', None)
+        if mw:
+            mw._dir_extrap_method = cur
+        if hasattr(self, '_cmb_dir_extrap_de'):
+            self._cmb_dir_extrap_de.blockSignals(True)
+            idx = self._cmb_dir_extrap_de.findData(cur)
+            if idx >= 0:
+                self._cmb_dir_extrap_de.setCurrentIndex(idx)
+            self._cmb_dir_extrap_de.blockSignals(False)
+        self._sync_to_mw()
 
         if hasattr(mw, '_cmb_freq_source') and mw._cmb_freq_source:
             data = self._cmb_freq_src.currentData()
@@ -1909,8 +2342,8 @@ class AntennaParamsPage(QWidget):
             if hasattr(mw, '_spin_trim_start'):
                 mw._spin_trim_start.setValue(self._spin_trim_start.value())
                 mw._spin_trim_end.setValue(self._spin_trim_end.value())
-            if hasattr(mw, '_check_extrapolate'):
-                mw._check_extrapolate.setChecked(self._check_extrap.isChecked())
+            if hasattr(self, '_cmb_extrap'):
+                mw._theta_extrap_method = self._cmb_extrap.currentData()
             if hasattr(mw, '_check_robust_peak'):
                 mw._check_robust_peak.setChecked(self._check_robust.isChecked())
             mw._ar_output_db = self._cmb_ar_output.currentData()
@@ -1950,6 +2383,16 @@ class AntennaParamsPage(QWidget):
                 from ui.widgets import AnglePickerWidget
                 self._ar_angle_widget = AnglePickerWidget(self.tr("AR 角度"))
             self._ar_angle_widget.set_config(mw._ar_lag_config)
+        if hasattr(mw, '_rhcp_lag_config'):
+            if not self._rhcp_angle_widget:
+                from ui.widgets import AnglePickerWidget
+                self._rhcp_angle_widget = AnglePickerWidget(self.tr("RHCP 角度"))
+            self._rhcp_angle_widget.set_config(mw._rhcp_lag_config)
+        if hasattr(mw, '_cpxpi_lag_config'):
+            if not self._cpxpi_angle_widget:
+                from ui.widgets import AnglePickerWidget
+                self._cpxpi_angle_widget = AnglePickerWidget(self.tr("CP-XPI 角度"))
+            self._cpxpi_angle_widget.set_config(mw._cpxpi_lag_config)
         # 以下读取 MainWindow UI 控件，可能因跨测试 GC 导致 C++ 对象已删除
         try:
             if hasattr(mw, '_cmb_freq_source') and mw._cmb_freq_source:
@@ -1966,8 +2409,16 @@ class AntennaParamsPage(QWidget):
         except RuntimeError:
             pass
         try:
-            if hasattr(mw, '_check_extrapolate'):
-                self._check_extrap.setChecked(mw._check_extrapolate.isChecked())
+            if hasattr(mw, '_theta_extrap_method') and hasattr(self, '_cmb_extrap'):
+                idx = self._cmb_extrap.findData(mw._theta_extrap_method)
+                if idx >= 0:
+                    self._cmb_extrap.setCurrentIndex(idx)
+            elif hasattr(mw, '_check_extrapolate'):
+                # 兼容旧版 checkbox
+                val = "linear" if mw._check_extrapolate.isChecked() else None
+                idx = self._cmb_extrap.findData(val)
+                if idx >= 0:
+                    self._cmb_extrap.setCurrentIndex(idx)
             if hasattr(mw, '_check_robust_peak'):
                 self._check_robust.setChecked(mw._check_robust_peak.isChecked())
         except RuntimeError:
@@ -2028,7 +2479,9 @@ class AntennaParamsPage(QWidget):
             ),
             "lag_config": self._gain_angle_widget.get_config() if self._gain_angle_widget else LagConfig(),
             "ar_lag_config": self._ar_angle_widget.get_config() if self._ar_angle_widget else LagConfig(),
-            "extrapolate": self._check_extrap.isChecked(),
+            "rhcp_lag_config": self._rhcp_angle_widget.get_config() if self._rhcp_angle_widget else LagConfig(),
+            "cpxpi_lag_config": self._cpxpi_angle_widget.get_config() if self._cpxpi_angle_widget else LagConfig(),
+            "extrapolate": self._cmb_extrap.currentData(),
             "robust_peak": self._check_robust.isChecked(),
             "ar_output_db": self._cmb_ar_output.currentData(),
             "freq_source": self._cmb_freq_src.currentData(),
@@ -2045,6 +2498,10 @@ class AntennaParamsPage(QWidget):
 
     def get_gen_diff_chart(self) -> bool:
         return hasattr(self, '_chk_gen_diff_chart') and self._chk_gen_diff_chart.isChecked()
+
+    def get_skip_original(self) -> bool:
+        """是否跳过原始步进。"""
+        return hasattr(self, '_chk_skip_original') and self._chk_skip_original.isChecked()
 
     def get_selected_steps(self) -> list:
         """获取用户选中的步进值列表。未启用多步进则返回空。"""
@@ -2064,9 +2521,222 @@ class AntennaParamsPage(QWidget):
                         pass
         return sorted(steps)
 
-    def get_skip_original(self) -> bool:
-        """是否跳过原始步进。"""
-        return hasattr(self, '_chk_skip_original') and self._chk_skip_original.isChecked()
+# ═══════════════════════════════════════════════════════════════
+# PatternManagerDialog — 列识别规则 JSON 编辑器
+# ═══════════════════════════════════════════════════════════════
+
+class PatternManagerDialog(QDialog):
+    """管理 config/column_patterns.json 的 GUI 编辑器。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("列识别规则管理"))
+        self.setMinimumSize(900, 600)
+        self._patterns: list[dict] = []
+        self._dirty = False
+
+        layout = QVBoxLayout(self)
+
+        # ── 顶部：测试栏 ──
+        test_grp = QGroupBox(self.tr("测试匹配"))
+        test_row = QHBoxLayout(test_grp)
+        test_row.addWidget(QLabel(self.tr("列头:")))
+        self._edit_test = QLineEdit()
+        self._edit_test.setPlaceholderText(self.tr("输入列头文本，如: Gain at Theta=30 (dB)"))
+        test_row.addWidget(self._edit_test, 1)
+        btn_test = QPushButton(self.tr("测试"))
+        btn_test.clicked.connect(self._test_match)
+        test_row.addWidget(btn_test)
+        self._lbl_test_result = QLabel("")
+        test_row.addWidget(self._lbl_test_result)
+        layout.addWidget(test_grp)
+
+        # ── 中部：模式表格 ──
+        self._table = QTableWidget()
+        self._table.setColumnCount(5)
+        self._table.setHorizontalHeaderLabels([
+            self.tr("列类型"), self.tr("关键词(AND)"), self.tr("中文(OR)"),
+            self.tr("正则"), self.tr("排除词"),
+        ])
+        self._table.horizontalHeader().setStretchLastSection(True)
+        self._table.setSelectionBehavior(QTableWidget.SelectRows)
+        self._table.setAlternatingRowColors(True)
+        layout.addWidget(self._table, 1)
+
+        # ── 底部：操作按钮 ──
+        btn_row = QHBoxLayout()
+        btn_add = QPushButton(self.tr("+ 添加"))
+        btn_add.clicked.connect(self._add_row)
+        btn_row.addWidget(btn_add)
+        btn_dup = QPushButton(self.tr("复制选中"))
+        btn_dup.clicked.connect(self._dup_row)
+        btn_row.addWidget(btn_dup)
+        btn_del = QPushButton(self.tr("删除选中"))
+        btn_del.clicked.connect(self._del_row)
+        btn_row.addWidget(btn_del)
+        btn_row.addStretch()
+        btn_reload = QPushButton(self.tr("重新加载"))
+        btn_reload.clicked.connect(self._load)
+        btn_row.addWidget(btn_reload)
+        btn_save = QPushButton(self.tr("💾 保存"))
+        btn_save.setStyleSheet("font-weight:bold;")
+        btn_save.clicked.connect(self._save)
+        btn_row.addWidget(btn_save)
+        layout.addLayout(btn_row)
+
+        self._load()
+
+    def _load(self):
+        """从 JSON 加载模式到表格。"""
+        import json, os, sys
+        patterns = []
+        candidates = []
+        if getattr(sys, 'frozen', False):
+            candidates.append(os.path.join(os.path.dirname(sys.executable), "config", "column_patterns.json"))
+        candidates.append(os.path.join(os.path.dirname(__file__), "..", "config", "column_patterns.json"))
+        candidates.append(os.path.join(os.getcwd(), "config", "column_patterns.json"))
+        for p in candidates:
+            path = os.path.normpath(p)
+            if os.path.isfile(path):
+                try:
+                    with open(path, encoding='utf-8') as f:
+                        data = json.load(f)
+                    patterns = data.get("patterns", [])
+                    break
+                except Exception:
+                    pass
+
+        self._patterns = patterns
+        self._table.setRowCount(len(patterns))
+        for i, entry in enumerate(patterns):
+            self._set_row(i, entry)
+        self._dirty = False
+
+    def _set_row(self, row: int, entry: dict):
+        """填充一行。"""
+        t = self._table
+        col_type = entry.get("col_type", "")
+        keywords = ", ".join(entry.get("keywords", []))
+        cn = entry.get("cn", "")
+        regex = entry.get("regex", "")
+        negate = ", ".join(entry.get("negate", []))
+
+        t.setItem(row, 0, QTableWidgetItem(col_type))
+        t.setItem(row, 1, QTableWidgetItem(keywords))
+        t.setItem(row, 2, QTableWidgetItem(cn))
+        t.setItem(row, 3, QTableWidgetItem(regex))
+        t.setItem(row, 4, QTableWidgetItem(negate))
+
+    def _read_row(self, row: int) -> dict:
+        """从表格读取一行。"""
+        t = self._table
+
+        def _cell(col): return (t.item(row, col).text() if t.item(row, col) else "").strip()
+
+        entry = {"col_type": _cell(0)}
+        kw_text = _cell(1)
+        entry["keywords"] = [k.strip() for k in kw_text.split(",") if k.strip()] if kw_text else []
+        cn = _cell(2)
+        if cn:
+            entry["cn"] = cn
+        regex = _cell(3)
+        if regex:
+            entry["regex"] = regex
+        neg_text = _cell(4)
+        entry["negate"] = [n.strip() for n in neg_text.split(",") if n.strip()] if neg_text else []
+        # Preserve extra_req if it existed
+        return entry
+
+    def _add_row(self):
+        """添加新行。"""
+        row = self._table.rowCount()
+        self._table.insertRow(row)
+        self._table.setItem(row, 0, QTableWidgetItem("new_param"))
+        self._table.setItem(row, 1, QTableWidgetItem(""))
+        self._table.setItem(row, 2, QTableWidgetItem(""))
+        self._table.setItem(row, 3, QTableWidgetItem(""))
+        self._table.setItem(row, 4, QTableWidgetItem(""))
+        self._table.scrollToBottom()
+
+    def _dup_row(self):
+        """复制选中行。"""
+        rows = set(i.row() for i in self._table.selectedItems())
+        if not rows:
+            return
+        src = max(rows)
+        entry = self._read_row(src)
+        row = self._table.rowCount()
+        self._table.insertRow(row)
+        entry["col_type"] = entry["col_type"] + "_copy"
+        self._set_row(row, entry)
+        self._table.scrollToBottom()
+
+    def _del_row(self):
+        """删除选中行。"""
+        rows = sorted(set(i.row() for i in self._table.selectedItems()), reverse=True)
+        for r in rows:
+            self._table.removeRow(r)
+
+    def _test_match(self):
+        """测试当前列头匹配。"""
+        header = self._edit_test.text().strip()
+        if not header:
+            self._lbl_test_result.setText(self.tr("(输入列头)"))
+            return
+        try:
+            from src.excel_reader import _classify_by_json_patterns, classify_column
+        except ImportError:
+            self._lbl_test_result.setText("❌ import error")
+            return
+
+        # 保存当前编辑内容到临时 patterns 测试
+        temp_patterns = [self._read_row(i) for i in range(self._table.rowCount())]
+        import src.excel_reader as er
+        old = er._COLUMN_PATTERNS
+        er._COLUMN_PATTERNS = temp_patterns
+        try:
+            jr = _classify_by_json_patterns(header)
+            cr = classify_column(header)
+        finally:
+            er._COLUMN_PATTERNS = old
+
+        self._lbl_test_result.setText(
+            f"JSON: {jr or '—'}  |  classify: {cr or '—'}"
+        )
+
+    def _save(self):
+        """保存到 JSON 文件。"""
+        import json, os, sys
+        patterns = [self._read_row(i) for i in range(self._table.rowCount())]
+
+        # 确定保存路径: 优先 EXE 同目录 config/, 否则项目根 config/
+        candidates = []
+        if getattr(sys, 'frozen', False):
+            candidates.append(os.path.join(os.path.dirname(sys.executable), "config"))
+        candidates.append(os.path.join(os.path.dirname(__file__), "..", "config"))
+        candidates.append(os.path.join(os.getcwd(), "config"))
+        save_dir = None
+        for d in candidates:
+            d = os.path.normpath(d)
+            if os.path.isdir(d) or not os.path.exists(d):
+                save_dir = d
+                break
+        if save_dir:
+            os.makedirs(save_dir, exist_ok=True)
+            path = os.path.join(save_dir, "column_patterns.json")
+        else:
+            path = os.path.join(os.getcwd(), "config", "column_patterns.json")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+
+        data = {"patterns": patterns, "_note": "通过 GUI 编辑保存"}
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+        self._patterns = patterns
+        self._dirty = False
+        QMessageBox.information(self, self.tr("已保存"),
+                                self.tr("已保存 {0} 条规则到:\n{1}").format(len(patterns), path))
+        self._load()  # 刷新
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -2111,13 +2781,16 @@ class ChartSettingsPage(QWidget):
         self._chart_output_dir: str = ""
         self._chart_output_filename: str = ""
         self._data_output_filename: str = ""
+        self._current_mode: int = -1  # 跟踪模式变更
         self._setup_ui()
         self._load_state()
+        self._current_mode = getattr(self._mw, '_test_mode', 0) if self._mw else 0
 
     def _setup_ui(self):
         from src.chart_config import ChartConfig
         labels = ChartConfig.chart_labels()
-        categories = ChartConfig.chart_categories()
+        mode = getattr(self._mw, '_test_mode', 0) if self._mw else 0
+        categories = ChartConfig.chart_categories(mode)
 
         self._gain_angles = []
         self._gain_ranges = []
@@ -2229,14 +2902,10 @@ class ChartSettingsPage(QWidget):
                 if key in ("chart_gain_freq", "chart_ar_freq"):
                     btn = QPushButton("⚙ " + self.tr("角度..."))
                     btn.setFixedWidth(80)
-                    is_ar = (key == "chart_ar_freq")
-                    btn.clicked.connect(lambda checked, k=key: self._show_chart_angle_popup(k, is_left=True))
+                    target = "ar" if key == "chart_ar_freq" else "gain"
+                    btn.clicked.connect(lambda checked, t=target: self._open_data_angle_popup(t))
                     row.addWidget(btn)
-                elif key == "chart_lag_freq":
-                    btn = QPushButton("⚙ " + self.tr("角度..."))
-                    btn.setFixedWidth(80)
-                    btn.clicked.connect(lambda checked: self._show_chart_angle_popup("chart_lag_freq", is_left=True))
-                    row.addWidget(btn)
+
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
                     btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
                     btn.setFixedWidth(85)
@@ -2353,13 +3022,10 @@ class ChartSettingsPage(QWidget):
                 if key in ("chart_gain_freq", "chart_ar_freq"):
                     btn = QPushButton("⚙ " + self.tr("角度..."))
                     btn.setFixedWidth(80)
-                    btn.clicked.connect(lambda checked, k=key: self._show_chart_angle_popup(k, is_left=False))
+                    target = "ar" if key == "chart_ar_freq" else "gain"
+                    btn.clicked.connect(lambda checked, t=target: self._open_data_angle_popup(t))
                     row.addWidget(btn)
-                elif key == "chart_lag_freq":
-                    btn = QPushButton("⚙ " + self.tr("角度..."))
-                    btn.setFixedWidth(80)
-                    btn.clicked.connect(lambda checked: self._show_chart_angle_popup("chart_lag_freq", is_left=False))
-                    row.addWidget(btn)
+
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
                     btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
                     btn.setFixedWidth(85)
@@ -2482,6 +3148,8 @@ class ChartSettingsPage(QWidget):
         scroll.setFrameShape(QScrollArea.NoFrame)
         scroll_content = QWidget()
         scroll_vbox = QVBoxLayout(scroll_content)
+        self._chart_grp_list = grp_list
+        self._chart_scroll_vbox = scroll_vbox
         for g in grp_list:
             scroll_vbox.addWidget(g)
         scroll_vbox.addStretch()
@@ -2615,7 +3283,8 @@ class ChartSettingsPage(QWidget):
         # \u4ec5\u5217\u51fa\u5df2\u9009\u4e2d\u7684\u56fe\u8868 (\u4ece _chart_required + _chart_extra + azimuth flags)
         from src.chart_config import ChartConfig
         labels = ChartConfig.chart_labels()
-        categories = ChartConfig.chart_categories()
+        mode = getattr(self._mw, '_test_mode', 0) if self._mw else 0
+        categories = ChartConfig.chart_categories(mode)
         active_labels = []
         for key, cb in self._chart_required.items():
             if cb.isChecked():
@@ -2678,6 +3347,11 @@ class ChartSettingsPage(QWidget):
         from src.chart_config import ChartConfig
         mw = self._mw
 
+        # 模式变更 → 自动刷新图表分类 (跳过首次初始化)
+        new_mode = getattr(mw, '_test_mode', 0)
+        if self._current_mode >= 0 and self._current_mode != new_mode:
+            self._rebuild_chart_categories(new_mode)
+
         step_deg = float(max(1, min(30, self._spin_step.value())))
 
         # 保留已有 ChartConfig 的非标准字段
@@ -2739,6 +3413,16 @@ class ChartSettingsPage(QWidget):
         azimuth.image_width_cm = self._spin_img_cm.value() if hasattr(self, '_spin_img_cm') else 7.5
         azimuth.share_radial_ticks = self._check_share_ticks.isChecked() if hasattr(self, '_check_share_ticks') else False
 
+        # 图表联动: chart_gain_freq → chart_lag_freq
+        if required.chart_gain_freq:
+            required.chart_lag_freq = True
+        if extra.chart_gain_freq:
+            extra.chart_lag_freq = True
+        if required.chart_trp_freq:
+            required.chart_trp_nhprp = True
+        if extra.chart_trp_freq:
+            extra.chart_trp_nhprp = True
+
         mw._azimuth_config = azimuth
         mw._chart_config_required = required
         mw._chart_config_extra = extra
@@ -2755,469 +3439,161 @@ class ChartSettingsPage(QWidget):
     def _parse_step_deg(self) -> float:
         return float(max(1, min(30, self._spin_step.value())))
 
+    def _rebuild_chart_categories(self, mode: int):
+        """模式变更时重建图表分类组。"""
+        if mode == self._current_mode:
+            return
+        self._current_mode = mode
+        from src.chart_config import ChartConfig
+        categories = ChartConfig.chart_categories(mode)
+        labels = ChartConfig.chart_labels()
+
+        # 保存当前勾选状态
+        saved = {}
+        for key, cb_dict in [('req', self._chart_required), ('xtr', self._chart_extra)]:
+            for k, cb in cb_dict.items():
+                saved[k] = cb.isChecked()
+
+        # 清除旧的图表分类组 (保留 stretch at end)
+        vbox = self._chart_scroll_vbox
+        while vbox.count() > 1:
+            item = vbox.takeAt(0)
+            if item.widget():
+                item.widget().hide()
+                item.widget().deleteLater()
+
+        # 重建
+        grp_list = []
+        for cat_name, keys in categories.items():
+            grp = QGroupBox(cat_name)
+            grp.setCheckable(True)
+            grp.setChecked(True)
+            grp.setStyleSheet("""
+                QGroupBox { font-weight: bold; padding-top: 16px; }
+                QGroupBox::indicator { width: 14px; height: 14px; margin-right: 4px; }
+            """)
+            grp.setCursor(Qt.PointingHandCursor)
+            outer_layout = QVBoxLayout(grp)
+            outer_layout.setSpacing(4)
+            self._collapse_map[cat_name] = {"grp": grp, "hidden": False}
+            content_widget = QWidget()
+            content_layout = QVBoxLayout(content_widget)
+            content_layout.setContentsMargins(0, 0, 0, 0)
+            content_layout.setSpacing(4)
+            outer_layout.addWidget(content_widget)
+            content_layout.addStretch()
+
+            row_layout = QHBoxLayout()
+            row_layout.setSpacing(8)
+
+            # 左列
+            left_box = QGroupBox(self.tr("报告需要"))
+            left_layout = QVBoxLayout(left_box)
+            left_layout.setSpacing(3)
+            self._add_select_all_row(self._chart_required, keys, left_layout)
+            for key in keys:
+                row = QHBoxLayout()
+                cb = QCheckBox(labels.get(key, key))
+                cb.setChecked(saved.get(key, False))
+                cb.toggled.connect(lambda: self._sync_to_mw())
+                row.addWidget(cb)
+                self._chart_required[key] = cb
+                if key in ("chart_gain_freq", "chart_ar_freq"):
+                    btn = QPushButton("⚙ " + self.tr("角度..."))
+                    btn.setFixedWidth(80)
+                    target = "ar" if key == "chart_ar_freq" else "gain"
+                    btn.clicked.connect(lambda checked, t=target: self._open_data_angle_popup(t))
+                    row.addWidget(btn)
+                elif key in ("cut_2d_polar", "cut_2d_rect"):
+                    btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
+                    btn.setFixedWidth(85)
+                    btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
+                    row.addWidget(btn)
+                row.addStretch()
+                left_layout.addLayout(row)
+            row_layout.addWidget(left_box, 1)
+
+            # 右列
+            right_box = QGroupBox(self.tr("额外 (full_report)"))
+            right_layout = QVBoxLayout(right_box)
+            right_layout.setSpacing(3)
+            self._add_select_all_row(self._chart_extra, keys, right_layout)
+            for key in keys:
+                row = QHBoxLayout()
+                cb = QCheckBox(labels.get(key, key))
+                cb.setChecked(saved.get(key, False))
+                cb.toggled.connect(lambda: self._sync_to_mw())
+                row.addWidget(cb)
+                self._chart_extra[key] = cb
+                if key in ("chart_gain_freq", "chart_ar_freq"):
+                    btn = QPushButton("⚙ " + self.tr("角度..."))
+                    btn.setFixedWidth(80)
+                    target = "ar" if key == "chart_ar_freq" else "gain"
+                    btn.clicked.connect(lambda checked, t=target: self._open_data_angle_popup(t))
+                    row.addWidget(btn)
+                elif key in ("cut_2d_polar", "cut_2d_rect"):
+                    btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
+                    btn.setFixedWidth(85)
+                    btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
+                    row.addWidget(btn)
+                row.addStretch()
+                right_layout.addLayout(row)
+            row_layout.addWidget(right_box, 1)
+
+            content_layout.addLayout(row_layout)
+            grp_list.append(grp)
+
+        self._chart_grp_list = grp_list
+        for g in grp_list:
+            vbox.insertWidget(vbox.count() - 1, g)
+
+    def _open_data_angle_popup(self, target: str):
+        """打开天线参数页的角度配置弹窗 (统一数据源)。"""
+        # 找到 AntennaParamsPage 并调用其 _show_angle_popup
+        ant_page = getattr(self._mw, '_antenna_params_page', None) if self._mw else None
+        if ant_page and hasattr(ant_page, '_show_angle_popup'):
+            ant_page._show_angle_popup(target)
+        self._sync_to_mw()
+
     def _show_chart_angle_popup(self, chart_key: str, is_left: bool = True):
-        dlg = QDialog(self)
-        is_ar = (chart_key == "chart_ar_freq")
-        if is_left:
-            singles = self._ar_angles if is_ar else self._gain_angles
-            ranges = self._ar_ranges if is_ar else self._gain_ranges
-        else:
-            singles = self._ar_angles_x if is_ar else self._gain_angles_x
-            ranges = self._ar_ranges_x if is_ar else self._gain_ranges_x
-
-        label_text = "AR" if is_ar else "Gain"
-        dlg.setWindowTitle(self.tr("选择 {} 曲线角度 — 频点曲线").format(label_text))
-        dlg.setMinimumSize(500, 420)
-
-        import copy
-        _singles = copy.deepcopy(singles)
-        _ranges = copy.deepcopy(ranges)
-
-        layout = QVBoxLayout(dlg)
-
-        def _refresh_display():
-            while _display_layout.count():
-                item = _display_layout.takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
-            if _singles or _ranges:
-                scroll = QScrollArea()
-                scroll.setWidgetResizable(True)
-                dw = QWidget()
-                fl = FlowLayout(dw, margin=4, h_spacing=6, v_spacing=4)
-                for a in sorted(set(_singles)):
-                    tag = QWidget()
-                    tl = QHBoxLayout(tag)
-                    tl.setContentsMargins(2, 1, 2, 1)
-                    tl.setSpacing(2)
-                    tl.addWidget(QLabel(f"{a}°"))
-                    btn_del = QPushButton("✕")
-                    btn_del.setFixedSize(20, 20)
-                    btn_del.setStyleSheet("padding:0;")
-                    btn_del.clicked.connect(lambda checked, v=a: (_singles.remove(v), _refresh_display()))
-                    tl.addWidget(btn_del)
-                    fl.addWidget(tag)
-                for lo, hi in sorted(set(_ranges), key=lambda x: (x[0], x[1])):
-                    tag = QWidget()
-                    tl = QHBoxLayout(tag)
-                    tl.setContentsMargins(2, 1, 2, 1)
-                    tl.setSpacing(2)
-                    tl.addWidget(QLabel(f"{lo}°~{hi}°"))
-                    btn_del = QPushButton("✕")
-                    btn_del.setFixedSize(20, 20)
-                    btn_del.setStyleSheet("padding:0;")
-                    btn_del.clicked.connect(lambda checked, l=lo, h=hi: (_ranges.remove((l, h)), _refresh_display()))
-                    tl.addWidget(btn_del)
-                    fl.addWidget(tag)
-                scroll.setWidget(dw)
-                _display_layout.addWidget(scroll)
-                btn_clear = QPushButton("🗑 " + self.tr("清空全部"))
-                btn_clear.clicked.connect(lambda: (_singles.clear(), _ranges.clear(), _refresh_display()))
-                _display_layout.addWidget(btn_clear)
-            else:
-                _display_layout.addWidget(QLabel(self.tr("  (暂无选择 — 将自动使用默认值)")))
-
-        _display_grp = QGroupBox(
-            self.tr("已选: {} 个单角度, {} 个范围").format(len(_singles), len(_ranges)))
-        _display_layout = QVBoxLayout(_display_grp)
-        _refresh_display()
-
-        splitter = ThinSplitter(Qt.Vertical)
-        bottom_ctls = QWidget()
-        bottom_layout = QVBoxLayout(bottom_ctls)
-        bottom_layout.setContentsMargins(0, 0, 0, 0)
-
-        # 快捷预设
-        quick_grp = QGroupBox(self.tr("快捷预设 — {}").format(label_text))
-        quick_layout = QHBoxLayout(quick_grp)
-        for a in [0, 30, 45, 60, 90]:
-            btn = QPushButton(f"{a}°")
-            btn.clicked.connect(lambda checked, v=a: (
-                _singles.append(v) if v not in _singles else None, _refresh_display()))
-            quick_layout.addWidget(btn)
-        quick_layout.addStretch()
-        bottom_layout.addWidget(quick_grp)
-
-        # 自定义
-        cust_grp = QGroupBox(self.tr("自定义"))
-        cust_layout = QHBoxLayout(cust_grp)
-        spin_custom = QDoubleSpinBox()
-        spin_custom.setRange(0, 180)
-        spin_custom.setValue(45)
-        btn_add_custom = QPushButton("+ " + self.tr("添加"))
-        btn_add_custom.clicked.connect(lambda: (
-            _singles.append(spin_custom.value()) if spin_custom.value() not in _singles else None,
-            _refresh_display()
-        ))
-        cust_layout.addWidget(QLabel(self.tr("角度:")))
-        cust_layout.addWidget(spin_custom)
-        cust_layout.addWidget(btn_add_custom)
-        cust_layout.addStretch()
-        bottom_layout.addWidget(cust_grp)
-
-        # 步进
-        step_grp = QGroupBox(self.tr("步进批量生成"))
-        step_layout = QHBoxLayout(step_grp)
-        spin_start = QDoubleSpinBox()
-        spin_start.setRange(0, 180)
-        spin_start.setValue(0)
-        spin_end = QDoubleSpinBox()
-        spin_end.setRange(0, 180)
-        spin_end.setValue(90)
-        spin_step = QDoubleSpinBox()
-        spin_step.setRange(1, 90)
-        spin_step.setValue(10)
-        btn_gen = QPushButton(self.tr("生成"))
-        btn_gen.clicked.connect(lambda: (
-            [_singles.append(round(float(a), 6))
-             for a in np.linspace(spin_start.value(), spin_end.value() , int((spin_end.value() -spin_start.value())/spin_step.value()+1))
-             if round(float(a), 6) not in _singles],
-            _refresh_display()
-        ))
-        step_layout.addWidget(QLabel(self.tr("起:")))
-        step_layout.addWidget(spin_start)
-        step_layout.addWidget(QLabel(self.tr("止:")))
-        step_layout.addWidget(spin_end)
-        step_layout.addWidget(QLabel(self.tr("步:")))
-        step_layout.addWidget(spin_step)
-        step_layout.addWidget(btn_gen)
-        bottom_layout.addWidget(step_grp)
-
-        # 范围
-        range_grp = QGroupBox(self.tr("角度范围"))
-        range_layout = QHBoxLayout(range_grp)
-        spin_rs = QDoubleSpinBox()
-        spin_rs.setRange(0, 180)
-        spin_rs.setValue(0)
-        spin_re = QDoubleSpinBox()
-        spin_re.setRange(0, 180)
-        spin_re.setValue(90)
-
-        def _add_range():
-            lo, hi = spin_rs.value(), spin_re.value()
-            key = (min(lo, hi), max(lo, hi))
-            if key not in _ranges:
-                _ranges.append(key)
-                _refresh_display()
-
-        btn_add_range = QPushButton(self.tr("添加范围"))
-        btn_add_range.clicked.connect(_add_range)
-        range_layout.addWidget(QLabel(self.tr("起:")))
-        range_layout.addWidget(spin_rs)
-        range_layout.addWidget(QLabel(self.tr("止:")))
-        range_layout.addWidget(spin_re)
-        range_layout.addWidget(btn_add_range)
-        range_layout.addStretch()
-        bottom_layout.addWidget(range_grp)
-
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        btns.accepted.connect(lambda: (
-            singles.clear(),
-            singles.extend(sorted(set(_singles))),
-            ranges.clear(),
-            ranges.extend(sorted(set(_ranges), key=lambda x: (x[0], x[1]))),
-            dlg.accept()
-        ))
-        btns.rejected.connect(dlg.reject)
-        bottom_layout.addWidget(btns)
-
-        splitter.addWidget(_display_grp)
-        splitter.addWidget(bottom_ctls)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 0)
-
-        layout.addWidget(splitter)
-        dlg.exec()
-        self._sync_to_mw()
-
-    # ── 方位面角度弹窗 ──
-
-    def _show_azimuth_angle_popup(self, chart_type: str = "gain"):
-        """弹出方位面切图 Theta 角度选择窗口。
-
-        Args:
-            chart_type: "gain" | "ar" | "rhcp" | "lhcp"，决定编辑哪个角度列表。
-        """
-        is_ar = (chart_type == "ar")
-        is_rhcp = (chart_type == "rhcp")
-        is_lhcp = (chart_type == "lhcp")
-        label_map = {"gain": "Gain", "ar": "AR", "rhcp": "RHCP", "lhcp": "LHCP"}
-        label_text = label_map.get(chart_type, chart_type)
-        dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("选择方位面切图角度 — {}").format(label_text))
-        dlg.setMinimumSize(480, 400)
-
-        import copy
-        if is_rhcp:
-            src_angles = self._azimuth_angles_rhcp
-        elif is_lhcp:
-            src_angles = self._azimuth_angles_lhcp
-        else:
-            src_angles = self._azimuth_angles_ar if is_ar else self._azimuth_angles
-        _target = src_angles  # 直接引用，OK 时写回
-        _singles: List[float] = copy.deepcopy(_target)
-
-        # 空列表 → 自动加载 LAG
-        if not _singles and hasattr(self._mw, '_lag_config'):
-            _singles = list(self._mw._lag_config.singles_sorted)
-
-        layout = QVBoxLayout(dlg)
-
-        # 已选角度显示区
-        display_grp = QGroupBox(self.tr("已选角度"))
-        _display_layout = QVBoxLayout(display_grp)
-
-        def _refresh_display():
-            while _display_layout.count():
-                item = _display_layout.takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
-            if _singles:
-                scroll = QScrollArea()
-                scroll.setWidgetResizable(True)
-                scroll.setFrameShape(QScrollArea.NoFrame)
-                scroll.setMaximumHeight(120)
-                tags = QWidget()
-                tag_layout = FlowLayout(tags)
-                for a in sorted(set(_singles)):
-                    row_w = QWidget()
-                    row_h = QHBoxLayout(row_w)
-                    row_h.setContentsMargins(2, 1, 2, 1)
-                    row_h.setSpacing(2)
-                    row_h.addWidget(QLabel(f"{a:.0f}°"))
-                    btn_del = QPushButton("✕")
-                    btn_del.setFixedSize(20, 20)
-                    btn_del.clicked.connect(lambda checked, angle=a: (
-                        _singles.remove(angle),
-                        _refresh_display()
-                    ))
-                    row_h.addWidget(btn_del)
-                    tag_layout.addWidget(row_w)
-                scroll.setWidget(tags)
-                _display_layout.addWidget(scroll)
-                btn_clear_all = QPushButton(self.tr("清空全部"))
-                btn_clear_all.clicked.connect(lambda: (_singles.clear(), _refresh_display()))
-                _display_layout.addWidget(btn_clear_all)
-            else:
-                _display_layout.addWidget(QLabel(self.tr("  (未选择任何角度)")))
-
-        _refresh_display()
-        layout.addWidget(display_grp)
-
-        # 分割线 + 控制区
-        splitter = QSplitter(Qt.Vertical)
-        bottom = QWidget()
-        bottom_layout = QVBoxLayout(bottom)
-        bottom_layout.setContentsMargins(0, 0, 0, 0)
-
-        # 自定义单角度
-        cust_grp = QGroupBox(self.tr("自定义"))
-        cust_layout = QHBoxLayout(cust_grp)
-        spin_custom = QDoubleSpinBox()
-        spin_custom.setRange(0, 180)
-        spin_custom.setDecimals(1)
-        spin_custom.setValue(60)
-        spin_custom.setSuffix("°")
-        cust_layout.addWidget(QLabel(self.tr("角度:")))
-        cust_layout.addWidget(spin_custom)
-        btn_add = QPushButton("+ " + self.tr("添加"))
-        btn_add.clicked.connect(lambda: (
-            _singles.append(spin_custom.value()) if spin_custom.value() not in _singles else None,
-            _refresh_display()
-        ))
-        cust_layout.addWidget(btn_add)
-        cust_layout.addStretch()
-        bottom_layout.addWidget(cust_grp)
-
-        # 步进批量生成
-        step_grp = QGroupBox(self.tr("步进批量生成"))
-        step_layout = QHBoxLayout(step_grp)
-        step_layout.addWidget(QLabel(self.tr("起始:")))
-        spin_start = QDoubleSpinBox()
-        spin_start.setRange(0, 180)
-        spin_start.setDecimals(1)
-        spin_start.setValue(0)
-        spin_start.setSuffix("°")
-        step_layout.addWidget(spin_start)
-        step_layout.addWidget(QLabel(self.tr("结束:")))
-        spin_end = QDoubleSpinBox()
-        spin_end.setRange(0, 180)
-        spin_end.setDecimals(1)
-        spin_end.setValue(90)
-        spin_end.setSuffix("°")
-        step_layout.addWidget(spin_end)
-        step_layout.addWidget(QLabel(self.tr("步进:")))
-        spin_step = QDoubleSpinBox()
-        spin_step.setRange(1, 90)
-        spin_step.setDecimals(1)
-        spin_step.setValue(10)
-        spin_step.setSuffix("°")
-        step_layout.addWidget(spin_step)
-        btn_gen = QPushButton(self.tr("生成"))
-        btn_gen.clicked.connect(lambda: (
-            [_singles.append(float(a)) for a in
-             np.linspace(spin_start.value(), spin_end.value(),
-                         max(1, int((spin_end.value() - spin_start.value()) /
-                                    max(1, spin_step.value())) + 1))
-             if float(a) not in _singles],
-            _refresh_display()
-        ))
-        step_layout.addWidget(btn_gen)
-        step_layout.addStretch()
-        bottom_layout.addWidget(step_grp)
-
-        # OK / Cancel
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        btns.accepted.connect(lambda: (
-            _target.clear(),
-            _target.extend(sorted(set(_singles))),
-            dlg.accept()
-        ))
-        btns.rejected.connect(dlg.reject)
-        bottom_layout.addWidget(btns)
-
-        splitter.addWidget(display_grp)
-        splitter.addWidget(bottom)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 0)
-
-        layout.addWidget(splitter)
-        dlg.exec()
-        self._sync_to_mw()
-
-    # ── 中间文件设置子对话框 ──
-
-    def _show_intermediate_file_settings(self):
-        """打开中间文件输出设置子对话框。"""
-        dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("中间文件输出设置"))
-        dlg.setMinimumSize(580, 320)
-
-        layout = QVBoxLayout(dlg)
-
-        # 中间数据
-        data_grp = QGroupBox(self.tr("中间数据 (多 sheet 单文件)"))
-        data_layout = QVBoxLayout(data_grp)
-        row_df = QHBoxLayout()
-        row_df.addWidget(QLabel(self.tr("文件名:")))
-        edit_data_fn = QLineEdit(self._data_output_filename)
-        edit_data_fn.setPlaceholderText(self.tr("默认: 源文件名中间数据.xlsx"))
-        edit_data_fn.setMinimumWidth(220)
-        row_df.addWidget(edit_data_fn)
-        btn_data_browse = QPushButton(self.tr("浏览..."))
-        row_df.addWidget(btn_data_browse)
-        row_df.addStretch()
-        data_layout.addLayout(row_df)
-        layout.addWidget(data_grp)
-        layout.addStretch()
-
-        btn_data_browse.clicked.connect(lambda: _pick_file(edit_data_fn))
-
-        def _pick_file(target_edit):
-            from PySide6.QtWidgets import QFileDialog
-            d = QFileDialog.getSaveFileName(
-                dlg, self.tr("选择中间数据输出文件"), "", "Excel (*.xlsx)")[0]
-            if d:
-                target_edit.setText(os.path.basename(d))
-
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        btns.accepted.connect(lambda: (
-            setattr(self, '_data_output_filename', edit_data_fn.text().strip()),
-            dlg.accept(),
-            self._sync_to_mw(),
-        ))
-        btns.rejected.connect(dlg.reject)
-        layout.addWidget(btns)
-        dlg.exec()
-
-    # ── 图表输出目录浏览 ──
-
-    def _browse_chart_output_dir(self):
-        from PySide6.QtWidgets import QFileDialog
-        d = QFileDialog.getExistingDirectory(
-            self, self.tr("选择图表输出目录 (Word)"))
-        if d and hasattr(self, '_edit_chart_output_dir'):
-            self._edit_chart_output_dir.setText(d)
-            self._sync_to_mw()
-
-    # ── 3D 多视角弹窗 ──
+        """已过时 — 使用 _open_data_angle_popup 代替 (统一角度配置)"""
+        target = "ar" if chart_key == "chart_ar_freq" else "gain"
+        self._open_data_angle_popup(target)
 
     def _show_view_angle_popup(self):
-        """弹出 3D 方向图多视角设置窗口。"""
         dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("3D 多视角设置"))
-        dlg.setMinimumSize(500, 350)
-        import copy
-        _pairs: List[Tuple[float, float]] = copy.deepcopy(self._view_angle_pairs)
-
+        dlg.setWindowTitle(self.tr("多视角"))
+        dlg.setMinimumSize(500, 400)
         layout = QVBoxLayout(dlg)
-        display_grp = QGroupBox(self.tr("视角列表 (仰角, 方位角)"))
-        _display_layout = QVBoxLayout(display_grp)
-
-        def _refresh_display():
-            while _display_layout.count():
-                item = _display_layout.takeAt(0)
-                if item.widget(): item.widget().deleteLater()
-            if _pairs:
-                scroll = QScrollArea()
-                scroll.setWidgetResizable(True); scroll.setFrameShape(QScrollArea.NoFrame)
-                scroll.setMaximumHeight(140)
-                tags = QWidget()
-                tag_layout = FlowLayout(tags)
-                for el, az in _pairs:
-                    row_w = QWidget()
-                    row_h = QHBoxLayout(row_w)
-                    row_h.setContentsMargins(2, 1, 2, 1); row_h.setSpacing(2)
-                    row_h.addWidget(QLabel(f"仰角 {el:.0f}°, 方位 {az:.0f}°"))
-                    btn_del = QPushButton("✕")
-                    btn_del.setFixedSize(20, 20)
-                    btn_del.clicked.connect(lambda checked, p=(el, az): (
-                        _pairs.remove(p), _refresh_display()))
-                    row_h.addWidget(btn_del); row_h.addStretch()
-                    tag_layout.addWidget(row_w)
-                scroll.setWidget(tags)
-                _display_layout.addWidget(scroll)
-                btn_clear = QPushButton(self.tr("清空全部"))
-                btn_clear.clicked.connect(lambda: (_pairs.clear(), _refresh_display()))
-                _display_layout.addWidget(btn_clear)
-            else:
-                _display_layout.addWidget(QLabel(self.tr(
-                    "  (未设置，使用上方仰角/方位角单值)")))
-        _refresh_display()
-        layout.addWidget(display_grp)
-
-        add_grp = QGroupBox(self.tr("添加视角"))
-        add_layout = QHBoxLayout(add_grp)
-        add_layout.addWidget(QLabel(self.tr("仰角:")))
-        spin_el = QDoubleSpinBox()
-        spin_el.setRange(-90, 90); spin_el.setDecimals(1)
-        spin_el.setValue(30); spin_el.setSuffix("°")
-        add_layout.addWidget(spin_el)
-        add_layout.addWidget(QLabel(self.tr("方位角:")))
-        spin_az = QDoubleSpinBox()
-        spin_az.setRange(-180, 180); spin_az.setDecimals(1)
-        spin_az.setValue(-60); spin_az.setSuffix("°")
-        add_layout.addWidget(spin_az)
-        btn_add = QPushButton("+ " + self.tr("添加"))
-        btn_add.clicked.connect(lambda: (
-            _pairs.append((spin_el.value(), spin_az.value())),
-            _refresh_display()))
-        add_layout.addWidget(btn_add); add_layout.addStretch()
-        layout.addWidget(add_grp)
-
+        layout.addWidget(QLabel(self.tr("添加多组 (仰角, 方位角) 视角对:")))
+        table = QTableWidget()
+        table.setColumnCount(2)
+        table.setHorizontalHeaderLabels([self.tr("仰角 (°)"), self.tr("方位角 (°)")])
+        layout.addWidget(table)
+        from ui.layout_utils import auto_size_dialog
+        auto_size_dialog(dlg, 520, 460)
+        btn_row = QHBoxLayout()
+        btn_add = QPushButton(self.tr("+ 添加"))
+        btn_add.clicked.connect(lambda: (table.insertRow(table.rowCount()),
+            table.setItem(table.rowCount()-1, 0, QTableWidgetItem("30")),
+            table.setItem(table.rowCount()-1, 1, QTableWidgetItem("-60"))))
+        btn_row.addWidget(btn_add)
+        btn_del = QPushButton(self.tr("删除选中"))
+        btn_del.clicked.connect(lambda: table.removeRow(table.currentRow()) if table.currentRow() >= 0 else None)
+        btn_row.addWidget(btn_del)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
             self._view_angle_pairs.clear(),
-            self._view_angle_pairs.extend(list(_pairs)),
-            dlg.accept()))
+            [self._view_angle_pairs.append(
+                (float(table.item(r,0).text() if table.item(r,0) else 30),
+                 float(table.item(r,1).text() if table.item(r,1) else -60))
+            ) for r in range(table.rowCount())],
+            self._sync_to_mw(), dlg.accept()))
         btns.rejected.connect(dlg.reject)
         layout.addWidget(btns)
-
         dlg.exec()
-        self._sync_to_mw()
-
-    # ── 2D 俯仰面 Phi 角度弹窗 ──
-
     def _show_2d_phi_angle_popup(self):
         """弹出 2D 俯仰面切面 Phi 角度选择窗口。"""
         dlg = QDialog(self)

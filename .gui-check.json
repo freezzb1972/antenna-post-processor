@@ -16,16 +16,25 @@
     "lblCsv"
   ],
   "min_sizes": {
-    "editOutputName": [200, 0],
-    "editOutputDir": [200, 0],
-    "editFullReportPath": [200, 0]
+    "editOutputName": [
+      200,
+      0
+    ],
+    "editOutputDir": [
+      200,
+      0
+    ],
+    "editFullReportPath": [
+      200,
+      0
+    ]
   },
   "required_custom_widgets": [
     "_file_list_widget",
     "_match_table",
     "_btn_add_files",
     "_btn_auto_match",
-    "_check_extrapolate"
+    "_cmb_extrapolate"
   ],
   "thread_patterns": [
     "QThread(self)",
@@ -39,5 +48,8 @@
     "self._thread.start()",
     "self._running = True"
   ],
-  "scroll_area_tabs": ["tabFile", "tabLag"]
+  "scroll_area_tabs": [
+    "tabFile",
+    "tabLag"
+  ]
 }

@@ -1,464 +1,670 @@
 {
-  "_comment": "列头识别规则 — 唯一数据源。内置规则(builtin:true)随App发布，用户规则(builtin:false)通过GUI添加。匹配顺序=优先级，先匹配者胜。",
-  "version": "2.0",
   "patterns": [
     {
       "col_type": "frequency",
-      "label": "频率",
       "keywords": [
-        "freq",
         "frequency"
       ],
+      "cn": "频率",
       "exact": [
         "freq",
         "f",
-        "freq(mhz)",
-        "f(mhz)"
-      ],
-      "builtin": true
+        "f(mhz)",
+        "freq(mhz)"
+      ]
     },
     {
       "col_type": "directivity",
-      "label": "方向性",
       "keywords": [
         "directivity"
       ],
+      "cn": "方向性",
       "exact": [
         "dir",
         "d(dbi)"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "total_efficiency_db",
-      "label": "总效率(dB)",
-      "keywords": [
-        "total",
-        "efficiency",
-        "db"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "total_efficiency_pct",
-      "label": "总效率(%)",
-      "keywords": [
-        "total",
-        "efficiency",
-        "%"
-      ],
-      "negate": [
-        "db"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "efficiency_db",
-      "label": "效率(dB)",
-      "keywords": [
-        "efficiency",
-        "db"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "efficiency_pct",
-      "label": "效率(%)",
-      "keywords": [
-        "efficiency",
-        "%"
-      ],
-      "negate": [
-        "db"
-      ],
-      "builtin": true
+      ]
     },
     {
       "col_type": "gain",
-      "label": "峰值增益",
-      "keywords": [
-        "gain",
-        "peak"
-      ],
+      "regex": "(?i)^\\s*gain\\b|^\\s*pk\\b|^\\s*peak\\s*gain|^g\\(dbi\\)",
+      "cn": "增益",
       "negate": [
         "average",
-        "avg",
         "theta",
-        "eirp"
-      ],
-      "exact": [
-        "g(dbi)",
-        "pk",
-        "gain(dbi)"
-      ],
-      "builtin": true
+        "@",
+        "平均"
+      ]
     },
     {
-      "col_type": "trp",
-      "label": "TRP",
-      "keywords": [
-        "trp"
-      ],
-      "negate": [
-        "nhprp",
-        "ratio"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "trp",
-      "label": "TRP(描述)",
+      "col_type": "total_efficiency",
       "keywords": [
         "total",
-        "radiated"
+        "efficiency"
       ],
+      "cn": "总效率"
+    },
+    {
+      "col_type": "efficiency_db",
+      "keywords": [
+        "efficiency"
+      ],
+      "cn": "效率",
       "negate": [
-        "nhprp"
+        "total",
+        "总"
       ],
-      "builtin": true
-    },
-    {
-      "col_type": "nhprp45_ratio_db",
-      "label": "NHPRP45/TRP 比率(dB)",
-      "keywords": [
-        "nhprp",
-        "45",
-        "ratio",
+      "extra_req": [
         "db"
-      ],
-      "builtin": true
+      ]
     },
     {
-      "col_type": "nhprp45_ratio_pct",
-      "label": "NHPRP45/TRP 比率(%)",
+      "col_type": "efficiency_pct",
       "keywords": [
-        "nhprp",
-        "45",
-        "ratio",
-        "%"
+        "efficiency"
       ],
-      "builtin": true
-    },
-    {
-      "col_type": "nhprp30_ratio_db",
-      "label": "NHPRP30/TRP 比率(dB)",
-      "keywords": [
-        "nhprp",
-        "30",
-        "ratio",
-        "db"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "nhprp30_ratio_pct",
-      "label": "NHPRP30/TRP 比率(%)",
-      "keywords": [
-        "nhprp",
-        "30",
-        "ratio",
-        "%"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "nhprp225_ratio_db",
-      "label": "NHPRP225/TRP 比率(dB)",
-      "keywords": [
-        "nhprp",
-        "22.5",
-        "ratio",
-        "db"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "nhprp225_ratio_pct",
-      "label": "NHPRP225/TRP 比率(%)",
-      "keywords": [
-        "nhprp",
-        "22.5",
-        "ratio",
-        "%"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "uh_ratio_db",
-      "label": "UH/TRP 比率(dB)",
-      "keywords": [
-        "prp",
-        "ratio",
+      "cn": "效率",
+      "negate": [
+        "total",
         "db",
-        "uh"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "uh_ratio_pct",
-      "label": "UH/TRP 比率(%)",
-      "keywords": [
-        "prp",
-        "ratio",
-        "uh",
-        "%"
-      ],
-      "negate": [
-        "db"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "lh_ratio_db",
-      "label": "LH/TRP 比率(dB)",
-      "keywords": [
-        "prp",
-        "ratio",
-        "db",
-        "lh"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "lh_ratio_pct",
-      "label": "LH/TRP 比率(%)",
-      "keywords": [
-        "prp",
-        "ratio",
-        "lh",
-        "%"
-      ],
-      "negate": [
-        "db"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "nhprp_45",
-      "label": "NHPRP ±45°",
-      "keywords": [
-        "nhprp",
-        "45"
-      ],
-      "negate": [
-        "ratio"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "nhprp_30",
-      "label": "NHPRP ±30°",
-      "keywords": [
-        "nhprp",
-        "30"
-      ],
-      "negate": [
-        "ratio"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "nhprp_225",
-      "label": "NHPRP ±22.5°",
-      "keywords": [
-        "nhprp",
-        "22.5"
-      ],
-      "negate": [
-        "ratio"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "peak_eirp",
-      "label": "Peak EIRP",
-      "keywords": [
-        "peak",
-        "eirp"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "ar_single",
-      "label": "AR 单角度",
-      "keywords": [
-        "ar",
-        "theta"
-      ],
-      "negate": [
-        "~"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "ar_range",
-      "label": "AR 范围",
-      "keywords": [
-        "ar",
-        "~"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "uh_prp",
-      "label": "上半球 PRP",
-      "keywords": [
-        "prp",
-        "uh"
-      ],
-      "negate": [
-        "ratio"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "lh_prp",
-      "label": "下半球 PRP",
-      "keywords": [
-        "prp",
-        "lh"
-      ],
-      "negate": [
-        "ratio"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "boresight_phi",
-      "label": "Boresight Phi",
-      "keywords": [
-        "boresight",
-        "phi"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "boresight_theta",
-      "label": "Boresight Theta",
-      "keywords": [
-        "boresight",
-        "theta"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "max_power",
-      "label": "最大功率",
-      "keywords": [
-        "max",
-        "power"
-      ],
-      "negate": [
-        "average",
-        "avg"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "min_power",
-      "label": "最小功率",
-      "keywords": [
-        "min",
-        "power"
-      ],
-      "negate": [
-        "average",
-        "avg"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "avg_gain",
-      "label": "平均增益",
-      "keywords": [
-        "average",
-        "gain"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "avg_power",
-      "label": "平均功率",
-      "keywords": [
-        "average",
-        "power"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "xpi_boresight",
-      "label": "XPI Boresight",
-      "keywords": [
-        "xpi",
-        "boresight"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "xpi_mean",
-      "label": "XPI Mean",
-      "keywords": [
-        "xpi",
-        "mean"
-      ],
-      "builtin": true
-    },
-    {
-      "col_type": "xpi_min",
-      "label": "XPI Min",
-      "keywords": [
-        "xpi",
-        "min"
-      ],
-      "negate": [
-        "mean"
-      ],
-      "builtin": true
+        "总"
+      ]
     },
     {
       "col_type": "mismatch_loss_db",
-      "label": "Mismatch Loss",
       "keywords": [
         "mismatch",
         "loss"
       ],
-      "builtin": true
+      "cn": "失配"
+    },
+    {
+      "col_type": "nhprp45_ratio",
+      "keywords": [
+        "nhprp",
+        "45"
+      ],
+      "cn": "近水平面",
+      "extra_req": [
+        "ratio",
+        "比",
+        "/",
+        "／"
+      ]
+    },
+    {
+      "col_type": "nhprp30_ratio",
+      "keywords": [
+        "nhprp",
+        "30"
+      ],
+      "cn": "近水平面",
+      "extra_req": [
+        "ratio",
+        "比",
+        "/",
+        "／"
+      ]
+    },
+    {
+      "col_type": "nhprp225_ratio",
+      "keywords": [
+        "nhprp",
+        "22",
+        "ratio"
+      ],
+      "cn": "近水平面"
+    },
+    {
+      "col_type": "nhpis45_ratio",
+      "keywords": [
+        "nhpis",
+        "45",
+        "ratio"
+      ],
+      "cn": "近水平面"
+    },
+    {
+      "col_type": "nhpis30_ratio",
+      "keywords": [
+        "nhpis",
+        "30",
+        "ratio"
+      ],
+      "cn": "近水平面"
+    },
+    {
+      "col_type": "nhpis225_ratio",
+      "keywords": [
+        "nhpis",
+        "22",
+        "ratio"
+      ],
+      "cn": "近水平面"
+    },
+    {
+      "col_type": "uh_ratio",
+      "keywords": [],
+      "cn": "上半球比",
+      "regex": "(?i)(uhprp|upper.*prp).*(ratio|比|/|／)"
+    },
+    {
+      "col_type": "lh_ratio",
+      "keywords": [],
+      "cn": "下半球比",
+      "regex": "(?i)(lhprp|lower.*prp).*(ratio|比|/|／)"
+    },
+    {
+      "col_type": "trp",
+      "keywords": [
+        "trp"
+      ],
+      "cn": "总辐射功率|辐射功率|全向辐射",
+      "negate": [
+        "nhprp",
+        "nhpis"
+      ]
+    },
+    {
+      "col_type": "peak_eirp",
+      "keywords": [
+        "eirp",
+        "peak"
+      ],
+      "cn": "峰值"
+    },
+    {
+      "col_type": "nhprp_45",
+      "keywords": [
+        "nhprp",
+        "45"
+      ],
+      "cn": "近水平面辐射功率",
+      "negate": [
+        "ratio",
+        "比",
+        "/"
+      ]
+    },
+    {
+      "col_type": "nhprp_30",
+      "keywords": [
+        "nhprp",
+        "30"
+      ],
+      "cn": "近水平面辐射功率",
+      "negate": [
+        "ratio",
+        "比",
+        "/"
+      ]
+    },
+    {
+      "col_type": "nhprp_225",
+      "keywords": [
+        "nhprp"
+      ],
+      "cn": "近水平面辐射功率",
+      "negate": [
+        "ratio",
+        "比",
+        "/"
+      ],
+      "extra_req": [
+        "22.5",
+        "22",
+        "pi/8",
+        "π/8"
+      ]
+    },
+    {
+      "col_type": "nhprp_custom",
+      "keywords": [
+        "nhprp"
+      ],
+      "cn": "近水平面",
+      "negate": [
+        "ratio",
+        "比",
+        "/",
+        "45",
+        "30"
+      ],
+      "extra_req": [
+        "custom",
+        "自定义",
+        "flex"
+      ]
+    },
+    {
+      "col_type": "uh_prp",
+      "keywords": [
+        "upper",
+        "prp"
+      ],
+      "cn": "上半球辐射功率"
+    },
+    {
+      "col_type": "lh_prp",
+      "keywords": [
+        "lower",
+        "prp"
+      ],
+      "cn": "下半球辐射功率"
+    },
+    {
+      "col_type": "prp_120",
+      "keywords": [
+        "prp",
+        "120"
+      ],
+      "cn": "部分辐射功率"
+    },
+    {
+      "col_type": "ar_range",
+      "regex": "(?i)(axial|(?:^|\\s)ar(?:\\s|$)|轴比).*(~|～|\\d+\\s*[-–—]\\s*\\d+)",
+      "cn": "轴比",
+      "keywords": []
+    },
+    {
+      "col_type": "ar_single",
+      "regex": "(?i)(axial|(?:^|\\s)ar(?:\\s|$)|轴比).*(theta|θ|@)[=\\s]*\\d+",
+      "cn": "轴比",
+      "negate": [
+        "~",
+        "～",
+        "range",
+        "范围"
+      ],
+      "keywords": []
+    },
+    {
+      "col_type": "rhcp_single",
+      "keywords": [
+        "rhcp"
+      ],
+      "cn": "右旋圆极化|右旋",
+      "extra_req": [
+        "theta",
+        "θ",
+        "@",
+        "°",
+        "deg"
+      ]
+    },
+    {
+      "col_type": "xpi_boresight",
+      "keywords": [
+        "xpi",
+        "boresight"
+      ],
+      "cn": "交叉极化"
+    },
+    {
+      "col_type": "xpi_mean",
+      "keywords": [
+        "xpi",
+        "mean"
+      ],
+      "cn": "交叉极化均值",
+      "negate": [
+        "min"
+      ]
+    },
+    {
+      "col_type": "xpi_min",
+      "keywords": [
+        "xpi",
+        "min"
+      ],
+      "cn": "交叉极化最小值",
+      "negate": [
+        "mean"
+      ]
+    },
+    {
+      "col_type": "cp_xpi_single",
+      "keywords": [
+        "cp",
+        "xpi"
+      ],
+      "cn": "圆极化交叉极化|交叉极化",
+      "extra_req": [
+        "theta",
+        "θ",
+        "@",
+        "°",
+        "deg"
+      ]
+    },
+    {
+      "col_type": "lag_range",
+      "regex": "(?:Theta|θ)\\s*[=＝]\\s*\\d+\\.?\\d*\\s*[-–—~～]\\s*\\d+\\.?\\d*",
+      "cn": "增益@θ范围",
+      "negate": [
+        "轴比",
+        "ar",
+        "axial"
+      ]
+    },
+    {
+      "col_type": "lag_single",
+      "regex": "(?:Theta|θ)\\s*[=＝]\\s*\\d+\\.?\\d*",
+      "cn": "增益@θ",
+      "negate": [
+        "轴比",
+        "range",
+        "～",
+        "axial",
+        "范围",
+        "ar",
+        "~",
+        "[-–—]"
+      ]
+    },
+    {
+      "col_type": "theta_bw",
+      "keywords": [
+        "beamwidth",
+        "3db"
+      ],
+      "cn": "波束宽度",
+      "extra_req": [
+        "theta",
+        "θ",
+        "th."
+      ],
+      "negate": [
+        "phi",
+        "φ"
+      ]
+    },
+    {
+      "col_type": "phi_bw",
+      "keywords": [
+        "beamwidth",
+        "3db",
+        "phi"
+      ],
+      "cn": "波束宽度"
+    },
+    {
+      "col_type": "front_back_ratio",
+      "keywords": [
+        "front",
+        "back"
+      ],
+      "cn": "前后比"
+    },
+    {
+      "col_type": "boresight_theta",
+      "keywords": [
+        "boresight"
+      ],
+      "cn": "瞄准角",
+      "extra_req": [
+        "theta",
+        "θ",
+        "th."
+      ],
+      "negate": [
+        "phi",
+        "φ"
+      ]
+    },
+    {
+      "col_type": "boresight_phi",
+      "keywords": [
+        "boresight"
+      ],
+      "cn": "瞄准角",
+      "extra_req": [
+        "phi",
+        "φ"
+      ]
+    },
+    {
+      "col_type": "max_power",
+      "keywords": [
+        "power"
+      ],
+      "cn": "最大功率",
+      "negate": [
+        "average",
+        "avg",
+        "平均",
+        "min",
+        "最小"
+      ],
+      "extra_req": [
+        "max",
+        "maximum",
+        "最大"
+      ]
+    },
+    {
+      "col_type": "min_power",
+      "keywords": [
+        "power"
+      ],
+      "cn": "最小功率",
+      "negate": [
+        "average",
+        "avg",
+        "平均"
+      ],
+      "extra_req": [
+        "min",
+        "minimum",
+        "最小"
+      ]
+    },
+    {
+      "col_type": "avg_power",
+      "keywords": [
+        "power"
+      ],
+      "cn": "平均功率",
+      "extra_req": [
+        "average",
+        "avg",
+        "平均"
+      ]
+    },
+    {
+      "col_type": "avg_gain",
+      "keywords": [
+        "gain"
+      ],
+      "cn": "平均增益",
+      "negate": [
+        "@",
+        "theta",
+        "θ"
+      ],
+      "extra_req": [
+        "average",
+        "avg",
+        "平均"
+      ]
+    },
+    {
+      "col_type": "max_min_ratio",
+      "keywords": [
+        "ratio"
+      ],
+      "cn": "峰均比",
+      "extra_req": [
+        "max",
+        "maximum",
+        "最大"
+      ],
+      "extra_req2": [
+        "min",
+        "minimum",
+        "最小"
+      ]
+    },
+    {
+      "col_type": "max_avg_ratio",
+      "keywords": [
+        "ratio"
+      ],
+      "cn": "比率",
+      "extra_req": [
+        "max",
+        "maximum",
+        "最大"
+      ],
+      "extra_req2": [
+        "avg",
+        "average",
+        "平均"
+      ]
+    },
+    {
+      "col_type": "min_avg_ratio",
+      "keywords": [
+        "ratio"
+      ],
+      "cn": "比率",
+      "extra_req": [
+        "min",
+        "minimum",
+        "最小"
+      ],
+      "extra_req2": [
+        "avg",
+        "average",
+        "平均"
+      ]
     },
     {
       "col_type": "pc_theta_mm",
-      "label": "Phase Center θ",
       "keywords": [
         "pc",
         "theta"
       ],
-      "builtin": true
+      "cn": "相位中心",
+      "negate": [
+        "phi",
+        "φ"
+      ]
     },
     {
       "col_type": "pc_phi_mm",
-      "label": "Phase Center φ",
       "keywords": [
         "pc",
         "phi"
       ],
-      "builtin": true
+      "cn": "相位中心"
     },
     {
-      "col_type": "lag_single",
-      "label": "LAG 单角度 (前缀)",
-      "regex": "lag\\s*(?:theta|θ)\\s*[=＝]\\s*(\\d+\\.?\\d*)",
-      "builtin": true
+      "col_type": "tis",
+      "cn": "灵敏度|各向同性",
+      "negate": [
+        "nhpis"
+      ],
+      "extra_req": [
+        "tis",
+        "sensitivity",
+        "total",
+        "isotropic",
+        "灵敏度",
+        "各向同性"
+      ],
+      "keywords": [
+        "sensitivity"
+      ]
     },
     {
-      "col_type": "lag_single",
-      "label": "LAG 单角度",
-      "regex": "(?:theta|θ)\\s*[=＝]\\s*(\\d+\\.?\\d*)\\s*(?:deg)?\\s*(?:lag|l\\.a\\.g\\.?)",
-      "builtin": true
+      "col_type": "nhpis_45",
+      "keywords": [
+        "nhpis",
+        "45"
+      ],
+      "cn": "近水平面灵敏度",
+      "negate": [
+        "ratio",
+        "比",
+        "/"
+      ]
     },
     {
-      "col_type": "lag_range",
-      "label": "LAG 范围",
-      "regex": "(?:theta|θ)\\s*[=＝]\\s*(\\d+\\.?\\d*)\\s*[-–—~]\\s*(\\d+\\.?\\d*)\\s*(?:deg)?",
-      "builtin": true
+      "col_type": "nhpis_30",
+      "keywords": [
+        "nhpis",
+        "30"
+      ],
+      "cn": "近水平面灵敏度",
+      "negate": [
+        "ratio",
+        "比",
+        "/"
+      ]
+    },
+    {
+      "col_type": "nhpis_225",
+      "keywords": [
+        "nhpis"
+      ],
+      "cn": "近水平面灵敏度",
+      "negate": [
+        "ratio",
+        "比",
+        "/",
+        "45",
+        "30"
+      ],
+      "extra_req": [
+        "22.5",
+        "22",
+        "pi/8",
+        "π/8"
+      ]
+    },
+    {
+      "col_type": "nhpis_custom",
+      "keywords": [
+        "nhpis"
+      ],
+      "cn": "近水平面灵敏度",
+      "negate": [
+        "ratio",
+        "比",
+        "/",
+        "45",
+        "30"
+      ],
+      "extra_req": [
+        "custom",
+        "自定义",
+        "flex"
+      ]
+    },
+    {
+      "col_type": "uh_pis",
+      "keywords": [
+        "upper",
+        "pis"
+      ],
+      "cn": "上半球灵敏度"
+    },
+    {
+      "col_type": "lh_pis",
+      "keywords": [
+        "lower",
+        "pis"
+      ],
+      "cn": "下半球灵敏度"
+    },
+    {
+      "col_type": "pis_120",
+      "keywords": [
+        "pis",
+        "120"
+      ],
+      "cn": "部分灵敏度"
     }
-  ]
+  ],
+  "_note": "匹配优先级: 1.regex  2.exact  3.keywords(ALL) + extra_req(ANY)  4.cn(ANY)  -negate(ANY排除)。regex匹配norm(规范化英文), cn匹配raw_header(原始中文)。"
 }

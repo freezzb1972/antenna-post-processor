@@ -109,8 +109,6 @@ class ChartConfig:
     chart_trp_freq: bool = False
     chart_trp_nhprp: bool = False
     chart_ar_freq: bool = False
-    chart_lag_vs_phi: bool = False      # LAG vs Phi 散点图 (待修复: 数据结构需重写)
-    chart_ar_vs_phi: bool = False       # AR  vs Phi 散点图 (待修复: 数据结构需重写)
 
     # B 类子选择: 具体角度/范围 (为空时自动使用模板默认值)
     gain_chart_angles: list[float] = field(default_factory=list)   # PK Gain + 指定 θ 单角度
@@ -145,8 +143,7 @@ class ChartConfig:
         return (self.chart_eff_freq or self.chart_gain_freq or
                 self.chart_dir_freq or self.chart_lag_freq or
                 self.chart_trp_freq or self.chart_trp_nhprp or
-                self.chart_ar_freq or self.chart_lag_vs_phi or
-                self.chart_ar_vs_phi)
+                self.chart_ar_freq)
 
     @property
     def has_any_c_class(self) -> bool:
@@ -166,7 +163,7 @@ class ChartConfig:
             "pattern_3d_etheta", "pattern_3d_ephi",
             "chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
             "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp",
-            "chart_ar_freq", "chart_lag_vs_phi", "chart_ar_vs_phi", "cut_2d_polar", "cut_2d_rect",
+            "chart_ar_freq", "cut_2d_polar", "cut_2d_rect",
         ]
         merged = ChartConfig(
             elev=self.elev, azim=self.azim, dpi=self.dpi,
@@ -284,7 +281,7 @@ class ChartConfig:
             "pattern_3d_etheta", "pattern_3d_ephi",
             "chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
             "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp",
-            "chart_ar_freq", "chart_lag_vs_phi", "chart_ar_vs_phi", "cut_2d_polar", "cut_2d_rect",
+            "chart_ar_freq", "cut_2d_polar", "cut_2d_rect",
         ]
 
     @classmethod
@@ -293,6 +290,32 @@ class ChartConfig:
         return ["gain_chart_angles", "gain_chart_ranges",
                 "ar_chart_angles", "ar_chart_ranges",
                 "cut_2d_phi_angles"]
+
+    @classmethod
+    def get_angles_from_data_config(cls, mw, chart_key: str) -> list[float]:
+        """从天线参数角度配置读取图表角度 (统一数据源)。
+
+        避免用户在数据参数和图表参数中重复配置角度。
+        """
+        if chart_key in ("chart_gain_freq", "chart_lag_freq", "cut_2d_polar", "cut_2d_rect",
+                         "pattern_3d_gain", "pattern_3d_etheta", "pattern_3d_ephi"):
+            cfg = getattr(mw, '_lag_config', None)
+            return cfg.singles_sorted if cfg else []
+        elif chart_key in ("chart_ar_freq", "pattern_3d_ar"):
+            cfg = getattr(mw, '_ar_lag_config', None)
+            return cfg.singles_sorted if cfg else []
+        return []
+
+    @classmethod
+    def get_chart_ranges_from_data_config(cls, mw, chart_key: str) -> list[tuple]:
+        """从天线参数角度配置读取图表角度范围。"""
+        if chart_key in ("chart_gain_freq", "chart_lag_freq"):
+            cfg = getattr(mw, '_lag_config', None)
+            return cfg.ranges_sorted if cfg else []
+        elif chart_key == "chart_ar_freq":
+            cfg = getattr(mw, '_ar_lag_config', None)
+            return cfg.ranges_sorted if cfg else []
+        return []
 
     @classmethod
     def chart_labels(cls) -> dict[str, str]:
@@ -304,34 +327,42 @@ class ChartConfig:
             "pattern_3d_etheta": "3D E_θ 分量方向图",
             "pattern_3d_ephi": "3D E_φ 分量方向图",
             "chart_eff_freq": "效率 vs 频率",
-            "chart_gain_freq": "峰值增益 vs 频率",
-            "chart_dir_freq": "方向性 vs 频率",
-            "chart_lag_freq": "增益@角度 vs 频率",
+            "chart_gain_freq": "Gain vs 频率",
+            "chart_dir_freq": "Directivity vs 频率",
             "chart_trp_freq": "TRP vs 频率",
-            "chart_trp_nhprp": "TRP+NHPRP vs 频率",
             "chart_ar_freq": "轴比 vs 频率",
-        "chart_lag_vs_phi": "LAG vs Phi 散点图",
-        "chart_ar_vs_phi": "AR vs Phi 散点图",
             "cut_2d_polar": "极坐标俯仰面切面图",
             "cut_2d_rect": "直角坐标俯仰面切面图",
         }
 
     @classmethod
-    def chart_categories(cls) -> dict[str, list[str]]:
-        """返回图形分类: 类别名 → [chart_key, ...]"""
+    def chart_categories(cls, mode: int = 0) -> dict[str, list[str]]:
+        """返回图形分类: 类别名 → [chart_key, ...]。按测试模式过滤。
+
+        Args:
+            mode: 0=无源天线, 1=有源发射(TRP), 2=有源接收(TIS)
+        """
+        # 共用: 3D 方向图 (所有模式都有 Gain)
+        pattern_3d = ["pattern_3d_gain", "pattern_3d_etheta", "pattern_3d_ephi"]
+        if mode == 1:
+            pattern_3d.append("pattern_3d_eirp")
+        else:
+            pattern_3d.append("pattern_3d_ar")
+
+        # vs 频率曲线: 按模式分组
+        vs_freq = ["chart_gain_freq", "chart_eff_freq", "chart_dir_freq"]
+        if mode == 0:
+            vs_freq.append("chart_ar_freq")
+        elif mode == 1:
+            vs_freq.append("chart_trp_freq")
+
+        # 俯仰面切面图: 共用
+        cuts = ["cut_2d_polar", "cut_2d_rect"]
+
         return {
-            "A 类: 3D 方向图": [
-                "pattern_3d_gain", "pattern_3d_eirp", "pattern_3d_ar",
-                "pattern_3d_etheta", "pattern_3d_ephi",
-            ],
-            "B 类: 频点曲线": [
-                "chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
-                "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp",
-                "chart_ar_freq",
-            ],
-            "C 类: 俯仰面切面图": [
-                "cut_2d_polar", "cut_2d_rect",
-            ],
+            "A 类: 3D 方向图": pattern_3d,
+            "B 类: vs 频率曲线": vs_freq,
+            "C 类: 俯仰面切面图": cuts,
         }
 
 
