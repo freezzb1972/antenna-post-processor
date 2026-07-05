@@ -589,10 +589,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             if name not in seen:
                 self._antenna_selector.addItem(name, name)
                 seen.add(name)
-                # 首次发现时自动创建 AntennaConfig
+                # 首次发现时自动创建 AntennaConfig（继承模板参数）
                 if name not in self._antenna_configs:
                     ant = AntennaConfig(name=name, data_files=[fe.path],
-                                        test_mode=fe.test_mode)
+                                        test_mode=fe.test_mode,
+                                        required_params=set(self._required_params))
                     self._antenna_configs[name] = ant
                 else:
                     # 追加数据文件到已有天线
@@ -658,20 +659,29 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 idx = ap._cmb_test_mode.findData(ant.test_mode)
                 if idx >= 0: ap._cmb_test_mode.setCurrentIndex(idx)
                 ap._cmb_test_mode.blockSignals(False)
-            # 加载参数 checkbox 状态
+            # 加载参数 checkbox 状态（如果天线未独立配置，继承模板参数）
+            params_to_use = ant.required_params if ant.required_params else self._required_params
+            extra_to_use = ant.extra_params if ant.extra_params else self._extra_params
             for key, cb in ap._left_checkboxes.items():
-                cb.setChecked(key in ant.required_params)
+                cb.setChecked(key in params_to_use)
             for key, cb in ap._right_checkboxes.items():
-                cb.setChecked(key in ant.extra_params)
-            # 加载角度配置
+                cb.setChecked(key in extra_to_use)
+            # 加载角度配置（如果天线未独立配置，继承全局模板配置）
+            gain_cfg = ant.lag_config if not ant.lag_config.is_empty() else self._lag_config
+            ar_cfg = ant.ar_lag_config if not ant.ar_lag_config.is_empty() else (
+                self._ar_lag_config if hasattr(self, '_ar_lag_config') else LagConfig())
+            rhcp_cfg = ant.rhcp_lag_config if not ant.rhcp_lag_config.is_empty() else (
+                self._rhcp_lag_config if hasattr(self, '_rhcp_lag_config') else LagConfig())
+            cpxpi_cfg = ant.cpxpi_lag_config if not ant.cpxpi_lag_config.is_empty() else (
+                self._cpxpi_lag_config if hasattr(self, '_cpxpi_lag_config') else LagConfig())
             if getattr(ap, '_gain_angle_widget', None):
-                ap._gain_angle_widget.set_config(ant.lag_config)
+                ap._gain_angle_widget.set_config(gain_cfg)
             if getattr(ap, '_ar_angle_widget', None):
-                ap._ar_angle_widget.set_config(ant.ar_lag_config)
+                ap._ar_angle_widget.set_config(ar_cfg)
             if getattr(ap, '_rhcp_angle_widget', None):
-                ap._rhcp_angle_widget.set_config(ant.rhcp_lag_config)
+                ap._rhcp_angle_widget.set_config(rhcp_cfg)
             if getattr(ap, '_cpxpi_angle_widget', None):
-                ap._cpxpi_angle_widget.set_config(ant.cpxpi_lag_config)
+                ap._cpxpi_angle_widget.set_config(cpxpi_cfg)
 
         # 同步到 ChartSettingsPage mode selector
         if hasattr(self, '_chart_settings_page'):
@@ -1913,9 +1923,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._required_params = tp
         self._extra_params = set()
 
-        # 同步到 AntennaParamsPage（checkbox 勾选 + 模式匹配 + 角度配置）
+        # 同步到 AntennaParamsPage
         if hasattr(self, '_antenna_params_page') and self._antenna_params_page:
             self._antenna_params_page.set_template_params(tp)
+
+        # 同步到当前天线配置
+        ant = self._antenna_configs.get(self._current_antenna_name) if self._current_antenna_name else None
+        if ant and not ant.required_params:
+            ant.required_params = set(tp)
 
         self._update_params_display()
 
