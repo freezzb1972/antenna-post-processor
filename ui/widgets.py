@@ -462,8 +462,18 @@ class DataFileSelector(QGroupBox):
         self.setTitle(self.tr("数据文件"))
         self.setStyleSheet("QGroupBox { padding-top: 4px; padding-bottom: 1px; margin-top: 14px; }")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(2, 0, 2, 0)
-        layout.setSpacing(0)
+        self._tight_margins = (2, 0, 2, 0)  # 保存紧凑值供 showEvent 恢复
+        self._tight_spacing = 0
+        layout.setContentsMargins(*self._tight_margins)
+        layout.setSpacing(self._tight_spacing)
+
+    def showEvent(self, event):
+        """QSS 重置后恢复紧凑间距。"""
+        super().showEvent(event)
+        ly = self.layout()
+        if ly and hasattr(self, '_tight_margins'):
+            ly.setContentsMargins(*self._tight_margins)
+            ly.setSpacing(self._tight_spacing)
 
         # 按钮行
         btn_row = QHBoxLayout()
