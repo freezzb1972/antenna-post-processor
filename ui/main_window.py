@@ -293,16 +293,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         return p._file_list_widget if p else None
 
     @property
-    def _match_table(self):
-        p = getattr(self, '_file_settings_page', None)
-        return p._match_table if p else None
 
-    @property
-    def _lbl_match_status(self):
-        p = getattr(self, '_file_settings_page', None)
-        return p._lbl_match_status if p else None
 
-    @property
     def _cmb_naming_mode(self):
         p = getattr(self, '_file_settings_page', None)
         return p._cmb_naming_mode if p else None
@@ -333,14 +325,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         return p._btn_auto_match if p else None
 
     @property
-    def _check_chart_eff(self):
-        p = getattr(self, '_file_settings_page', None)
-        return p._check_chart_eff if p else None
 
-    @property
-    def _check_chart_lag(self):
-        p = getattr(self, '_file_settings_page', None)
-        return p._check_chart_lag if p else None
 
     def _init_params_tab(self):
         """构建「天线参数」子节 — 频点 + 算法选项，加入 tabFile。"""
@@ -1422,8 +1407,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """工作表命名方式变更回调。"""
         self._worksheet_naming_mode = self._cmb_naming_mode.currentData() or 0
         # 命名方式变了，重建匹配表
-        if self._match_table.rowCount() > 0:
-            self._on_auto_match()
+        self._on_auto_match()
 
     def _on_auto_match(self):
         template_path = self.ui.editTemplatePath.text().strip()
@@ -1503,19 +1487,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 status.setForeground(QColor("orange"))
             self._match_table.setItem(i, 2, status)
 
-    def _on_match_changed(self, row: int):
-        combo = self._match_table.cellWidget(row, 1)
-        fp = combo.currentData() or "" if combo else ""
-        valid = fp and fp != "—" and Path(fp).exists()
-        status = self._match_table.item(row, 2)
-        if status:
-            if valid:
-                status.setText(self.tr("✓ 已匹配"))
-                status.setForeground(QColor("green"))
-            else:
-                status.setText(self.tr("未匹配"))
-                status.setForeground(QColor("orange"))
-
     def _build_datasource_map(self, progress_callback=None):
         from src.datasource import DataSource
         from src.sheet_file_matcher import extract_key, sanitize_sheet_name
@@ -1527,8 +1498,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 防御: 清除不在 _data_file_paths 中的匹配表行 (陈旧数据保护)
         valid_paths = set(self._data_file_paths)
-        for row in range(self._match_table.rowCount()):
-            combo = self._match_table.cellWidget(row, 1)
+        for m in getattr(self, '_last_matches', []):
+            fp = m.file_path or ""
             if combo:
                 fp = combo.currentData() or ""
                 if fp and fp != "—" and fp not in valid_paths:
@@ -1537,9 +1508,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 已匹配的行
         matched_files = set()
-        for row in range(self._match_table.rowCount()):
-            template_sheet_name = self._match_table.item(row, 0).text()
-            combo = self._match_table.cellWidget(row, 1)
+        for m in getattr(self, '_last_matches', []):
+            template_sheet_name = m.sheet_name
+            fp = m.file_path or ""
             fp = combo.currentData() or "" if combo else ""
             if fp and Path(fp).exists():
                 if progress_callback:
@@ -1611,11 +1582,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
     def _retry_unmatched_files(self):
         """LLM 辅助: 自动匹配后仍有未匹配文件时尝试 LLM 建议。"""
-        if self._match_table.rowCount() == 0:
+        if not getattr(self, '_last_matches', None):
             return
         matched_files = set()
-        for row in range(self._match_table.rowCount()):
-            combo = self._match_table.cellWidget(row, 1)
+        for m in getattr(self, '_last_matches', []):
+            fp = m.file_path or ""
             fp = combo.currentData() or "" if combo else ""
             if fp and Path(fp).exists():
                 matched_files.add(fp)
@@ -1724,8 +1695,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             except Exception:
                 pass
             # 模板路径变更后，旧的匹配表基于旧模板的工作表名，无效
-            if self._match_table is not None:
-                self._match_table.setRowCount(0)
             if hasattr(self, '_lbl_match_status') and self._lbl_match_status is not None:
                 self._lbl_match_status.setText("")
             # 若已有数据文件，立即重建匹配表
@@ -2232,7 +2201,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 自动触发匹配 (从 FileSettingsPage 读取)
         file_page = getattr(self, '_file_settings_page', None)
-        if file_page and file_page._match_table.rowCount() == 0 and self._data_file_paths:
+        if file_page and bool(getattr(file_page, '_last_matches', None)) == 0 and self._data_file_paths:
             try:
                 if file_page:
                     file_page._on_auto_match()
@@ -3075,7 +3044,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 fp = getattr(self, '_file_settings_page', None)
                 if fp: fp._file_entries.clear()
                 self._file_list_widget.setRowCount(0)
-                self._match_table.setRowCount(0)
                 self._lbl_match_status.setText("")
             existing = set(self._data_file_paths)
             new = [p for p in valid if p not in existing]

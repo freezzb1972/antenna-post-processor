@@ -236,13 +236,10 @@ class FileSettingsPage(QWidget):
         self._btn_clear_selected = ds.btn_clear_selected
         self._btn_clear_all = ds.btn_clear_all
         self._file_list_widget = ds.file_list_widget
-        self._match_table = ds.match_table
         self._btn_auto_match = ds.btn_auto_match
         self._lbl_match_status = ds.lbl_match_status
         self._lbl_naming_mode = ds.lbl_naming_mode
         self._cmb_naming_mode = ds.cmb_naming_mode
-        self._check_chart_eff = ds.check_chart_eff
-        self._check_chart_lag = ds.check_chart_lag
 
         v_splitter.addWidget(ds)
         v_splitter.setStretchFactor(0, 0)  # 模板区不拉伸
@@ -475,29 +472,6 @@ class FileSettingsPage(QWidget):
         self._worksheet_naming_mode = getattr(self._mw, '_worksheet_naming_mode', 0)
         # 刷新 UI
         self._refresh_data_file_ui()
-        self._sync_match_table_from_mw()
-
-    def _sync_match_table_from_mw(self):
-        """从 MainWindow 同步匹配表。"""
-        if not self._mw:
-            return
-        mw_match = getattr(self._mw, '_match_table', None)
-        if mw_match is not None and mw_match.rowCount() > 0:
-            # 复制匹配表数据
-            self._match_table.setRowCount(mw_match.rowCount())
-            for row in range(mw_match.rowCount()):
-                self._match_table.setRowHeight(row, 28)
-                item0 = mw_match.item(row, 0)
-                if item0:
-                    self._match_table.setItem(row, 0, QTableWidgetItem(item0.text()))
-                item2 = mw_match.item(row, 2)
-                if item2:
-                    s = QTableWidgetItem(item2.text())
-                    s.setForeground(item2.foreground())
-                    self._match_table.setItem(row, 2, s)
-            self._lbl_match_status.setText(
-                getattr(self._mw, '_lbl_match_status', QLabel("")).text()
-            )
 
     # ── 日志 ──
 
@@ -538,7 +512,6 @@ class FileSettingsPage(QWidget):
                 self._mw._auto_update_angle_config_from_template(sheets)
             except Exception:
                 pass
-        self._match_table.setRowCount(0)
         self._lbl_match_status.setText("")
         if self._data_file_paths:
             self._on_auto_match()
@@ -649,7 +622,6 @@ class FileSettingsPage(QWidget):
                 self._mw._auto_update_angle_config_from_template(sheets)
             except Exception:
                 pass
-        self._match_table.setRowCount(0)
         self._lbl_match_status.setText("")
         if self._data_file_paths:
             self._on_auto_match()
@@ -1088,7 +1060,6 @@ class FileSettingsPage(QWidget):
             self._data_file_paths.clear()
             self._file_entries.clear()
             self._file_list_widget.setRowCount(0)
-            self._match_table.setRowCount(0)
             self._lbl_match_status.setText("")
         existing = set(self._data_file_paths)
         new_paths = [p for p in paths if p not in existing]
@@ -1122,7 +1093,6 @@ class FileSettingsPage(QWidget):
                     del self._file_entries[r]
         self._refresh_data_file_ui()
         if not self._data_file_paths:
-            self._match_table.setRowCount(0)
             self._lbl_match_status.setText("")
             self._data_stale = True
         else:
@@ -1135,7 +1105,6 @@ class FileSettingsPage(QWidget):
         self._data_file_paths.clear()
         self._file_entries.clear()
         self._file_list_widget.setRowCount(0)
-        self._match_table.setRowCount(0)
         self._lbl_match_status.setText("")
         self._data_stale = True
 
@@ -1217,8 +1186,7 @@ class FileSettingsPage(QWidget):
         self._worksheet_naming_mode = data
         if self._mw:
             self._mw._worksheet_naming_mode = data
-        if self._match_table.rowCount() > 0:
-            self._on_auto_match()
+        self._on_auto_match()
 
     def _on_auto_match(self):
         template_path = self._template_path
@@ -1263,47 +1231,11 @@ class FileSettingsPage(QWidget):
         self._log(f"自动匹配完成: {matched}/{len(matches)}")
 
     def _populate_match_table(self, matches):
-        from src.sheet_file_matcher import extract_key, sanitize_sheet_name
-        use_file_names = self._worksheet_naming_mode == 1
-        self._match_table.setRowCount(len(matches))
-        for i, m in enumerate(matches):
-            self._match_table.setRowHeight(i, 28)
-            display_name = m.sheet_name
-            if use_file_names and m.file_path:
-                display_name = sanitize_sheet_name(extract_key(m.file_path))
-            self._match_table.setItem(i, 0, QTableWidgetItem(display_name))
-            combo = QComboBox()
-            combo.addItem("—")
-            for fp in self._data_file_paths:
-                combo.addItem(Path(fp).name, fp)
-                combo.model().item(combo.count() - 1).setToolTip(fp)
-            if m.file_path:
-                idx = combo.findData(m.file_path)
-                if idx >= 0:
-                    combo.setCurrentIndex(idx)
-            combo.currentIndexChanged.connect(lambda idx, row=i: self._on_match_changed(row))
-            self._match_table.setCellWidget(i, 1, combo)
+        """存储匹配结果并更新状态标签（匹配表 GUI 已移除）。"""
+        self._last_matches = matches
+        matched = sum(1 for m in matches if m.file_path is not None)
+        self._lbl_match_status.setText(f"✓ {matched}/{len(matches)} 个工作表已匹配")
 
-            if m.file_path:
-                status = QTableWidgetItem(self.tr("✓ 已匹配"))
-                status.setForeground(QColor("green"))
-            else:
-                status = QTableWidgetItem(self.tr("未匹配"))
-                status.setForeground(QColor("orange"))
-            self._match_table.setItem(i, 2, status)
-
-    def _on_match_changed(self, row: int):
-        combo = self._match_table.cellWidget(row, 1)
-        fp = combo.currentData() or "" if combo else ""
-        valid = fp and fp != "—" and Path(fp).exists()
-        status = self._match_table.item(row, 2)
-        if status:
-            if valid:
-                status.setText(self.tr("✓ 已匹配"))
-                status.setForeground(QColor("green"))
-            else:
-                status.setText(self.tr("未匹配"))
-                status.setForeground(QColor("orange"))
 
     # ── 对外接口 ──
 
@@ -1355,8 +1287,6 @@ class FileSettingsPage(QWidget):
     def get_lag_checkboxes(self):
         """返回 {效率曲线, 增益曲线} 勾选状态。"""
         return {
-            "chart_eff": self._check_chart_eff.isChecked(),
-            "chart_lag": self._check_chart_lag.isChecked(),
         }
 
     def build_datasource_map(self, progress_callback=None):
@@ -1369,8 +1299,8 @@ class FileSettingsPage(QWidget):
         use_file_names = self._worksheet_naming_mode == 1
 
         valid_paths = set(self._data_file_paths)
-        for row in range(self._match_table.rowCount()):
-            combo = self._match_table.cellWidget(row, 1)
+        for m in getattr(self, '_last_matches', []):
+            fp = m.file_path or ""
             if combo:
                 fp = combo.currentData() or ""
                 if fp and fp != "—" and fp not in valid_paths:
@@ -1378,10 +1308,9 @@ class FileSettingsPage(QWidget):
                     self._log(f"⚠ 匹配表中 {fp} 已不在数据文件列表中，已重置")
 
         matched_files = set()
-        for row in range(self._match_table.rowCount()):
-            template_sheet_name = self._match_table.item(row, 0).text()
-            combo = self._match_table.cellWidget(row, 1)
-            fp = combo.currentData() or "" if combo else ""
+        for m in getattr(self, '_last_matches', []):
+            template_sheet_name = m.sheet_name
+            fp = m.file_path or ""
             if fp and Path(fp).exists():
                 if progress_callback:
                     file_idx += 1

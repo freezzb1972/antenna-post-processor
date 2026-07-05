@@ -255,21 +255,12 @@ class TemplateSourceRow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        # 厂商下拉 (搜索)
-        self._cmb_mfr = QComboBox()
-        self._cmb_mfr.setEditable(True)
-        self._cmb_mfr.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_mfr.lineEdit().setPlaceholderText(self.tr("厂商..."))
-        self._cmb_mfr.setMinimumWidth(100)
-        self._cmb_mfr.currentIndexChanged.connect(self._on_mfr_changed)
-        layout.addWidget(self._cmb_mfr)
-
-        # 模板名下拉 (搜索, 根据厂商联动)
+        # 单一下拉: 厂商为分组标题(不可选), 模板为缩进子项
         self._cmb_tpl = QComboBox()
         self._cmb_tpl.setEditable(True)
         self._cmb_tpl.setInsertPolicy(QComboBox.NoInsert)
         self._cmb_tpl.lineEdit().setPlaceholderText(self.tr("模板..."))
-        self._cmb_tpl.setMinimumWidth(120)
+        self._cmb_tpl.setMinimumWidth(220)
         self._cmb_tpl.currentIndexChanged.connect(self._on_tpl_selected)
         layout.addWidget(self._cmb_tpl)
 
@@ -285,61 +276,50 @@ class TemplateSourceRow(QWidget):
     def set_path(self, path: str):
         """手动设置模板路径（非预设选择时使用, 不触发信号以避免递归）。"""
         self._path = path
-        # 清除预设选择
-        self._cmb_mfr.blockSignals(True)
-        self._cmb_mfr.setCurrentIndex(0)
-        self._cmb_mfr.blockSignals(False)
         self._cmb_tpl.blockSignals(True)
         self._cmb_tpl.setCurrentIndex(0)
         self._cmb_tpl.blockSignals(False)
-        # 不 emit template_changed — 调用方自己 emit 或由 browse 流程处理
 
     def get_path(self) -> str:
         """返回当前模板路径。"""
         return self._path
 
     def populate_presets(self, presets: List[dict]):
-        """填充厂商和模板两级下拉。每个预设含 Excel path + Word path。"""
+        """填充单一下拉: 厂商为分组标题(不可选), 模板为缩进子项。"""
         self._all_presets = presets
-        self._cmb_mfr.blockSignals(True)
-        self._cmb_mfr.clear()
-        self._cmb_mfr.addItem("", "")
-        mfrs = sorted(set(p.get('manufacturer', '') for p in presets if p.get('manufacturer')))
-        for m in mfrs:
-            self._cmb_mfr.addItem(m, m)
-        self._cmb_mfr.blockSignals(False)
-        self._populate_templates("")
-
-    def _populate_templates(self, mfr_filter: str):
         self._cmb_tpl.blockSignals(True)
         self._cmb_tpl.clear()
-        self._cmb_tpl.addItem("", "")
-        for p in self._all_presets:
-            if mfr_filter and p.get('manufacturer', '') != mfr_filter:
-                continue
-            label = p.get('name', '')
-            self._cmb_tpl.addItem(label, json.dumps({
-                "excel": p.get("path", ""),
-                "word": p.get("word_template_path", ""),
-            }))
+        self._cmb_tpl.addItem("", "")  # 空项
+        mfrs = sorted(set(p.get('manufacturer', '') for p in presets if p.get('manufacturer')))
+        for mfr in mfrs:
+            # 厂商标题 (不可选, 用 icon 或纯文本标记)
+            self._cmb_tpl.insertSeparator(self._cmb_tpl.count())
+            self._cmb_tpl.addItem(f"— {mfr} —")
+            # 标记为不可选: 通过 model 设置
+            idx = self._cmb_tpl.count() - 1
+            self._cmb_tpl.model().item(idx).setEnabled(False)
+            mfr_presets = [p for p in presets if p.get('manufacturer', '') == mfr]
+            for p in mfr_presets:
+                label = p.get('name', '')
+                self._cmb_tpl.addItem(f"    {label}", json.dumps({
+                    "excel": p.get("path", ""),
+                    "word": p.get("word_template_path", ""),
+                }))
         self._cmb_tpl.blockSignals(False)
-
-    def _on_mfr_changed(self, idx: int):
-        mfr = self._cmb_mfr.currentData() or ""
-        self._populate_templates(mfr)
 
     def _on_tpl_selected(self, idx: int):
         data = self._cmb_tpl.currentData()
-        if data:
-            try:
-                d = json.loads(data)
-                excel = d.get("excel", ""); word = d.get("word", "")
-            except Exception:
-                excel = data; word = ""
-            self._path = excel
-            self.template_changed.emit(excel)
-            if word:
-                self.template_pair_changed.emit(excel, word)
+        if not data:
+            return  # 空项或厂商标题
+        try:
+            d = json.loads(data)
+            excel = d.get("excel", ""); word = d.get("word", "")
+        except Exception:
+            return
+        self._path = excel
+        self.template_changed.emit(excel)
+        if word:
+            self.template_pair_changed.emit(excel, word)
 
     def _on_browse(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -515,23 +495,6 @@ class DataFileSelector(QGroupBox):
         self.file_list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
         layout.addWidget(self.file_list_widget)
 
-        # 匹配表
-        self.match_table = QTableWidget()
-        self.match_table.setColumnCount(3)
-        self.match_table.setHorizontalHeaderLabels([
-            self.tr("工作表"), self.tr("数据文件"), self.tr("状态")
-        ])
-        self.match_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
-        self.match_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.match_table.setColumnWidth(0, 120)
-        self.match_table.verticalHeader().setDefaultSectionSize(28)
-        self.match_table.verticalHeader().setVisible(False)
-        self.match_table.setMinimumHeight(120)
-        self.match_table.setMaximumHeight(280)
-        self.match_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.match_table.setAlternatingRowColors(True)
-        layout.addWidget(self.match_table)
-
         # 自动匹配按钮行
         match_row = QHBoxLayout()
         self.btn_auto_match = QPushButton(self.tr("🔗 自动匹配"))
@@ -545,24 +508,13 @@ class DataFileSelector(QGroupBox):
         self.lbl_naming_mode = QLabel(self.tr("工作表命名:"))
         match_row.addWidget(self.lbl_naming_mode)
         self.cmb_naming_mode = QComboBox()
-        self.cmb_naming_mode.addItem(self.tr("保留原模板工作表名"), 0)
         self.cmb_naming_mode.addItem(self.tr("用数据源名替换"), 1)
+        self.cmb_naming_mode.addItem(self.tr("保留原模板工作表名"), 0)
         self.cmb_naming_mode.setToolTip(self.tr("多数据源时，选择工作表命名方式"))
         self.cmb_naming_mode.setFixedWidth(190)
         match_row.addWidget(self.cmb_naming_mode)
         match_row.addStretch()
         layout.addLayout(match_row)
-
-        # 图表选择行
-        chart_row = QHBoxLayout()
-        self.check_chart_eff = QCheckBox(self.tr("效率曲线"))
-        self.check_chart_eff.setChecked(True)
-        chart_row.addWidget(self.check_chart_eff)
-        self.check_chart_lag = QCheckBox(self.tr("增益曲线"))
-        self.check_chart_lag.setChecked(True)
-        chart_row.addWidget(self.check_chart_lag)
-        chart_row.addStretch()
-        layout.addLayout(chart_row)
         layout.addStretch()
 
 
