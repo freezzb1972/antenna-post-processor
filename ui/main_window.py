@@ -1456,12 +1456,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         matched = sum(1 for m in matches if m.file_path is not None)
         if hasattr(self, '_lbl_match_status'):
             self._lbl_match_status.setText(f'{matched}/{len(matches)} done')
-        # delegate to FileSettingsPage
         fp = getattr(self, '_file_settings_page', None)
-        if fp and hasattr(fp, '_last_matches'):
-            fp._last_matches = matches
-            if fp._populate_match_table.__code__.co_code != self._populate_match_table.__code__.co_code:
-                fp._populate_match_table(matches)
+        if fp and hasattr(fp, '_populate_match_table'):
+            fp._populate_match_table(matches)
 
     def _build_datasource_map(self, progress_callback=None):
         from src.datasource import DataSource
@@ -1563,7 +1560,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         matched_files = set()
         for m in getattr(self, '_last_matches', []):
             fp = m.file_path or ""
-            fp = combo.currentData() or "" if combo else ""
             if fp and Path(fp).exists():
                 matched_files.add(fp)
         unmatched = [f for f in self._data_file_paths if f not in matched_files]
@@ -2191,14 +2187,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 self.tr("请先通过「设置→数据源配置」添加数据文件并执行自动匹配。"))
             return
 
-        # 自动触发匹配 (从 FileSettingsPage 读取)
+        # 自动触发匹配 (如果尚未匹配)
         file_page = getattr(self, '_file_settings_page', None)
-        if file_page and bool(getattr(file_page, '_last_matches', None)) == 0 and self._data_file_paths:
+        if not getattr(self, '_last_matches', None) and self._data_file_paths:
             try:
-                if file_page:
-                    file_page._on_auto_match()
-                else:
-                    self._on_auto_match()
+                self._on_auto_match()
             except Exception as e:
                 self._log(f"⚠ 自动匹配失败: {e}")
                 QMessageBox.warning(self, self.tr("自动匹配失败"),

@@ -3071,16 +3071,6 @@ class ChartSettingsPage(QWidget):
         row_az_ar.addStretch()
         left_layout.addLayout(row_az_ar)
 
-        # Gain 0-70° Pk azimuth
-        row_az_pk = QHBoxLayout()
-        cb_az_pk = QCheckBox(self.tr("Gain 0-70° Pk 方位面"))
-        cb_az_pk.setToolTip(self.tr("每频点单曲线极坐标图: Theta 0-70°峰值增益 vs Phi"))
-        cb_az_pk.toggled.connect(lambda: self._sync_to_mw())
-        row_az_pk.addWidget(cb_az_pk)
-        self._chart_required["cut_azimuth_polar_pk070"] = cb_az_pk
-        row_az_pk.addStretch()
-        left_layout.addLayout(row_az_pk)
-
         # RHCP azimuth
         row_az_rhcp = QHBoxLayout()
         cb_az_rhcp = QCheckBox(self.tr("RHCP 极坐标方位面"))
@@ -3181,8 +3171,6 @@ class ChartSettingsPage(QWidget):
                 self._chart_required["cut_azimuth_polar"].setChecked(az.cut_azimuth_polar)
             if "cut_azimuth_polar_ar" in self._chart_required:
                 self._chart_required["cut_azimuth_polar_ar"].setChecked(az.cut_azimuth_polar_ar)
-            if "cut_azimuth_polar_pk070" in self._chart_required:
-                self._chart_required["cut_azimuth_polar_pk070"].setChecked(az.cut_azimuth_polar_pk070)
 
             self._azimuth_angles = list(az.azimuth_cut_angles)
             self._azimuth_angles_ar = list(az.azimuth_cut_angles_ar)
@@ -3272,7 +3260,6 @@ class ChartSettingsPage(QWidget):
         az = getattr(self._mw, '_azimuth_config', None) if self._mw else None
         if az:
             if az.cut_azimuth_polar: active_labels.append("Gain Azimuth Cut")
-            if az.cut_azimuth_polar_pk070: active_labels.append("Gain 0-70\u00b0 Pk Azimuth")
             if az.cut_azimuth_polar_ar: active_labels.append("AR Azimuth Cut")
             if az.cut_azimuth_polar_rhcp: active_labels.append("RHCP Azimuth Cut")
             if az.cut_azimuth_polar_lhcp: active_labels.append("LHCP Azimuth Cut")
@@ -3379,7 +3366,6 @@ class ChartSettingsPage(QWidget):
         azimuth = existing if existing is not None else AzimuthReportConfig()
         azimuth.cut_azimuth_polar = self._chart_required.get("cut_azimuth_polar", QCheckBox()).isChecked()
         azimuth.cut_azimuth_polar_ar = self._chart_required.get("cut_azimuth_polar_ar", QCheckBox()).isChecked()
-        azimuth.cut_azimuth_polar_pk070 = self._chart_required.get("cut_azimuth_polar_pk070", QCheckBox()).isChecked()
         azimuth.cut_azimuth_polar_rhcp = self._chart_required.get("cut_azimuth_polar_rhcp", QCheckBox()).isChecked()
         azimuth.cut_azimuth_polar_lhcp = self._chart_required.get("cut_azimuth_polar_lhcp", QCheckBox()).isChecked()
         azimuth.azimuth_cut_angles = list(self._azimuth_angles)
@@ -3497,7 +3483,7 @@ class ChartSettingsPage(QWidget):
                 self._build_azimuth_section(left_layout)
                 # 恢复方位面 checkbox 状态
                 for az_key in ("cut_azimuth_polar", "cut_azimuth_polar_ar",
-                               "cut_azimuth_polar_pk070", "cut_azimuth_polar_rhcp"):
+                               "cut_azimuth_polar_rhcp"):
                     if az_key in self._chart_required and az_key in saved:
                         self._chart_required[az_key].setChecked(saved[az_key])
             left_layout.addStretch()
