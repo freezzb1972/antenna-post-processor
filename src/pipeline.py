@@ -1243,15 +1243,19 @@ def _export_azimuth(
 
     # ── 按频点配对: azimuth_polar + azimuth_polar_pk070 并排 ──
     freq_pairs: dict[float, dict[str, io.BytesIO]] = {}
-    if out_word and azimuth_config and azimuth_config.cut_azimuth_polar \
-            and azimuth_config.cut_azimuth_polar_pk070:
+    if out_word and azimuth_config and (azimuth_config.cut_azimuth_polar
+            or azimuth_config.cut_azimuth_polar_pk070):
         for row in (r for rows in sheet_results.values() for r in rows):
             f = row.get("frequency")
             if f is None: continue
             imgs = row.get("_images", {})
-            if "azimuth_polar" in imgs and "azimuth_polar_pk070" in imgs:
-                freq_pairs[f] = {"azimuth_polar": imgs["azimuth_polar"],
-                                 "azimuth_polar_pk070": imgs["azimuth_polar_pk070"]}
+            pair = {}
+            if "azimuth_polar" in imgs:
+                pair["azimuth_polar"] = imgs["azimuth_polar"]
+            if "azimuth_polar_pk070" in imgs:
+                pair["azimuth_polar_pk070"] = imgs["azimuth_polar_pk070"]
+            if pair:
+                freq_pairs[f] = pair
 
     # 分离 B 类 (非 azimuth) 图片
     extra_groups = {k: v for k, v in image_groups.items()
@@ -1273,7 +1277,7 @@ def _export_azimuth(
             try:
                 write_chart_word_report_by_freq(
                     freq_pairs,
-                    pair_order=["azimuth_polar", "azimuth_polar_pk070"],
+                    pair_order=["azimuth_polar"] + (["azimuth_polar_pk070"] if azimuth_config.cut_azimuth_polar_pk070 else []),
                     pair_labels={
                         "azimuth_polar": "Gain Azimuth Cut",
                         "azimuth_polar_pk070": "Gain Azimuth (θ=0°-70°)",
