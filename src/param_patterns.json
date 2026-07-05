@@ -8,6 +8,15 @@
         "peak gain",
         "g(dbi)",
         "pk gain"
+      ],
+      "negate": [
+        "average",
+        "avg",
+        "theta",
+        "peakeirp",
+        "at",
+        "lag",
+        "boresight"
       ]
     },
     "lag_single": {
@@ -18,6 +27,11 @@
         "gain at theta",
         "gain @",
         "lag"
+      ],
+      "negate": [
+        "~",
+        "～",
+        "range"
       ]
     },
     "lag_range": {
@@ -28,6 +42,9 @@
         "lag_range",
         "gain at theta",
         "gain @"
+      ],
+      "extra_req": [
+        "~"
       ]
     },
     "directivity": {
@@ -46,6 +63,11 @@
         "efficiency_pct",
         "eff",
         "efficiency"
+      ],
+      "negate": [
+        "db",
+        "total",
+        "tot"
       ]
     },
     "efficiency_db": {
@@ -55,6 +77,15 @@
         "eff",
         "efficiency",
         "efficiency_db"
+      ],
+      "negate": [
+        "%",
+        "pct",
+        "total",
+        "tot"
+      ],
+      "extra_req": [
+        "db"
       ]
     },
     "ar_single": {
@@ -65,6 +96,14 @@
         "ar_single",
         "axial",
         "axial ratio"
+      ],
+      "negate": [
+        "~",
+        "～",
+        "range"
+      ],
+      "extra_req": [
+        "theta"
       ]
     },
     "ar_range": {
@@ -75,6 +114,9 @@
         "ar_range",
         "axial",
         "axial ratio"
+      ],
+      "extra_req": [
+        "~"
       ]
     },
     "boresight_theta": {
@@ -84,6 +126,9 @@
         "boresight_theta",
         "boresight",
         "瞄准"
+      ],
+      "extra_req": [
+        "theta"
       ]
     },
     "boresight_phi": {
@@ -93,34 +138,39 @@
         "boresight_phi",
         "boresight",
         "瞄准"
+      ],
+      "extra_req": [
+        "phi"
       ]
     },
     "theta_bw": {
       "label": "Theta Beamwidth (3dB)",
       "cn": "波束宽度",
       "aliases": [
-        "beam width",
         "beamwidth",
-        "theta_bw"
+        "beam width",
+        "3db",
+        "theta beamwidth"
       ]
     },
     "phi_bw": {
       "label": "Phi Beamwidth (3dB)",
       "cn": "波束宽度",
       "aliases": [
+        "beamwidth",
         "beam width",
-        "phi_bw",
-        "beamwidth"
+        "3db",
+        "phi beamwidth"
       ]
     },
     "front_back_ratio": {
       "label": "Front/Back Ratio",
       "cn": "前后比",
       "aliases": [
+        "front/back",
         "front_back_ratio",
-        "f/b",
         "front back",
-        "front/back"
+        "f/b"
       ]
     },
     "max_power": {
@@ -130,6 +180,9 @@
         "max power",
         "maximum power",
         "max_power"
+      ],
+      "extra_req": [
+        "max"
       ]
     },
     "min_power": {
@@ -139,6 +192,9 @@
         "minimum power",
         "min_power",
         "min power"
+      ],
+      "extra_req": [
+        "min"
       ]
     },
     "avg_gain": {
@@ -157,33 +213,39 @@
         "avg_power",
         "avg power",
         "average power"
+      ],
+      "extra_req": [
+        "avg"
       ]
     },
     "max_min_ratio": {
       "label": "Max/Min Ratio",
       "cn": "峰均比",
       "aliases": [
-        "max min",
+        "max minimum",
+        "max/min",
         "max_min_ratio",
-        "max/min"
+        "max min"
       ]
     },
     "max_avg_ratio": {
       "label": "Max/Avg Ratio",
       "cn": "峰值平均比",
       "aliases": [
-        "max/avg",
+        "max_avg_ratio",
         "max avg",
-        "max_avg_ratio"
+        "max/avg",
+        "max average"
       ]
     },
     "min_avg_ratio": {
       "label": "Min/Avg Ratio",
       "cn": "最小平均比",
       "aliases": [
+        "min avg",
+        "min average",
         "min/avg",
-        "min_avg_ratio",
-        "min avg"
+        "min_avg_ratio"
       ]
     },
     "xpi_boresight": {
@@ -195,6 +257,9 @@
         "瞄准",
         "boresight",
         "xpi_boresight"
+      ],
+      "extra_req": [
+        "boresight"
       ]
     },
     "xpi_mean": {
@@ -204,6 +269,13 @@
         "xpi_mean",
         "cross polarization",
         "xpi"
+      ],
+      "negate": [
+        "boresight",
+        "min"
+      ],
+      "extra_req": [
+        "mean"
       ]
     },
     "xpi_min": {
@@ -213,6 +285,13 @@
         "xpi_min",
         "cross polarization",
         "xpi"
+      ],
+      "negate": [
+        "boresight",
+        "mean"
+      ],
+      "extra_req": [
+        "min"
       ]
     },
     "rhcp_single": {
@@ -242,6 +321,12 @@
         "total efficiency",
         "total eff",
         "total_efficiency"
+      ],
+      "negate": [
+        "db"
+      ],
+      "extra_req": [
+        "total"
       ]
     },
     "mismatch_loss_db": {
@@ -251,6 +336,9 @@
         "mismatch_loss_db",
         "mismatch",
         "mismatch loss"
+      ],
+      "extra_req": [
+        "loss"
       ]
     },
     "pc_theta_mm": {
@@ -260,6 +348,9 @@
         "pc_theta_mm",
         "pc",
         "phase center"
+      ],
+      "extra_req": [
+        "theta"
       ]
     },
     "pc_phi_mm": {
@@ -269,6 +360,9 @@
         "pc_phi_mm",
         "pc",
         "phase center"
+      ],
+      "extra_req": [
+        "phi"
       ]
     },
     "trp": {
@@ -277,6 +371,9 @@
       "aliases": [
         "trp",
         "total radiated power"
+      ],
+      "negate": [
+        "nhprp"
       ]
     },
     "peak_eirp": {
@@ -287,6 +384,10 @@
         "peak_eirp",
         "peak eirp",
         "eirp"
+      ],
+      "negate": [
+        "nhprp",
+        "trp"
       ]
     },
     "nhprp_45": {
@@ -296,6 +397,14 @@
         "nhprp",
         "nhprp_45",
         "near horizon"
+      ],
+      "negate": [
+        "22",
+        "30",
+        "ratio"
+      ],
+      "extra_req": [
+        "45"
       ]
     },
     "nhprp_30": {
@@ -305,6 +414,14 @@
         "nhprp",
         "nhprp_30",
         "near horizon"
+      ],
+      "negate": [
+        "22",
+        "45",
+        "ratio"
+      ],
+      "extra_req": [
+        "30"
       ]
     },
     "nhprp_225": {
@@ -314,6 +431,9 @@
         "nhprp",
         "nhprp_225",
         "near horizon"
+      ],
+      "extra_req": [
+        "22"
       ]
     },
     "nhprp_custom": {
@@ -332,6 +452,9 @@
         "hemisphere",
         "uh_prp",
         "prp"
+      ],
+      "extra_req": [
+        "upper"
       ]
     },
     "lh_prp": {
@@ -341,15 +464,19 @@
         "lh_prp",
         "hemisphere",
         "prp"
+      ],
+      "extra_req": [
+        "lower"
       ]
     },
     "prp_120": {
       "label": "PRP (theta 0-120°)",
       "cn": "部分辐射功率",
       "aliases": [
-        "prp_120",
+        "prp",
         "hemisphere",
-        "prp"
+        "120",
+        "prp_120"
       ]
     },
     "nhprp45_ratio": {
@@ -360,6 +487,10 @@
         "ratio",
         "near horizon",
         "nhprp45_ratio"
+      ],
+      "extra_req": [
+        "45",
+        "ratio"
       ]
     },
     "nhprp30_ratio": {
@@ -370,6 +501,10 @@
         "ratio",
         "nhprp30_ratio",
         "near horizon"
+      ],
+      "extra_req": [
+        "30",
+        "ratio"
       ]
     },
     "nhprp225_ratio": {
@@ -380,6 +515,10 @@
         "ratio",
         "near horizon",
         "nhprp"
+      ],
+      "extra_req": [
+        "22",
+        "ratio"
       ]
     },
     "uh_ratio": {
@@ -389,6 +528,10 @@
         "uh_ratio",
         "ratio",
         "prp"
+      ],
+      "extra_req": [
+        "upper",
+        "ratio"
       ]
     },
     "lh_ratio": {
@@ -398,6 +541,10 @@
         "ratio",
         "prp",
         "lh_ratio"
+      ],
+      "extra_req": [
+        "lower",
+        "ratio"
       ]
     },
     "tis": {
@@ -412,9 +559,10 @@
       "label": "NHPIS ±45° (Pi/4)",
       "cn": "近水平面灵敏度",
       "aliases": [
-        "nhpis",
         "nhpis_45",
-        "near horizon"
+        "nhpis",
+        "near horizon",
+        "45"
       ]
     },
     "nhpis_30": {
@@ -422,8 +570,9 @@
       "cn": "近水平面灵敏度",
       "aliases": [
         "nhpis",
-        "nhpis_30",
-        "near horizon"
+        "30",
+        "near horizon",
+        "nhpis_30"
       ]
     },
     "nhpis_225": {
@@ -432,43 +581,48 @@
       "aliases": [
         "nhpis",
         "nhpis_225",
-        "near horizon"
+        "near horizon",
+        "22"
       ]
     },
     "nhpis_custom": {
       "label": "NHPIS 自定义角度",
       "cn": "近水平面灵敏度",
       "aliases": [
+        "nhpis_custom",
+        "custom",
         "nhpis",
-        "near horizon",
-        "nhpis_custom"
+        "near horizon"
       ]
     },
     "uh_pis": {
       "label": "Upper Hemisphere PIS",
       "cn": "上半球灵敏度",
       "aliases": [
-        "uh_pis",
+        "pis",
         "hemisphere",
-        "pis"
+        "uh_pis",
+        "upper"
       ]
     },
     "lh_pis": {
       "label": "Lower Hemisphere PIS",
       "cn": "下半球灵敏度",
       "aliases": [
-        "hemisphere",
         "pis",
-        "lh_pis"
+        "hemisphere",
+        "lh_pis",
+        "lower"
       ]
     },
     "pis_120": {
       "label": "PIS (theta 0-120°)",
       "cn": "部分灵敏度",
       "aliases": [
-        "hemisphere",
         "pis",
-        "pis_120"
+        "hemisphere",
+        "pis_120",
+        "120"
       ]
     },
     "nhpis45_ratio": {
@@ -476,29 +630,42 @@
       "cn": "近水平面灵敏度比",
       "aliases": [
         "ratio",
+        "near horizon",
         "nhpis",
         "nhpis45_ratio",
-        "near horizon"
+        "45"
       ]
     },
     "nhpis30_ratio": {
       "label": "NHPIS30 / TIS",
       "cn": "近水平面灵敏度比",
       "aliases": [
-        "nhpis30_ratio",
         "ratio",
+        "30",
+        "near horizon",
         "nhpis",
-        "near horizon"
+        "nhpis30_ratio"
       ]
     },
     "nhpis225_ratio": {
       "label": "NHPIS22.5 / TIS",
       "cn": "近水平面灵敏度比",
       "aliases": [
-        "nhpis225_ratio",
         "ratio",
+        "near horizon",
         "nhpis",
-        "near horizon"
+        "22",
+        "nhpis225_ratio"
+      ]
+    },
+    "frequency": {
+      "label": "Frequency (MHz)",
+      "cn": "频率",
+      "aliases": [
+        "frequency",
+        "freq",
+        "f(mhz)",
+        "freq(mhz)"
       ]
     }
   },

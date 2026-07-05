@@ -85,17 +85,29 @@ def _classify_by_param_patterns(raw_header: str) -> str | None:
         return None
 
     norm = normalize_header(raw_header).lower()
-    # 移除括号内容 (如 "(dB)", "(dBi)") 便于匹配
-    norm_clean = re.sub(r'\([^)]*\)', '', norm).strip()
+    norm_clean = re.sub(r'\([^)]*\)', '', norm).strip()  # alias 匹配去括号
 
     for key, info in _PARAM_PATTERNS.items():
         aliases = info.get('aliases', [])
         if not isinstance(aliases, list):
             aliases = []
-        # 匹配: 任意别名出现在清理后的 header 中
+        matched = False
         for alias in aliases:
             if alias in norm_clean:
-                return key
+                matched = True
+                break
+        if not matched:
+            continue
+        # negate/extra_req 用完整 header (含括号内容)
+        negate_words = info.get('negate', [])
+        if negate_words:
+            if any(nw.lower() in norm for nw in negate_words if isinstance(nw, str)):
+                continue
+        extra_words = info.get('extra_req', [])
+        if extra_words:
+            if not all(ew.lower() in norm for ew in extra_words if isinstance(ew, str)):
+                continue
+        return key
     return None
 
 
