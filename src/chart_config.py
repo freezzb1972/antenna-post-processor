@@ -128,6 +128,9 @@ class ChartConfig:
     dpi: int = 150
     step_deg: float = 5.0          # 3D 图形采样精度 (°)
 
+    # 频点过滤 (空列表 = 所有频点)
+    selected_frequencies: list[float] = field(default_factory=list)
+
     # 输出方式
     embed_in_excel: bool = True
     save_png_folder: str | None = None

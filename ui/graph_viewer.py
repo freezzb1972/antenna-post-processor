@@ -235,6 +235,36 @@ class GraphViewer(QWidget):
     def get_mode(self) -> int:
         return getattr(self._mw, '_test_mode', 0) if hasattr(self, '_mw') and self._mw else 0
 
+    def set_antenna_list(self, names: list[str], current: str = ""):
+        """设置天线列表（从 MainWindow 同步）。"""
+        self._antenna_list = names
+        self._cmb_ant.blockSignals(True)
+        self._cmb_ant.clear()
+        self._cmb_ant.addItems(names)
+        if current:
+            idx = self._cmb_ant.findText(current)
+            if idx >= 0: self._cmb_ant.setCurrentIndex(idx)
+        self._current_antenna = current
+        self._cmb_ant.blockSignals(False)
+
+    def set_antenna_results(self, name: str, results: dict):
+        """存储某个天线的 results 并切换显示。"""
+        self._antenna_results[name] = results
+        if name == self._current_antenna:
+            import copy
+            self.load_data(copy.deepcopy(results), self._step_deg)
+
+    def _on_antenna_changed(self, idx: int):
+        """图表查看器天线切换 → 加载对应数据。"""
+        if idx < 0:
+            return
+        name = self._cmb_ant.itemText(idx)
+        self._current_antenna = name
+        results = self._antenna_results.get(name)
+        if results:
+            import copy
+            self.load_data(copy.deepcopy(results), self._step_deg)
+
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -490,6 +520,22 @@ class GraphViewer(QWidget):
         self._lbl_mode = QLabel("")
         self._lbl_mode.setStyleSheet("color: #888; font-style: italic;")
         lay.addWidget(self._lbl_mode)
+
+        # ── 天线选择 ──
+        sep3 = QFrame(); sep3.setFrameShape(QFrame.VLine); lay.addWidget(sep3)
+        lay.addWidget(QLabel("天线:"))
+        self._cmb_ant = QComboBox()
+        self._cmb_ant.setMinimumWidth(100)
+        self._cmb_ant.setToolTip("选择查看的天线数据")
+        self._cmb_ant.currentIndexChanged.connect(self._on_antenna_changed)
+        lay.addWidget(self._cmb_ant)
+        self._check_ant_link = QCheckBox("联动")
+        self._check_ant_link.setChecked(True)
+        self._check_ant_link.setToolTip("跟随主天线选择器")
+        lay.addWidget(self._check_ant_link)
+        self._antenna_list: list[str] = []
+        self._antenna_results: dict[str, dict] = {}
+        self._current_antenna: str = ""
 
         # ── 右侧信息 ──
         lay.addStretch()

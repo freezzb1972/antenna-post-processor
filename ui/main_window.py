@@ -142,6 +142,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._multi_antenna_config = None     # 多天线配置
         self._antenna_configs: dict[str, "AntennaConfig"] = {}  # per-antenna 配置
         self._current_antenna_name: str = ""   # 当前编辑的天线
+        self._antenna_results: dict[str, dict] = {}   # antenna_name → results
+        self._antenna_images: dict[str, dict] = {}    # antenna_name → images
         self._nh_custom_angles: List[float] = []  # NHPRP/NHPIS 自定义角度列表
         self._ar_output_db: bool = True     # AR 默认输出 dB
         self._chart_config_required = None   # ChartConfig: 报告需要
@@ -2525,13 +2527,20 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.lblProgressMsg.setText(self.tr("✓ 处理完成"))
         self._update_status()
 
-        # 填充参数结果表
-        self._populate_results_table(results)
+        # 按天线名存储结果
+        ant_name = self._current_antenna_name or "默认天线"
+        self._antenna_results[ant_name] = results
+        self._antenna_images[ant_name] = images
+
+        # 填充参数结果表 (当前天线)
+        self._populate_results_table(results, ant_name)
         # 生成图形展示
         self._populate_charts(results)
-        # 更新图形查看器模式标签
+        # 更新图形查看器模式标签 + 天线列表
         if self._graph_viewer:
             self._graph_viewer.update_mode_display()
+            self._graph_viewer.set_antenna_list(list(self._antenna_results.keys()),
+                                                ant_name)
         # 生成图形数据表
         self._populate_graph_data(results)
         # ── Word 模板填充 ──
@@ -2717,7 +2726,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             return f"{prefix} {lo}-{hi}°"
         return key
 
-    def _populate_results_table(self, results):
+    def _populate_results_table(self, results, antenna_name: str = ""):
         """填充参数结果表格。"""
         vtab = self.ui.vTabResults
         # 清除旧内容
@@ -2725,10 +2734,47 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             item = vtab.takeAt(0)
             if item.widget(): item.widget().deleteLater()
 
-        if not results: return
+        # ── 顶栏: 天线选择 + 数据层选择 + 联动 checkbox ──
+        top_row = QHBoxLayout()
+        top_row.addWidget(QLabel("<b>" + self.tr("天线:") + "</b>"))
+        cmb_ant = QComboBox()
+        cmb_ant.setMinimumWidth(120)
+        ant_names = list(self._antenna_results.keys())
+        for an in ant_names:
+            cmb_ant.addItem(an)
+        if antenna_name:
+            idx = cmb_ant.findText(antenna_name)
+            if idx >= 0: cmb_ant.setCurrentIndex(idx)
+        cmb_ant.currentIndexChanged.connect(
+            lambda i: self._show_antenna_results(cmb_ant.itemText(i)))
+        top_row.addWidget(cmb_ant)
+
+        top_row.addWidget(QLabel(self.tr("  数据层:")))
+        cmb_layer = QComboBox()
+        cmb_layer.addItem(self.tr("最终参数"))
+        cmb_layer.addItem(self.tr("中间数据"))
+        cmb_layer.addItem(self.tr("原始数据 (TODO)"))
+        top_row.addWidget(cmb_layer)
+
+        check_link = QCheckBox(self.tr("☑ 联动"))
+        check_link.setChecked(True)
+        check_link.setToolTip(self.tr("跟随主天线选择器"))
+        top_row.addWidget(check_link)
+        top_row.addStretch()
+
+        vtab.addLayout(top_row)
+        # 存储引用供联动使用
+        self._results_ant_combo = cmb_ant
+        self._results_link_check = check_link
+
+        if not results:
+            vtab.addWidget(QLabel(self.tr("  (暂无计算结果 — 请先预览)")))
+            return
         # 取第一个 sheet 的数据
         first_sheet = next(iter(results.values()))
-        if not first_sheet: return
+        if not first_sheet:
+            vtab.addWidget(QLabel(self.tr("  (无数据)")))
+            return
         # 收集所有参数列 (排除内部 error key)
         keys = sorted(k for k in first_sheet[0].keys() if not k.startswith('_'))
         # 可读列名映射
@@ -2771,6 +2817,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         vtab.addWidget(table)
         self._log(self.tr(f"📊 参数表格已更新: {len(keys)} 列 × {len(first_sheet)} 行"))
+
+    def _show_antenna_results(self, antenna_name: str):
+        """切换显示指定天线的计算结果。"""
+        results = self._antenna_results.get(antenna_name)
+        if results:
+            self._populate_results_table(results, antenna_name)
 
     def _populate_charts(self, results):
         """用处理结果填充 GraphViewer（GraphViewer 在启动时已创建，工具栏始终可见）。"""

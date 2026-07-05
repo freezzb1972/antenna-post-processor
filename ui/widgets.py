@@ -10,9 +10,10 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QFormLayout, QFrame,
+    QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+    QDoubleSpinBox, QFileDialog, QFormLayout, QFrame,
     QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton,
-    QSizePolicy, QSpinBox, QSplitter, QSplitterHandle, QTableWidget,
+    QScrollArea, QSizePolicy, QSpinBox, QSplitter, QSplitterHandle, QTableWidget,
     QVBoxLayout, QWidget,
 )
 
@@ -547,3 +548,147 @@ class DataFileSelector(QGroupBox):
         chart_row.addStretch()
         layout.addLayout(chart_row)
         layout.addStretch()
+
+
+# ═══════════════════════════════════════════════════════════════
+# FrequencyPickerWidget — 频点批量选择组件
+# ═══════════════════════════════════════════════════════════════
+
+class FrequencyPickerWidget(QWidget):
+    """频点批量选择: 全选/清除/范围 + checkbox 网格 + 计数。
+
+    用法:
+        picker = FrequencyPickerWidget()
+        picker.set_frequencies([698.0, 824.0, 960.0, ...])
+        selected = picker.get_selected()
+    """
+
+    selection_changed = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._freqs: list[float] = []
+        self._checks: dict[float, QCheckBox] = {}
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        # ── 操作按钮行 ──
+        btn_row = QHBoxLayout()
+        btn_all = QPushButton("全选")
+        btn_all.clicked.connect(self._select_all)
+        btn_row.addWidget(btn_all)
+        btn_clear = QPushButton("清除")
+        btn_clear.clicked.connect(self._clear_all)
+        btn_row.addWidget(btn_clear)
+        btn_range = QPushButton("范围选择...")
+        btn_range.clicked.connect(self._show_range_dialog)
+        btn_row.addWidget(btn_range)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        # ── checkbox 区域 (scrollable) ──
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        scroll.setMaximumHeight(200)
+        self._check_container = QWidget()
+        self._check_layout = QVBoxLayout(self._check_container)
+        self._check_layout.setSpacing(1)
+        self._check_layout.setContentsMargins(0, 0, 0, 0)
+        scroll.setWidget(self._check_container)
+        layout.addWidget(scroll)
+
+        # ── 计数 ──
+        self._lbl_count = QLabel("已选: 0 / 0")
+        self._lbl_count.setStyleSheet("color: #888; font-size: 9pt;")
+        layout.addWidget(self._lbl_count)
+
+    # ── 公共 API ──
+
+    def set_frequencies(self, freqs: list[float]):
+        """设置可选频点列表（覆盖旧数据）。"""
+        self._freqs = sorted(set(freqs))
+        self._checks.clear()
+        # 清空旧 checkbox
+        while self._check_layout.count():
+            item = self._check_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        # 创建新 checkbox（每行 4 个，使用嵌套 HBoxLayout）
+        row_layout = None
+        for i, f in enumerate(self._freqs):
+            if i % 5 == 0:
+                row_layout = QHBoxLayout()
+                row_layout.setSpacing(4)
+                self._check_layout.addLayout(row_layout)
+            cb = QCheckBox(f"{f:.1f}")
+            cb.setChecked(True)
+            cb.toggled.connect(self._update_count)
+            self._checks[f] = cb
+            row_layout.addWidget(cb)
+        self._check_layout.addStretch()
+        self._update_count()
+
+    def get_selected(self) -> list[float]:
+        """返回选中的频点列表（排序）。"""
+        return sorted(f for f, cb in self._checks.items() if cb.isChecked())
+
+    def set_selected(self, freqs: list[float]):
+        """设置哪些频点被选中。"""
+        target = set(freqs)
+        for f, cb in self._checks.items():
+            cb.setChecked(f in target)
+        self._update_count()
+
+    # ── 内部 ──
+
+    def _select_all(self):
+        for cb in self._checks.values():
+            cb.setChecked(True)
+        self._update_count()
+
+    def _clear_all(self):
+        for cb in self._checks.values():
+            cb.setChecked(False)
+        self._update_count()
+
+    def _show_range_dialog(self):
+        """弹出范围选择对话框：起始 MHz ~ 结束 MHz。"""
+        if not self._freqs:
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle("频点范围选择")
+        layout = QVBoxLayout(dlg)
+        form = QFormLayout()
+        spin_lo = QDoubleSpinBox()
+        spin_lo.setRange(min(self._freqs), max(self._freqs))
+        spin_lo.setValue(min(self._freqs))
+        spin_lo.setDecimals(1)
+        spin_lo.setSuffix(" MHz")
+        form.addRow("起始频率:", spin_lo)
+        spin_hi = QDoubleSpinBox()
+        spin_hi.setRange(min(self._freqs), max(self._freqs))
+        spin_hi.setValue(max(self._freqs))
+        spin_hi.setDecimals(1)
+        spin_hi.setSuffix(" MHz")
+        form.addRow("结束频率:", spin_hi)
+        layout.addLayout(form)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            [cb.setChecked(spin_lo.value() <= f <= spin_hi.value())
+             for f, cb in self._checks.items()],
+            self._update_count(),
+            dlg.accept()))
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
+
+    def _update_count(self):
+        sel = sum(1 for cb in self._checks.values() if cb.isChecked())
+        total = len(self._checks)
+        self._lbl_count.setText(f"已选: {sel} / {total}")
+        self.selection_changed.emit()

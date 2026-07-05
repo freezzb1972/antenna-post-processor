@@ -3974,6 +3974,23 @@ class ChartSettingsPage(QWidget):
         _refresh_display()
         layout.addWidget(display_grp)
 
+        # ── 频点选择 ──
+        from ui.widgets import FrequencyPickerWidget
+        freq_grp = QGroupBox(self.tr("频点选择"))
+        freq_layout = QVBoxLayout(freq_grp)
+        freq_picker = FrequencyPickerWidget()
+        gv = getattr(self._mw, '_graph_viewer', None) if self._mw else None
+        if gv and gv._graph_data:
+            freq_picker.set_frequencies(list(gv._graph_data.keys()))
+            cfg = getattr(self._mw, '_chart_config_required', None) if self._mw else None
+            if cfg and cfg.selected_frequencies:
+                freq_picker.set_selected(cfg.selected_frequencies)
+        else:
+            freq_picker.set_frequencies([])
+            freq_layout.addWidget(QLabel(self.tr("  (运行预览后可选频点)")))
+        freq_layout.addWidget(freq_picker)
+        layout.addWidget(freq_grp)
+
         splitter = ThinSplitter(Qt.Vertical)
         bottom = QWidget()
         bottom_layout = QVBoxLayout(bottom)
@@ -4017,6 +4034,7 @@ class ChartSettingsPage(QWidget):
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
             setattr(self, attr_name, sorted(set(_singles))),
+            self._sync_selected_frequencies(freq_picker.get_selected()),
             dlg.accept()))
         btns.rejected.connect(dlg.reject)
         bottom_layout.addWidget(btns)
@@ -4025,6 +4043,16 @@ class ChartSettingsPage(QWidget):
         layout.addWidget(splitter)
         dlg.exec()
         self._sync_to_mw()
+
+    def _sync_selected_frequencies(self, freqs: list[float]):
+        """将选中的频点同步到 ChartConfig。"""
+        if not self._mw:
+            return
+        if not hasattr(self._mw, '_chart_config_required') or self._mw._chart_config_required is None:
+            return
+        self._mw._chart_config_required.selected_frequencies = list(freqs)
+        if hasattr(self._mw, '_chart_config_extra') and self._mw._chart_config_extra is not None:
+            self._mw._chart_config_extra.selected_frequencies = list(freqs)
 
     # ── 公共接口 ──
 
