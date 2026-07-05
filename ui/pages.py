@@ -167,8 +167,8 @@ class FileSettingsPage(QWidget):
         # Excel 模版组
         excel_grp = QGroupBox(self.tr("Excel 参数模版"))
         excel_layout = QVBoxLayout(excel_grp)
-        excel_layout.setContentsMargins(4, 0, 4, 0)
-        excel_layout.setSpacing(1)
+        excel_layout.setContentsMargins(2, 0, 2, 0)
+        excel_layout.setSpacing(0)
         self._tpl_row = TemplateSourceRow(
             on_browse=self._on_browse_template,
             on_preview=self._on_preview_report,
@@ -192,8 +192,8 @@ class FileSettingsPage(QWidget):
         # Word 报告模版组
         word_grp = QGroupBox(self.tr("Word 报告模版"))
         word_layout = QVBoxLayout(word_grp)
-        word_layout.setContentsMargins(4, 0, 4, 0)
-        word_layout.setSpacing(1)
+        word_layout.setContentsMargins(2, 0, 2, 0)
+        word_layout.setSpacing(0)
         self._word_tpl_row = TemplateSourceRow(
             on_browse=self._on_browse_word_template,
             on_preview=self._on_preview_word,

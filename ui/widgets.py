@@ -253,7 +253,7 @@ class TemplateSourceRow(QWidget):
     def _setup_ui(self):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(2)
 
         # 单一下拉: 厂商为分组标题(不可选), 模板为缩进子项
         self._cmb_tpl = QComboBox()
@@ -487,7 +487,7 @@ class DataFileSelector(QGroupBox):
         self.file_list_widget.setColumnWidth(1, 120)
         self.file_list_widget.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
         self.file_list_widget.setColumnWidth(2, 120)
-        self.file_list_widget.verticalHeader().setDefaultSectionSize(28)
+        self.file_list_widget.verticalHeader().setDefaultSectionSize(22)
         self.file_list_widget.verticalHeader().setVisible(False)
         self.file_list_widget.setMinimumHeight(80)
         self.file_list_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
