@@ -169,7 +169,6 @@ class FileSettingsPage(QWidget):
         excel_layout = QVBoxLayout(self.excel_grp)
         excel_layout.setContentsMargins(2, 0, 2, 0)
         excel_layout.setSpacing(0)
-        excel_layout.setSizeConstraint(excel_layout.SetMinAndMaxSize)
         self._tpl_row = TemplateSourceRow(
             on_browse=self._on_browse_template,
             on_preview=self._on_preview_report,
@@ -339,27 +338,34 @@ class FileSettingsPage(QWidget):
         main_layout.addWidget(scroll_area, 1)
 
     def showEvent(self, event):
-        """首次显示时强制应用紧凑间距 (QSS 可能已重置)。"""
+        """首次显示 + 延迟双重确保紧凑间距生效。"""
         super().showEvent(event)
         if not hasattr(self, '_spacing_applied'):
             self._spacing_applied = True
             self._apply_tight_spacing()
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(100, self._apply_tight_spacing)  # QSS 可能延迟
 
     def _apply_tight_spacing(self):
         """绕过 QSS, 直接设置紧凑间距。"""
-        excel_layout = self.excel_grp.layout() if hasattr(self, 'excel_grp') else None
-        if excel_layout:
-            excel_layout.setContentsMargins(2, 0, 2, 0)
-            excel_layout.setSpacing(0)
-        word_layout = self.word_grp.layout() if hasattr(self, 'word_grp') else None
-        if word_layout:
-            word_layout.setContentsMargins(2, 0, 2, 0)
-            word_layout.setSpacing(0)
+        for grp, has_attr_name in [(getattr(self, 'excel_grp', None), 'excel_grp'),
+                                     (getattr(self, 'word_grp', None), 'word_grp')]:
+            if grp:
+                ly = grp.layout()
+                if ly:
+                    ly.setContentsMargins(2, 0, 2, 0)
+                    ly.setSpacing(0)
         if hasattr(self, '_data_sel'):
             ds_layout = self._data_sel.layout()
             if ds_layout:
                 ds_layout.setContentsMargins(2, 0, 2, 0)
                 ds_layout.setSpacing(0)
+        # 直接设置 QSS 为极紧凑值 (绕过全局 QSS)
+        compact_qss = "QGroupBox { padding-top: 2px; padding-bottom: 0px; margin-top: 12px; }"
+        for w in [getattr(self, 'excel_grp', None), getattr(self, 'word_grp', None),
+                  getattr(self, '_data_sel', None)]:
+            if w:
+                w.setStyleSheet(compact_qss)
 
     def _init_state(self):
         """初始化本地状态（无 MainWindow 时使用）。"""
