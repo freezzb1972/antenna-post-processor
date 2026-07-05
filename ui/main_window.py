@@ -548,9 +548,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _on_nav_changed(self, row: int):
         """导航列表切换 → 切换页面栈。所有页面内联展开。"""
         if hasattr(self, '_page_stack') and 0 <= row < self._page_stack.count():
-            if row == 0 and hasattr(self, '_file_settings_page'):
-                from PySide6.QtCore import QTimer
-                QTimer.singleShot(50, self._file_settings_page._apply_tight_spacing)
             if row == 1 and hasattr(self, '_antenna_params_page'):
                 self._antenna_params_page._load_state()
             self._page_stack.setCurrentIndex(row)

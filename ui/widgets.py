@@ -460,28 +460,10 @@ class DataFileSelector(QGroupBox):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setTitle(self.tr("数据文件"))
-        self.setStyleSheet("QGroupBox { padding-top: 4px; padding-bottom: 1px; margin-top: 14px; }")
         layout = QVBoxLayout(self)
-        self._tight_margins = (2, 0, 2, 0)
-        self._tight_spacing = 0
-        layout.setContentsMargins(*self._tight_margins)
-        layout.setSpacing(self._tight_spacing)
+        layout.setContentsMargins(2, 0, 2, 0)
+        layout.setSpacing(0)
         self._setup_widgets()
-
-    def showEvent(self, event):
-        """QSS 重置后恢复紧凑间距 (立即 + 延迟)。"""
-        super().showEvent(event)
-        self._apply_tight()
-        from PySide6.QtCore import QTimer
-        QTimer.singleShot(100, self._apply_tight)
-
-    def _apply_tight(self):
-        ly = self.layout()
-        if ly and hasattr(self, '_tight_margins'):
-            ly.setContentsMargins(*self._tight_margins)
-            ly.setSpacing(self._tight_spacing)
-        self.setStyleSheet("QGroupBox { padding-top: 1px; padding-bottom: 1px; margin-top: 12px; }")
-        self.setSizePolicy(self.sizePolicy().horizontalPolicy(), QSizePolicy.Fixed)
 
     def _setup_widgets(self):
         # 按钮行

@@ -249,7 +249,7 @@ class FileSettingsPage(QWidget):
         v_splitter.addWidget(ds)
         v_splitter.setStretchFactor(0, 0)  # 模板区不拉伸
         v_splitter.setStretchFactor(1, 1)  # 数据文件区可拉伸
-        v_splitter.setSizes([160, 400])    # 初始: 模板160px, 数据400px
+        v_splitter.setSizes([80, 480])     # 初始: 模板紧贴内容, 数据撑满
         left_layout.addWidget(v_splitter)
         h_splitter.addWidget(left_widget)
 
@@ -338,33 +338,19 @@ class FileSettingsPage(QWidget):
         main_layout.addWidget(scroll_area, 1)
 
     def showEvent(self, event):
-        """首次显示 + 延迟双重确保紧凑间距生效。"""
         super().showEvent(event)
         if not hasattr(self, '_spacing_applied'):
             self._spacing_applied = True
             self._apply_tight_spacing()
-            from PySide6.QtCore import QTimer
-            QTimer.singleShot(100, self._apply_tight_spacing)  # QSS 可能延迟
 
     def _apply_tight_spacing(self):
-        """绕过 QSS, 直接设置紧凑间距。"""
+        """确保 QGroupBox 紧贴内容高度不被 splitter 撑大。"""
         for grp in [getattr(self, 'excel_grp', None), getattr(self, 'word_grp', None)]:
             if grp:
-                ly = grp.layout()
-                if ly:
-                    ly.setContentsMargins(2, 0, 2, 0)
-                    ly.setSpacing(0)
+                grp.setSizePolicy(grp.sizePolicy().horizontalPolicy(), QSizePolicy.Fixed)
         if hasattr(self, '_data_sel'):
-            ds_layout = self._data_sel.layout()
-            if ds_layout:
-                ds_layout.setContentsMargins(2, 0, 2, 0)
-                ds_layout.setSpacing(0)
-        compact_qss = "QGroupBox { padding-top: 1px; padding-bottom: 1px; margin-top: 12px; }"
-        for w in [getattr(self, 'excel_grp', None), getattr(self, 'word_grp', None),
-                  getattr(self, '_data_sel', None)]:
-            if w:
-                w.setStyleSheet(compact_qss)
-                w.setSizePolicy(w.sizePolicy().horizontalPolicy(), QSizePolicy.Fixed)
+            self._data_sel.setSizePolicy(
+                self._data_sel.sizePolicy().horizontalPolicy(), QSizePolicy.Expanding)
 
     def _init_state(self):
         """初始化本地状态（无 MainWindow 时使用）。"""
