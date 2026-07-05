@@ -348,8 +348,7 @@ class FileSettingsPage(QWidget):
 
     def _apply_tight_spacing(self):
         """绕过 QSS, 直接设置紧凑间距。"""
-        for grp, has_attr_name in [(getattr(self, 'excel_grp', None), 'excel_grp'),
-                                     (getattr(self, 'word_grp', None), 'word_grp')]:
+        for grp in [getattr(self, 'excel_grp', None), getattr(self, 'word_grp', None)]:
             if grp:
                 ly = grp.layout()
                 if ly:
@@ -360,12 +359,21 @@ class FileSettingsPage(QWidget):
             if ds_layout:
                 ds_layout.setContentsMargins(2, 0, 2, 0)
                 ds_layout.setSpacing(0)
-        # 直接设置 QSS 为极紧凑值 (绕过全局 QSS)
         compact_qss = "QGroupBox { padding-top: 1px; padding-bottom: 1px; margin-top: 12px; }"
         for w in [getattr(self, 'excel_grp', None), getattr(self, 'word_grp', None),
                   getattr(self, '_data_sel', None)]:
             if w:
                 w.setStyleSheet(compact_qss)
+                # 诊断: 打印实际生效的 QSS 值
+                import json
+                actual = w.styleSheet()
+                print(f"[DIAG] {w.title()} actual QSS: {actual}")
+                print(f"[DIAG] {w.title()} geometry: x={w.x()} y={w.y()} w={w.width()} h={w.height()}")
+                if w.layout():
+                    ly = w.layout()
+                    lm = ly.contentsMargins()
+                    print(f"[DIAG] {w.title()} layout margins: L={lm.left()} T={lm.top()} R={lm.right()} B={lm.bottom()}")
+                    print(f"[DIAG] {w.title()} layout spacing: {ly.spacing()}")
 
     def _init_state(self):
         """初始化本地状态（无 MainWindow 时使用）。"""
