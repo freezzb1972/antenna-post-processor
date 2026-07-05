@@ -124,8 +124,10 @@ class ProcessingWorker(QObject):
         skip_original: bool = False,
         gen_diff: bool = False,
         gen_diff_chart: bool = False,
+        antenna_configs: dict | None = None,
     ):
         super().__init__()
+        self.antenna_configs = antenna_configs or {}
         self.csv_path = csv_path
         self.template_path = template_path
         self.output_path = output_path
@@ -196,6 +198,7 @@ class ProcessingWorker(QObject):
                 ar_output_db=self.ar_output_db,
                 worksheet_naming_mode=self.worksheet_naming_mode,
                 compute_only=self.compute_only,
+                antenna_configs=self.antenna_configs,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
                 log_callback=self._on_log,

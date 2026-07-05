@@ -6,7 +6,11 @@
 """
 from __future__ import annotations
 
-from typing import List
+from __future__ import annotations
+from typing import TYPE_CHECKING, List
+
+if TYPE_CHECKING:
+    from ui.main_window import MainWindow as WorkWindow  # noqa: F401
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QWidgetAction

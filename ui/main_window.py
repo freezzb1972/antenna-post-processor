@@ -54,6 +54,7 @@ from PySide6.QtWidgets import (
 
 from src.file_entry import FileEntry, mode_name, infer_mode_from_sheet
 from src.lag_config import LagConfig, PRESET_AUTOMOTIVE
+from src.multi_antenna import AntennaConfig, extract_antenna_name
 from src.scale_manager import ScaleManager, AdaptiveWidgetMixin
 from ui.compiled.ui_main_window import Ui_MainWindow
 from ui.pages import FileSettingsPage, AntennaParamsPage, ChartSettingsPage
@@ -139,6 +140,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._rhcp_lag_config = LagConfig()  # RHCP 独立角度配置
         self._cpxpi_lag_config = LagConfig() # CP-XPI 独立角度配置
         self._multi_antenna_config = None     # 多天线配置
+        self._antenna_configs: dict[str, "AntennaConfig"] = {}  # per-antenna 配置
+        self._current_antenna_name: str = ""   # 当前编辑的天线
         self._nh_custom_angles: List[float] = []  # NHPRP/NHPIS 自定义角度列表
         self._ar_output_db: bool = True     # AR 默认输出 dB
         self._chart_config_required = None   # ChartConfig: 报告需要
@@ -417,11 +420,26 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         h_layout.setContentsMargins(0, 0, 0, 0)
 
         # 左侧导航
+        left_sidebar = QVBoxLayout()
+        left_sidebar.setSpacing(4)
+        left_sidebar.setContentsMargins(0, 0, 0, 0)
+
+        # 天线选择器
+        ant_sel_row = QHBoxLayout()
+        ant_sel_row.addWidget(QLabel("<b>" + self.tr("天线:") + "</b>"))
+        self._antenna_selector = QComboBox()
+        self._antenna_selector.setMinimumWidth(100)
+        self._antenna_selector.setToolTip(self.tr("选择要配置的天线"))
+        self._antenna_selector.currentIndexChanged.connect(self._on_antenna_selector_changed)
+        ant_sel_row.addWidget(self._antenna_selector, 1)
+        left_sidebar.addLayout(ant_sel_row)
+
         self._nav_list = QListWidget()
         self._nav_list.setFixedWidth(140)
         self._nav_list.setSpacing(2)
         self._nav_list.setStyleSheet("QListWidget::item { padding: 8px 4px; }")
-        h_layout.addWidget(self._nav_list)
+        left_sidebar.addWidget(self._nav_list, 1)
+        h_layout.addLayout(left_sidebar)
 
         # 右侧页面栈
         self._page_stack = QStackedWidget()
@@ -553,6 +571,115 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """切换标签页时显示/隐藏执行栏（仅 tab[0] 处理设置显示）。"""
         if hasattr(self, '_execution_bar'):
             self._execution_bar.setVisible(index == 0)
+
+    # ═══════════════════════════════════════════════════════════════
+    # 天线选择器
+    # ═══════════════════════════════════════════════════════════════
+
+    def _refresh_antenna_selector(self):
+        """从 FileEntry 列表刷新天线选择器。"""
+        self._antenna_selector.blockSignals(True)
+        current = self._antenna_selector.currentData()  # 保存旧选择
+        self._antenna_selector.clear()
+        seen = set()
+        for fe in self._file_entries:
+            name = fe.antenna_name or extract_antenna_name(fe.path)
+            if name not in seen:
+                self._antenna_selector.addItem(name, name)
+                seen.add(name)
+                # 首次发现时自动创建 AntennaConfig
+                if name not in self._antenna_configs:
+                    ant = AntennaConfig(name=name, data_files=[fe.path],
+                                        test_mode=fe.test_mode)
+                    self._antenna_configs[name] = ant
+                else:
+                    # 追加数据文件到已有天线
+                    ant = self._antenna_configs[name]
+                    if fe.path not in ant.data_files:
+                        ant.data_files.append(fe.path)
+        # 恢复选择
+        if current and current in seen:
+            idx = self._antenna_selector.findData(current)
+            if idx >= 0: self._antenna_selector.setCurrentIndex(idx)
+        elif self._antenna_selector.count() > 0:
+            self._antenna_selector.setCurrentIndex(0)
+        self._antenna_selector.blockSignals(False)
+
+    def _on_antenna_selector_changed(self, idx: int):
+        """切换天线 → 保存当前配置 → 加载新天线配置。"""
+        if idx < 0:
+            return
+        new_name = self._antenna_selector.itemData(idx)
+        if not new_name or new_name == self._current_antenna_name:
+            return
+
+        # 保存当前天线配置
+        self._save_current_antenna_config()
+
+        # 切换到新天线
+        self._current_antenna_name = new_name
+        self._load_antenna_config(new_name)
+
+    def _save_current_antenna_config(self):
+        """保存当前页面的编辑状态到当前 AntennaConfig。"""
+        if not self._current_antenna_name:
+            return
+        ant = self._antenna_configs.get(self._current_antenna_name)
+        if not ant:
+            return
+        # 从 AntennaParamsPage 保存
+        if hasattr(self, '_antenna_params_page'):
+            ap = self._antenna_params_page
+            ant.test_mode = getattr(ap, '_test_mode', 0)
+            ant.lag_config = ap._gain_angle_widget.get_config() if getattr(ap, '_gain_angle_widget', None) else LagConfig()
+            ant.ar_lag_config = ap._ar_angle_widget.get_config() if getattr(ap, '_ar_angle_widget', None) else LagConfig()
+            ant.rhcp_lag_config = ap._rhcp_angle_widget.get_config() if getattr(ap, '_rhcp_angle_widget', None) else LagConfig()
+            ant.cpxpi_lag_config = ap._cpxpi_angle_widget.get_config() if getattr(ap, '_cpxpi_angle_widget', None) else LagConfig()
+            ant.required_params = ap._get_checked_keys(ap._left_checkboxes) if hasattr(ap, '_get_checked_keys') else set()
+            ant.extra_params = ap._get_checked_keys(ap._right_checkboxes) if hasattr(ap, '_get_checked_keys') else set()
+
+    def _load_antenna_config(self, name: str):
+        """加载指定天线的配置到 UI 页面。"""
+        ant = self._antenna_configs.get(name)
+        if not ant:
+            return
+        # 同步 test_mode 到 MainWindow
+        self._test_mode = ant.test_mode
+
+        # 同步到 AntennaParamsPage
+        if hasattr(self, '_antenna_params_page'):
+            ap = self._antenna_params_page
+            ap._test_mode = ant.test_mode
+            # 更新 mode selector
+            if hasattr(ap, '_cmb_test_mode'):
+                ap._cmb_test_mode.blockSignals(True)
+                idx = ap._cmb_test_mode.findData(ant.test_mode)
+                if idx >= 0: ap._cmb_test_mode.setCurrentIndex(idx)
+                ap._cmb_test_mode.blockSignals(False)
+            # 加载参数 checkbox 状态
+            for key, cb in ap._left_checkboxes.items():
+                cb.setChecked(key in ant.required_params)
+            for key, cb in ap._right_checkboxes.items():
+                cb.setChecked(key in ant.extra_params)
+            # 加载角度配置
+            if getattr(ap, '_gain_angle_widget', None):
+                ap._gain_angle_widget.set_config(ant.lag_config)
+            if getattr(ap, '_ar_angle_widget', None):
+                ap._ar_angle_widget.set_config(ant.ar_lag_config)
+            if getattr(ap, '_rhcp_angle_widget', None):
+                ap._rhcp_angle_widget.set_config(ant.rhcp_lag_config)
+            if getattr(ap, '_cpxpi_angle_widget', None):
+                ap._cpxpi_angle_widget.set_config(ant.cpxpi_lag_config)
+
+        # 同步到 ChartSettingsPage mode selector
+        if hasattr(self, '_chart_settings_page'):
+            cp = self._chart_settings_page
+            if hasattr(cp, '_cmb_test_mode'):
+                cp._cmb_test_mode.blockSignals(True)
+                idx = cp._cmb_test_mode.findData(ant.test_mode)
+                if idx >= 0: cp._cmb_test_mode.setCurrentIndex(idx)
+                cp._cmb_test_mode.blockSignals(False)
+                cp._rebuild_chart_categories(ant.test_mode)
 
     def _make_tab_scrollable(self, tab: QWidget):
         """将指定 Tab 的内容包裹在 QScrollArea 中，防止内容溢出被压缩。"""
@@ -1237,6 +1364,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 self._file_entries.append(old_map[p])
             else:
                 self._file_entries.append(FileEntry(path=p, test_mode=self._test_mode))
+        self._refresh_antenna_selector()
 
     def _refresh_data_file_ui(self):
         if self._file_list_widget is None:
@@ -2265,6 +2393,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             skip_original=skip_original,
             gen_diff=gen_diff,
             gen_diff_chart=gen_diff_chart,
+            antenna_configs=self._antenna_configs if self._antenna_configs else None,
         )
         self._worker.moveToThread(self._thread)
 

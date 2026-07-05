@@ -479,13 +479,15 @@ class DataFileSelector(QGroupBox):
 
         # 文件列表
         self.file_list_widget = QTableWidget()
-        self.file_list_widget.setColumnCount(2)
+        self.file_list_widget.setColumnCount(3)
         self.file_list_widget.setHorizontalHeaderLabels([
-            self.tr("数据源文件"), self.tr("测试模式")
+            self.tr("数据源文件"), self.tr("天线名称"), self.tr("测试模式")
         ])
         self.file_list_widget.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.file_list_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
-        self.file_list_widget.setColumnWidth(1, 140)
+        self.file_list_widget.setColumnWidth(1, 120)
+        self.file_list_widget.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+        self.file_list_widget.setColumnWidth(2, 120)
         self.file_list_widget.verticalHeader().setDefaultSectionSize(28)
         self.file_list_widget.verticalHeader().setVisible(False)
         self.file_list_widget.setMinimumHeight(80)

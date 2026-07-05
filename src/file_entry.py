@@ -17,12 +17,14 @@ class FileEntry:
     Attributes:
         path: 数据文件绝对路径。
         test_mode: 测试模式 (0=无源天线, 1=有源发射 TRP, 2=有源接收 TIS)。
+        antenna_name: 天线名称/标识 (为空时自动从文件名提取)。
         matched_sheet: 自动匹配的工作表名称（空字符串表示未匹配）。
         label: 显示用的简短名称（默认使用文件名）。
     """
 
     path: str
     test_mode: int = 0
+    antenna_name: str = ""
     matched_sheet: str = ""
 
     @property

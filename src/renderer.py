@@ -415,7 +415,7 @@ class MatplotlibRenderer(BaseRenderer):
         """双Y轴频点曲线: 压缩多段单轴, 线连续。"""
         threshold = gap_mhz if gap_mhz > 0 else 999999
         gap_vis = 10.0
-        x = []; xt = []; xl = []; off = 0.0
+        x = []; xt = []; xl = []; off = 0.0; off_prev = 0.0
         seg_i = 0; seg_start = 0
         for i in range(1, len(freqs) + 1):
             if i == len(freqs) or freqs[i] - freqs[i-1] > threshold:
@@ -482,7 +482,7 @@ class MatplotlibRenderer(BaseRenderer):
         """B 类频点曲线: 压缩多段到单轴, 线连续, 端点+等差整数刻度。"""
         threshold = gap_mhz if gap_mhz > 0 else 999999
         gap_vis = 10.0  # 段间视觉间距
-        x = []; xt = []; xl = []; off = 0.0
+        x = []; xt = []; xl = []; off = 0.0; off_prev = 0.0
         seg_i = 0; seg_start = 0
         for i in range(1, len(freqs) + 1):
             if i == len(freqs) or freqs[i] - freqs[i-1] > threshold:
