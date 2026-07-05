@@ -403,7 +403,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         container = QWidget()
         h_layout = QHBoxLayout(container)
         h_layout.setSpacing(8)
-        h_layout.setContentsMargins(0, 0, 0, 0)
+        h_layout.setContentsMargins(0, 0, 12, 0)
 
         # 左侧导航
         left_sidebar = QVBoxLayout()

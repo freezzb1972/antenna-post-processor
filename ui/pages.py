@@ -253,7 +253,7 @@ class FileSettingsPage(QWidget):
         # === 右侧：输出设置 ===
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setContentsMargins(0, 0, 8, 0)
         right_layout.setSpacing(1)
 
         # ── 输出选项 ──
