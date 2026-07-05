@@ -762,7 +762,7 @@ class FileSettingsPage(QWidget):
         # 转置表: 每列=模版一列, 行=属性
         n = len(mappings)
         table = QTableWidget()
-        table.setRowCount(7)
+        table.setRowCount(8)
         table.setColumnCount(n)
         ROW_LABELS = [self.tr("列号"), self.tr("列头文本"), self.tr("检测类型"),
                        self.tr("参数值"), self.tr("修正类型"), self.tr("修正参数"), self.tr("操作")]
@@ -794,32 +794,27 @@ class FileSettingsPage(QWidget):
             edit_param.setPlaceholderText(self.tr("输入参数值"))
             edit_param.setText(angle_val)
             param_layout.addWidget(edit_param, 1)
-            btn_angle_popup = QPushButton("⚙")
-            btn_angle_popup.setFixedWidth(44)
-            btn_angle_popup.setToolTip(self.tr("打开角度配置对话框"))
-            btn_angle_popup.clicked.connect(
+            table.setCellWidget(5, ci, param_widget)
+            # ⚙ 按钮独占一行
+            btn_cfg = QPushButton("⚙ " + self.tr("打开角度配置"))
+            btn_cfg.clicked.connect(
                 lambda checked, ci=ci, cb=cmb, ep=edit_param, tbl=table:
                 self._on_preview_open_angle_popup(ci, cb, ep, tbl))
-            param_layout.addWidget(btn_angle_popup)
-            table.setCellWidget(5, ci, param_widget)
+            table.setCellWidget(6, ci, btn_cfg)
             # 类型变更 → 自动填充角度参数
             cmb.currentIndexChanged.connect(
                 lambda _i, c=ci, cb=cmb, ep=edit_param, rh=m.raw_header:
                 self._on_preview_type_changed(c, cb, table, rh, ep))
-            # 修改按钮（所有类型可用）
+            # 应用按钮
             btn_mod = QPushButton(self.tr("应用"))
             btn_mod.setFixedWidth(50)
             btn_mod.clicked.connect(lambda checked, idx=ci, ct=m.detected_type:
                 self._on_preview_apply(dlg, idx, ct, table))
-            table.setCellWidget(6, ci, btn_mod)
+            table.setCellWidget(7, ci, btn_mod)
             if m.detected_type != "unknown":
                 detected += 1
         table.resizeColumnsToContents()
-        # 确保每列足够宽以显示 ⚙ 按钮
-        for ci in range(n):
-            if table.columnWidth(ci) < 90:
-                table.setColumnWidth(ci, 90)
-        table.setMinimumHeight(280)
+        table.setMinimumHeight(320)
         layout.addWidget(table)
 
         # 摘要
