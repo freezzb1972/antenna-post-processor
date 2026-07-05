@@ -282,6 +282,22 @@ class TemplateSourceRow(QWidget):
         layout.addWidget(btn_preview)
         layout.addStretch()
 
+    def set_path(self, path: str):
+        """手动设置模板路径（非预设选择时使用）。"""
+        self._path = path
+        # 清除预设选择
+        self._cmb_mfr.blockSignals(True)
+        self._cmb_mfr.setCurrentIndex(0)
+        self._cmb_mfr.blockSignals(False)
+        self._cmb_tpl.blockSignals(True)
+        self._cmb_tpl.setCurrentIndex(0)
+        self._cmb_tpl.blockSignals(False)
+        self.template_changed.emit(path)
+
+    def get_path(self) -> str:
+        """返回当前模板路径。"""
+        return self._path
+
     def populate_presets(self, presets: List[dict]):
         """填充厂商和模板两级下拉。每个预设含 Excel path + Word path。"""
         self._all_presets = presets

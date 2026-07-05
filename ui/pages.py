@@ -1119,6 +1119,9 @@ class FileSettingsPage(QWidget):
         self._data_file_paths.extend(new_paths)
         self._data_stale = False
         self._sync_file_entries()
+        # 刷新 MainWindow 天线选择器
+        if self._mw and hasattr(self._mw, '_refresh_antenna_selector'):
+            self._mw._refresh_antenna_selector()
         if self._cfg:
             self._cfg.config.last_csv_paths = [new_paths[0]]
             self._cfg._dirty = True
