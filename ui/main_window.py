@@ -1603,7 +1603,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         QGroupBox::title {
             subcontrol-origin: margin;
             left: 8px;
-            padding: 0 3px;
+            padding: 1px 3px;
         }
         QPlainTextEdit {
             border-radius: 4px;
