@@ -262,29 +262,34 @@ class FileSettingsPage(QWidget):
         # 1) 天线参数报告 (.xlsx)
         self._check_out_excel = QCheckBox(self.tr("天线参数报告 (.xlsx)"))
         self._check_out_excel.setChecked(True)
-        self._xlsx_output_path = "antenna_report.xlsx"  # 默认文件名
-        self._btn_save_xlsx = QPushButton(self.tr("另存为 antenna_report.xlsx"))
-        self._btn_save_xlsx.clicked.connect(self._on_save_xlsx)
+        self._edit_xlsx = QLineEdit()
+        self._edit_xlsx.setPlaceholderText(self.tr("默认: ./output/antenna_report.xlsx"))
+        btn_xl = QPushButton(self.tr("浏览..."))
+        btn_xl.clicked.connect(self._on_browse_xlsx)
         row_xl = QHBoxLayout()
         row_xl.addWidget(self._check_out_excel)
-        row_xl.addWidget(self._btn_save_xlsx)
-        row_xl.addStretch()
+        row_xl.addWidget(self._edit_xlsx, 1)
+        row_xl.addWidget(btn_xl)
         out_layout.addLayout(row_xl)
+
+        self._check_out_excel.toggled.connect(lambda c: self._edit_xlsx.setEnabled(c))
 
         out_layout.addWidget(_make_hsep())
 
         # 2) 图表报告 (.docx)
         self._check_out_word = QCheckBox(self.tr("测试报告 (.docx)"))
-        self._word_output_path = ""  # 默认: 源文件目录 + 自动命名
-        self._btn_save_word = QPushButton(self.tr("另存为..."))
-        self._btn_save_word.clicked.connect(self._on_save_word)
+        self._edit_word = QLineEdit()
+        self._edit_word.setPlaceholderText(self.tr("默认: 源文件名图表报告.docx"))
+        btn_wd = QPushButton(self.tr("浏览..."))
+        btn_wd.clicked.connect(self._on_browse_word)
         row_wd = QHBoxLayout()
         row_wd.addWidget(self._check_out_word)
-        row_wd.addWidget(self._btn_save_word)
-        row_wd.addStretch()
+        row_wd.addWidget(self._edit_word, 1)
+        row_wd.addWidget(btn_wd)
         out_layout.addLayout(row_wd)
 
         self._check_out_word.toggled.connect(lambda c: (
+            self._edit_word.setEnabled(c),
             self._sync_azimuth_cut_switch(),
         ))
 
@@ -292,16 +297,18 @@ class FileSettingsPage(QWidget):
 
         # 3) 中间数据文件 (.xlsx)
         self._check_out_data = QCheckBox(self.tr("中间数据文件 (.xlsx)"))
-        self._data_output_path = ""
-        self._btn_save_data = QPushButton(self.tr("另存为..."))
-        self._btn_save_data.clicked.connect(self._on_save_data)
+        self._edit_data = QLineEdit()
+        self._edit_data.setPlaceholderText(self.tr("默认: 源文件名中间数据.xlsx"))
+        btn_dt = QPushButton(self.tr("浏览..."))
+        btn_dt.clicked.connect(self._on_browse_data)
         row_dt = QHBoxLayout()
         row_dt.addWidget(self._check_out_data)
-        row_dt.addWidget(self._btn_save_data)
-        row_dt.addStretch()
+        row_dt.addWidget(self._edit_data, 1)
+        row_dt.addWidget(btn_dt)
         out_layout.addLayout(row_dt)
 
         self._check_out_data.toggled.connect(lambda c: (
+            self._edit_data.setEnabled(c),
             self._sync_azimuth_cut_switch(),
         ))
 
@@ -337,37 +344,38 @@ class FileSettingsPage(QWidget):
         """从 MainWindow 加载输出设置。"""
         if not self._mw:
             return
-        # Excel output: 从 MainWindow 恢复全路径
-        if hasattr(self._mw, 'ui') and hasattr(self, '_xlsx_output_path'):
+        if hasattr(self._mw, 'ui') and hasattr(self, '_edit_xlsx'):
             d = self._mw.ui.editOutputDir.text().strip()
             n = self._mw.ui.editOutputName.text().strip()
             if d and n:
-                self._xlsx_output_path = str(Path(d) / n)
-                self._btn_save_xlsx.setText(self.tr("另存为 ") + n)
-        # Azimuth config: 从配置恢复 Word 全路径
+                self._edit_xlsx.setText(str(Path(d) / n))
         az = getattr(self._mw, '_azimuth_config', None)
-        if az is not None and az.chart_output_dir and az.chart_output_filename and hasattr(self, '_word_output_path'):
-            self._word_output_path = str(Path(az.chart_output_dir) / az.chart_output_filename)
-            self._btn_save_word.setText(self.tr("另存为 ") + az.chart_output_filename)
+        if az is not None and hasattr(self, '_edit_word'):
+            if az.chart_output_dir and az.chart_output_filename:
+                self._edit_word.setText(str(Path(az.chart_output_dir) / az.chart_output_filename))
 
     def _sync_azimuth_state(self):
         """将输出设置写回 MainWindow。"""
         if not self._mw:
             return
-        # Excel output
-        if hasattr(self._mw, 'ui') and hasattr(self, '_xlsx_output_path'):
-            p = Path(self._xlsx_output_path)
-            self._mw.ui.editOutputDir.setText(str(p.parent))
-            self._mw.ui.editOutputName.setText(p.name)
-        # Word output → Azimuth config
+        if hasattr(self._mw, 'ui') and hasattr(self, '_edit_xlsx'):
+            txt = self._edit_xlsx.text().strip()
+            if txt:
+                p = Path(txt)
+                self._mw.ui.editOutputDir.setText(str(p.parent))
+                self._mw.ui.editOutputName.setText(p.name)
         az = getattr(self._mw, '_azimuth_config', None)
         if az is not None:
-            if hasattr(self, '_word_output_path') and self._word_output_path:
-                p = Path(self._word_output_path)
-                az.chart_output_dir = str(p.parent)
-                az.chart_output_filename = p.name
-            if hasattr(self, '_data_output_path') and self._data_output_path:
-                az.data_output_filename = Path(self._data_output_path).name
+            if hasattr(self, '_edit_word'):
+                txt = self._edit_word.text().strip()
+                if txt:
+                    p = Path(txt)
+                    az.chart_output_dir = str(p.parent)
+                    az.chart_output_filename = p.name
+            if hasattr(self, '_edit_data'):
+                txt = self._edit_data.text().strip()
+                if txt:
+                    az.data_output_filename = Path(txt).name
 
     def _sync_azimuth_cut_switch(self):
         """勾选 Word 或数据输出时自动开启/关闭方位面开关。"""
@@ -393,49 +401,37 @@ class FileSettingsPage(QWidget):
 
     # ── 方位面输出目录浏览 ──
 
-    def _on_save_xlsx(self):
-        """另存为: 选路径+文件名 一步完成。"""
+    def _on_browse_xlsx(self):
+        """浏览: Excel 报告输出路径。"""
         from pathlib import Path
-        start = self._xlsx_output_path or "antenna_report.xlsx"
-        if not Path(start).is_absolute():
-            start = str(Path.cwd() / "output" / Path(start).name)
+        start = self._edit_xlsx.text().strip() or str(Path.cwd() / "output" / "antenna_report.xlsx")
         path, _ = QFileDialog.getSaveFileName(
             self, self.tr("保存天线参数报告"), start,
             self.tr("Excel 文件 (*.xlsx)"))
         if path:
-            self._xlsx_output_path = path
-            self._btn_save_xlsx.setText(self.tr("另存为 ") + Path(path).name)
-            if self._mw and hasattr(self._mw, 'ui'):
-                self._mw.ui.editOutputDir.setText(str(Path(path).parent))
-                self._mw.ui.editOutputName.setText(Path(path).name)
+            self._edit_xlsx.setText(path)
             self._sync_azimuth_state()
 
-    def _on_save_word(self):
-        """另存为: Word 报告路径。"""
+    def _on_browse_word(self):
+        """浏览: Word 报告输出路径。"""
         from pathlib import Path
-        start = self._word_output_path or "图表报告.docx"
-        if not Path(start).is_absolute():
-            start = str(Path.cwd() / "output" / Path(start).name)
+        start = self._edit_word.text().strip() or str(Path.cwd() / "output" / "图表报告.docx")
         path, _ = QFileDialog.getSaveFileName(
             self, self.tr("保存测试报告"), start,
             self.tr("Word 文档 (*.docx)"))
         if path:
-            self._word_output_path = path
-            self._btn_save_word.setText(self.tr("另存为 ") + Path(path).name)
+            self._edit_word.setText(path)
             self._sync_azimuth_state()
 
-    def _on_save_data(self):
-        """另存为: 中间数据文件路径。"""
+    def _on_browse_data(self):
+        """浏览: 中间数据输出路径。"""
         from pathlib import Path
-        start = self._data_output_path or "中间数据.xlsx"
-        if not Path(start).is_absolute():
-            start = str(Path.cwd() / "output" / Path(start).name)
+        start = self._edit_data.text().strip() or str(Path.cwd() / "output" / "中间数据.xlsx")
         path, _ = QFileDialog.getSaveFileName(
             self, self.tr("保存中间数据"), start,
             self.tr("Excel 文件 (*.xlsx)"))
         if path:
-            self._data_output_path = path
-            self._btn_save_data.setText(self.tr("另存为 ") + Path(path).name)
+            self._edit_data.setText(path)
             self._sync_azimuth_state()
 
     def _on_browse_word_template(self):
