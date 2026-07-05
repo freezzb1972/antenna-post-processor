@@ -665,30 +665,14 @@ class FileSettingsPage(QWidget):
             QMessageBox.warning(self, self.tr("检测失败"), self.tr(f"列头检测失败:\n{e}"))
             return
 
-        import re
-        from src.lag_config import _RE_LAG_SINGLE, _RE_LAG_RANGE
-        # AR 正则 — lag_config 中为局部变量
-        _RE_AR_S = re.compile(
-            r"(?:AR|Axial\s*Ratio)\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)",
-            re.IGNORECASE)
-        _RE_AR_R = re.compile(
-            r"(?:AR|Axial\s*Ratio)\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)\s*[-–—~]\s*(\d+\.?\d*)",
-            re.IGNORECASE)
-
         def _extract_angle(raw: str, ctype: str) -> str:
-            if ctype in ("lag_single", "ar_single", "rhcp_single", "cp_xpi_single"):
-                if ctype == "lag_single": rx = _RE_LAG_SINGLE
-                elif ctype == "ar_single": rx = _RE_AR_S
-                elif ctype == "rhcp_single":
-                    rx = re.compile(r"RHCP(?:\s*Gain)?\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)", re.I)
-                else:
-                    rx = re.compile(r"CP[\s-]*XPI\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)", re.I)
-                m = rx.search(raw)
-                return m.group(1) if m else ""
-            if ctype in ("lag_range", "ar_range"):
-                rx = _RE_LAG_RANGE if ctype == "lag_range" else _RE_AR_R
-                m = rx.search(raw)
-                return f"{m.group(1)}–{m.group(2)}" if m else ""
+            from src.lag_config import extract_angles_from_headers
+            singles, ranges = extract_angles_from_headers([raw])
+            if ctype.endswith("_range") and ranges:
+                lo, hi = ranges[0]
+                return f"{lo:.0f}–{hi:.0f}"
+            if singles:
+                return ", ".join(f"{a:.0f}" for a in singles[:5])
             return ""
 
         dlg = QDialog(self)
@@ -882,49 +866,34 @@ class FileSettingsPage(QWidget):
         # 更新检测类型显示
         table.item(2, col).setText(new_type)
         table.item(3, col).setText(param_val)
-        # 同步到计算参数（通过 MainWindow 属性）
-        if self._mw:
-            if new_type in ("lag_single", "lag_range"):
+        # 通用: 按类型前缀写入对应 config
+        if self._mw and param_val:
+            _TYPE_CONFIG = {
+                "lag": ("_lag_config", True), "ar": ("_ar_lag_config", True),
+                "rhcp": ("_rhcp_lag_config", False), "cpxpi": ("_cpxpi_lag_config", False),
+            }
+            for prefix, (attr, has_range) in _TYPE_CONFIG.items():
+                if not new_type.startswith(prefix + "_"):
+                    continue
+                cfg = getattr(self._mw, attr, None)
+                if cfg is None:
+                    break
                 try:
-                    val = float(param_val.replace("°", "").split("–")[0])
-                except ValueError:
-                    val = None
-                if val is not None and hasattr(self._mw, '_lag_config'):
-                    if new_type == "lag_single":
-                        self._mw._lag_config.add_single(val)
-                    else:
+                    if new_type.endswith("_range") and has_range:
                         parts = param_val.replace("°", "").split("–")
                         if len(parts) == 2:
-                            self._mw._lag_config.add_range(float(parts[0]), float(parts[1]))
+                            cfg.add_range(float(parts[0]), float(parts[1]))
+                    else:
+                        for v in param_val.replace("°", "").split(","):
+                            cfg.add_single(float(v.strip()))
+                except ValueError:
+                    pass
+                if hasattr(self._mw, '_sync_quick_buttons'):
                     self._mw._sync_quick_buttons()
+                if hasattr(self._mw, '_update_lag_display'):
                     self._mw._update_lag_display()
-            elif new_type in ("ar_single", "ar_range"):
-                try:
-                    val = float(param_val.replace("°", "").split("–")[0])
-                except ValueError:
-                    val = None
-                if val is not None and hasattr(self._mw, '_ar_lag_config'):
-                    if new_type == "ar_single":
-                        self._mw._ar_lag_config.add_single(val)
-                    else:
-                        parts = param_val.replace("°", "").split("–")
-                        if len(parts) == 2:
-                            self._mw._ar_lag_config.add_range(float(parts[0]), float(parts[1]))
-            elif new_type == "rhcp_single":
-                try:
-                    val = float(param_val.replace("°", ""))
-                except ValueError:
-                    val = None
-                if val is not None and hasattr(self._mw, '_rhcp_lag_config'):
-                    self._mw._rhcp_lag_config.add_single(val)
-            elif new_type == "cp_xpi_single":
-                try:
-                    val = float(param_val.replace("°", ""))
-                except ValueError:
-                    val = None
-                if val is not None and hasattr(self._mw, '_cpxpi_lag_config'):
-                    self._mw._cpxpi_lag_config.add_single(val)
-            self._mw._log(f"✓ 已应用: {new_type} = {param_val}")
+                self._mw._log(f"✓ 已应用: {new_type} = {param_val}")
+                break
 
     def _on_preview_type_changed(self, col: int, cmb: QComboBox, table, raw_header: str,
                                   edit_param=None):
@@ -938,33 +907,15 @@ class FileSettingsPage(QWidget):
         if not new_type:
             return
 
-        # 从列头提取角度 (所有 _single/_range 类型)
-        import re
-        from src.lag_config import _RE_LAG_SINGLE, _RE_LAG_RANGE
-        _RE_AR_S = re.compile(
-            r"(?:AR|Axial\s*Ratio)\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)", re.IGNORECASE)
-        _RE_AR_R = re.compile(
-            r"(?:AR|Axial\s*Ratio)\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)\s*[-–—~]\s*(\d+\.?\d*)", re.IGNORECASE)
-        _RE_RHCP_S = re.compile(
-            r"RHCP(?:\s*Gain)?\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)", re.IGNORECASE)
-        _RE_CPXPI_S = re.compile(
-            r"CP[\s-]*XPI\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)", re.IGNORECASE)
-
+        # 通用角度提取
+        from src.lag_config import extract_angles_from_headers
         angle_val = ""
-        if new_type in ("lag_single", "ar_single", "rhcp_single", "cp_xpi_single"):
-            if new_type == "lag_single": rx = _RE_LAG_SINGLE
-            elif new_type == "ar_single": rx = _RE_AR_S
-            elif new_type == "rhcp_single": rx = _RE_RHCP_S
-            else: rx = _RE_CPXPI_S
-            m = rx.search(raw_header)
-            if m:
-                angle_val = m.group(1)
-
-        elif new_type in ("lag_range", "ar_range"):
-            rx = _RE_LAG_RANGE if new_type == "lag_range" else _RE_AR_R
-            m = rx.search(raw_header)
-            if m:
-                angle_val = f"{m.group(1)}–{m.group(2)}"
+        singles, ranges = extract_angles_from_headers([raw_header])
+        if new_type.endswith("_range") and ranges:
+            lo, hi = ranges[0]
+            angle_val = f"{lo:.0f}–{hi:.0f}"
+        elif singles:
+            angle_val = ", ".join(f"{a:.0f}" for a in singles[:5])
 
         # 列头未提取到 → 从天线参数 AnglePicker 配置读取
         if not angle_val and self._mw:
