@@ -79,10 +79,11 @@ def _make_hsep() -> QFrame:
 class FileSettingsPage(QWidget):
     """文件设置：模板 + 数据 + 输出 集中管理。
 
-    直接读写 MainWindow 的以下属性：
-      - ui.editTemplatePath / ui.editOutputDir / ui.editOutputName / …
-      - _data_file_paths, _file_entries, …
+    Word 模板路径存为内部属性 (非 GUI widget)，供 preset 和出报告使用。
     """
+
+    _edit_word_report_tpl = ""  # 内部属性: str, 存储 Word 报告模版路径
+    _edit_word_tpl = ""         # 内部属性: str, 存储含 SDT tag 的 .docx 模版路径
 
     def __init__(self, mainwindow=None):
         super().__init__(mainwindow)
@@ -174,9 +175,6 @@ class FileSettingsPage(QWidget):
             for t in presets:
                 presets_list.append({"manufacturer": t.manufacturer, "name": t.name, "path": t.path,
                     "word_template_path": t.word_template_path})
-                if t.word_template_path:
-                    label = f"{t.manufacturer} - {t.name}" if t.manufacturer else t.name
-                    self._cmb_word_preset.addItem(label, t.word_template_path)
             self._tpl_row.populate_presets(presets_list)
         self._tpl_row.template_changed.connect(self._on_preset_template_selected)
         excel_layout.addWidget(self._tpl_row)
@@ -186,26 +184,6 @@ class FileSettingsPage(QWidget):
         self._tpl_path_label.setPlaceholderText(self.tr("(未选择 Excel 参数模版)"))
         excel_layout.addWidget(self._tpl_path_label)
         v_splitter.addWidget(excel_grp)
-
-        # Word 报告模版组 (与 Excel 同款布局，复用 TemplateSourceRow)
-        word_grp = QGroupBox(self.tr("Word 报告模版"))
-        word_layout = QVBoxLayout(word_grp)
-        word_layout.setSpacing(4)
-        self._word_tpl_row = TemplateSourceRow(
-            on_browse=self._on_browse_word_template,
-            on_preview=self._on_preview_word,
-        )
-        if self._mw and hasattr(self._mw, '_tm'):
-            self._word_tpl_row.populate_presets(self._mw._tm.get_all_templates())
-        self._word_tpl_row.template_changed.connect(self._on_word_tpl_path_set)
-        self._word_tpl_row.template_pair_changed.connect(self._on_word_preset_excel_load)
-        word_layout.addWidget(self._word_tpl_row)
-        self._edit_word_report_tpl = QLineEdit()
-        self._edit_word_report_tpl.setReadOnly(True)
-        self._edit_word_report_tpl.setPlaceholderText(self.tr("(未选择 Word 报告模版)"))
-        self._word_tpl_row.template_changed.connect(self._edit_word_report_tpl.setText)
-        word_layout.addWidget(self._edit_word_report_tpl)
-        v_splitter.addWidget(word_grp)
 
         # 数据文件选择器 (widgets.DataFileSelector)
         from ui.widgets import DataFileSelector
@@ -305,17 +283,6 @@ class FileSettingsPage(QWidget):
             self._edit_az_chart_fn.setEnabled(c),
             self._sync_azimuth_cut_switch(),
         ))
-
-        # Word 模板 (含 SDT Tag 的 .docx)
-        row_word_tpl = QHBoxLayout()
-        row_word_tpl.addWidget(QLabel(self.tr("Word 模板:")))
-        self._edit_word_tpl = QLineEdit()
-        self._edit_word_tpl.setPlaceholderText(self.tr("选择带 SDT tag 的 .docx 模板 (可选)"))
-        row_word_tpl.addWidget(self._edit_word_tpl, 1)
-        btn_word_tpl = QPushButton(self.tr("浏览..."))
-        btn_word_tpl.clicked.connect(self._on_browse_word_template)
-        row_word_tpl.addWidget(btn_word_tpl)
-        out_layout.addLayout(row_word_tpl)
 
         out_layout.addWidget(_make_hsep())
 
@@ -453,11 +420,11 @@ class FileSettingsPage(QWidget):
         """选择带 SDT tag 的 Word 模板（不自动预览）。"""
         from PySide6.QtWidgets import QFileDialog
         from pathlib import Path
-        start = self._edit_word_report_tpl.text() or str(Path.cwd())
+        start = self._edit_word_report_tpl or str(Path.cwd())
         d, _ = QFileDialog.getOpenFileName(self, self.tr("选择 Word 模板"), start,
                                             self.tr("Word 文档 (*.docx)"))
         if d:
-            self._edit_word_report_tpl.setText(d)
+            self._edit_word_report_tpl = d
 
     def _on_browse_az_data_dir(self):
         from PySide6.QtWidgets import QFileDialog
@@ -563,7 +530,7 @@ class FileSettingsPage(QWidget):
     def _check_excel_word_consistency(self):
         """检查 Excel 参数模板与 Word SDT tag 的一致性。"""
         excel_path = self._tpl_path_label.text().strip()
-        word_path = self._edit_word_report_tpl.text().strip() if hasattr(self, '_edit_word_report_tpl') else ""
+        word_path = (self._edit_word_report_tpl or "").strip() if hasattr(self, '_edit_word_report_tpl') else ""
         if not excel_path or not word_path or not Path(excel_path).exists() or not Path(word_path).exists():
             return
         try:
@@ -600,7 +567,7 @@ class FileSettingsPage(QWidget):
     def _on_word_tpl_path_set(self, path: str):
         """Word 模板预设选中 → 更新路径。"""
         if path:
-            self._edit_word_report_tpl.setText(path)
+            self._edit_word_report_tpl = path
 
     def _on_word_preset_excel_load(self, excel_path: str, word_path: str):
         """Word 预设选中 → 同步加载对应 Excel 模板。"""
@@ -611,25 +578,18 @@ class FileSettingsPage(QWidget):
             if self._mw:
                 self._mw.ui.editTemplatePath.setText(excel_path)
 
-    def _on_word_preset_selected(self, idx: int):
-        """(已废弃 — 使用 TemplateSourceRow 替代)"""
-        pass
-        """Word 预设选中 → 更新路径。"""
-        path = self._cmb_word_preset.currentData()
-        if path and hasattr(self, '_edit_word_report_tpl'):
-            self._edit_word_report_tpl.setText(path)
-
     def _on_preview_word(self):
         """预览 Word 模板: 分屏视图 — 文档 + SDT tag 树。"""
-        w = getattr(self, '_edit_word_report_tpl', None)
-        if w is None: return
-        path = w.text().strip()
+        path = (getattr(self, '_edit_word_report_tpl', '') or '').strip()
         if not path or not Path(path).exists():
             from PySide6.QtWidgets import QFileDialog
             d, _ = QFileDialog.getOpenFileName(self, self.tr("选择 Word 模板"), "",
                                                 self.tr("Word 文档 (*.docx)"))
-            if d: w.setText(d); path = d
-            else: return
+            if d:
+                self._edit_word_report_tpl = d
+                path = d
+            else:
+                return
         try:
             from src.docx_exporter import DocxTemplateFiller
             from src.docx_sdt_inserter import scan_docx
@@ -647,7 +607,7 @@ class FileSettingsPage(QWidget):
     def _on_preset_word_loaded(self, excel_path: str, word_path: str):
         """预设选中时，同时加载 Word 模板路径。"""
         if word_path and hasattr(self, '_edit_word_report_tpl'):
-            self._edit_word_report_tpl.setText(word_path)
+            self._edit_word_report_tpl = word_path
             # 更新 Word 预设下拉选中项
             # Word 预设同步到 TemplateSourceRow
             if hasattr(self, '_word_tpl_row') and word_path:
@@ -1376,9 +1336,9 @@ class FileSettingsPage(QWidget):
                 page._antenna_list.addItem(ant.name)
             page._antenna_list.setCurrentRow(0)
         if hasattr(self, '_edit_word_tpl'):
-            word_path = self._edit_word_tpl.text().strip()
+            word_path = (self._edit_word_tpl or "").strip()
             if word_path:
-                page._edit_word_tpl.setText(word_path)
+                page._edit_word_tpl = word_path
         layout.addWidget(page)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (

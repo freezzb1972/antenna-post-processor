@@ -1779,7 +1779,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if hasattr(self, '_file_settings_page'):
             fp = self._file_settings_page
             if hasattr(fp, '_edit_word_report_tpl'):
-                word_tpl = fp._edit_word_report_tpl.text().strip()
+                word_tpl = (fp._edit_word_report_tpl or "").strip()
         if word_tpl:
             word_lbl = QLabel(Path(word_tpl).name)
             word_lbl.setToolTip(word_tpl)
@@ -1798,7 +1798,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if hasattr(self, '_file_settings_page'):
             fp = self._file_settings_page
             if hasattr(fp, '_edit_word_report_tpl'):
-                word_tpl = fp._edit_word_report_tpl.text().strip()
+                word_tpl = (fp._edit_word_report_tpl or "").strip()
         self._tm.add_template(mfr, tpl_name, template_path, output_dir, word_tpl)
         self._log(f"✓ 模板预设已保存: {mfr} → {tpl_name}")
 
@@ -2584,7 +2584,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._populate_graph_data(results)
         # ── Word 模板填充 ──
         if file_page and hasattr(file_page, '_edit_word_tpl'):
-            word_tpl = file_page._edit_word_tpl.text().strip()
+            word_tpl = (file_page._edit_word_tpl or "").strip()
             if word_tpl and Path(word_tpl).exists() and results:
                 try:
                     self.ui.lblProgressMsg.setText(self.tr("📝 正在填充 Word 模板..."))
