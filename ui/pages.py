@@ -364,16 +364,7 @@ class FileSettingsPage(QWidget):
                   getattr(self, '_data_sel', None)]:
             if w:
                 w.setStyleSheet(compact_qss)
-                # 诊断: 打印实际生效的 QSS 值
-                import json
-                actual = w.styleSheet()
-                print(f"[DIAG] {w.title()} actual QSS: {actual}")
-                print(f"[DIAG] {w.title()} geometry: x={w.x()} y={w.y()} w={w.width()} h={w.height()}")
-                if w.layout():
-                    ly = w.layout()
-                    lm = ly.contentsMargins()
-                    print(f"[DIAG] {w.title()} layout margins: L={lm.left()} T={lm.top()} R={lm.right()} B={lm.bottom()}")
-                    print(f"[DIAG] {w.title()} layout spacing: {ly.spacing()}")
+                w.setSizePolicy(w.sizePolicy().horizontalPolicy(), QSizePolicy.Fixed)
 
     def _init_state(self):
         """初始化本地状态（无 MainWindow 时使用）。"""

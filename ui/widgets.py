@@ -481,12 +481,7 @@ class DataFileSelector(QGroupBox):
             ly.setContentsMargins(*self._tight_margins)
             ly.setSpacing(self._tight_spacing)
         self.setStyleSheet("QGroupBox { padding-top: 1px; padding-bottom: 1px; margin-top: 12px; }")
-        print(f"[DIAG] DataFileSelector QSS: {self.styleSheet()}")
-        print(f"[DIAG] DataFileSelector geometry: x={self.x()} y={self.y()} w={self.width()} h={self.height()}")
-        if ly:
-            lm = ly.contentsMargins()
-            print(f"[DIAG] DataFileSelector layout margins: L={lm.left()} T={lm.top()} R={lm.right()} B={lm.bottom()}")
-            print(f"[DIAG] DataFileSelector layout spacing: {ly.spacing()}")
+        self.setSizePolicy(self.sizePolicy().horizontalPolicy(), QSizePolicy.Fixed)
 
     def _setup_widgets(self):
         # 按钮行
