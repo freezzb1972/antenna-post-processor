@@ -1792,7 +1792,7 @@ class AntennaParamsPage(QWidget):
 
         dlg = QDialog(self)
         dlg.setWindowTitle(label + " " + self.tr("参数设置"))
-        dlg.setMinimumSize(520, 460)
+        dlg.setMinimumSize(560, 460)
         layout = QVBoxLayout(dlg)
 
         # ── 已配置项汇总（FlowLayout + 删除按钮） ──
