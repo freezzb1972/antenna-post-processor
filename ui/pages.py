@@ -185,6 +185,26 @@ class FileSettingsPage(QWidget):
         excel_layout.addWidget(self._tpl_path_label)
         v_splitter.addWidget(excel_grp)
 
+        # Word 报告模版组
+        word_grp = QGroupBox(self.tr("Word 报告模版"))
+        word_layout = QVBoxLayout(word_grp)
+        word_layout.setSpacing(4)
+        self._word_tpl_row = TemplateSourceRow(
+            on_browse=self._on_browse_word_template,
+            on_preview=self._on_preview_word,
+        )
+        if self._mw and hasattr(self._mw, '_tm'):
+            self._word_tpl_row.populate_presets(self._mw._tm.get_all_templates())
+        self._word_tpl_row.template_changed.connect(self._on_word_tpl_path_set)
+        self._word_tpl_row.template_pair_changed.connect(self._on_word_preset_excel_load)
+        word_layout.addWidget(self._word_tpl_row)
+        self._edit_word_tpl_widget = QLineEdit()
+        self._edit_word_tpl_widget.setReadOnly(True)
+        self._edit_word_tpl_widget.setPlaceholderText(self.tr("(未选择 Word 报告模版)"))
+        self._word_tpl_row.template_changed.connect(self._edit_word_tpl_widget.setText)
+        word_layout.addWidget(self._edit_word_tpl_widget)
+        v_splitter.addWidget(word_grp)
+
         # 数据文件选择器 (widgets.DataFileSelector)
         from ui.widgets import DataFileSelector
         self._data_sel = DataFileSelector()
@@ -425,6 +445,8 @@ class FileSettingsPage(QWidget):
                                             self.tr("Word 文档 (*.docx)"))
         if d:
             self._edit_word_report_tpl = d
+            if hasattr(self, '_edit_word_tpl_widget'):
+                self._edit_word_tpl_widget.setText(d)
 
     def _on_browse_az_data_dir(self):
         from PySide6.QtWidgets import QFileDialog
