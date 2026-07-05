@@ -89,12 +89,14 @@ class ScaleManager:
             }}
             QGroupBox {{
                 font-size: {fs:.1f}px;
-                padding-top: {8 * f:.0f}px;
-                margin-top: {6 * f:.0f}px;
+                padding-top: {4 * f:.0f}px;
+                margin-top: {14 * f:.0f}px;
             }}
             QGroupBox::title {{
                 font-size: {fs:.1f}px;
-                padding: {2 * f:.0f}px {6 * f:.0f}px;
+                subcontrol-origin: margin;
+                left: {8 * f:.0f}px;
+                padding: {1 * f:.0f}px {3 * f:.0f}px;
             }}
             QTabBar::tab {{
                 font-size: {fs:.1f}px;
