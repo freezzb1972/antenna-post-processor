@@ -1511,8 +1511,8 @@ class AntennaParamsPage(QWidget):
             ("total_efficiency_pct", "Total Efficiency (%)"),
             ("mismatch_loss_db", "Mismatch Loss (dB)"),
         ]),
-        ("Axial Ratio", [
-            ("ar", "Axial Ratio (单角度 / 范围)"),
+        ("AR", [
+            ("ar", "AR (单角度 / 范围)"),
         ]),
         ("波束参数", [
             ("boresight_theta", "Boresight θ"),
@@ -3235,11 +3235,11 @@ class ChartSettingsPage(QWidget):
         sep.setFrameShadow(QFrame.Sunken)
         left_layout.addWidget(sep)
 
-        left_layout.addWidget(QLabel(self.tr("方位面极坐标切面:")))
+        left_layout.addWidget(QLabel(self.tr("极坐标方位面切面图:")))
 
         # Gain azimuth
         row_az_g = QHBoxLayout()
-        cb_az_g = QCheckBox(self.tr("Gain 方位面极坐标"))
+        cb_az_g = QCheckBox(self.tr("Gain 极坐标方位面"))
         cb_az_g.toggled.connect(lambda: self._sync_to_mw())
         row_az_g.addWidget(cb_az_g)
         self._chart_required["cut_azimuth_polar"] = cb_az_g
@@ -3252,7 +3252,7 @@ class ChartSettingsPage(QWidget):
 
         # AR azimuth
         row_az_ar = QHBoxLayout()
-        cb_az_ar = QCheckBox(self.tr("AR 方位面极坐标"))
+        cb_az_ar = QCheckBox(self.tr("AR 极坐标方位面"))
         cb_az_ar.toggled.connect(lambda: self._sync_to_mw())
         row_az_ar.addWidget(cb_az_ar)
         self._chart_required["cut_azimuth_polar_ar"] = cb_az_ar
@@ -3275,7 +3275,7 @@ class ChartSettingsPage(QWidget):
 
         # RHCP azimuth
         row_az_rhcp = QHBoxLayout()
-        cb_az_rhcp = QCheckBox(self.tr("RHCP 方位面极坐标"))
+        cb_az_rhcp = QCheckBox(self.tr("RHCP 极坐标方位面"))
         cb_az_rhcp.toggled.connect(lambda: self._sync_to_mw())
         row_az_rhcp.addWidget(cb_az_rhcp)
         self._chart_required["cut_azimuth_polar_rhcp"] = cb_az_rhcp

@@ -322,18 +322,18 @@ class ChartConfig:
 
     @classmethod
     def chart_labels(cls) -> dict[str, str]:
-        """返回图形 key → 中文显示名称映射。"""
+        """返回图形 key → 统一命名映射 (英文技术缩写 + 中文类别词)。"""
         return {
-            "pattern_3d_gain": "3D 增益方向图",
+            "pattern_3d_gain": "3D Gain 方向图",
             "pattern_3d_eirp": "3D EIRP 方向图",
-            "pattern_3d_ar": "3D 轴比方向图",
-            "pattern_3d_etheta": "3D E_θ 分量方向图",
-            "pattern_3d_ephi": "3D E_φ 分量方向图",
-            "chart_eff_freq": "效率 vs 频率",
+            "pattern_3d_ar": "3D AR 方向图",
+            "pattern_3d_etheta": "3D Eθ 方向图",
+            "pattern_3d_ephi": "3D Eφ 方向图",
+            "chart_eff_freq": "Efficiency vs 频率",
             "chart_gain_freq": "Gain vs 频率",
             "chart_dir_freq": "Directivity vs 频率",
             "chart_trp_freq": "TRP vs 频率",
-            "chart_ar_freq": "轴比 vs 频率",
+            "chart_ar_freq": "AR vs 频率",
             "cut_2d_polar": "极坐标俯仰面切面图",
             "cut_2d_rect": "直角坐标俯仰面切面图",
         }
@@ -359,13 +359,13 @@ class ChartConfig:
         elif mode == 1:
             vs_freq.append("chart_trp_freq")
 
-        # 俯仰面切面图: 共用
+        # 2D 切面图: 共用
         cuts = ["cut_2d_polar", "cut_2d_rect"]
 
         return {
             "A 类: 3D 方向图": pattern_3d,
-            "B 类: vs 频率曲线": vs_freq,
-            "C 类: 俯仰面切面图": cuts,
+            "B 类: 频率曲线": vs_freq,
+            "C 类: 2D 切面图": cuts,
         }
 
 
