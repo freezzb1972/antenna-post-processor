@@ -216,6 +216,7 @@ class FileSettingsPage(QWidget):
         # 模板行打包到一个 widget 加入垂直 splitter
         tpl_widget = QWidget()
         tpl_widget.setLayout(tpl_row)
+        tpl_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         v_splitter.addWidget(tpl_widget)
 
         # 数据文件选择器 (widgets.DataFileSelector)
@@ -249,7 +250,7 @@ class FileSettingsPage(QWidget):
         v_splitter.addWidget(ds)
         v_splitter.setStretchFactor(0, 0)  # 模板区不拉伸
         v_splitter.setStretchFactor(1, 1)  # 数据文件区可拉伸
-        v_splitter.setSizes([80, 480])     # 初始: 模板紧贴内容, 数据撑满
+        v_splitter.setSizes([60, 500])     # 模板区贴内容, 数据区撑满
         left_layout.addWidget(v_splitter)
         h_splitter.addWidget(left_widget)
 
