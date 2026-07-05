@@ -2865,6 +2865,11 @@ class ChartSettingsPage(QWidget):
                     btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
                     row.addWidget(btn)
+                elif key.startswith("chart_") and "_freq" in key:
+                    btn = QPushButton("⚙ " + self.tr("参数"))
+                    btn.setFixedWidth(80)
+                    btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
+                    row.addWidget(btn)
 
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
                     btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
@@ -2898,6 +2903,11 @@ class ChartSettingsPage(QWidget):
                     btn = QPushButton("⚙ " + self.tr("参数"))
                     btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
+                    row.addWidget(btn)
+                elif key.startswith("chart_") and "_freq" in key:
+                    btn = QPushButton("⚙ " + self.tr("参数"))
+                    btn.setFixedWidth(80)
+                    btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
 
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
@@ -2935,20 +2945,6 @@ class ChartSettingsPage(QWidget):
         row_wl.addWidget(btn_word_layout)
         row_wl.addStretch()
         out_layout.addLayout(row_wl)
-
-        # ── B 类频率曲线参数 ──
-        row_bf = QHBoxLayout()
-        row_bf.addWidget(QLabel(self.tr("频段间隔(MHz):")))
-        self._spin_freq_gap = QSpinBox()
-        self._spin_freq_gap.setRange(0, 999); self._spin_freq_gap.setValue(10)
-        self._spin_freq_gap.setToolTip(self.tr("0=不打断单轴; >0=相邻频点差超此值时分段绘制"))
-        row_bf.addWidget(self._spin_freq_gap)
-        row_bf.addWidget(QLabel(self.tr("  双Y轴:")))
-        self._check_dual_y = QCheckBox(self.tr("配对"))
-        self._check_dual_y.setToolTip(self.tr("Efficiency%+Gain, Directivity+TRP 双Y轴"))
-        row_bf.addWidget(self._check_dual_y)
-        row_bf.addStretch()
-        out_layout.addLayout(row_bf)
 
         # ── 列数 / 图片宽 ──
         row_img = QHBoxLayout()
@@ -3471,6 +3467,11 @@ class ChartSettingsPage(QWidget):
                     btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
                     row.addWidget(btn)
+                elif key.startswith("chart_") and "_freq" in key:
+                    btn = QPushButton("⚙ " + self.tr("参数"))
+                    btn.setFixedWidth(80)
+                    btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
+                    row.addWidget(btn)
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
                     btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
                     btn.setFixedWidth(85)
@@ -3505,6 +3506,11 @@ class ChartSettingsPage(QWidget):
                     btn = QPushButton("⚙ " + self.tr("参数"))
                     btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
+                    row.addWidget(btn)
+                elif key.startswith("chart_") and "_freq" in key:
+                    btn = QPushButton("⚙ " + self.tr("参数"))
+                    btn.setFixedWidth(80)
+                    btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
                     btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
