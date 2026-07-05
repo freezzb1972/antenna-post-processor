@@ -796,7 +796,8 @@ class FileSettingsPage(QWidget):
             param_layout.addWidget(edit_param, 1)
             table.setCellWidget(5, ci, param_widget)
             # ⚙ 按钮独占一行
-            btn_cfg = QPushButton("⚙ " + self.tr("打开角度配置"))
+            btn_cfg = QPushButton("⚙")
+            btn_cfg.setToolTip(self.tr("打开角度配置对话框"))
             btn_cfg.clicked.connect(
                 lambda checked, ci=ci, cb=cmb, ep=edit_param, tbl=table:
                 self._on_preview_open_angle_popup(ci, cb, ep, tbl))
