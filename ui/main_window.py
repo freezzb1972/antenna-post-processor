@@ -768,22 +768,23 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # ── 工具 ──
         tm = menubar.addMenu(self.tr("&工具"))
-        # 数据转换组
-        tm.addAction(self.tr("数据检查与转换..."), self._on_tool_batch_check)
-        tm.addAction(self.tr("路径损耗补偿..."), self._on_tool_calibrate)
-        tm.addAction(self.tr("数据合并 (多段拼接)..."), self._on_tool_merge)
-        tm.addAction(self.tr("步进重采样..."), self._on_tool_resample)
-        tm.addAction(self.tr("数据修复 (插值)..."), self._on_tool_quality_repair)
-        tm.addSeparator()
-        # 预设管理组
+        # 数据处理子菜单
+        data_menu = tm.addMenu(self.tr("数据处理"))
+        data_menu.addAction(self.tr("数据检查与转换..."), self._on_tool_batch_check)
+        data_menu.addAction(self.tr("路径损耗补偿..."), self._on_tool_calibrate)
+        data_menu.addAction(self.tr("数据合并 (多段拼接)..."), self._on_tool_merge)
+        data_menu.addAction(self.tr("步进重采样..."), self._on_tool_resample)
+        data_menu.addAction(self.tr("数据修复 (插值)..."), self._on_tool_quality_repair)
+        data_menu.addSeparator()
+        data_menu.addAction(self.tr("EMQuest 数据导出..."), self._on_tool_emq_export)
+        data_menu.addAction(self.tr("FinalSummary 转 CSV..."), self._on_tool_xlsx_to_csv)
+        # 模板/SDT
         tm.addAction(self.tr("模板预设管理..."), self._on_tool_template_recognizer)
         tm.addAction(self.tr("Docx SDT 工具箱..."), self._on_tool_docx_sdt)
-
-        tm.addAction(self.tr("校准预设管理..."), self._on_show_rsp_presets)
+        tm.addAction(self.tr("报告元数据..."), self._on_tool_metadata)
+        tm.addAction(self.tr("列识别规则..."), self._on_tool_pattern_mgr)
         tm.addSeparator()
-        # 导入导出组
-        tm.addAction(self.tr("EMQuest 数据导出..."), self._on_tool_emq_export)
-        tm.addAction(self.tr("FinalSummary 转 CSV..."), self._on_tool_xlsx_to_csv)
+        tm.addAction(self.tr("校准预设管理..."), self._on_show_rsp_presets)
 
         # ── 帮助 ──
         hm = menubar.addMenu(self.tr("&帮助"))
@@ -1066,9 +1067,24 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _on_tool_docx_sdt(self):
         """Docx SDT 工具箱: 分析 Word 模板，自动推荐 SDT tag，插入并保存。"""
         from ui.template_recognizer import DocxTemplateToolbox
-        path = self.ui.editTemplatePath.text().strip() if hasattr(self, 'ui') else ""
-        dlg = DocxTemplateToolbox(self, path if path and Path(path).exists() else "")
+        fp = getattr(self, '_file_settings_page', None)
+        word_path = getattr(fp, '_edit_word_report_tpl', '') if fp else ''
+        if not word_path:
+            word_path = self.ui.editTemplatePath.text().strip() if hasattr(self, 'ui') else ""
+        dlg = DocxTemplateToolbox(self, word_path if word_path and Path(word_path).exists() else "")
         dlg.exec()
+
+    def _on_tool_metadata(self):
+        """报告元数据编辑: 客户/项目/测试信息，支持 Excel 导入。"""
+        fp = getattr(self, '_file_settings_page', None)
+        if fp and hasattr(fp, '_show_metadata_editor'):
+            fp._show_metadata_editor()
+
+    def _on_tool_pattern_mgr(self):
+        """列识别规则管理: 编辑 column_patterns.json。"""
+        fp = getattr(self, '_file_settings_page', None)
+        if fp and hasattr(fp, '_show_pattern_manager'):
+            fp._show_pattern_manager()
 
     def _on_tool_template_recognizer(self):
         """模板预设管理: 加载模板 Excel，显示列头检测，支持手动修正并保存。"""
@@ -1442,7 +1458,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         for m in matches:
             if m.file_path:
                 inferred = infer_mode_from_sheet(m.sheet_name)
-                for e in self._file_entries:
+                fp = getattr(self, '_file_settings_page', None)
+                entries = fp._file_entries if fp else []
+                for e in entries:
                     if e.path == m.file_path and e.test_mode == 0:
                         e.test_mode = inferred
         self._refresh_data_file_ui()
@@ -3054,7 +3072,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 if n_stale > 0:
                     self._log(f"🗑 自动清除上次计算遗留的 {n_stale} 个文件")
                 self._data_file_paths.clear()
-                self._file_entries.clear()
+                fp = getattr(self, '_file_settings_page', None)
+                if fp: fp._file_entries.clear()
                 self._file_list_widget.setRowCount(0)
                 self._match_table.setRowCount(0)
                 self._lbl_match_status.setText("")

@@ -306,17 +306,6 @@ class FileSettingsPage(QWidget):
             self.tr("保存为 .ant 任务包后，下次双击即可直接查看结果，无需重新计算。"))
         right_layout.addWidget(self._check_save_task)
 
-        right_layout.addWidget(_make_hsep())
-
-        btn_metadata = QPushButton(self.tr("📝 编辑报告元数据..."))
-        btn_metadata.setToolTip(self.tr("客户名称、项目信息、测试参数等，将填入 Word 报告模板"))
-        btn_metadata.clicked.connect(self._show_metadata_editor)
-        right_layout.addWidget(btn_metadata)
-
-        btn_pattern_mgr = QPushButton(self.tr("📋 管理列识别规则..."))
-        btn_pattern_mgr.setToolTip(self.tr("编辑 config/column_patterns.json — 控制模板列头自动识别"))
-        btn_pattern_mgr.clicked.connect(self._show_pattern_manager)
-        right_layout.addWidget(btn_pattern_mgr)
         right_layout.addStretch()
 
         h_splitter.addWidget(right_widget)
