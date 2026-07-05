@@ -2873,6 +2873,24 @@ class ChartSettingsPage(QWidget):
                 row.addStretch()
                 right_layout.addLayout(row)
             right_layout.addStretch()
+            # 方位面切面 (C类右列: 存 _chart_extra)
+            if "C 类" in cat_name:
+                sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
+                right_layout.addWidget(sep)
+                right_layout.addWidget(QLabel(self.tr("极坐标方位面切面图:")))
+                for az_key, az_label in [
+                    ("cut_azimuth_polar", "Gain 极坐标方位面"),
+                    ("cut_azimuth_polar_ar", "AR 极坐标方位面"),
+                    ("cut_azimuth_polar_rhcp", "RHCP 极坐标方位面"),
+                ]:
+                    row_az = QHBoxLayout()
+                    cb_az = QCheckBox(self.tr(az_label))
+                    cb_az.toggled.connect(lambda: self._sync_to_mw())
+                    row_az.addWidget(cb_az)
+                    self._chart_extra[az_key] = cb_az
+                    row_az.addStretch()
+                    right_layout.addLayout(row_az)
+
             row_layout.addWidget(right_box, 1)
 
             content_layout.addLayout(row_layout)
@@ -3440,6 +3458,24 @@ class ChartSettingsPage(QWidget):
                     row.addWidget(btn)
                 row.addStretch()
                 right_layout.addLayout(row)
+            # 方位面切面 (C类右列重建: 存 _chart_extra)
+            if "C 类" in cat_name:
+                sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
+                right_layout.addWidget(sep)
+                right_layout.addWidget(QLabel(self.tr("极坐标方位面切面图:")))
+                for az_key, az_label in [
+                    ("cut_azimuth_polar", "Gain 极坐标方位面"),
+                    ("cut_azimuth_polar_ar", "AR 极坐标方位面"),
+                    ("cut_azimuth_polar_rhcp", "RHCP 极坐标方位面"),
+                ]:
+                    row_az = QHBoxLayout()
+                    cb_az = QCheckBox(self.tr(az_label))
+                    cb_az.setChecked(saved.get(az_key, False))
+                    cb_az.toggled.connect(lambda: self._sync_to_mw())
+                    row_az.addWidget(cb_az)
+                    self._chart_extra[az_key] = cb_az
+                    row_az.addStretch()
+                    right_layout.addLayout(row_az)
             right_layout.addStretch()
             row_layout.addWidget(right_box, 1)
 
