@@ -1596,14 +1596,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         QGroupBox {
             border: 1px solid rgba(128,128,128,50);
             border-radius: 6px;
-            margin-top: 10px;
-            padding-top: 14px;
+            margin-top: 4px;
+            padding-top: 12px;
             font-weight: bold;
         }
         QGroupBox::title {
             subcontrol-origin: margin;
-            left: 10px;
-            padding: 0 4px;
+            left: 8px;
+            padding: 0 2px;
         }
         QPlainTextEdit {
             border-radius: 4px;
