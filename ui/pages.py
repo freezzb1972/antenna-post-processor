@@ -258,7 +258,8 @@ class FileSettingsPage(QWidget):
         self._btn_save_xlsx.clicked.connect(self._on_save_xlsx)
         row_xl = QHBoxLayout()
         row_xl.addWidget(self._check_out_excel)
-        row_xl.addWidget(self._btn_save_xlsx, 1)
+        row_xl.addWidget(self._btn_save_xlsx)
+        row_xl.addStretch()
         out_layout.addLayout(row_xl)
 
         out_layout.addWidget(_make_hsep())
@@ -270,7 +271,8 @@ class FileSettingsPage(QWidget):
         self._btn_save_word.clicked.connect(self._on_save_word)
         row_wd = QHBoxLayout()
         row_wd.addWidget(self._check_out_word)
-        row_wd.addWidget(self._btn_save_word, 1)
+        row_wd.addWidget(self._btn_save_word)
+        row_wd.addStretch()
         out_layout.addLayout(row_wd)
 
         self._check_out_word.toggled.connect(lambda c: (
@@ -286,7 +288,8 @@ class FileSettingsPage(QWidget):
         self._btn_save_data.clicked.connect(self._on_save_data)
         row_dt = QHBoxLayout()
         row_dt.addWidget(self._check_out_data)
-        row_dt.addWidget(self._btn_save_data, 1)
+        row_dt.addWidget(self._btn_save_data)
+        row_dt.addStretch()
         out_layout.addLayout(row_dt)
 
         self._check_out_data.toggled.connect(lambda c: (
