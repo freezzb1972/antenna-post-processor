@@ -818,7 +818,10 @@ def _parse_sheet(ws) -> SheetInfo | None:
         data_end_row=data_end_row,
         columns=columns,
         frequencies=frequencies,
-        angle_configs=angle_configs,
+        lag_config=lag_config,
+        ar_config=ar_config,
+        rhcp_config=rhcp_config,
+        cpxpi_config=cpxpi_config,
         theta_range=theta_range,
     )
 
