@@ -1452,9 +1452,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._refresh_data_file_ui()
 
         matched = sum(1 for m in matches if m.file_path is not None)
-        self._lbl_match_status.setText(
-            f"✓ {matched}/{len(matches)} 个工作表已匹配"
-        )
+        if hasattr(self, '_lbl_match_status'):
+            self._lbl_match_status.setText(
+                f"✓ {matched}/{len(matches)} 个工作表已匹配"
+            )
         self._log(f"自动匹配完成: {matched}/{len(matches)}")
 
     def _populate_match_table(self, matches):
@@ -3035,7 +3036,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 fp = getattr(self, '_file_settings_page', None)
                 if fp: fp._file_entries.clear()
                 self._file_list_widget.setRowCount(0)
-                self._lbl_match_status.setText("")
+                if hasattr(self, '_lbl_match_status'):
+                    self._lbl_match_status.setText("")
             existing = set(self._data_file_paths)
             new = [p for p in valid if p not in existing]
             if new:
