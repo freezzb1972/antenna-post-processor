@@ -324,9 +324,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         p = getattr(self, '_file_settings_page', None)
         return p._btn_auto_match if p else None
 
-    @property
-
-
     def _init_params_tab(self):
         """构建「天线参数」子节 — 频点 + 算法选项，加入 tabFile。"""
         vtab = self.ui.vTabFile  # 放入文件设置区域
