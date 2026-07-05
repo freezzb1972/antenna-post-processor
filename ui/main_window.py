@@ -1842,6 +1842,19 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     f"从模板自动更新 AR 角度: "
                     f"单角度={ar_cfg.singles_sorted}, 范围={ar_cfg.ranges_sorted}"
                 )
+
+        # RHCP 配置
+        rhcp_cfg = LagConfig.from_rhcp_headers(all_headers)
+        if not rhcp_cfg.is_empty():
+            self._rhcp_lag_config = rhcp_cfg
+            self._log(f"从模板自动更新 RHCP 角度: 单角度={rhcp_cfg.singles_sorted}")
+
+        # CP-XPI 配置
+        cpxpi_cfg = LagConfig.from_cpxpi_headers(all_headers)
+        if not cpxpi_cfg.is_empty():
+            self._cpxpi_lag_config = cpxpi_cfg
+            self._log(f"从模板自动更新 CP-XPI 角度: 单角度={cpxpi_cfg.singles_sorted}")
+
         self._update_params_display()
 
     def _auto_apply_template_params(self):

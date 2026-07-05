@@ -186,6 +186,52 @@ class LagConfig:
 
         return cls(single_angles=singles, ranges=ranges)
 
+    @classmethod
+    def from_rhcp_headers(cls, headers: list[str]) -> LagConfig:
+        """从 Excel 列头自动解析 RHCP Gain 角度需求。
+
+        识别模式:
+          - ``RHCP at Theta=30`` / ``RHCP Gain at θ=60`` → 单角度 30°, 60°
+        """
+        singles: list[float] = []
+        _RE_RHCP_SINGLE = re.compile(
+            r"RHCP(?:\s*Gain)?\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)",
+            re.IGNORECASE,
+        )
+        for raw in headers:
+            h = normalize_header(raw)
+            if not h:
+                continue
+            sm = _RE_RHCP_SINGLE.search(h)
+            if sm:
+                val = float(sm.group(1))
+                if val not in singles:
+                    singles.append(val)
+        return cls(single_angles=singles)
+
+    @classmethod
+    def from_cpxpi_headers(cls, headers: list[str]) -> LagConfig:
+        """从 Excel 列头自动解析 CP-XPI 角度需求。
+
+        识别模式:
+          - ``CP-XPI at Theta=30`` / ``CP XPI at θ=60`` → 单角度 30°, 60°
+        """
+        singles: list[float] = []
+        _RE_CPXPI_SINGLE = re.compile(
+            r"CP[\s-]*XPI\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)",
+            re.IGNORECASE,
+        )
+        for raw in headers:
+            h = normalize_header(raw)
+            if not h:
+                continue
+            sm = _RE_CPXPI_SINGLE.search(h)
+            if sm:
+                val = float(sm.group(1))
+                if val not in singles:
+                    singles.append(val)
+        return cls(single_angles=singles)
+
     # --- 查询 ---
 
     @property
