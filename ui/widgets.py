@@ -461,7 +461,7 @@ class DataFileSelector(QGroupBox):
         super().__init__(parent)
         self.setTitle(self.tr("数据文件"))
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(4, 1, 4, 1)
+        layout.setContentsMargins(4, 0, 4, 0)
         layout.setSpacing(1)
 
         # 按钮行
