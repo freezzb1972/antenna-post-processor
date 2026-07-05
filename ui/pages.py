@@ -539,6 +539,7 @@ class FileSettingsPage(QWidget):
             return
         self._template_path = path  # 属性 setter
         self._tpl_row.set_path(path)
+        self._tpl_path_label.setText(path)
         if self._cfg:
             self._cfg.config.last_template_path = path
             self._cfg._dirty = True

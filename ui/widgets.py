@@ -283,7 +283,7 @@ class TemplateSourceRow(QWidget):
         layout.addStretch()
 
     def set_path(self, path: str):
-        """手动设置模板路径（非预设选择时使用）。"""
+        """手动设置模板路径（非预设选择时使用, 不触发信号以避免递归）。"""
         self._path = path
         # 清除预设选择
         self._cmb_mfr.blockSignals(True)
@@ -292,7 +292,7 @@ class TemplateSourceRow(QWidget):
         self._cmb_tpl.blockSignals(True)
         self._cmb_tpl.setCurrentIndex(0)
         self._cmb_tpl.blockSignals(False)
-        self.template_changed.emit(path)
+        # 不 emit template_changed — 调用方自己 emit 或由 browse 流程处理
 
     def get_path(self) -> str:
         """返回当前模板路径。"""
