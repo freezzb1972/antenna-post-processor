@@ -790,7 +790,7 @@ class FileSettingsPage(QWidget):
             edit_param.setText(angle_val)
             param_layout.addWidget(edit_param, 1)
             btn_angle_popup = QPushButton("⚙")
-            btn_angle_popup.setFixedWidth(30)
+            btn_angle_popup.setFixedWidth(44)
             btn_angle_popup.setToolTip(self.tr("打开角度配置对话框"))
             btn_angle_popup.clicked.connect(
                 lambda checked, ci=ci, cb=cmb, ep=edit_param, tbl=table:
