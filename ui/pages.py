@@ -3066,10 +3066,10 @@ class ChartSettingsPage(QWidget):
                 cb.toggled.connect(lambda: self._sync_to_mw())
                 row.addWidget(cb)
                 self._chart_required[key] = cb
-                if key in ("chart_gain_freq", "chart_ar_freq"):
+                if key.startswith("pattern_3d_"):
                     btn = QPushButton("⚙ " + self.tr("参数"))
                     btn.setFixedWidth(80)
-                    btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
+                    btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
                     row.addWidget(btn)
 
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
@@ -3100,10 +3100,10 @@ class ChartSettingsPage(QWidget):
                 cb.toggled.connect(lambda: self._sync_to_mw())
                 row.addWidget(cb)
                 self._chart_extra[key] = cb
-                if key in ("chart_gain_freq", "chart_ar_freq"):
+                if key.startswith("pattern_3d_"):
                     btn = QPushButton("⚙ " + self.tr("参数"))
                     btn.setFixedWidth(80)
-                    btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
+                    btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
                     row.addWidget(btn)
 
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
@@ -3141,6 +3141,20 @@ class ChartSettingsPage(QWidget):
         row_wl.addWidget(btn_word_layout)
         row_wl.addStretch()
         out_layout.addLayout(row_wl)
+
+        # ── B 类频率曲线参数 ──
+        row_bf = QHBoxLayout()
+        row_bf.addWidget(QLabel(self.tr("频段间隔(MHz):")))
+        self._spin_freq_gap = QSpinBox()
+        self._spin_freq_gap.setRange(0, 999); self._spin_freq_gap.setValue(10)
+        self._spin_freq_gap.setToolTip(self.tr("0=不打断单轴; >0=相邻频点差超此值时分段绘制"))
+        row_bf.addWidget(self._spin_freq_gap)
+        row_bf.addWidget(QLabel(self.tr("  双Y轴:")))
+        self._check_dual_y = QCheckBox(self.tr("配对"))
+        self._check_dual_y.setToolTip(self.tr("Efficiency%+Gain, Directivity+TRP 双Y轴"))
+        row_bf.addWidget(self._check_dual_y)
+        row_bf.addStretch()
+        out_layout.addLayout(row_bf)
 
         # ── 列数 / 图片宽 ──
         row_img = QHBoxLayout()
@@ -3670,10 +3684,10 @@ class ChartSettingsPage(QWidget):
                 cb.toggled.connect(lambda: self._sync_to_mw())
                 row.addWidget(cb)
                 self._chart_required[key] = cb
-                if key in ("chart_gain_freq", "chart_ar_freq"):
+                if key.startswith("pattern_3d_"):
                     btn = QPushButton("⚙ " + self.tr("参数"))
                     btn.setFixedWidth(80)
-                    btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
+                    btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
                     row.addWidget(btn)
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
                     btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
@@ -3705,10 +3719,10 @@ class ChartSettingsPage(QWidget):
                 cb.toggled.connect(lambda: self._sync_to_mw())
                 row.addWidget(cb)
                 self._chart_extra[key] = cb
-                if key in ("chart_gain_freq", "chart_ar_freq"):
+                if key.startswith("pattern_3d_"):
                     btn = QPushButton("⚙ " + self.tr("参数"))
                     btn.setFixedWidth(80)
-                    btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
+                    btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
                     row.addWidget(btn)
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
                     btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
@@ -3726,6 +3740,46 @@ class ChartSettingsPage(QWidget):
         self._chart_grp_list = grp_list
         for g in grp_list:
             vbox.insertWidget(vbox.count() - 1, g)
+
+    def _show_a3d_param_dialog(self, chart_key: str):
+        """A 类 3D 方向图参数设置 — DPI + 采样精度 + 多视角。"""
+        from src.chart_config import ChartConfig
+        label_map = ChartConfig.chart_labels()
+        label = label_map.get(chart_key, chart_key)
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(label + " " + self.tr("参数设置"))
+        dlg.setMinimumSize(420, 300)
+        layout = QVBoxLayout(dlg)
+
+        form = QFormLayout()
+        spin_dpi = QSpinBox()
+        spin_dpi.setRange(72, 600); spin_dpi.setValue(self._spin_dpi.value())
+        form.addRow(self.tr("DPI:"), spin_dpi)
+
+        spin_step = QSpinBox()
+        spin_step.setRange(1, 30); spin_step.setValue(self._spin_step.value())
+        spin_step.setSuffix("°")
+        spin_step.setToolTip(self.tr("3D 采样精度: 1°=最细, 30°=最快"))
+        form.addRow(self.tr("采样精度:"), spin_step)
+
+        layout.addLayout(form)
+
+        btn_view = QPushButton(self.tr("多视角..."))
+        btn_view.clicked.connect(lambda: (
+            dlg.accept(), self._show_view_angle_popup()))
+        layout.addWidget(btn_view)
+        layout.addStretch()
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            self._spin_dpi.setValue(spin_dpi.value()),
+            self._spin_step.setValue(spin_step.value()),
+            self._sync_to_mw(),
+            dlg.accept()))
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
 
     def _show_bclass_param_dialog(self, chart_key: str):
         """B 类频率曲线参数设置对话框 — 频段间隔 + 双Y轴 + 线宽。"""
