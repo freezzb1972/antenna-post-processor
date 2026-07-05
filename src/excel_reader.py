@@ -611,6 +611,8 @@ class SheetInfo:
     frequencies: list[float] = field(default_factory=list)
     lag_config: LagConfig = field(default_factory=LagConfig)
     ar_config: LagConfig = field(default_factory=LagConfig)
+    lag_config: LagConfig = field(default_factory=LagConfig)
+    ar_config: LagConfig = field(default_factory=LagConfig)
     rhcp_config: LagConfig = field(default_factory=LagConfig)
     cpxpi_config: LagConfig = field(default_factory=LagConfig)
     theta_range: str | None = None  # e.g., "0-110°"
@@ -761,10 +763,7 @@ def _parse_sheet(ws) -> SheetInfo | None:
         data_end_row=data_end_row,
         columns=columns,
         frequencies=frequencies,
-        lag_config=lag_config,
-        ar_config=ar_config,
-        rhcp_config=rhcp_config,
-        cpxpi_config=cpxpi_config,
+        angle_configs=angle_configs,
         theta_range=theta_range,
     )
 
