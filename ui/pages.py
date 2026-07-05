@@ -3331,16 +3331,16 @@ class ChartSettingsPage(QWidget):
         mw._chart_config_extra = extra
 
         if hasattr(mw, 'ui'):
-            mw.ui.spinElev.setValue(int(self._spin_elev.value()))
-            mw.ui.spinAzim.setValue(int(self._spin_azim.value()))
-            mw.ui.spinDpi.setValue(self._spin_dpi.value())
+            mw.ui.spinElev.setValue(int(getattr(self, '_elev', 30)))
+            mw.ui.spinAzim.setValue(int(getattr(self, '_azim', -60)))
+            mw.ui.spinDpi.setValue(getattr(self, '_dpi', 150))
             mw.ui.checkEmbedExcel.setChecked(self._check_embed.isChecked())
             mw.ui.checkSavePng.setChecked(self._check_png.isChecked())
 
         self.chart_config_changed.emit()
 
     def _parse_step_deg(self) -> float:
-        return float(max(1, min(30, self._spin_step.value())))
+        return float(max(1, min(30, getattr(self, '_step_deg', 5))))
 
     def _rebuild_chart_categories(self, mode: int):
         """模式变更时重建图表分类组。"""
@@ -3901,9 +3901,9 @@ class ChartSettingsPage(QWidget):
             cfg = ChartConfig()
             for key in ChartConfig.all_chart_keys():
                 setattr(cfg, key, required_map.get(key, QCheckBox()).isChecked())
-            cfg.elev = self._spin_elev.value()
-            cfg.azim = self._spin_azim.value()
-            cfg.dpi = self._spin_dpi.value()
+            cfg.elev = getattr(self, '_elev', 30.0)
+            cfg.azim = getattr(self, '_azim', -60.0)
+            cfg.dpi = getattr(self, '_dpi', 150)
             cfg.step_deg = self._parse_step_deg()
             cfg.embed_in_excel = self._check_embed.isChecked()
             cfg.gain_chart_angles = list(gain_angles)
