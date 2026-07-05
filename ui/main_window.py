@@ -1456,36 +1456,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._log(f"自动匹配完成: {matched}/{len(matches)}")
 
     def _populate_match_table(self, matches):
-        from src.sheet_file_matcher import extract_key, sanitize_sheet_name
-        use_file_names = self._worksheet_naming_mode == 1
-        self._match_table.setRowCount(len(matches))
-        for i, m in enumerate(matches):
-            self._match_table.setRowHeight(i, 28)
-            # 工作表名: mode=0 用模板原名, mode=1 用数据源文件名推导
-            display_name = m.sheet_name
-            if use_file_names and m.file_path:
-                display_name = sanitize_sheet_name(extract_key(m.file_path))
-            self._match_table.setItem(i, 0, QTableWidgetItem(display_name))
-            combo = QComboBox()
-            combo.addItem("—")
-            for fp in self._data_file_paths:
-                # 只显示文件名，完整路径放 tooltip
-                combo.addItem(Path(fp).name, fp)
-                combo.model().item(combo.count() - 1).setToolTip(fp)
-            if m.file_path:
-                idx = combo.findData(m.file_path)
-                if idx >= 0:
-                    combo.setCurrentIndex(idx)
-            combo.currentIndexChanged.connect(lambda idx, row=i: self._on_match_changed(row))
-            self._match_table.setCellWidget(i, 1, combo)
-
-            if m.file_path:
-                status = QTableWidgetItem(self.tr("✓ 已匹配"))
-                status.setForeground(QColor("green"))
-            else:
-                status = QTableWidgetItem(self.tr("未匹配"))
-                status.setForeground(QColor("orange"))
-            self._match_table.setItem(i, 2, status)
+        self._last_matches = matches
+        matched = sum(1 for m in matches if m.file_path is not None)
+        if hasattr(self, '_lbl_match_status'):
+            self._lbl_match_status.setText(f'{matched}/{len(matches)} done')
+        # delegate to FileSettingsPage
+        fp = getattr(self, '_file_settings_page', None)
+        if fp and hasattr(fp, '_last_matches'):
+            fp._last_matches = matches
+            if fp._populate_match_table.__code__.co_code != self._populate_match_table.__code__.co_code:
+                fp._populate_match_table(matches)
 
     def _build_datasource_map(self, progress_callback=None):
         from src.datasource import DataSource
@@ -1595,11 +1575,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             return
         try:
             from src.llm_assist import LLMAssist
-            sheet_names = []
-            for row in range(self._match_table.rowCount()):
-                item = self._match_table.item(row, 0)
-                if item:
-                    sheet_names.append(item.text())
+            sheet_names = [m.sheet_name for m in getattr(self, '_last_matches', [])]
             suggestions = LLMAssist.suggest_file_matches(
                 sheet_names, self._data_file_paths,
                 current_matches=None, logger=self._log,

@@ -1349,14 +1349,11 @@ class FileSettingsPage(QWidget):
         sheet_mode_map: Dict[str, int] = {}
         file_mode_lookup = {e.path: e.test_mode for e in self._file_entries}
         use_file_names = self._worksheet_naming_mode == 1
-        for row in range(self._match_table.rowCount()):
-            sn = self._match_table.item(row, 0)
-            combo = self._match_table.cellWidget(row, 1)
-            if sn and combo:
-                fp = combo.currentData() or ""
-                if fp and fp in file_mode_lookup:
-                    key = sanitize_sheet_name(extract_key(fp)) if use_file_names else sanitize_sheet_name(sn.text())
-                    sheet_mode_map[key] = file_mode_lookup[fp]
+        for m in getattr(self, '_last_matches', []):
+            fp = m.file_path or ""
+            if fp and fp in file_mode_lookup:
+                key = sanitize_sheet_name(extract_key(fp)) if use_file_names else sanitize_sheet_name(m.sheet_name)
+                sheet_mode_map[key] = file_mode_lookup[fp]
         for sn in datasource_map:
             if sn not in sheet_mode_map:
                 sheet_mode_map[sn] = getattr(self._mw, '_test_mode', 0) if self._mw else 0
