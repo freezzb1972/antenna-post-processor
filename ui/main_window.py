@@ -21,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional
 
-from PySide6.QtCore import QEvent, QSettings, Qt, QThread
+from PySide6.QtCore import QEvent, QSettings, Qt, QThread, QTimer
 from PySide6.QtGui import QColor, QDragEnterEvent, QDropEvent, QPalette, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
@@ -144,6 +144,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._current_antenna_name: str = ""   # 当前编辑的天线
         self._antenna_results: dict[str, dict] = {}   # antenna_name → results
         self._antenna_images: dict[str, dict] = {}    # antenna_name → images
+        self._ant_queue: list[str] = []               # 多天线处理队列
+        self._ant_idx: int = 0                        # 当前处理索引
+        self._ant_all_results: dict = {}              # 累积结果
+        self._ant_all_images: dict = {}               # 累积图片
         self._nh_custom_angles: List[float] = []  # NHPRP/NHPIS 自定义角度列表
         self._ar_output_db: bool = True     # AR 默认输出 dB
         self._chart_config_required = None   # ChartConfig: 报告需要
@@ -2151,9 +2155,42 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._do_run(compute_only=False, reuse_datasource=True)
 
     def _on_one_click(self):
-        """一键出报告: 直接 compute_only=False, 不要求先预览。"""
+        """一键出报告: 支持多天线逐个处理。"""
+        self._save_current_antenna_config()
+        if self._antenna_configs and len(self._antenna_configs) > 1:
+            # 多天线模式: 逐个处理
+            self._log(f"🚀 多天线处理: {len(self._antenna_configs)} 个天线")
+            self._process_antennas_sequential()
+        else:
+            # 单天线模式
+            self._enter_exporting()
+            self._do_run(compute_only=False, reuse_datasource=False)
+
+    def _process_antennas_sequential(self):
+        """逐个串行处理所有天线。"""
         self._enter_exporting()
+        ant_names = list(self._antenna_configs.keys())
+        self._ant_queue = ant_names[:]
+        self._ant_idx = 0
+        self._ant_all_results = {}
+        self._ant_all_images = {}
+        self._process_next_antenna()
+
+    def _process_next_antenna(self):
+        """处理队列中的下一个天线。"""
+        if self._ant_idx >= len(self._ant_queue):
+            # 全部完成
+            self._log(f"✅ 全部天线处理完成: {len(self._ant_all_results)} 个")
+            self._antenna_results = self._ant_all_results
+            self._antenna_images = self._ant_all_images
+            return
+        name = self._ant_queue[self._ant_idx]
+        self._log(f"📡 处理天线: {name} ({self._ant_idx + 1}/{len(self._ant_queue)})")
+        self._load_antenna_config(name)
+        self._current_antenna_name = name
+        self._ant_idx += 1
         self._do_run(compute_only=False, reuse_datasource=False)
+        # _on_finished 会收集结果并调用 _process_next_antenna 继续
 
     def _do_run(self, compute_only: bool = False, reuse_datasource: bool = False):
         """统一执行入口（预览/出报告共用）。"""
@@ -2572,6 +2609,18 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 自动切到结果Tab
         self.ui.tabConfig.setCurrentIndex(0)
 
+        # 多天线模式: 继续处理下一个
+        if hasattr(self, '_ant_queue') and self._ant_idx < len(self._ant_queue):
+            self._ant_all_results[ant_name] = results
+            self._ant_all_images[ant_name] = images
+            QTimer.singleShot(500, self._process_next_antenna)
+            return
+
+        # 全部完成，恢复状态
+        if hasattr(self, '_ant_all_results') and self._ant_all_results:
+            self._antenna_results = self._ant_all_results
+            self._antenna_images = self._ant_all_images
+            self._ant_queue = []
 
     def _process_antennas_parallel(self, antennas):
         """并行处理多个天线 (自动检测 CPU 核数)。"""
