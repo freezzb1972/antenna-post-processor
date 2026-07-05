@@ -245,6 +245,9 @@ class FileSettingsPage(QWidget):
         self._check_chart_lag = ds.check_chart_lag
 
         v_splitter.addWidget(ds)
+        v_splitter.setStretchFactor(0, 0)  # 模板区不拉伸
+        v_splitter.setStretchFactor(1, 1)  # 数据文件区可拉伸
+        v_splitter.setSizes([160, 400])    # 初始: 模板160px, 数据400px
         left_layout.addWidget(v_splitter)
         h_splitter.addWidget(left_widget)
 
