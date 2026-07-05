@@ -488,14 +488,13 @@ class DataFileSelector(QGroupBox):
         self.file_list_widget.verticalHeader().setDefaultSectionSize(28)
         self.file_list_widget.verticalHeader().setVisible(False)
         self.file_list_widget.setMinimumHeight(80)
-        self.file_list_widget.setMaximumHeight(180)
-        self.file_list_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.file_list_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.file_list_widget.setAlternatingRowColors(True)
         self.file_list_widget.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.file_list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        layout.addWidget(self.file_list_widget)
+        layout.addWidget(self.file_list_widget, 1)  # stretch=1, 占满空间
 
-        # 自动匹配按钮行
+        # 自动匹配按钮行 (底部)
         match_row = QHBoxLayout()
         self.btn_auto_match = QPushButton(self.tr("🔗 自动匹配"))
         self.btn_auto_match.setToolTip(self.tr("按文件命名自动匹配工作表"))
@@ -515,7 +514,6 @@ class DataFileSelector(QGroupBox):
         match_row.addWidget(self.cmb_naming_mode)
         match_row.addStretch()
         layout.addLayout(match_row)
-        layout.addStretch()
 
 
 # ═══════════════════════════════════════════════════════════════
