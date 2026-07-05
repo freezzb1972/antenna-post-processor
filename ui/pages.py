@@ -679,11 +679,11 @@ class FileSettingsPage(QWidget):
             if ctype in ("lag_single", "ar_single"):
                 rx = _RE_LAG_SINGLE if ctype == "lag_single" else _RE_AR_S
                 m = rx.search(raw)
-                return f"{m.group(1)}°" if m else ""
+                return f"{m.group(1)}" if m else ""
             if ctype in ("lag_range", "ar_range"):
                 rx = _RE_LAG_RANGE if ctype == "lag_range" else _RE_AR_R
                 m = rx.search(raw)
-                return f"{m.group(1)}–{m.group(2)}°" if m else ""
+                return f"{m.group(1)}–{m.group(2)}" if m else ""
             return ""
 
         dlg = QDialog(self)
@@ -952,7 +952,7 @@ class FileSettingsPage(QWidget):
             rx = _RE_LAG_RANGE if new_type == "lag_range" else _RE_AR_R
             m = rx.search(raw_header)
             if m:
-                angle_val = f"{m.group(1)}–{m.group(2)}°"
+                angle_val = f"{m.group(1)}–{m.group(2)}"
 
         # 列头未提取到 → 从天线参数 AnglePicker 配置读取
         if not angle_val and self._mw:
@@ -962,31 +962,31 @@ class FileSettingsPage(QWidget):
             if new_type in ("lag_single",) and lag_cfg:
                 singles = lag_cfg.singles_sorted
                 if singles:
-                    angle_val = ", ".join(f"{a}°" for a in singles[:3])
+                    angle_val = ", ".join(f"{a:.0f}" for a in singles[:3])
             elif new_type in ("lag_range",) and lag_cfg:
                 ranges = lag_cfg.ranges_sorted
                 if ranges:
                     lo, hi = ranges[0]
-                    angle_val = f"{lo}–{hi}°"
+                    angle_val = f"{lo:.0f}–{hi:.0f}"
             elif new_type in ("ar_single",) and ar_cfg:
                 singles = ar_cfg.singles_sorted
                 if singles:
-                    angle_val = ", ".join(f"{a}°" for a in singles[:3])
+                    angle_val = ", ".join(f"{a:.0f}" for a in singles[:3])
             elif new_type in ("ar_range",) and ar_cfg:
                 ranges = ar_cfg.ranges_sorted
                 if ranges:
                     lo, hi = ranges[0]
-                    angle_val = f"{lo}–{hi}°"
+                    angle_val = f"{lo:.0f}–{hi:.0f}"
             elif new_type == "rhcp_single":
                 rhcp_cfg = getattr(self._mw, '_rhcp_lag_config', None) or lag_cfg
                 singles = rhcp_cfg.singles_sorted if rhcp_cfg else []
                 if singles:
-                    angle_val = ", ".join(f"{a}°" for a in singles[:3])
+                    angle_val = ", ".join(f"{a:.0f}" for a in singles[:3])
             elif new_type == "cp_xpi_single":
                 cp_cfg = getattr(self._mw, '_cpxpi_lag_config', None) or lag_cfg
                 singles = cp_cfg.singles_sorted if cp_cfg else []
                 if singles:
-                    angle_val = ", ".join(f"{a}°" for a in singles[:3])
+                    angle_val = ", ".join(f"{a:.0f}" for a in singles[:3])
 
         if angle_val:
             edit_param.setText(angle_val)
@@ -1039,10 +1039,10 @@ class FileSettingsPage(QWidget):
             singles = cfg.singles_sorted
             ranges = cfg.ranges_sorted
             if cell_ctype.endswith("_single") and singles:
-                cell_edit.setText(", ".join(f"{a}°" for a in singles[:5]))
+                cell_edit.setText(", ".join(f"{a:.0f}" for a in singles[:5]))
             elif cell_ctype.endswith("_range") and ranges:
                 lo, hi = ranges[0]
-                cell_edit.setText(f"{lo}–{hi}°")
+                cell_edit.setText(f"{lo:.0f}–{hi:.0f}")
 
     def _on_preview_apply_all(self, dlg, table, n_cols, mappings):
         """批量应用所有列的修正参数。"""
