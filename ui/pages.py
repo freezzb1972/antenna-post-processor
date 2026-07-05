@@ -2704,6 +2704,1467 @@ class PatternManagerDialog(QDialog):
                 self._lbl_test_result.setStyleSheet("color: red;")
 
 
+class ChartSettingsPage(QWidget):
+    """图表配置页面（原 PlotConfigDialog → QWidget）。
+
+    直接读写 MainWindow 属性：
+      _chart_config_required, _chart_config_extra,
+      ui.spinElev, ui.spinAzim, ui.spinDpi,
+      ui.checkEmbedExcel, ui.checkSavePng
+    """
+
+    chart_config_changed = Signal()
+
+    def __init__(self, mainwindow=None):
+        super().__init__(mainwindow)
+        self._mw = mainwindow
+        self._chart_required: Dict[str, QCheckBox] = {}
+        self._chart_extra: Dict[str, QCheckBox] = {}
+        self._collapse_map: dict = {}
+
+        # 子角度选择状态
+        self._gain_angles: List[float] = []
+        self._gain_ranges: List[tuple] = []
+        self._ar_angles: List[float] = []
+        self._ar_ranges: List[tuple] = []
+        self._gain_angles_x: List[float] = []
+        self._gain_ranges_x: List[tuple] = []
+        self._ar_angles_x: List[float] = []
+        self._ar_ranges_x: List[tuple] = []
+
+        # 方位面极坐标切面
+        self._azimuth_angles: List[float] = []
+        self._azimuth_angles_ar: List[float] = []
+        self._azimuth_angles_rhcp: List[float] = []
+        self._azimuth_angles_lhcp: List[float] = []
+        self._antenna_name: str = ""
+        self._word_layout_mode: str = "side_by_side"
+        self._chart_output_dir: str = ""
+        self._chart_output_filename: str = ""
+        self._data_output_filename: str = ""
+        self._current_mode: int = -1  # 跟踪模式变更
+        self._setup_ui()
+        self._load_state()
+        self._current_mode = getattr(self._mw, '_test_mode', 0) if self._mw else 0
+
+    def _setup_ui(self):
+        from src.chart_config import ChartConfig
+        labels = ChartConfig.chart_labels()
+        mode = getattr(self._mw, '_test_mode', 0) if self._mw else 0
+        categories = ChartConfig.chart_categories(mode)
+
+        self._gain_angles = []
+        self._gain_ranges = []
+        self._ar_angles = []
+        self._ar_ranges = []
+        self._gain_angles_x = []
+        self._gain_ranges_x = []
+        self._ar_angles_x = []
+        self._ar_ranges_x = []
+
+        self._azimuth_angles = []
+        self._azimuth_angles_ar = []
+        self._azimuth_angles_rhcp: List[float] = []
+        self._azimuth_angles_lhcp: List[float] = []
+        self._cut_2d_phi_angles: List[float] = []
+        self._view_angle_pairs: List[Tuple[float, float]] = []
+        self._antenna_name = ""
+        self._word_layout_mode = "side_by_side"
+        self._chart_output_dir = ""
+        self._chart_output_filename = ""
+        self._data_output_filename = ""
+
+        # 视角参数
+        view_grp = QGroupBox(self.tr("视角参数"))
+        view_layout = QHBoxLayout(view_grp)
+        view_layout.addWidget(QLabel(self.tr("仰角:")))
+        self._spin_elev = QDoubleSpinBox()
+        self._spin_elev.setRange(-90, 90)
+        self._spin_elev.setValue(30)
+        self._spin_elev.setSuffix("°")
+        self._spin_elev.setFixedWidth(80)
+        self._spin_elev.valueChanged.connect(lambda: self._sync_to_mw())
+        view_layout.addWidget(self._spin_elev)
+        view_layout.addWidget(QLabel(self.tr("方位角:")))
+        self._spin_azim = QDoubleSpinBox()
+        self._spin_azim.setRange(-180, 180)
+        self._spin_azim.setValue(-60)
+        self._spin_azim.setSuffix("°")
+        self._spin_azim.setFixedWidth(80)
+        self._spin_azim.valueChanged.connect(lambda: self._sync_to_mw())
+        view_layout.addWidget(self._spin_azim)
+        view_layout.addWidget(QLabel("DPI:"))
+        self._spin_dpi = QSpinBox()
+        self._spin_dpi.setRange(72, 300)
+        self._spin_dpi.setValue(150)
+        self._spin_dpi.setFixedWidth(70)
+        self._spin_dpi.valueChanged.connect(lambda: self._sync_to_mw())
+        view_layout.addWidget(self._spin_dpi)
+        view_layout.addWidget(QLabel(self.tr("采样精度:")))
+        self._spin_step = QSpinBox()
+        self._spin_step.setRange(1, 30)
+        self._spin_step.setValue(5)
+        self._spin_step.setSuffix("°")
+        self._spin_step.setFixedWidth(70)
+        self._spin_step.setToolTip(self.tr(
+            "3D 图形采样步进 (1°–30°):\n"
+            "  1°=最精细(~40K点/频点,慢)\n"
+            "  5°=标准(~1.7K点/频点)\n"
+            "  30°=最快(~150点/频点)\n"
+            "值越小图形越精细但计算越慢。"
+        ))
+        self._spin_step.valueChanged.connect(lambda: self._sync_to_mw())
+        view_layout.addWidget(self._spin_step)
+
+        btn_multi_view = QPushButton(self.tr("多视角..."))
+        btn_multi_view.setFixedWidth(80)
+        btn_multi_view.clicked.connect(self._show_view_angle_popup)
+        view_layout.addWidget(btn_multi_view)
+
+        view_layout.addStretch()
+
+        grp_list: list = []
+
+        for cat_name, keys in categories.items():
+            grp = QGroupBox(cat_name)
+            grp.setCheckable(True)
+            grp.setChecked(True)
+            grp.setStyleSheet("""
+                QGroupBox { font-weight: bold; padding-top: 16px; }
+                QGroupBox::indicator { width: 14px; height: 14px; margin-right: 4px; }
+            """)
+            grp.setCursor(Qt.PointingHandCursor)
+            outer_layout = QVBoxLayout(grp)
+            outer_layout.setSpacing(4)
+            self._collapse_map[cat_name] = {"grp": grp, "hidden": False}
+            content_widget = QWidget()
+            content_layout = QVBoxLayout(content_widget)
+            content_layout.setContentsMargins(0, 0, 0, 0)
+            content_layout.setSpacing(4)
+            outer_layout.addWidget(content_widget)
+
+            content_layout.addStretch()  # 占位, 左右 box 内自有按钮
+
+            row_layout = QHBoxLayout()
+            row_layout.setSpacing(8)
+
+            # 左列: 报告需要
+            left_box = QGroupBox(self.tr("报告需要"))
+            left_layout = QVBoxLayout(left_box)
+            left_layout.setSpacing(3)
+
+            self._add_select_all_row(self._chart_required, keys, left_layout)
+            for key in keys:
+                row = QHBoxLayout()
+                cb = QCheckBox(labels.get(key, key))
+                cb.toggled.connect(lambda: self._sync_to_mw())
+                row.addWidget(cb)
+                self._chart_required[key] = cb
+                if key.startswith("pattern_3d_"):
+                    btn = QPushButton("⚙ " + self.tr("参数"))
+                    btn.setFixedWidth(80)
+                    btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
+                    row.addWidget(btn)
+
+                elif key in ("cut_2d_polar", "cut_2d_rect"):
+                    btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
+                    btn.setFixedWidth(85)
+                    btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
+                    row.addWidget(btn)
+                row.addStretch()
+                left_layout.addLayout(row)
+            # ── 方位面极坐标切面 (Gain + AR) ──
+            if "C 类" in cat_name:
+                self._build_azimuth_section(left_layout)
+
+            left_layout.addStretch()
+            row_layout.addWidget(left_box, 1)
+
+            # 右列: 额外 (full_report)
+            right_box = QGroupBox(self.tr("额外 (full_report)"))
+            right_layout = QVBoxLayout(right_box)
+            right_layout.setSpacing(3)
+
+            # full_report 独立全选/取消全选按钮
+            self._add_select_all_row(self._chart_extra, keys, right_layout)
+
+            for key in keys:
+                row = QHBoxLayout()
+                cb = QCheckBox(labels.get(key, key))
+                cb.toggled.connect(lambda: self._sync_to_mw())
+                row.addWidget(cb)
+                self._chart_extra[key] = cb
+                if key.startswith("pattern_3d_"):
+                    btn = QPushButton("⚙ " + self.tr("参数"))
+                    btn.setFixedWidth(80)
+                    btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
+                    row.addWidget(btn)
+
+                elif key in ("cut_2d_polar", "cut_2d_rect"):
+                    btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
+                    btn.setFixedWidth(85)
+                    btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
+                    row.addWidget(btn)
+                row.addStretch()
+                right_layout.addLayout(row)
+            right_layout.addStretch()
+            row_layout.addWidget(right_box, 1)
+
+            content_layout.addLayout(row_layout)
+            grp_list.append(grp)
+
+            # 视角参数紧跟 A 类 3D 图
+            if "A 类" in cat_name:
+                grp_list.append(view_grp)
+
+            def make_toggle(g=grp, cw=content_widget, name=cat_name):
+                def toggle(checked):
+                    cw.setVisible(checked)
+                    self._collapse_map[name]["hidden"] = not checked
+                return toggle
+            grp.toggled.connect(make_toggle(grp, content_widget, cat_name))
+
+        # 输出方式
+        out_grp = QGroupBox(self.tr("输出方式"))
+        out_layout = QVBoxLayout(out_grp)
+
+        # ── Word 布局 ──
+        row_wl = QHBoxLayout()
+        btn_word_layout = QPushButton(self.tr("Word 输出布局设置..."))
+        btn_word_layout.clicked.connect(self._show_word_layout_dialog)
+        row_wl.addWidget(btn_word_layout)
+        row_wl.addStretch()
+        out_layout.addLayout(row_wl)
+
+        # ── B 类频率曲线参数 ──
+        row_bf = QHBoxLayout()
+        row_bf.addWidget(QLabel(self.tr("频段间隔(MHz):")))
+        self._spin_freq_gap = QSpinBox()
+        self._spin_freq_gap.setRange(0, 999); self._spin_freq_gap.setValue(10)
+        self._spin_freq_gap.setToolTip(self.tr("0=不打断单轴; >0=相邻频点差超此值时分段绘制"))
+        row_bf.addWidget(self._spin_freq_gap)
+        row_bf.addWidget(QLabel(self.tr("  双Y轴:")))
+        self._check_dual_y = QCheckBox(self.tr("配对"))
+        self._check_dual_y.setToolTip(self.tr("Efficiency%+Gain, Directivity+TRP 双Y轴"))
+        row_bf.addWidget(self._check_dual_y)
+        row_bf.addStretch()
+        out_layout.addLayout(row_bf)
+
+        # ── 列数 / 图片宽 ──
+        row_img = QHBoxLayout()
+        row_img.addWidget(QLabel(self.tr(" 列数:")))
+        self._spin_az_columns = QSpinBox()
+        self._spin_az_columns.setRange(1, 6)
+        self._spin_az_columns.setValue(2)
+        self._spin_az_columns.setPrefix(self.tr("每行 "))
+        self._spin_az_columns.setSuffix(self.tr(" 列"))
+        self._spin_az_columns.valueChanged.connect(lambda: self._sync_to_mw())
+        row_img.addWidget(self._spin_az_columns)
+
+        row_img.addWidget(QLabel(self.tr(" 宽:")))
+        self._spin_az_img_pct = QSpinBox()
+        self._spin_az_img_pct.setRange(10, 100)
+        self._spin_az_img_pct.setValue(90)
+        self._spin_az_img_pct.setSuffix("%")
+        self._spin_az_img_pct.setFixedWidth(65)
+        self._spin_az_img_pct.valueChanged.connect(lambda: self._sync_to_mw())
+        row_img.addWidget(self._spin_az_img_pct)
+        row_img.addStretch()
+        out_layout.addLayout(row_img)
+
+        # ── 题注 + 图片宽度 ──
+        row_cap = QHBoxLayout()
+        self._check_show_caption = QCheckBox(self.tr("显示题注"))
+        self._check_show_caption.setChecked(True)
+        self._check_show_caption.toggled.connect(lambda c: (
+            setattr(getattr(self._mw, '_azimuth_config', None), 'show_caption', c)
+            if self._mw and getattr(self._mw, '_azimuth_config', None) else None
+        ))
+        row_cap.addWidget(self._check_show_caption)
+        row_cap.addWidget(QLabel(self.tr("  图片宽(cm):")))
+        self._spin_img_cm = QDoubleSpinBox()
+        self._spin_img_cm.setRange(3.0, 16.0); self._spin_img_cm.setValue(8.5)
+        self._spin_img_cm.setSingleStep(0.5); self._spin_img_cm.setFixedWidth(70)
+        self._spin_img_cm.valueChanged.connect(lambda v: (
+            setattr(getattr(self._mw, '_azimuth_config', None), 'image_width_cm', v)
+            if self._mw and getattr(self._mw, '_azimuth_config', None) else None
+        ))
+        row_cap.addWidget(self._spin_img_cm)
+        row_cap.addStretch()
+        out_layout.addLayout(row_cap)
+
+        # 嵌入/PNG 放在最下方
+        row_bottom = QHBoxLayout()
+        self._check_embed = QCheckBox(self.tr("嵌入 Excel"))
+        self._check_embed.setChecked(False)
+        self._check_embed.toggled.connect(lambda: self._sync_to_mw())
+        self._check_png = QCheckBox(self.tr("保存 PNG 文件夹"))
+        self._check_png.toggled.connect(lambda: self._sync_to_mw())
+        row_bottom.addWidget(self._check_embed)
+        row_bottom.addWidget(self._check_png)
+        row_bottom.addStretch()
+        out_layout.addLayout(row_bottom)
+
+        grp_list.append(out_grp)
+
+        # 测试模式选择器（放在滚动区上方，始终可见）
+        main_layout = QVBoxLayout(self)
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("<b>" + self.tr("测试模式:") + "</b>"))
+        self._cmb_test_mode = QComboBox()
+        self._cmb_test_mode.addItem("📡 " + self.tr("无源天线"), 0)
+        self._cmb_test_mode.addItem("📶 " + self.tr("有源发射 TRP"), 1)
+        self._cmb_test_mode.addItem("📻 " + self.tr("有源接收 TIS"), 2)
+        cur_mode = getattr(self._mw, '_test_mode', 0) if self._mw else 0
+        idx = self._cmb_test_mode.findData(cur_mode)
+        if idx >= 0: self._cmb_test_mode.setCurrentIndex(idx)
+        self._cmb_test_mode.currentIndexChanged.connect(self._on_chart_mode_changed)
+        mode_row.addWidget(self._cmb_test_mode)
+        mode_row.addStretch()
+        main_layout.addLayout(mode_row)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        scroll_content = QWidget()
+        scroll_vbox = QVBoxLayout(scroll_content)
+        self._chart_grp_list = grp_list
+        self._chart_scroll_vbox = scroll_vbox
+        for g in grp_list:
+            scroll_vbox.addWidget(g)
+        scroll_vbox.addStretch()
+        scroll.setWidget(scroll_content)
+        main_layout.addWidget(scroll)
+
+    def _build_azimuth_section(self, left_layout: QVBoxLayout):
+        """构建方位面极坐标切面控件 (可复用 — setup_ui + rebuild 共用)。"""
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setFrameShadow(QFrame.Sunken)
+        left_layout.addWidget(sep)
+
+        left_layout.addWidget(QLabel(self.tr("极坐标方位面切面图:")))
+
+        # Gain azimuth
+        row_az_g = QHBoxLayout()
+        cb_az_g = QCheckBox(self.tr("Gain 极坐标方位面"))
+        cb_az_g.toggled.connect(lambda: self._sync_to_mw())
+        row_az_g.addWidget(cb_az_g)
+        self._chart_required["cut_azimuth_polar"] = cb_az_g
+        btn_az = QPushButton("⚙ " + self.tr("参数"))
+        btn_az.setFixedWidth(80)
+        btn_az.clicked.connect(lambda checked: self._show_azimuth_angle_popup("gain"))
+        row_az_g.addWidget(btn_az)
+        row_az_g.addStretch()
+        left_layout.addLayout(row_az_g)
+
+        # AR azimuth
+        row_az_ar = QHBoxLayout()
+        cb_az_ar = QCheckBox(self.tr("AR 极坐标方位面"))
+        cb_az_ar.toggled.connect(lambda: self._sync_to_mw())
+        row_az_ar.addWidget(cb_az_ar)
+        self._chart_required["cut_azimuth_polar_ar"] = cb_az_ar
+        btn_az_ar = QPushButton("⚙ " + self.tr("参数"))
+        btn_az_ar.setFixedWidth(80)
+        btn_az_ar.clicked.connect(lambda checked: self._show_azimuth_angle_popup("ar"))
+        row_az_ar.addWidget(btn_az_ar)
+        row_az_ar.addStretch()
+        left_layout.addLayout(row_az_ar)
+
+        # Gain 0-70° Pk azimuth
+        row_az_pk = QHBoxLayout()
+        cb_az_pk = QCheckBox(self.tr("Gain 0-70° Pk 方位面"))
+        cb_az_pk.setToolTip(self.tr("每频点单曲线极坐标图: Theta 0-70°峰值增益 vs Phi"))
+        cb_az_pk.toggled.connect(lambda: self._sync_to_mw())
+        row_az_pk.addWidget(cb_az_pk)
+        self._chart_required["cut_azimuth_polar_pk070"] = cb_az_pk
+        row_az_pk.addStretch()
+        left_layout.addLayout(row_az_pk)
+
+        # RHCP azimuth
+        row_az_rhcp = QHBoxLayout()
+        cb_az_rhcp = QCheckBox(self.tr("RHCP 极坐标方位面"))
+        cb_az_rhcp.toggled.connect(lambda: self._sync_to_mw())
+        row_az_rhcp.addWidget(cb_az_rhcp)
+        self._chart_required["cut_azimuth_polar_rhcp"] = cb_az_rhcp
+        btn_az_rhcp = QPushButton("⚙ " + self.tr("参数"))
+        btn_az_rhcp.setFixedWidth(80)
+        btn_az_rhcp.clicked.connect(lambda checked: self._show_azimuth_angle_popup("rhcp"))
+        row_az_rhcp.addWidget(btn_az_rhcp)
+        row_az_rhcp.addStretch()
+        left_layout.addLayout(row_az_rhcp)
+
+        # DPI
+        row_dpi = QHBoxLayout()
+        row_dpi.addWidget(QLabel(self.tr("方位图 DPI:")))
+        self._spin_azimuth_dpi = QSpinBox()
+        self._spin_azimuth_dpi.setRange(150, 1000)
+        self._spin_azimuth_dpi.setValue(150)
+        self._spin_azimuth_dpi.setSingleStep(50)
+        self._spin_azimuth_dpi.setFixedWidth(70)
+        self._spin_azimuth_dpi.valueChanged.connect(lambda: self._sync_to_mw())
+        row_dpi.addWidget(self._spin_azimuth_dpi)
+        row_dpi.addStretch()
+        left_layout.addLayout(row_dpi)
+
+        # 天线名
+        sep_az = QFrame()
+        sep_az.setFrameShape(QFrame.HLine)
+        sep_az.setFrameShadow(QFrame.Sunken)
+        left_layout.addWidget(sep_az)
+
+        row_ant = QHBoxLayout()
+        row_ant.addWidget(QLabel(self.tr("天线名:")))
+        self._edit_antenna_name = QLineEdit()
+        self._edit_antenna_name.setPlaceholderText(self.tr("可选，用于图表标题"))
+        self._edit_antenna_name.setMaximumWidth(160)
+        self._edit_antenna_name.textChanged.connect(lambda: self._sync_to_mw())
+        row_ant.addWidget(self._edit_antenna_name)
+        row_ant.addStretch()
+        left_layout.addLayout(row_ant)
+
+    def _on_chart_mode_changed(self, idx: int):
+        """图表配置页测试模式切换 → 重建分类列表。"""
+        mode = self._cmb_test_mode.currentData()
+        if mode is None: return
+        if self._mw:
+            self._mw._test_mode = mode
+        self._rebuild_chart_categories(mode)
+
+    def _load_state(self):
+        if not self._mw:
+            return
+        mw = self._mw
+
+        self._spin_elev_value = 30
+        self._spin_azim_value = -60
+        self._spin_dpi_value = 150
+
+        if hasattr(mw, 'ui'):
+            if hasattr(mw.ui, 'spinElev'):
+                self._spin_elev.setValue(mw.ui.spinElev.value())
+                self._spin_azim.setValue(mw.ui.spinAzim.value())
+                self._spin_dpi.setValue(mw.ui.spinDpi.value())
+                self._check_embed.setChecked(mw.ui.checkEmbedExcel.isChecked())
+                self._check_png.setChecked(mw.ui.checkSavePng.isChecked())
+
+        step_deg = 5
+        if hasattr(mw, '_chart_config_required') and mw._chart_config_required is not None:
+            step_deg = int(getattr(mw._chart_config_required, 'step_deg', 5))
+        self._spin_step.setValue(max(1, min(30, step_deg)))
+
+        if hasattr(mw, '_chart_config_required') and mw._chart_config_required is not None:
+            req = mw._chart_config_required
+            for key, cb in self._chart_required.items():
+                val = getattr(req, key, False)
+                cb.setChecked(val)
+            self._gain_angles = list(req.gain_chart_angles)
+            self._gain_ranges = list(req.gain_chart_ranges)
+            self._ar_angles = list(req.ar_chart_angles)
+            self._ar_ranges = list(req.ar_chart_ranges)
+            self._cut_2d_phi_angles = list(req.cut_2d_phi_angles)
+            self._view_angle_pairs = list(req.view_angle_pairs)
+        if hasattr(mw, '_chart_config_extra') and mw._chart_config_extra is not None:
+            xtr = mw._chart_config_extra
+            for key, cb in self._chart_extra.items():
+                val = getattr(xtr, key, False)
+                cb.setChecked(val)
+            self._gain_angles_x = list(xtr.gain_chart_angles)
+            self._gain_ranges_x = list(xtr.gain_chart_ranges)
+            self._ar_angles_x = list(xtr.ar_chart_angles)
+            self._ar_ranges_x = list(xtr.ar_chart_ranges)
+
+        # ── 方位面配置 ──
+        if hasattr(mw, '_azimuth_config') and mw._azimuth_config is not None:
+            az = mw._azimuth_config
+            if "cut_azimuth_polar" in self._chart_required:
+                self._chart_required["cut_azimuth_polar"].setChecked(az.cut_azimuth_polar)
+            if "cut_azimuth_polar_ar" in self._chart_required:
+                self._chart_required["cut_azimuth_polar_ar"].setChecked(az.cut_azimuth_polar_ar)
+            if "cut_azimuth_polar_pk070" in self._chart_required:
+                self._chart_required["cut_azimuth_polar_pk070"].setChecked(az.cut_azimuth_polar_pk070)
+
+            self._azimuth_angles = list(az.azimuth_cut_angles)
+            self._azimuth_angles_ar = list(az.azimuth_cut_angles_ar)
+            self._azimuth_angles_rhcp = list(az.azimuth_cut_angles_rhcp)
+            self._azimuth_angles_lhcp = list(az.azimuth_cut_angles_lhcp)
+            self._antenna_name = az.antenna_name
+            self._word_layout_mode = az.word_layout_mode
+            self._chart_output_dir = az.chart_output_dir
+            self._chart_output_filename = az.chart_output_filename
+            self._data_output_filename = az.data_output_filename
+
+            if hasattr(self, '_edit_antenna_name'):
+                self._edit_antenna_name.setText(az.antenna_name)
+
+            if hasattr(self, '_spin_azimuth_dpi'):
+                self._spin_azimuth_dpi.setValue(az.dpi if az.dpi >= 150 else 150)
+            if hasattr(self, '_combo_az_columns'):
+                idx2 = self._spin_az_columns.findData(az.word_columns if az.word_columns in (1, 2) else 2)
+                if idx2 >= 0:
+                    self._spin_az_columns.setCurrentIndex(idx2)
+            if hasattr(self, '_spin_az_img_pct'):
+                self._spin_az_img_pct.setValue(az.word_image_width_pct if 10 <= az.word_image_width_pct <= 100 else 90)
+            if hasattr(self, '_check_show_caption'):
+                self._check_show_caption.setChecked(getattr(az, 'show_caption', True))
+            if hasattr(self, '_spin_img_cm'):
+                self._spin_img_cm.setValue(getattr(az, 'image_width_cm', 7.5))
+            if hasattr(self, '_check_share_ticks'):
+                self._check_share_ticks.setChecked(getattr(az, 'share_radial_ticks', False))
+
+    def _add_select_all_row(self, target_dict, keys, parent_layout):
+        """添加全选/取消全选按钮行到指定布局。"""
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(6)
+        sel = QPushButton(self.tr("全选"))
+        des = QPushButton(self.tr("取消全选"))
+        sel.setFixedWidth(60)
+        des.setFixedWidth(72)
+        sel.clicked.connect(
+            lambda checked, ks=keys: (
+                [target_dict[k].setChecked(True) for k in ks if k in target_dict]
+            ))
+        des.clicked.connect(
+            lambda checked, ks=keys: (
+                [target_dict[k].setChecked(False) for k in ks if k in target_dict]
+            ))
+        btn_row.addWidget(sel)
+        btn_row.addWidget(des)
+        btn_row.addStretch()
+        parent_layout.addLayout(btn_row)
+
+
+    # ── Word 输出布局子对话框 ──
+
+    def _show_word_layout_dialog(self):
+        """Word 输出布局设置子对话框: 批量模式 + 图表排序。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("Word 输出布局设置"))
+        dlg.setMinimumSize(550, 400)
+        layout = QVBoxLayout(dlg)
+        mode_grp = QGroupBox(self.tr("批量输出模式"))
+        mode_layout = QVBoxLayout(mode_grp)
+        self._radio_by_freq = QRadioButton(self.tr("按频点: 每频点全部图 → 下一频点"))
+        self._radio_by_type = QRadioButton(self.tr("按图表类型: 每类图全频点 → 下一类"))
+        self._radio_by_freq.setChecked(self._word_layout_mode != "by_type")
+        self._radio_by_type.setChecked(self._word_layout_mode == "by_type")
+        mode_layout.addWidget(self._radio_by_freq)
+        mode_layout.addWidget(self._radio_by_type)
+        layout.addWidget(mode_grp)
+        sort_grp = QGroupBox(self.tr("图表顺序 (上移/下移调整)"))
+        sort_layout = QVBoxLayout(sort_grp)
+        self._word_chart_list = QListWidget()
+        self._word_chart_list.setDragDropMode(QAbstractItemView.InternalMove)
+        self._word_chart_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        # \u4ec5\u5217\u51fa\u5df2\u9009\u4e2d\u7684\u56fe\u8868 (\u4ece _chart_required + _chart_extra + azimuth flags)
+        from src.chart_config import ChartConfig
+        labels = ChartConfig.chart_labels()
+        mode = getattr(self._mw, '_test_mode', 0) if self._mw else 0
+        categories = ChartConfig.chart_categories(mode)
+        active_labels = []
+        for key, cb in self._chart_required.items():
+            if cb.isChecked():
+                active_labels.append(labels.get(key, key))
+        for key, cb in self._chart_extra.items():
+            if cb.isChecked():
+                active_labels.append(labels.get(key, key))
+        # azimuth \u56fe
+        az = getattr(self._mw, '_azimuth_config', None) if self._mw else None
+        if az:
+            if az.cut_azimuth_polar: active_labels.append("Gain Azimuth Cut")
+            if az.cut_azimuth_polar_pk070: active_labels.append("Gain 0-70\u00b0 Pk Azimuth")
+            if az.cut_azimuth_polar_ar: active_labels.append("AR Azimuth Cut")
+            if az.cut_azimuth_polar_rhcp: active_labels.append("RHCP Azimuth Cut")
+            if az.cut_azimuth_polar_lhcp: active_labels.append("LHCP Azimuth Cut")
+        # B \u7c7b\u66f2\u7ebf
+        b_map = {"efficiency_pct": "Efficiency vs Freq", "gain": "Peak Gain vs Freq",
+                 "directivity": "Directivity vs Freq", "trp": "TRP vs Freq",
+                 "peak_eirp": "Peak EIRP vs Freq", "avg_gain": "Average Gain vs Freq"}
+        for key, cb in self._chart_required.items():
+            if cb.isChecked() and key in b_map:
+                if b_map[key] not in active_labels:
+                    active_labels.append(b_map[key])
+        if not active_labels:
+            active_labels = [self.tr("(\u672a\u9009\u62e9\u4efb\u4f55\u56fe\u8868)")]
+        for item in active_labels:
+            self._word_chart_list.addItem(item)
+        sort_layout.addWidget(self._word_chart_list)
+        btn_row = QHBoxLayout()
+        btn_up = QPushButton(self.tr("\u2191 \u4e0a\u79fb"))
+        btn_down = QPushButton(self.tr("\u2193 \u4e0b\u79fb"))
+        btn_reset = QPushButton(self.tr("\u6062\u590d\u9ed8\u8ba4"))
+        def _move_item(direction):
+            row = self._word_chart_list.currentRow()
+            if 0 <= row < self._word_chart_list.count():
+                item = self._word_chart_list.takeItem(row)
+                new_row = max(0, min(self._word_chart_list.count(), row + direction))
+                self._word_chart_list.insertItem(new_row, item)
+                self._word_chart_list.setCurrentRow(new_row)
+        btn_up.clicked.connect(lambda: _move_item(-1))
+        btn_down.clicked.connect(lambda: _move_item(1))
+        btn_reset.clicked.connect(lambda: (
+            self._word_chart_list.clear(),
+            [self._word_chart_list.addItem(item) for item in active_labels]
+        ))
+        btn_row.addWidget(btn_up); btn_row.addWidget(btn_down)
+        btn_row.addWidget(btn_reset); btn_row.addStretch()
+        sort_layout.addLayout(btn_row)
+        layout.addWidget(sort_grp)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        def _on_accept_layout():
+            self._word_layout_mode = "by_type" if self._radio_by_type.isChecked() else "by_freq"
+            self._sync_to_mw()
+            dlg.accept()
+        btns.accepted.connect(_on_accept_layout)
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
+
+    def _sync_to_mw(self):
+        """同步当前配置到 MainWindow。"""
+        if not self._mw:
+            return
+        from src.chart_config import ChartConfig
+        mw = self._mw
+
+        # 模式变更 → 自动刷新图表分类 (跳过首次初始化)
+        new_mode = getattr(mw, '_test_mode', 0)
+        if self._current_mode >= 0 and self._current_mode != new_mode:
+            self._rebuild_chart_categories(new_mode)
+
+        step_deg = float(max(1, min(30, self._spin_step.value())))
+
+        # 保留已有 ChartConfig 的非标准字段
+        existing_req = getattr(mw, '_chart_config_required', None)
+        existing_extra = getattr(mw, '_chart_config_extra', None)
+        required = ChartConfig()
+        extra = ChartConfig()
+        if existing_req:
+            for k, v in vars(existing_req).items():
+                if k not in ChartConfig.all_chart_keys() and not k.startswith('_'):
+                    setattr(required, k, v)
+        if existing_extra:
+            for k, v in vars(existing_extra).items():
+                if k not in ChartConfig.all_chart_keys() and not k.startswith('_'):
+                    setattr(extra, k, v)
+        for key in ChartConfig.all_chart_keys():
+            setattr(required, key, self._chart_required.get(key, QCheckBox()).isChecked())
+            setattr(extra, key, self._chart_extra.get(key, QCheckBox()).isChecked())
+
+        required.elev = self._spin_elev.value()
+        required.azim = self._spin_azim.value()
+        required.dpi = self._spin_dpi.value()
+        required.step_deg = step_deg
+        required.embed_in_excel = self._check_embed.isChecked()
+        extra.elev = required.elev
+        extra.azim = required.azim
+        extra.dpi = required.dpi
+        extra.step_deg = step_deg
+        extra.embed_in_excel = False
+
+        required.gain_chart_angles = list(self._gain_angles)
+        required.gain_chart_ranges = list(self._gain_ranges)
+        required.ar_chart_angles = list(self._ar_angles)
+        required.ar_chart_ranges = list(self._ar_ranges)
+        required.cut_2d_phi_angles = list(self._cut_2d_phi_angles)
+        required.view_angle_pairs = list(self._view_angle_pairs)
+        extra.gain_chart_angles = list(self._gain_angles_x)
+        extra.gain_chart_ranges = list(self._gain_ranges_x)
+        extra.ar_chart_angles = list(self._ar_angles_x)
+        extra.ar_chart_ranges = list(self._ar_ranges_x)
+
+        # ── 方位面配置 ──
+        from src.azimuth_config import AzimuthReportConfig
+        existing = getattr(mw, '_azimuth_config', None)
+        azimuth = existing if existing is not None else AzimuthReportConfig()
+        azimuth.cut_azimuth_polar = self._chart_required.get("cut_azimuth_polar", QCheckBox()).isChecked()
+        azimuth.cut_azimuth_polar_ar = self._chart_required.get("cut_azimuth_polar_ar", QCheckBox()).isChecked()
+        azimuth.cut_azimuth_polar_pk070 = self._chart_required.get("cut_azimuth_polar_pk070", QCheckBox()).isChecked()
+        azimuth.cut_azimuth_polar_rhcp = self._chart_required.get("cut_azimuth_polar_rhcp", QCheckBox()).isChecked()
+        azimuth.cut_azimuth_polar_lhcp = self._chart_required.get("cut_azimuth_polar_lhcp", QCheckBox()).isChecked()
+        azimuth.azimuth_cut_angles = list(self._azimuth_angles)
+        azimuth.azimuth_cut_angles_ar = list(self._azimuth_angles_ar)
+        azimuth.azimuth_cut_angles_rhcp = list(self._azimuth_angles_rhcp)
+        azimuth.azimuth_cut_angles_lhcp = list(self._azimuth_angles_lhcp)
+        azimuth.antenna_name = self._edit_antenna_name.text().strip() if hasattr(self, '_edit_antenna_name') else ""
+        azimuth.word_layout_mode = self._word_layout_mode if hasattr(self, '_word_layout_mode') else "side_by_side"
+        azimuth.dpi = self._spin_azimuth_dpi.value() if hasattr(self, '_spin_azimuth_dpi') else 150
+        azimuth.word_columns = self._spin_az_columns.currentData() if hasattr(self, '_combo_az_columns') else 2
+        azimuth.word_image_width_pct = self._spin_az_img_pct.value() if hasattr(self, '_spin_az_img_pct') else 90
+        azimuth.show_caption = self._check_show_caption.isChecked() if hasattr(self, '_check_show_caption') else True
+        azimuth.image_width_cm = self._spin_img_cm.value() if hasattr(self, '_spin_img_cm') else 7.5
+        azimuth.share_radial_ticks = self._check_share_ticks.isChecked() if hasattr(self, '_check_share_ticks') else False
+
+        # 图表联动: chart_gain_freq → chart_lag_freq
+        if required.chart_gain_freq:
+            required.chart_lag_freq = True
+        if extra.chart_gain_freq:
+            extra.chart_lag_freq = True
+        if required.chart_trp_freq:
+            required.chart_trp_nhprp = True
+        if extra.chart_trp_freq:
+            extra.chart_trp_nhprp = True
+
+        mw._azimuth_config = azimuth
+        mw._chart_config_required = required
+        mw._chart_config_extra = extra
+
+        if hasattr(mw, 'ui'):
+            mw.ui.spinElev.setValue(int(self._spin_elev.value()))
+            mw.ui.spinAzim.setValue(int(self._spin_azim.value()))
+            mw.ui.spinDpi.setValue(self._spin_dpi.value())
+            mw.ui.checkEmbedExcel.setChecked(self._check_embed.isChecked())
+            mw.ui.checkSavePng.setChecked(self._check_png.isChecked())
+
+        self.chart_config_changed.emit()
+
+    def _parse_step_deg(self) -> float:
+        return float(max(1, min(30, self._spin_step.value())))
+
+    def _rebuild_chart_categories(self, mode: int):
+        """模式变更时重建图表分类组。"""
+        if mode == self._current_mode:
+            return
+        self._current_mode = mode
+        from src.chart_config import ChartConfig
+        categories = ChartConfig.chart_categories(mode)
+        labels = ChartConfig.chart_labels()
+
+        # 保存当前勾选状态
+        saved = {}
+        for key, cb_dict in [('req', self._chart_required), ('xtr', self._chart_extra)]:
+            for k, cb in cb_dict.items():
+                saved[k] = cb.isChecked()
+
+        # 清除旧的图表分类组 (保留 stretch at end)
+        vbox = self._chart_scroll_vbox
+        while vbox.count() > 1:
+            item = vbox.takeAt(0)
+            if item.widget():
+                item.widget().hide()
+                item.widget().deleteLater()
+
+        # 重建
+        grp_list = []
+        for cat_name, keys in categories.items():
+            grp = QGroupBox(cat_name)
+            grp.setCheckable(True)
+            grp.setChecked(True)
+            grp.setStyleSheet("""
+                QGroupBox { font-weight: bold; padding-top: 16px; }
+                QGroupBox::indicator { width: 14px; height: 14px; margin-right: 4px; }
+            """)
+            grp.setCursor(Qt.PointingHandCursor)
+            outer_layout = QVBoxLayout(grp)
+            outer_layout.setSpacing(4)
+            self._collapse_map[cat_name] = {"grp": grp, "hidden": False}
+            content_widget = QWidget()
+            content_layout = QVBoxLayout(content_widget)
+            content_layout.setContentsMargins(0, 0, 0, 0)
+            content_layout.setSpacing(4)
+            outer_layout.addWidget(content_widget)
+            content_layout.addStretch()
+
+            row_layout = QHBoxLayout()
+            row_layout.setSpacing(8)
+
+            # 左列
+            left_box = QGroupBox(self.tr("报告需要"))
+            left_layout = QVBoxLayout(left_box)
+            left_layout.setSpacing(3)
+            self._add_select_all_row(self._chart_required, keys, left_layout)
+            for key in keys:
+                row = QHBoxLayout()
+                cb = QCheckBox(labels.get(key, key))
+                cb.setChecked(saved.get(key, False))
+                cb.toggled.connect(lambda: self._sync_to_mw())
+                row.addWidget(cb)
+                self._chart_required[key] = cb
+                if key.startswith("pattern_3d_"):
+                    btn = QPushButton("⚙ " + self.tr("参数"))
+                    btn.setFixedWidth(80)
+                    btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
+                    row.addWidget(btn)
+                elif key in ("cut_2d_polar", "cut_2d_rect"):
+                    btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
+                    btn.setFixedWidth(85)
+                    btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
+                    row.addWidget(btn)
+                row.addStretch()
+                left_layout.addLayout(row)
+            # ── 方位面极坐标切面 (仅 C 类) ──
+            if "C 类" in cat_name:
+                self._build_azimuth_section(left_layout)
+                # 恢复方位面 checkbox 状态
+                for az_key in ("cut_azimuth_polar", "cut_azimuth_polar_ar",
+                               "cut_azimuth_polar_pk070", "cut_azimuth_polar_rhcp"):
+                    if az_key in self._chart_required and az_key in saved:
+                        self._chart_required[az_key].setChecked(saved[az_key])
+            left_layout.addStretch()
+            row_layout.addWidget(left_box, 1)
+
+            # 右列: 额外 (full_report)
+            right_box = QGroupBox(self.tr("额外 (full_report)"))
+            right_layout = QVBoxLayout(right_box)
+            right_layout.setSpacing(3)
+            self._add_select_all_row(self._chart_extra, keys, right_layout)
+            for key in keys:
+                row = QHBoxLayout()
+                cb = QCheckBox(labels.get(key, key))
+                cb.setChecked(saved.get(key, False))
+                cb.toggled.connect(lambda: self._sync_to_mw())
+                row.addWidget(cb)
+                self._chart_extra[key] = cb
+                if key.startswith("pattern_3d_"):
+                    btn = QPushButton("⚙ " + self.tr("参数"))
+                    btn.setFixedWidth(80)
+                    btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
+                    row.addWidget(btn)
+                elif key in ("cut_2d_polar", "cut_2d_rect"):
+                    btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
+                    btn.setFixedWidth(85)
+                    btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
+                    row.addWidget(btn)
+                row.addStretch()
+                right_layout.addLayout(row)
+            right_layout.addStretch()
+            row_layout.addWidget(right_box, 1)
+
+            content_layout.addLayout(row_layout)
+            grp_list.append(grp)
+
+        self._chart_grp_list = grp_list
+        for g in grp_list:
+            vbox.insertWidget(vbox.count() - 1, g)
+
+    def _show_a3d_param_dialog(self, chart_key: str):
+        """A 类 3D 方向图参数设置 — DPI + 采样精度 + 多视角。"""
+        from src.chart_config import ChartConfig
+        label_map = ChartConfig.chart_labels()
+        label = label_map.get(chart_key, chart_key)
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(label + " " + self.tr("参数设置"))
+        dlg.setMinimumSize(420, 300)
+        layout = QVBoxLayout(dlg)
+
+        form = QFormLayout()
+        spin_dpi = QSpinBox()
+        spin_dpi.setRange(72, 600); spin_dpi.setValue(self._spin_dpi.value())
+        form.addRow(self.tr("DPI:"), spin_dpi)
+
+        spin_step = QSpinBox()
+        spin_step.setRange(1, 30); spin_step.setValue(self._spin_step.value())
+        spin_step.setSuffix("°")
+        spin_step.setToolTip(self.tr("3D 采样精度: 1°=最细, 30°=最快"))
+        form.addRow(self.tr("采样精度:"), spin_step)
+
+        layout.addLayout(form)
+
+        btn_view = QPushButton(self.tr("多视角..."))
+        btn_view.clicked.connect(lambda: (
+            dlg.accept(), self._show_view_angle_popup()))
+        layout.addWidget(btn_view)
+        layout.addStretch()
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            self._spin_dpi.setValue(spin_dpi.value()),
+            self._spin_step.setValue(spin_step.value()),
+            self._sync_to_mw(),
+            dlg.accept()))
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
+
+    def _show_bclass_param_dialog(self, chart_key: str):
+        """B 类频率曲线参数设置对话框 — 频段间隔 + 双Y轴 + 线宽。"""
+        from src.chart_config import ChartConfig
+        label_map = ChartConfig.chart_labels()
+        chart_label = label_map.get(chart_key, chart_key)
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(chart_label + " " + self.tr("参数设置"))
+        dlg.setMinimumSize(400, 280)
+        layout = QVBoxLayout(dlg)
+
+        # 从 AzimuthReportConfig 读取当前值
+        az = getattr(self._mw, '_azimuth_config', None) if self._mw else None
+        cur_gap = az.freq_gap_mhz if az else 10
+        cur_dual = az.dual_y_enabled if az else False
+
+        form = QFormLayout()
+        spin_gap = QSpinBox()
+        spin_gap.setRange(0, 999)
+        spin_gap.setValue(cur_gap)
+        spin_gap.setToolTip(self.tr("0=不打断单轴；>0=相邻频点差超此值时分段绘制"))
+        form.addRow(self.tr("频段间隔 (MHz):"), spin_gap)
+
+        check_dual = QCheckBox(self.tr("启用双Y轴配对"))
+        check_dual.setChecked(cur_dual)
+        check_dual.setToolTip(self.tr("Efficiency%+Gain 和 Directivity+TRP 共用双Y轴"))
+        form.addRow("", check_dual)
+
+        # 线宽
+        spin_lw = QDoubleSpinBox()
+        spin_lw.setRange(0.5, 5.0); spin_lw.setSingleStep(0.5)
+        spin_lw.setValue(1.5)
+        spin_lw.setSuffix(" pt")
+        form.addRow(self.tr("曲线线宽:"), spin_lw)
+
+        layout.addLayout(form)
+        layout.addStretch()
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            setattr(az, 'freq_gap_mhz', spin_gap.value()) if az else None,
+            setattr(az, 'dual_y_enabled', check_dual.isChecked()) if az else None,
+            dlg.accept()))
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
+
+    def _open_data_angle_popup(self, target: str):
+        """打开天线参数页的角度配置弹窗 (统一数据源)。"""
+        # 找到 AntennaParamsPage 并调用其 _show_angle_popup
+        ant_page = getattr(self._mw, '_antenna_params_page', None) if self._mw else None
+        if ant_page and hasattr(ant_page, '_show_angle_popup'):
+            ant_page._show_angle_popup(target)
+        self._sync_to_mw()
+
+    def _show_chart_angle_popup(self, chart_key: str, is_left: bool = True):
+        """已过时 — 使用 _open_data_angle_popup 代替 (统一角度配置)"""
+        target = "ar" if chart_key == "chart_ar_freq" else "gain"
+        self._open_data_angle_popup(target)
+
+    def _show_view_angle_popup(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("多视角"))
+        dlg.setMinimumSize(500, 400)
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(QLabel(self.tr("添加多组 (仰角, 方位角) 视角对:")))
+        table = QTableWidget()
+        table.setColumnCount(2)
+        table.setHorizontalHeaderLabels([self.tr("仰角 (°)"), self.tr("方位角 (°)")])
+        layout.addWidget(table)
+        from ui.layout_utils import auto_size_dialog
+        auto_size_dialog(dlg, 520, 460)
+        btn_row = QHBoxLayout()
+        btn_add = QPushButton(self.tr("+ 添加"))
+        btn_add.clicked.connect(lambda: (table.insertRow(table.rowCount()),
+            table.setItem(table.rowCount()-1, 0, QTableWidgetItem("30")),
+            table.setItem(table.rowCount()-1, 1, QTableWidgetItem("-60"))))
+        btn_row.addWidget(btn_add)
+        btn_del = QPushButton(self.tr("删除选中"))
+        btn_del.clicked.connect(lambda: table.removeRow(table.currentRow()) if table.currentRow() >= 0 else None)
+        btn_row.addWidget(btn_del)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            self._view_angle_pairs.clear(),
+            [self._view_angle_pairs.append(
+                (float(table.item(r,0).text() if table.item(r,0) else 30),
+                 float(table.item(r,1).text() if table.item(r,1) else -60))
+            ) for r in range(table.rowCount())],
+            self._sync_to_mw(), dlg.accept()))
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
+    def _show_2d_phi_angle_popup(self):
+        """弹出 2D 俯仰面切面 Phi 角度选择窗口。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("选择俯仰面切图 Phi 角度"))
+        dlg.setMinimumSize(480, 380)
+        import copy
+        _singles: List[float] = copy.deepcopy(self._cut_2d_phi_angles)
+
+        layout = QVBoxLayout(dlg)
+        display_grp = QGroupBox(self.tr("已选 Phi 角度"))
+        _display_layout = QVBoxLayout(display_grp)
+
+        def _refresh_display():
+            while _display_layout.count():
+                item = _display_layout.takeAt(0)
+                if item.widget(): item.widget().deleteLater()
+            if _singles:
+                scroll = QScrollArea()
+                scroll.setWidgetResizable(True); scroll.setFrameShape(QScrollArea.NoFrame)
+                scroll.setMaximumHeight(120)
+                tags = QWidget()
+                tag_layout = FlowLayout(tags)
+                for a in sorted(set(_singles)):
+                    row_w = QWidget()
+                    row_h = QHBoxLayout(row_w)
+                    row_h.setContentsMargins(2, 1, 2, 1); row_h.setSpacing(2)
+                    row_h.addWidget(QLabel(f"{a:.0f}°"))
+                    btn_del = QPushButton("✕")
+                    btn_del.setFixedSize(20, 20)
+                    btn_del.clicked.connect(lambda checked, angle=a: (
+                        _singles.remove(angle), _refresh_display()))
+                    row_h.addWidget(btn_del); row_h.addStretch()
+                    tag_layout.addWidget(row_w)
+                scroll.setWidget(tags)
+                _display_layout.addWidget(scroll)
+                btn_clear = QPushButton(self.tr("清空全部"))
+                btn_clear.clicked.connect(lambda: (_singles.clear(), _refresh_display()))
+                _display_layout.addWidget(btn_clear)
+            else:
+                _display_layout.addWidget(QLabel(self.tr("  (未选择，默认 φ=0°, 90°)")))
+        _refresh_display()
+        layout.addWidget(display_grp)
+
+        splitter = QSplitter(Qt.Vertical)
+        bottom = QWidget()
+        bottom_layout = QVBoxLayout(bottom)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+
+        # 自定义 Phi
+        cust_grp = QGroupBox(self.tr("自定义"))
+        cust_layout = QHBoxLayout(cust_grp)
+        spin_custom = QDoubleSpinBox()
+        spin_custom.setRange(0, 360); spin_custom.setDecimals(1)
+        spin_custom.setValue(0); spin_custom.setSuffix("°")
+        cust_layout.addWidget(QLabel(self.tr("Phi:")))
+        cust_layout.addWidget(spin_custom)
+        btn_add = QPushButton("+ " + self.tr("添加"))
+        btn_add.clicked.connect(lambda: (
+            _singles.append(spin_custom.value()) if spin_custom.value() not in _singles else None,
+            _refresh_display()))
+        cust_layout.addWidget(btn_add); cust_layout.addStretch()
+        bottom_layout.addWidget(cust_grp)
+
+        # 步进
+        step_grp = QGroupBox(self.tr("步进批量生成"))
+        step_layout = QHBoxLayout(step_grp)
+        for label, default in [("起始:", 0), ("结束:", 180), ("步进:", 45)]:
+            step_layout.addWidget(QLabel(self.tr(label)))
+            sp = QDoubleSpinBox()
+            sp.setRange(0, 360); sp.setDecimals(1); sp.setSuffix("°")
+            sp.setValue(default)
+            step_layout.addWidget(sp)
+            if label == "步进:":
+                spin_step = sp
+            elif label == "起始:":
+                spin_start = sp
+            else:
+                spin_end = sp
+        btn_gen = QPushButton(self.tr("生成"))
+        btn_gen.clicked.connect(lambda: (
+            [_singles.append(float(a)) for a in
+             np.linspace(spin_start.value(), spin_end.value(),
+                         max(1, int((spin_end.value()-spin_start.value())/
+                                    max(1, spin_step.value()))+1))
+             if float(a) not in _singles],
+            _refresh_display()))
+        step_layout.addWidget(btn_gen); step_layout.addStretch()
+        bottom_layout.addWidget(step_grp)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            self._cut_2d_phi_angles.clear(),
+            self._cut_2d_phi_angles.extend(sorted(set(_singles))),
+            dlg.accept()))
+        btns.rejected.connect(dlg.reject)
+        bottom_layout.addWidget(btns)
+
+        splitter.addWidget(bottom)
+        layout.addWidget(splitter)
+        dlg.exec()
+        self._sync_to_mw()
+
+    def _show_azimuth_angle_popup(self, target: str):
+        """方位面极坐标切面参数设置 — 支持多图表 (每图表=一张图)。"""
+        angle_attr = {"gain": "_azimuth_angles", "ar": "_azimuth_angles_ar",
+                      "rhcp": "_azimuth_angles_rhcp", "lhcp": "_azimuth_angles_lhcp"}
+        target_label = {"gain": "Gain", "ar": "AR", "rhcp": "RHCP", "lhcp": "LHCP"}
+        attr_name = angle_attr.get(target, "_azimuth_angles")
+        label = target_label.get(target, "Gain")
+
+        # 加载已有数据: 支持旧格式 (flat list) 和新格式 (list of lists)
+        src_data: list = getattr(self, attr_name, [])
+        if src_data and isinstance(src_data[0], (int, float)):
+            _charts = [list(src_data)]  # 旧格式: 单图表
+        else:
+            _charts = [list(c) for c in src_data] if src_data else [[]]  # 新格式
+        if not _charts:
+            _charts = [[]]
+        _selected_idx = [0]
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"{label} " + self.tr("参数设置"))
+        dlg.setMinimumSize(560, 520)
+        layout = QVBoxLayout(dlg)
+
+        # ── 图表列表 ──
+        chart_grp = QGroupBox(self.tr("图表列表"))
+        chart_layout = QHBoxLayout(chart_grp)
+        chart_list = QListWidget()
+        chart_list.setMaximumHeight(100)
+
+        def _rebuild_chart_list():
+            chart_list.clear()
+            for i, ch in enumerate(_charts):
+                singles_str = ", ".join(f"{a:.0f}°" for a in sorted(set(ch)))
+                label = f"图表 {i+1}: {singles_str}" if singles_str else f"图表 {i+1}: (空)"
+                chart_list.addItem(label)
+            if _selected_idx[0] >= chart_list.count():
+                _selected_idx[0] = chart_list.count() - 1
+            if _selected_idx[0] >= 0:
+                chart_list.setCurrentRow(_selected_idx[0])
+
+        _rebuild_chart_list()
+        chart_layout.addWidget(chart_list, 1)
+
+        btn_col = QVBoxLayout()
+        btn_add_chart = QPushButton("+")
+        btn_add_chart.setFixedWidth(30)
+        btn_add_chart.clicked.connect(lambda: (_charts.append([]), _rebuild_chart_list()))
+        btn_col.addWidget(btn_add_chart)
+        btn_del_chart = QPushButton("✕")
+        btn_del_chart.setFixedWidth(30)
+        btn_del_chart.clicked.connect(lambda: (
+            _charts.pop(_selected_idx[0]) if len(_charts) > 1 and 0 <= _selected_idx[0] < len(_charts) else None,
+            _rebuild_chart_list()))
+        btn_col.addWidget(btn_del_chart)
+        btn_col.addStretch()
+        chart_layout.addLayout(btn_col)
+        layout.addWidget(chart_grp)
+
+        def _get_current():
+            idx = chart_list.currentRow()
+            if 0 <= idx < len(_charts):
+                _selected_idx[0] = idx
+                return _charts[idx]
+            return _charts[0] if _charts else []
+
+        # ── 频点选择 ──
+        from ui.widgets import FrequencyPickerWidget
+        freq_grp = QGroupBox(self.tr("频点选择"))
+        freq_layout = QVBoxLayout(freq_grp)
+        freq_picker = FrequencyPickerWidget()
+        gv = getattr(self._mw, '_graph_viewer', None) if self._mw else None
+        if gv and gv._graph_data:
+            freq_picker.set_frequencies(list(gv._graph_data.keys()))
+            cfg = getattr(self._mw, '_chart_config_required', None) if self._mw else None
+            if cfg and cfg.selected_frequencies:
+                freq_picker.set_selected(cfg.selected_frequencies)
+        else:
+            freq_picker.set_frequencies([])
+            freq_layout.addWidget(QLabel(self.tr("  (运行预览后可选频点)")))
+        freq_layout.addWidget(freq_picker)
+        layout.addWidget(freq_grp)
+
+        # ── 角度编辑区 ──
+        edit_grp = QGroupBox(self.tr("编辑选中图表的角度"))
+        edit_layout = QVBoxLayout(edit_grp)
+        tags_layout = QVBoxLayout()
+
+        def _refresh_tags():
+            while tags_layout.count():
+                item = tags_layout.takeAt(0)
+                if item.widget(): item.widget().deleteLater()
+            cur = _get_current()
+            if cur:
+                scroll = QScrollArea()
+                scroll.setWidgetResizable(True); scroll.setFrameShape(QScrollArea.NoFrame)
+                scroll.setMaximumHeight(100)
+                tags = QWidget()
+                fl = FlowLayout(tags)
+                for a in sorted(set(cur)):
+                    row_w = QWidget()
+                    row_h = QHBoxLayout(row_w)
+                    row_h.setContentsMargins(2, 1, 2, 1); row_h.setSpacing(2)
+                    row_h.addWidget(QLabel(f"{a:.0f}°"))
+                    btn_x = QPushButton("✕"); btn_x.setFixedSize(20, 20)
+                    btn_x.clicked.connect(lambda checked, angle=a: (
+                        cur.remove(angle), _refresh_tags(), _rebuild_chart_list()))
+                    row_h.addWidget(btn_x); row_h.addStretch()
+                    fl.addWidget(row_w)
+                scroll.setWidget(tags)
+                tags_layout.addWidget(scroll)
+        _refresh_tags()
+        edit_layout.addLayout(tags_layout)
+
+        add_row = QHBoxLayout()
+        spin_custom = QDoubleSpinBox()
+        spin_custom.setRange(0, 180); spin_custom.setDecimals(1)
+        spin_custom.setValue(0); spin_custom.setSuffix("°")
+        add_row.addWidget(QLabel(self.tr("Theta:")))
+        add_row.addWidget(spin_custom)
+        btn_add = QPushButton("+ " + self.tr("添加"))
+        btn_add.clicked.connect(lambda: (
+            _get_current().append(spin_custom.value()),
+            _refresh_tags(), _rebuild_chart_list()))
+        add_row.addWidget(btn_add); add_row.addStretch()
+        edit_layout.addLayout(add_row)
+
+        step_row = QHBoxLayout()
+        spin_start = QDoubleSpinBox(); spin_start.setRange(0, 180); spin_start.setValue(0); spin_start.setSuffix("°")
+        spin_end = QDoubleSpinBox(); spin_end.setRange(0, 180); spin_end.setValue(90); spin_end.setSuffix("°")
+        spin_step = QDoubleSpinBox(); spin_step.setRange(1, 90); spin_step.setValue(10); spin_step.setSuffix("°")
+        step_row.addWidget(QLabel(self.tr("起:"))); step_row.addWidget(spin_start)
+        step_row.addWidget(QLabel(self.tr("止:"))); step_row.addWidget(spin_end)
+        step_row.addWidget(QLabel(self.tr("步:"))); step_row.addWidget(spin_step)
+        btn_gen = QPushButton(self.tr("生成"))
+        btn_gen.clicked.connect(lambda: (
+            [_get_current().append(float(a)) for a in
+             np.linspace(spin_start.value(), spin_end.value(),
+                         max(1, int((spin_end.value()-spin_start.value())/
+                                    max(1, spin_step.value()))+1))
+             if float(a) not in _get_current()],
+            _refresh_tags(), _rebuild_chart_list()))
+        step_row.addWidget(btn_gen); step_row.addStretch()
+        edit_layout.addLayout(step_row)
+
+        layout.addWidget(edit_grp)
+
+        chart_list.currentRowChanged.connect(lambda i: (_refresh_tags()))
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            # 保存为 list-of-lists 格式 (单图表时退化为 flat list 兼容旧代码)
+            setattr(self, attr_name, _charts if len(_charts) > 1 else _charts[0] if _charts else []),
+            self._sync_selected_frequencies(freq_picker.get_selected()),
+            dlg.accept()))
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
+        self._sync_to_mw()
+
+    def _sync_selected_frequencies(self, freqs: list[float]):
+        """将选中的频点同步到 ChartConfig。"""
+        if not self._mw:
+            return
+        if not hasattr(self._mw, '_chart_config_required') or self._mw._chart_config_required is None:
+            return
+        self._mw._chart_config_required.selected_frequencies = list(freqs)
+        if hasattr(self._mw, '_chart_config_extra') and self._mw._chart_config_extra is not None:
+            self._mw._chart_config_extra.selected_frequencies = list(freqs)
+
+    # ── 公共接口 ──
+
+    def get_chart_config(self) -> tuple:
+        """返回 (chart_config_required, chart_config_extra)。"""
+        from src.chart_config import ChartConfig
+
+        def _build(required_map, extra_map, gain_angles, gain_ranges, ar_angles, ar_ranges):
+            cfg = ChartConfig()
+            for key in ChartConfig.all_chart_keys():
+                setattr(cfg, key, required_map.get(key, QCheckBox()).isChecked())
+            cfg.elev = self._spin_elev.value()
+            cfg.azim = self._spin_azim.value()
+            cfg.dpi = self._spin_dpi.value()
+            cfg.step_deg = self._parse_step_deg()
+            cfg.embed_in_excel = self._check_embed.isChecked()
+            cfg.gain_chart_angles = list(gain_angles)
+            cfg.gain_chart_ranges = list(gain_ranges)
+            cfg.ar_chart_angles = list(ar_angles)
+            cfg.ar_chart_ranges = list(ar_ranges)
+            return cfg
+
+        req = _build(self._chart_required, self._chart_extra,
+                     self._gain_angles, self._gain_ranges,
+                     self._ar_angles, self._ar_ranges)
+        xtr = _build(self._chart_extra, self._chart_extra,
+                     self._gain_angles_x, self._gain_ranges_x,
+                     self._ar_angles_x, self._ar_ranges_x)
+        xtr.embed_in_excel = False
+        return req, xtr
+
+    def update_ui(self):
+        """由外部触发刷新 UI 状态。"""
+        self._load_state()
+
+# ═══════════════════════════════════════════════════════════════
+# Docx 模板 SDT 工具箱
+# ═══════════════════════════════════════════════════════════════
+
+class DocxTemplateToolbox(QDialog):
+    """.docx 模板分析 + SDT tag 推荐 + 插入。"""
+
+    def __init__(self, parent=None, docx_path=""):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Docx 模板 SDT 工具箱"))
+        self.resize(1000, 700)
+        self.setMinimumSize(800, 550)
+        self._docx_path = docx_path
+        self._positions = []
+        self._setup_ui()
+        if docx_path and Path(docx_path).exists():
+            self._edit_path.setText(docx_path)
+            self._scan()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(8)
+
+        grp = QGroupBox(self.tr("Word 模板"))
+        gr = QHBoxLayout(grp)
+        self._edit_path = QLineEdit()
+        self._edit_path.setPlaceholderText(self.tr("选择 .docx 模板文件..."))
+        gr.addWidget(self._edit_path, 1)
+        btn_browse = QPushButton(self.tr("浏览..."))
+        btn_browse.clicked.connect(self._browse)
+        gr.addWidget(btn_browse)
+        btn_scan = QPushButton(self.tr("扫描"))
+        btn_scan.clicked.connect(self._scan)
+        gr.addWidget(btn_scan)
+        layout.addWidget(grp)
+
+        self._table = QTableWidget()
+        self._table.setColumnCount(6)
+        self._table.setHorizontalHeaderLabels([
+            self.tr("#"), self.tr("位置"), self.tr("类型"), self.tr("示例文本"),
+            self.tr("推荐 Tag"), self.tr("确认 Tag"),
+        ])
+        self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self._table.setColumnWidth(0, 40)
+        self._table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        self._table.setColumnWidth(1, 150)
+        self._table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+        self._table.setColumnWidth(2, 70)
+        self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        self._table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Fixed)
+        self._table.setColumnWidth(4, 160)
+        self._table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Fixed)
+        self._table.setColumnWidth(5, 160)
+        self._table.setAlternatingRowColors(True)
+        layout.addWidget(self._table, 1)
+
+        self._lbl_summary = QLabel("")
+        layout.addWidget(self._lbl_summary)
+
+        btn_row = QHBoxLayout()
+        btn_rule = QPushButton(self.tr("规则自动匹配"))
+        btn_rule.clicked.connect(self._rule_match)
+        btn_row.addWidget(btn_rule)
+        btn_llm = QPushButton(self.tr("LLM 智能推荐"))
+        btn_llm.clicked.connect(self._llm_suggest)
+        btn_row.addWidget(btn_llm)
+        btn_row.addStretch()
+        btn_insert = QPushButton(self.tr("插入 SDT 并保存"))
+        btn_insert.setStyleSheet("font-weight:bold;")
+        btn_insert.clicked.connect(self._insert_and_save)
+        btn_row.addWidget(btn_insert)
+        btn_close = QPushButton(self.tr("关闭"))
+        btn_close.clicked.connect(self.accept)
+        btn_row.addWidget(btn_close)
+        layout.addLayout(btn_row)
+
+    def _browse(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("选择 Word 模板"), "",
+            self.tr("Word 文档 (*.docx)"))
+        if path:
+            if path.lower().endswith('.doc') and not path.lower().endswith('.docx'):
+                QMessageBox.warning(self, self.tr("格式不支持"),
+                    self.tr("不支持 .doc 格式。请用 Word 另存为 .docx 后再使用。"))
+                return
+            self._edit_path.setText(path)
+            self._docx_path = path
+            self._scan()
+
+    def _scan(self):
+        path = self._edit_path.text().strip()
+        if not path or not Path(path).exists():
+            return
+        try:
+            from src.docx_sdt_inserter import scan_docx
+            self._positions = scan_docx(path)
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("扫描失败"), str(e))
+            return
+        self._populate_table()
+        tables = sum(1 for p in self._positions if "table" in p.pos_type)
+        images = sum(1 for p in self._positions if p.pos_type == "image")
+        self._lbl_summary.setText(
+            self.tr("共 {} 个表格, {} 张图片").format(tables, images))
+
+    def _populate_table(self):
+        self._table.setRowCount(len(self._positions))
+        for i, p in enumerate(self._positions):
+            self._table.setItem(i, 0, QTableWidgetItem(str(p.index + 1)))
+            self._table.setItem(i, 1, QTableWidgetItem(p.location))
+            self._table.setItem(i, 2, QTableWidgetItem(p.pos_type))
+            self._table.setItem(i, 3, QTableWidgetItem(p.sample_text[:80]))
+            self._table.setItem(i, 4, QTableWidgetItem(p.suggested_tag))
+            self._table.setItem(i, 5, QTableWidgetItem(p.confirmed_tag))
+
+    def _rule_match(self):
+        try:
+            from src.llm_tagger import rule_based_suggest
+            n = rule_based_suggest(self._positions)
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("匹配失败"), str(e))
+            return
+        self._populate_table()
+        self._lbl_summary.setText(
+            self.tr("规则匹配: {}/{} 个已推荐").format(n, len(self._positions)))
+
+    def _llm_suggest(self):
+        from src.config_manager import get_config_manager
+        cfg = get_config_manager()
+        llm = getattr(cfg.config, 'llm', None)
+        if not llm or not llm.enabled:
+            reply = QMessageBox.question(self, self.tr("LLM 未配置"),
+                self.tr("尚未配置 AI API。是否打开系统设置？"),
+                QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                p = self.parent()
+                while p and not hasattr(p, '_data_file_paths'):
+                    p = p.parent()
+                from ui.dialogs import SystemSettingsDialog
+                SystemSettingsDialog(p).exec()
+            return
+        try:
+            from src.llm_tagger import suggest_tags_with_llm
+            n = suggest_tags_with_llm(
+                self._positions, llm.api_base,
+                getattr(llm, '_api_key', ''), llm.model)
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("LLM 失败"), str(e))
+            return
+        self._populate_table()
+        self._lbl_summary.setText(self.tr("LLM: {} 个新推荐").format(n))
+
+    def _insert_and_save(self):
+        for i in range(self._table.rowCount()):
+            item5 = self._table.item(i, 5)
+            if item5 and item5.text().strip():
+                self._positions[i].confirmed_tag = item5.text().strip()
+            else:
+                item4 = self._table.item(i, 4)
+                if item4 and item4.text().strip():
+                    self._positions[i].confirmed_tag = item4.text().strip()
+        confirmed = [p for p in self._positions if p.confirmed_tag.strip()]
+        if not confirmed:
+            QMessageBox.information(self, self.tr("提示"),
+                self.tr("请先确认至少一个 SDT tag。"))
+            return
+        out_path, _ = QFileDialog.getSaveFileName(
+            self, self.tr("保存带 SDT 的模板"),
+            str(Path(self._docx_path).parent /
+                (Path(self._docx_path).stem + "_SDT.docx")),
+            self.tr("Word 文档 (*.docx)"))
+        if not out_path:
+            return
+        try:
+            from src.docx_sdt_inserter import insert_sdt_tags
+            insert_sdt_tags(self._docx_path, self._positions, out_path)
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("插入失败"), str(e))
+            return
+        msg = self.tr("已插入 {} 个 SDT tag 到:").format(len(confirmed))
+        QMessageBox.information(self, self.tr("完成"), msg + "\n" + out_path)
+
+# ═══════════════════════════════════════════════════════════════
+# Word 模板分屏预览对话框
+# ═══════════════════════════════════════════════════════════════
+
+
+
+
 class WordTemplatePreviewDialog(QDialog):
     """Word 模板分屏预览: 左=文档 + 右=SDT Tag 树。"""
 
