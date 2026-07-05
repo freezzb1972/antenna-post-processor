@@ -160,6 +160,10 @@ class FileSettingsPage(QWidget):
         v_splitter = QSplitter(Qt.Vertical)
         v_splitter.setHandleWidth(6)  # 可拖拽分割线
 
+        # Excel + Word 模版并列
+        tpl_row = QHBoxLayout()
+        tpl_row.setSpacing(4)
+
         # Excel 模版组
         excel_grp = QGroupBox(self.tr("Excel 参数模版"))
         excel_layout = QVBoxLayout(excel_grp)
@@ -182,7 +186,7 @@ class FileSettingsPage(QWidget):
         self._tpl_path_label.setReadOnly(True)
         self._tpl_path_label.setPlaceholderText(self.tr("(未选择 Excel 参数模版)"))
         excel_layout.addWidget(self._tpl_path_label)
-        v_splitter.addWidget(excel_grp)
+        tpl_row.addWidget(excel_grp, 1)
 
         # Word 报告模版组
         word_grp = QGroupBox(self.tr("Word 报告模版"))
@@ -202,7 +206,12 @@ class FileSettingsPage(QWidget):
         self._edit_word_tpl_widget.setPlaceholderText(self.tr("(未选择 Word 报告模版)"))
         self._word_tpl_row.template_changed.connect(self._edit_word_tpl_widget.setText)
         word_layout.addWidget(self._edit_word_tpl_widget)
-        v_splitter.addWidget(word_grp)
+        tpl_row.addWidget(word_grp, 1)
+
+        # 模板行打包到一个 widget 加入垂直 splitter
+        tpl_widget = QWidget()
+        tpl_widget.setLayout(tpl_row)
+        v_splitter.addWidget(tpl_widget)
 
         # 数据文件选择器 (widgets.DataFileSelector)
         from ui.widgets import DataFileSelector
