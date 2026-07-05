@@ -793,8 +793,8 @@ class FileSettingsPage(QWidget):
             btn_angle_popup.setFixedWidth(30)
             btn_angle_popup.setToolTip(self.tr("打开角度配置对话框"))
             btn_angle_popup.clicked.connect(
-                lambda checked, ci=ci, cb=cmb, ep=edit_param:
-                self._on_preview_open_angle_popup(ci, cb, ep))
+                lambda checked, ci=ci, cb=cmb, ep=edit_param, tbl=table:
+                self._on_preview_open_angle_popup(ci, cb, ep, tbl))
             param_layout.addWidget(btn_angle_popup)
             table.setCellWidget(5, ci, param_widget)
             # 类型变更 → 自动填充角度参数
@@ -991,7 +991,8 @@ class FileSettingsPage(QWidget):
         if angle_val:
             edit_param.setText(angle_val)
 
-    def _on_preview_open_angle_popup(self, col: int, cmb: QComboBox, edit_param: QLineEdit):
+    def _on_preview_open_angle_popup(self, col: int, cmb: QComboBox, edit_param: QLineEdit,
+                                       table: QTableWidget = None):
         """预览中点击 ⚙ → 打开角度配置弹窗，批量填充所有同 target 列。"""
         ctype = cmb.currentData()
         if not ctype:
@@ -1017,8 +1018,10 @@ class FileSettingsPage(QWidget):
 
         # 扫描表所有列，批量填充同 target 的参数
         all_same_target = {t for t, tg in type_to_target.items() if tg == target}
-        pw_parent = edit_param.parent()  # param_widget
-        table = pw_parent.parent().parent() if pw_parent else None
+        if table is None:
+            # fallback: 从 widget 树查找
+            pw_parent = edit_param.parent()
+            table = pw_parent.parent().parent() if pw_parent else None
         if not isinstance(table, QTableWidget):
             return
         n = table.columnCount()
