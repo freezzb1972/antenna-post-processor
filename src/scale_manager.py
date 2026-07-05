@@ -92,7 +92,7 @@ class ScaleManager:
                 border: 1px solid rgba(128,128,128,50);
                 border-radius: {4 * f:.0f}px;
                 font-weight: bold;
-                padding-top: {4 * f:.0f}px;
+                padding: {4 * f:.0f}px {4 * f:.0f}px {1 * f:.0f}px {4 * f:.0f}px;
                 margin-top: {14 * f:.0f}px;
             }}
             QGroupBox::title {{
