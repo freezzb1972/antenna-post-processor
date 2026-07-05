@@ -1007,7 +1007,6 @@ class FileSettingsPage(QWidget):
                                        table: QTableWidget = None):
         """预览中点击 ⚙ → 打开角度配置弹窗，批量填充所有同 target 列。"""
         ctype = cmb.currentData()
-        print(f"[DEBUG] _on_preview_open_angle_popup: col={col} ctype={ctype}")
         if not ctype:
             return
         type_to_target = {
@@ -1016,10 +1015,14 @@ class FileSettingsPage(QWidget):
             "rhcp_single": "rhcp", "cp_xpi_single": "cpxpi",
         }
         target = type_to_target.get(ctype)
-        print(f"[DEBUG] target={target}")
         if not target:
             return
-        self._show_angle_popup(target)
+        # _show_angle_popup 在 AntennaParamsPage 上, FileSettingsPage 通过 mw 访问
+        ant_page = getattr(self._mw, '_antenna_params_page', None) if self._mw else None
+        if ant_page and hasattr(ant_page, '_show_angle_popup'):
+            ant_page._show_angle_popup(target)
+        else:
+            return
         if not self._mw:
             return
         config_attrs = {
