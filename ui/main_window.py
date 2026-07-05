@@ -1593,11 +1593,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _make_custom_qss() -> str:
         """生成自定义 QSS（不立即应用, 由 set_base_qss 统一处理）。"""
         return """
-        QGroupBox {
-            border: 1px solid rgba(128,128,128,50);
-            border-radius: 4px;
-            font-weight: bold;
-        }
         QPlainTextEdit {
             border-radius: 4px;
             font-family: "Consolas","Courier New",monospace;
