@@ -157,7 +157,8 @@ class FileSettingsPage(QWidget):
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(4)
 
-        v_splitter = ThinSplitter(Qt.Vertical)
+        v_splitter = QSplitter(Qt.Vertical)
+        v_splitter.setHandleWidth(6)  # 可拖拽分割线
 
         # Excel 模版组
         excel_grp = QGroupBox(self.tr("Excel 参数模版"))
@@ -1233,6 +1234,9 @@ class FileSettingsPage(QWidget):
     def _on_antenna_name_changed(self, row: int, text: str):
         if row < len(self._file_entries):
             self._file_entries[row].antenna_name = text.strip()
+        # 同步更新天线选择器
+        if self._mw and hasattr(self._mw, '_refresh_antenna_selector'):
+            self._mw._refresh_antenna_selector()
 
     def _update_window_title(self):
         if self._mw:
