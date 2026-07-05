@@ -609,9 +609,8 @@ def _setup_polar_radial_ticks(ax):
     每圈标注 + 字体 10pt + 标签 @15°。
     """
     yl = ax.get_ylim()
-    vmin, vmax = yl[0], yl[1]
-    # 极坐标径向轴必须从 0 开始
-    vmin = min(vmin, 0)
+    _, vmax = yl[0], yl[1]
+    vmin = 0.0  # 极坐标中心必须为 0 (增益/AR 的零点)
     if vmax - vmin <= 0:
         vmax = vmin + 10
 
