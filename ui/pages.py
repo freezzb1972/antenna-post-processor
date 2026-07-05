@@ -281,19 +281,15 @@ class FileSettingsPage(QWidget):
 
         # 3) 中间数据文件 (.xlsx)
         self._check_out_data = QCheckBox(self.tr("中间数据文件 (.xlsx)"))
-        out_layout.addWidget(self._check_out_data)
-
-        row_data_fn = QHBoxLayout()
-        self._edit_az_data_fn = QLineEdit()
-        self._edit_az_data_fn.setPlaceholderText(self.tr("默认: 源文件名中间数据.xlsx"))
-        row_data_fn.addWidget(self._edit_az_data_fn, 1)
-        btn_data_browse = QPushButton(self.tr("浏览..."))
-        btn_data_browse.clicked.connect(self._on_browse_az_data_dir)
-        row_data_fn.addWidget(btn_data_browse)
-        out_layout.addLayout(row_data_fn)
+        self._data_output_path = ""
+        self._btn_save_data = QPushButton(self.tr("另存为..."))
+        self._btn_save_data.clicked.connect(self._on_save_data)
+        row_dt = QHBoxLayout()
+        row_dt.addWidget(self._check_out_data)
+        row_dt.addWidget(self._btn_save_data, 1)
+        out_layout.addLayout(row_dt)
 
         self._check_out_data.toggled.connect(lambda c: (
-            self._edit_az_data_fn.setEnabled(c),
             self._sync_azimuth_cut_switch(),
         ))
 
@@ -353,10 +349,13 @@ class FileSettingsPage(QWidget):
             self._mw.ui.editOutputName.setText(p.name)
         # Word output → Azimuth config
         az = getattr(self._mw, '_azimuth_config', None)
-        if az is not None and hasattr(self, '_word_output_path') and self._word_output_path:
-            p = Path(self._word_output_path)
-            az.chart_output_dir = str(p.parent)
-            az.chart_output_filename = p.name
+        if az is not None:
+            if hasattr(self, '_word_output_path') and self._word_output_path:
+                p = Path(self._word_output_path)
+                az.chart_output_dir = str(p.parent)
+                az.chart_output_filename = p.name
+            if hasattr(self, '_data_output_path') and self._data_output_path:
+                az.data_output_filename = Path(self._data_output_path).name
 
     def _sync_azimuth_cut_switch(self):
         """勾选 Word 或数据输出时自动开启/关闭方位面开关。"""
@@ -413,6 +412,20 @@ class FileSettingsPage(QWidget):
             self._btn_save_word.setText(self.tr("另存为 ") + Path(path).name)
             self._sync_azimuth_state()
 
+    def _on_save_data(self):
+        """另存为: 中间数据文件路径。"""
+        from pathlib import Path
+        start = self._data_output_path or "中间数据.xlsx"
+        if not Path(start).is_absolute():
+            start = str(Path.cwd() / "output" / Path(start).name)
+        path, _ = QFileDialog.getSaveFileName(
+            self, self.tr("保存中间数据"), start,
+            self.tr("Excel 文件 (*.xlsx)"))
+        if path:
+            self._data_output_path = path
+            self._btn_save_data.setText(self.tr("另存为 ") + Path(path).name)
+            self._sync_azimuth_state()
+
     def _on_browse_word_template(self):
         """选择带 SDT tag 的 Word 模板（不自动预览）。"""
         from PySide6.QtWidgets import QFileDialog
@@ -425,13 +438,6 @@ class FileSettingsPage(QWidget):
             if hasattr(self, '_edit_word_tpl_widget'):
                 self._edit_word_tpl_widget.setText(d)
 
-    def _on_browse_az_data_dir(self):
-        from PySide6.QtWidgets import QFileDialog
-        d = QFileDialog.getSaveFileName(self, self.tr("选择中间数据输出文件"),
-                                         "", "Excel 文件 (*.xlsx)")[0]
-        if d and hasattr(self, '_edit_az_data_fn'):
-            self._edit_az_data_fn.setText(os.path.basename(d))
-            self._sync_azimuth_state()
         if self._mw:
             from src.config_manager import get_config_manager
             self._cfg = get_config_manager()
