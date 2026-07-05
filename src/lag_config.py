@@ -151,15 +151,15 @@ class LagConfig:
         singles: list[float] = []
         ranges: list[tuple[float, float]] = []
 
-        # AR 单角度: "AR at Theta=30" / "Axial Ratio at Theta=60"
+        # AR 单角度: "AR at Theta=30" / "Axial Ratio at Theta=60" / "AR @ θ=30°"
         _RE_AR_SINGLE = re.compile(
-            r"(?:AR|Axial\s*Ratio)\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)",
+            r"(?:AR|Axial\s*Ratio)\s+(?:at\s+)?(?:Theta|θ)\s*[=＝@]\s*(\d+\.?\d*)\s*°?",
             re.IGNORECASE,
         )
 
         # AR 范围: "AR at Theta=0~70" / "Axial Ratio at Theta=20~80"
         _RE_AR_RANGE = re.compile(
-            r"(?:AR|Axial\s*Ratio)\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)\s*[-–—~]\s*(\d+\.?\d*)",
+            r"(?:AR|Axial\s*Ratio)\s+(?:at\s+)?(?:Theta|θ)\s*[=＝@]\s*(\d+\.?\d*)\s*[-–—~]\s*(\d+\.?\d*)",
             re.IGNORECASE,
         )
 
