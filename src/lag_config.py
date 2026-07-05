@@ -61,6 +61,68 @@ _RE_LAG_SINGLE_NO_PREFIX = re.compile(
 
 # is_*_column / _normalize_key 已移至 excel_reader.py（它们只被模板解析使用）
 # ---------------------------------------------------------------------------
+# 通用角度提取 — 不关心参数类型，从任意列头提取 θ 角度数值
+# ---------------------------------------------------------------------------
+
+# 单角度: "Theta=30", "θ=60°", "@45", "30度", "at 90°", "θ: 30"
+_RE_ANGLE_SINGLE = re.compile(
+    r"(?:Theta|θ)\s*[=＝:：]\s*(\d+\.?\d*)\s*°?|"
+    r"@\s*(\d+\.?\d*)\s*°?|"
+    r"(\d+\.?\d*)\s*度|"
+    r"at\s+(\d+\.?\d*)\s*°?",
+    re.IGNORECASE,
+)
+
+# 角度范围: "Theta=0-90", "θ=30~70", "@0–90°", "0-90 LAG", "30~60度"
+_RE_ANGLE_RANGE = re.compile(
+    r"(?:Theta|θ)\s*[=＝:：]\s*(\d+\.?\d*)\s*[-–—~]\s*(\d+\.?\d*)\s*°?|"
+    r"@\s*(\d+\.?\d*)\s*[-–—~]\s*(\d+\.?\d*)\s*°?|"
+    r"(\d+\.?\d*)\s*[-–—~]\s*(\d+\.?\d*)\s*(?:°|度)",
+    re.IGNORECASE,
+)
+
+
+def extract_angles_from_headers(headers: list[str], param_prefix: str = "") -> tuple[list[float], list[tuple[float, float]]]:
+    """通用角度提取: 从列头列表中解析所有 θ 角度值。
+
+    不依赖参数类型关键词，只匹配数字角度模式。
+    可按 param_prefix 过滤（如 "ar_", "rhcp_" 只处理对应列头）。
+
+    Returns:
+        (singles, ranges) — 单角度列表和范围列表
+    """
+    singles: list[float] = []
+    ranges: list[tuple[float, float]] = []
+
+    for raw in headers:
+        h = normalize_header(raw)
+        if not h:
+            continue
+        if param_prefix and param_prefix not in h.lower():
+            continue
+
+        # 先检测范围（避免 "0-90" 中的 0/90 被单角度误匹配）
+        rm = _RE_ANGLE_RANGE.search(h)
+        if rm:
+            groups = [g for g in rm.groups() if g is not None]
+            if len(groups) >= 2:
+                lo, hi = float(groups[0]), float(groups[1])
+                key = (min(lo, hi), max(lo, hi))
+                if key not in ranges:
+                    ranges.append(key)
+                continue
+
+        # 再检测单角度
+        sm = _RE_ANGLE_SINGLE.search(h)
+        if sm:
+            val = float(next(g for g in sm.groups() if g is not None))
+            if val not in singles:
+                singles.append(val)
+
+    return singles, ranges
+
+
+# ---------------------------------------------------------------------------
 # LAG 配置数据类
 # ---------------------------------------------------------------------------
 
@@ -107,129 +169,25 @@ class LagConfig:
 
         注意：列头可能含换行符 ``\\n``、全角括号等，先做规范化。
         """
-        singles: list[float] = []
-        ranges: list[tuple[float, float]] = []
-
-        for raw in headers:
-            h = normalize_header(raw)
-            if not h:
-                continue
-
-            # 先检测范围（避免 "0-90" 中的 0 被单角度误匹配）
-            rm = _RE_LAG_RANGE.search(h)
-            if not rm:
-                rm = _RE_LAG_RANGE_NO_PREFIX.search(h)
-            if rm:
-                lo, hi = float(rm.group(1)), float(rm.group(2))
-                # 去重
-                key = (min(lo, hi), max(lo, hi))
-                if key not in ranges:
-                    ranges.append(key)
-                continue
-
-            # 再检测单角度
-            sm = _RE_LAG_SINGLE.search(h)
-            if not sm:
-                sm = _RE_LAG_SINGLE_NO_PREFIX.search(h)
-            if sm:
-                val = float(sm.group(1))
-                if val not in singles:
-                    singles.append(val)
-
+        singles, ranges = extract_angles_from_headers(headers)
         return cls(single_angles=singles, ranges=ranges)
 
     @classmethod
     def from_ar_headers(cls, headers: list[str]) -> LagConfig:
-        """从 Excel 列头自动解析 AR (Axial Ratio) 角度需求。
-
-        识别模式：
-          - ``AR at Theta=30`` / ``Axial Ratio at Theta=60`` → 单角度 30°, 60°
-          - ``AR at Theta=0~70`` / ``Axial Ratio at Theta=20~80`` → 范围 (0, 70), (20, 80)
-
-        注意：列头可能含换行符 ``\\n``、全角括号等，先做规范化。
-        """
-        singles: list[float] = []
-        ranges: list[tuple[float, float]] = []
-
-        # AR 单角度: "AR at Theta=30" / "Axial Ratio at Theta=60" / "AR @ θ=30°"
-        _RE_AR_SINGLE = re.compile(
-            r"(?:AR|Axial\s*Ratio)\s+(?:at\s+)?(?:Theta|θ)\s*[=＝@]\s*(\d+\.?\d*)\s*°?",
-            re.IGNORECASE,
-        )
-
-        # AR 范围: "AR at Theta=0~70" / "Axial Ratio at Theta=20~80"
-        _RE_AR_RANGE = re.compile(
-            r"(?:AR|Axial\s*Ratio)\s+(?:at\s+)?(?:Theta|θ)\s*[=＝@]\s*(\d+\.?\d*)\s*[-–—~]\s*(\d+\.?\d*)",
-            re.IGNORECASE,
-        )
-
-        for raw in headers:
-            h = normalize_header(raw)
-            if not h:
-                continue
-
-            # 先检测范围
-            rm = _RE_AR_RANGE.search(h)
-            if rm:
-                lo, hi = float(rm.group(1)), float(rm.group(2))
-                key = (min(lo, hi), max(lo, hi))
-                if key not in ranges:
-                    ranges.append(key)
-                continue
-
-            # 再检测单角度
-            sm = _RE_AR_SINGLE.search(h)
-            if sm:
-                val = float(sm.group(1))
-                if val not in singles:
-                    singles.append(val)
-
+        """从 Excel 列头自动解析 AR 角度需求。"""
+        singles, ranges = extract_angles_from_headers(headers, param_prefix="ar")
         return cls(single_angles=singles, ranges=ranges)
 
     @classmethod
     def from_rhcp_headers(cls, headers: list[str]) -> LagConfig:
-        """从 Excel 列头自动解析 RHCP Gain 角度需求。
-
-        识别模式:
-          - ``RHCP at Theta=30`` / ``RHCP Gain at θ=60`` → 单角度 30°, 60°
-        """
-        singles: list[float] = []
-        _RE_RHCP_SINGLE = re.compile(
-            r"RHCP(?:\s*Gain)?\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)",
-            re.IGNORECASE,
-        )
-        for raw in headers:
-            h = normalize_header(raw)
-            if not h:
-                continue
-            sm = _RE_RHCP_SINGLE.search(h)
-            if sm:
-                val = float(sm.group(1))
-                if val not in singles:
-                    singles.append(val)
+        """从 Excel 列头自动解析 RHCP Gain 角度需求。"""
+        singles, _ = extract_angles_from_headers(headers, param_prefix="rhcp")
         return cls(single_angles=singles)
 
     @classmethod
     def from_cpxpi_headers(cls, headers: list[str]) -> LagConfig:
-        """从 Excel 列头自动解析 CP-XPI 角度需求。
-
-        识别模式:
-          - ``CP-XPI at Theta=30`` / ``CP XPI at θ=60`` → 单角度 30°, 60°
-        """
-        singles: list[float] = []
-        _RE_CPXPI_SINGLE = re.compile(
-            r"CP[\s-]*XPI\s+at\s+(?:Theta|θ)\s*[=＝]\s*(\d+\.?\d*)",
-            re.IGNORECASE,
-        )
-        for raw in headers:
-            h = normalize_header(raw)
-            if not h:
-                continue
-            sm = _RE_CPXPI_SINGLE.search(h)
-            if sm:
-                val = float(sm.group(1))
-                if val not in singles:
-                    singles.append(val)
+        """从 Excel 列头自动解析 CP-XPI 角度需求。"""
+        singles, _ = extract_angles_from_headers(headers, param_prefix="cpxpi")
         return cls(single_angles=singles)
 
     # --- 查询 ---
