@@ -460,9 +460,10 @@ class DataFileSelector(QGroupBox):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setTitle(self.tr("数据文件"))
+        self.setStyleSheet("QGroupBox { font-weight: bold; }")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(4, 2, 4, 2)
-        layout.setSpacing(2)
+        layout.setContentsMargins(4, 1, 4, 1)
+        layout.setSpacing(1)
 
         # 按钮行
         btn_row = QHBoxLayout()

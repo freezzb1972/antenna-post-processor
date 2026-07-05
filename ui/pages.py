@@ -155,7 +155,7 @@ class FileSettingsPage(QWidget):
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(4)
+        left_layout.setSpacing(1)
 
         v_splitter = QSplitter(Qt.Vertical)
         v_splitter.setHandleWidth(4)  # 可拖拽分割线
@@ -254,12 +254,13 @@ class FileSettingsPage(QWidget):
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(4)
+        right_layout.setSpacing(1)
 
         # ── 输出选项 ──
         out_grp = QGroupBox(self.tr("输出设置"))
         out_layout = QVBoxLayout(out_grp)
-        out_layout.setSpacing(6)
+        out_layout.setContentsMargins(4, 1, 4, 1)
+        out_layout.setSpacing(2)
 
         # 1) 天线参数报告 (.xlsx)
         self._check_out_excel = QCheckBox(self.tr("天线参数报告 (.xlsx)"))
