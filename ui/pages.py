@@ -158,7 +158,7 @@ class FileSettingsPage(QWidget):
         left_layout.setSpacing(4)
 
         v_splitter = QSplitter(Qt.Vertical)
-        v_splitter.setHandleWidth(6)  # 可拖拽分割线
+        v_splitter.setHandleWidth(4)  # 可拖拽分割线
 
         # Excel + Word 模版并列
         tpl_row = QHBoxLayout()
