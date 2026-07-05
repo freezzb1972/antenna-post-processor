@@ -166,6 +166,7 @@ class FileSettingsPage(QWidget):
 
         # Excel 模版组
         excel_grp = QGroupBox(self.tr("Excel 参数模版"))
+        excel_grp.setStyleSheet("QGroupBox { padding-top: 4px; padding-bottom: 1px; margin-top: 14px; }")
         excel_layout = QVBoxLayout(excel_grp)
         excel_layout.setContentsMargins(2, 0, 2, 0)
         excel_layout.setSpacing(0)
@@ -191,6 +192,7 @@ class FileSettingsPage(QWidget):
 
         # Word 报告模版组
         word_grp = QGroupBox(self.tr("Word 报告模版"))
+        word_grp.setStyleSheet("QGroupBox { padding-top: 4px; padding-bottom: 1px; margin-top: 14px; }")
         word_layout = QVBoxLayout(word_grp)
         word_layout.setContentsMargins(2, 0, 2, 0)
         word_layout.setSpacing(0)
