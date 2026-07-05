@@ -815,6 +815,10 @@ class FileSettingsPage(QWidget):
             if m.detected_type != "unknown":
                 detected += 1
         table.resizeColumnsToContents()
+        # 确保每列足够宽以显示 ⚙ 按钮
+        for ci in range(n):
+            if table.columnWidth(ci) < 90:
+                table.setColumnWidth(ci, 90)
         table.setMinimumHeight(280)
         layout.addWidget(table)
 
