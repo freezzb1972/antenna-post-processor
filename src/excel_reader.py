@@ -610,7 +610,9 @@ class SheetInfo:
     columns: list[ColumnInfo] = field(default_factory=list)
     frequencies: list[float] = field(default_factory=list)
     lag_config: LagConfig = field(default_factory=LagConfig)
-    ar_config: LagConfig = field(default_factory=LagConfig)  # AR 角度配置
+    ar_config: LagConfig = field(default_factory=LagConfig)
+    rhcp_config: LagConfig = field(default_factory=LagConfig)
+    cpxpi_config: LagConfig = field(default_factory=LagConfig)
     theta_range: str | None = None  # e.g., "0-110°"
 
 
@@ -670,6 +672,8 @@ def _parse_sheet(ws) -> SheetInfo | None:
     columns: list[ColumnInfo] = []
     lag_headers: list[str] = []
     ar_headers: list[str] = []
+    rhcp_headers: list[str] = []
+    cpxpi_headers: list[str] = []
 
     for c in range(1, max_col + 1):
         raw = _cell_str(ws.cell(header_row, c))
@@ -702,11 +706,15 @@ def _parse_sheet(ws) -> SheetInfo | None:
         )
         columns.append(cinfo)
 
-        # 收集 LAG / AR 列头用于解析
+        # 收集各类型列头用于角度解析
         if ctype in ("lag_single", "lag_range"):
             lag_headers.append(raw)
         if ctype in ("ar_single", "ar_range"):
             ar_headers.append(raw)
+        if ctype == "rhcp_single":
+            rhcp_headers.append(raw)
+        if ctype == "cp_xpi_single":
+            cpxpi_headers.append(raw)
 
     # ---- 解析频点列表 ----
     data_start_row = header_row + 1
@@ -732,6 +740,8 @@ def _parse_sheet(ws) -> SheetInfo | None:
     # ---- 解析 LAG / AR 配置 ----
     lag_config = LagConfig.from_template_headers(lag_headers)
     ar_config = LagConfig.from_ar_headers(ar_headers)
+    rhcp_config = LagConfig.from_rhcp_headers(rhcp_headers)
+    cpxpi_config = LagConfig.from_cpxpi_headers(cpxpi_headers)
 
     # ---- 读取 θ 范围 ----
     theta_range = None
@@ -753,6 +763,8 @@ def _parse_sheet(ws) -> SheetInfo | None:
         frequencies=frequencies,
         lag_config=lag_config,
         ar_config=ar_config,
+        rhcp_config=rhcp_config,
+        cpxpi_config=cpxpi_config,
         theta_range=theta_range,
     )
 
