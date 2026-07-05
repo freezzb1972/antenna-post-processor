@@ -1883,7 +1883,26 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if ant and not ant.required_params:
             ant.required_params = set(tp)
 
+        # 自动推断图表配置
+        from src.chart_config import auto_detect_charts
+        auto_charts = auto_detect_charts(tp)
+        if auto_charts:
+            self._auto_apply_chart_config(auto_charts)
+
         self._update_params_display()
+
+    def _auto_apply_chart_config(self, auto_charts: dict[str, bool]):
+        """根据模板参数自动启用对应的图表 checkbox。"""
+        if not hasattr(self, '_chart_settings_page') or not self._chart_settings_page:
+            return
+        cp = self._chart_settings_page
+        for chart_key, enabled in auto_charts.items():
+            if chart_key in cp._chart_required:
+                cp._chart_required[chart_key].setChecked(enabled)
+            if chart_key in cp._chart_extra:
+                cp._chart_extra[chart_key].setChecked(enabled)
+        cp._sync_to_mw()
+        self._log(f"📊 从模板自动推断图表: {', '.join(auto_charts.keys())}")
 
     def _on_load_from_template(self):
         template_path = self.ui.editTemplatePath.text()

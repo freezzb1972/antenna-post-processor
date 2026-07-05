@@ -69,19 +69,41 @@ _CHART_PATTERNS: dict[str, list[str]] = {
     ],
 }
 
-# 从列类型推导 B 类图表的映射
+# 从列类型推导图表 — B 类(频点曲线) + A 类(3D) + C 类(切面)
 _COLTYPE_TO_CHART = {
-    "efficiency_pct": "chart_eff_freq",
-    "efficiency_db": "chart_eff_freq",
-    "gain": "chart_gain_freq",
-    "directivity": "chart_dir_freq",
-    "lag_range": "chart_lag_freq",
-    "lag_single": "chart_lag_freq",
-    "trp": "chart_trp_freq",
-    "ar_single": "chart_ar_freq",
-    "ar_range": "chart_ar_freq",
-    "peak_eirp": "chart_trp_freq",
+    # B 类: 频点曲线
+    "efficiency_pct":  "chart_eff_freq",
+    "efficiency_db":   "chart_eff_freq",
+    "gain":            "chart_gain_freq",
+    "directivity":     "chart_dir_freq",
+    "lag_range":       "chart_lag_freq",
+    "lag_single":      "chart_lag_freq",
+    "trp":             "chart_trp_freq",
+    "ar_single":       "chart_ar_freq",
+    "ar_range":        "chart_ar_freq",
+    "avg_gain":        "chart_gain_freq",
+    "peak_eirp":       "chart_trp_freq",
+    "nhprp_45":        "chart_trp_nhprp",
+    "nhprp_30":        "chart_trp_nhprp",
+    # A 类: 3D 方向图
+    "rhcp_single":     "pattern_3d_gain|pattern_3d_rhcp",   # 多图表用 | 分隔
+    "cp_xpi_single":   "pattern_3d_gain",
+    # C 类: 切面图 (由 azimuth config 独立控制, 不在此映射)
 }
+
+# 图表自动检测: 从模板参数推断哪些图表应启用
+def auto_detect_charts(template_params: set) -> dict[str, bool]:
+    """根据模板检测到的参数, 返回应启用的图表 key → True。"""
+    result: dict[str, bool] = {}
+    for col_type, chart_keys in _COLTYPE_TO_CHART.items():
+        if col_type in template_params:
+            for ck in chart_keys.split("|"):
+                result[ck.strip()] = True
+    # C 类切面图: 只要有 Gain 或 AR 就启用
+    if "gain" in template_params or "ar_single" in template_params or "ar_range" in template_params:
+        result["cut_2d_polar"] = True
+        result["cut_2d_rect"] = True
+    return result
 
 
 @dataclass
