@@ -2774,54 +2774,9 @@ class ChartSettingsPage(QWidget):
         self._chart_output_filename = ""
         self._data_output_filename = ""
 
-        # 视角参数
-        view_grp = QGroupBox(self.tr("视角参数"))
-        view_layout = QHBoxLayout(view_grp)
-        view_layout.addWidget(QLabel(self.tr("仰角:")))
-        self._spin_elev = QDoubleSpinBox()
-        self._spin_elev.setRange(-90, 90)
-        self._spin_elev.setValue(30)
-        self._spin_elev.setSuffix("°")
-        self._spin_elev.setFixedWidth(80)
-        self._spin_elev.valueChanged.connect(lambda: self._sync_to_mw())
-        view_layout.addWidget(self._spin_elev)
-        view_layout.addWidget(QLabel(self.tr("方位角:")))
-        self._spin_azim = QDoubleSpinBox()
-        self._spin_azim.setRange(-180, 180)
-        self._spin_azim.setValue(-60)
-        self._spin_azim.setSuffix("°")
-        self._spin_azim.setFixedWidth(80)
-        self._spin_azim.valueChanged.connect(lambda: self._sync_to_mw())
-        view_layout.addWidget(self._spin_azim)
-        view_layout.addWidget(QLabel("DPI:"))
-        self._spin_dpi = QSpinBox()
-        self._spin_dpi.setRange(72, 300)
-        self._spin_dpi.setValue(150)
-        self._spin_dpi.setFixedWidth(70)
-        self._spin_dpi.valueChanged.connect(lambda: self._sync_to_mw())
-        view_layout.addWidget(self._spin_dpi)
-        view_layout.addWidget(QLabel(self.tr("采样精度:")))
-        self._spin_step = QSpinBox()
-        self._spin_step.setRange(1, 30)
-        self._spin_step.setValue(5)
-        self._spin_step.setSuffix("°")
-        self._spin_step.setFixedWidth(70)
-        self._spin_step.setToolTip(self.tr(
-            "3D 图形采样步进 (1°–30°):\n"
-            "  1°=最精细(~40K点/频点,慢)\n"
-            "  5°=标准(~1.7K点/频点)\n"
-            "  30°=最快(~150点/频点)\n"
-            "值越小图形越精细但计算越慢。"
-        ))
-        self._spin_step.valueChanged.connect(lambda: self._sync_to_mw())
-        view_layout.addWidget(self._spin_step)
-
-        btn_multi_view = QPushButton(self.tr("多视角..."))
-        btn_multi_view.setFixedWidth(80)
-        btn_multi_view.clicked.connect(self._show_view_angle_popup)
-        view_layout.addWidget(btn_multi_view)
-
-        view_layout.addStretch()
+        # 视角参数默认值（每个3D图表参数对话框中可单独调整）
+        self._elev = 30.0; self._azim = -60.0
+        self._dpi = 150; self._step_deg = 5.0
 
         grp_list: list = []
 
@@ -2923,10 +2878,6 @@ class ChartSettingsPage(QWidget):
             content_layout.addLayout(row_layout)
             grp_list.append(grp)
 
-            # 视角参数紧跟 A 类 3D 图
-            if "A 类" in cat_name:
-                grp_list.append(view_grp)
-
             def make_toggle(g=grp, cw=content_widget, name=cat_name):
                 def toggle(checked):
                     cw.setVisible(checked)
@@ -2948,7 +2899,7 @@ class ChartSettingsPage(QWidget):
 
         # 图表标题天线名
         row_ant = QHBoxLayout()
-        row_ant.addWidget(QLabel(self.tr("图表标题:")))
+        row_ant.addWidget(QLabel(self.tr("图表标题天线名:")))
         self._edit_antenna_name = QLineEdit()
         self._edit_antenna_name.setPlaceholderText(self.tr("天线名，用于图表标题"))
         self._edit_antenna_name.setMaximumWidth(200)
@@ -3075,22 +3026,16 @@ class ChartSettingsPage(QWidget):
             return
         mw = self._mw
 
-        self._spin_elev_value = 30
-        self._spin_azim_value = -60
-        self._spin_dpi_value = 150
-
         if hasattr(mw, 'ui'):
             if hasattr(mw.ui, 'spinElev'):
-                self._spin_elev.setValue(mw.ui.spinElev.value())
-                self._spin_azim.setValue(mw.ui.spinAzim.value())
-                self._spin_dpi.setValue(mw.ui.spinDpi.value())
+                self._elev = mw.ui.spinElev.value()
+                self._azim = mw.ui.spinAzim.value()
+                self._dpi = mw.ui.spinDpi.value()
                 self._check_embed.setChecked(mw.ui.checkEmbedExcel.isChecked())
                 self._check_png.setChecked(mw.ui.checkSavePng.isChecked())
 
-        step_deg = 5
         if hasattr(mw, '_chart_config_required') and mw._chart_config_required is not None:
-            step_deg = int(getattr(mw._chart_config_required, 'step_deg', 5))
-        self._spin_step.setValue(max(1, min(30, step_deg)))
+            self._step_deg = int(getattr(mw._chart_config_required, 'step_deg', 5))
 
         if hasattr(mw, '_chart_config_required') and mw._chart_config_required is not None:
             req = mw._chart_config_required
@@ -3292,7 +3237,7 @@ class ChartSettingsPage(QWidget):
         if self._current_mode >= 0 and self._current_mode != new_mode:
             self._rebuild_chart_categories(new_mode)
 
-        step_deg = float(max(1, min(30, self._spin_step.value())))
+        step_deg = float(max(1, min(30, getattr(self, '_step_deg', 5))))
 
         # 保留已有 ChartConfig 的非标准字段
         existing_req = getattr(mw, '_chart_config_required', None)
@@ -3311,15 +3256,15 @@ class ChartSettingsPage(QWidget):
             setattr(required, key, self._chart_required.get(key, QCheckBox()).isChecked())
             setattr(extra, key, self._chart_extra.get(key, QCheckBox()).isChecked())
 
-        required.elev = self._spin_elev.value()
-        required.azim = self._spin_azim.value()
-        required.dpi = self._spin_dpi.value()
-        required.step_deg = step_deg
+        required.elev = getattr(self, '_elev', 30.0)
+        required.azim = getattr(self, '_azim', -60.0)
+        required.dpi = getattr(self, '_dpi', 150)
+        required.step_deg = getattr(self, '_step_deg', 5.0)
         required.embed_in_excel = self._check_embed.isChecked()
         extra.elev = required.elev
         extra.azim = required.azim
         extra.dpi = required.dpi
-        extra.step_deg = step_deg
+        extra.step_deg = required.step_deg
         extra.embed_in_excel = False
 
         required.gain_chart_angles = list(self._gain_angles)
@@ -3518,11 +3463,11 @@ class ChartSettingsPage(QWidget):
 
         form = QFormLayout()
         spin_dpi = QSpinBox()
-        spin_dpi.setRange(72, 600); spin_dpi.setValue(self._spin_dpi.value())
+        spin_dpi.setRange(72, 600); spin_dpi.setValue(getattr(self, '_dpi', 150))
         form.addRow(self.tr("DPI:"), spin_dpi)
 
         spin_step = QSpinBox()
-        spin_step.setRange(1, 30); spin_step.setValue(self._spin_step.value())
+        spin_step.setRange(1, 30); spin_step.setValue(int(getattr(self, '_step_deg', 5)))
         spin_step.setSuffix("°")
         spin_step.setToolTip(self.tr("3D 采样精度: 1°=最细, 30°=最快"))
         form.addRow(self.tr("采样精度:"), spin_step)
@@ -3537,8 +3482,8 @@ class ChartSettingsPage(QWidget):
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
-            self._spin_dpi.setValue(spin_dpi.value()),
-            self._spin_step.setValue(spin_step.value()),
+            setattr(self, '_dpi', spin_dpi.value()),
+            setattr(self, '_step_deg', float(spin_step.value())),
             self._sync_to_mw(),
             dlg.accept()))
         btns.rejected.connect(dlg.reject)
