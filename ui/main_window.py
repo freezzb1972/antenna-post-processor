@@ -128,8 +128,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             geo = QByteArray.fromBase64(bytes(geo_str, 'utf-8'))
             self.restoreGeometry(geo)
         self._data_file_paths: List[str] = []
-        self._file_entries: List[FileEntry] = []  # Phase 1: FileEntry 并行列表
-        # 以下 widget 由 FileSettingsPage 统一管理，MainWindow 通过 @property 代理访问
         self._required_params: set = set()   # 用户确认的报告必需参数
         self._extra_params: set = set()      # 用户额外选择的计算参数
         self._dir_extrap_method: str = "linear"  # Directivity 外推算法
@@ -1386,48 +1384,23 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if p: p._on_clear_all_files()
 
     def _sync_file_entries(self):
-        """同步 _file_entries 与 _data_file_paths，保留已设置的 test_mode。"""
-        old_map = {e.path: e for e in self._file_entries}
-        self._file_entries = []
-        for p in self._data_file_paths:
-            if p in old_map:
-                self._file_entries.append(old_map[p])
-            else:
-                self._file_entries.append(FileEntry(path=p, test_mode=self._test_mode))
+        """委托给 FileSettingsPage 同步文件条目并刷新天线选择器。"""
+        fp = getattr(self, '_file_settings_page', None)
+        if fp:
+            fp._sync_file_entries()
         self._refresh_antenna_selector()
 
     def _refresh_data_file_ui(self):
-        if self._file_list_widget is None:
-            return
-        t = self._file_list_widget
-        t.setRowCount(len(self._data_file_paths))
-        for i, p in enumerate(self._data_file_paths):
-            try:
-                size_mb = Path(p).stat().st_size / (1024 * 1024)
-                label = f"📄 {Path(p).name}  ({size_mb:.1f} MB)"
-            except OSError:
-                label = f"📄 {Path(p).name}"
-            item = QTableWidgetItem(label)
-            item.setToolTip(p)
-            t.setItem(i, 0, item)
-            # 测试模式下拉
-            mode_combo = QComboBox()
-            for mode_val in [0, 1, 2]:
-                mode_combo.addItem(mode_name(mode_val), mode_val)
-            if i < len(self._file_entries):
-                mode_combo.setCurrentIndex(self._file_entries[i].test_mode)
-            mode_combo.currentIndexChanged.connect(
-                lambda idx, row=i: self._on_file_mode_changed(row))
-            t.setCellWidget(i, 1, mode_combo)
-            t.setRowHeight(i, 28)
-
-        self._update_window_title()
+        """委托给 FileSettingsPage 刷新文件列表 UI。"""
+        fp = getattr(self, '_file_settings_page', None)
+        if fp:
+            fp._refresh_data_file_ui()
 
     def _on_file_mode_changed(self, row: int):
-        """文件行测试模式变更回调。"""
-        combo = self._file_list_widget.cellWidget(row, 1)
-        if combo and row < len(self._file_entries):
-            self._file_entries[row].test_mode = combo.currentData()
+        """委托给 FileSettingsPage 处理文件模式变更。"""
+        fp = getattr(self, '_file_settings_page', None)
+        if fp:
+            fp._on_file_mode_changed(row)
 
     def _on_naming_mode_changed(self, index: int):
         """工作表命名方式变更回调。"""
