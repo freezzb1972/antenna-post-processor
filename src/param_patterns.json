@@ -1,0 +1,506 @@
+{
+  "params": {
+    "gain": {
+      "label": "Peak Gain",
+      "cn": "峰值增益",
+      "aliases": [
+        "gain",
+        "peak gain",
+        "g(dbi)",
+        "pk gain"
+      ]
+    },
+    "lag_single": {
+      "label": "Gain @ θ（单角度）",
+      "cn": "增益@θ",
+      "aliases": [
+        "lag_single",
+        "gain at theta",
+        "gain @",
+        "lag"
+      ]
+    },
+    "lag_range": {
+      "label": "Gain @ θ Range（范围）",
+      "cn": "增益@θ范围",
+      "aliases": [
+        "lag",
+        "lag_range",
+        "gain at theta",
+        "gain @"
+      ]
+    },
+    "directivity": {
+      "label": "Directivity (dBi)",
+      "cn": "方向性",
+      "aliases": [
+        "dir",
+        "d(dbi)",
+        "directivity"
+      ]
+    },
+    "efficiency_pct": {
+      "label": "Efficiency (%)",
+      "cn": "效率",
+      "aliases": [
+        "efficiency_pct",
+        "eff",
+        "efficiency"
+      ]
+    },
+    "efficiency_db": {
+      "label": "Efficiency (dB)",
+      "cn": "效率",
+      "aliases": [
+        "eff",
+        "efficiency",
+        "efficiency_db"
+      ]
+    },
+    "ar_single": {
+      "label": "AR @ θ（单角度）",
+      "cn": "轴比",
+      "aliases": [
+        "ar",
+        "ar_single",
+        "axial",
+        "axial ratio"
+      ]
+    },
+    "ar_range": {
+      "label": "AR @ θ Range（范围）",
+      "cn": "轴比范围",
+      "aliases": [
+        "ar",
+        "ar_range",
+        "axial",
+        "axial ratio"
+      ]
+    },
+    "boresight_theta": {
+      "label": "Boresight θ",
+      "cn": "瞄准角",
+      "aliases": [
+        "boresight_theta",
+        "boresight",
+        "瞄准"
+      ]
+    },
+    "boresight_phi": {
+      "label": "Boresight φ",
+      "cn": "瞄准角",
+      "aliases": [
+        "boresight_phi",
+        "boresight",
+        "瞄准"
+      ]
+    },
+    "theta_bw": {
+      "label": "Theta Beamwidth (3dB)",
+      "cn": "波束宽度",
+      "aliases": [
+        "beam width",
+        "beamwidth",
+        "theta_bw"
+      ]
+    },
+    "phi_bw": {
+      "label": "Phi Beamwidth (3dB)",
+      "cn": "波束宽度",
+      "aliases": [
+        "beam width",
+        "phi_bw",
+        "beamwidth"
+      ]
+    },
+    "front_back_ratio": {
+      "label": "Front/Back Ratio",
+      "cn": "前后比",
+      "aliases": [
+        "front_back_ratio",
+        "f/b",
+        "front back",
+        "front/back"
+      ]
+    },
+    "max_power": {
+      "label": "Maximum Power",
+      "cn": "最大功率",
+      "aliases": [
+        "max power",
+        "maximum power",
+        "max_power"
+      ]
+    },
+    "min_power": {
+      "label": "Minimum Power",
+      "cn": "最小功率",
+      "aliases": [
+        "minimum power",
+        "min_power",
+        "min power"
+      ]
+    },
+    "avg_gain": {
+      "label": "Average Gain",
+      "cn": "平均增益",
+      "aliases": [
+        "avg gain",
+        "avg_gain",
+        "average gain"
+      ]
+    },
+    "avg_power": {
+      "label": "Average Power",
+      "cn": "平均功率",
+      "aliases": [
+        "avg_power",
+        "avg power",
+        "average power"
+      ]
+    },
+    "max_min_ratio": {
+      "label": "Max/Min Ratio",
+      "cn": "峰均比",
+      "aliases": [
+        "max min",
+        "max_min_ratio",
+        "max/min"
+      ]
+    },
+    "max_avg_ratio": {
+      "label": "Max/Avg Ratio",
+      "cn": "峰值平均比",
+      "aliases": [
+        "max/avg",
+        "max avg",
+        "max_avg_ratio"
+      ]
+    },
+    "min_avg_ratio": {
+      "label": "Min/Avg Ratio",
+      "cn": "最小平均比",
+      "aliases": [
+        "min/avg",
+        "min_avg_ratio",
+        "min avg"
+      ]
+    },
+    "xpi_boresight": {
+      "label": "XPI @ Boresight (dB)",
+      "cn": "交叉极化隔离度@瞄准角",
+      "aliases": [
+        "cross polarization",
+        "xpi",
+        "瞄准",
+        "boresight",
+        "xpi_boresight"
+      ]
+    },
+    "xpi_mean": {
+      "label": "XPI Mean (dB)",
+      "cn": "交叉极化隔离度均值",
+      "aliases": [
+        "xpi_mean",
+        "cross polarization",
+        "xpi"
+      ]
+    },
+    "xpi_min": {
+      "label": "XPI Min (dB)",
+      "cn": "交叉极化隔离度最小值",
+      "aliases": [
+        "xpi_min",
+        "cross polarization",
+        "xpi"
+      ]
+    },
+    "rhcp_single": {
+      "label": "RHCP Gain @ θ（单角度）",
+      "cn": "右旋圆极化增益",
+      "aliases": [
+        "rhcp gain",
+        "rhcp",
+        "rhcp_single"
+      ]
+    },
+    "cp_xpi_single": {
+      "label": "CP-XPI @ θ（单角度）",
+      "cn": "圆极化交叉极化",
+      "aliases": [
+        "cp xpi",
+        "cp_xpi",
+        "cpxpi",
+        "cp-xpi",
+        "cp_xpi_single"
+      ]
+    },
+    "total_efficiency": {
+      "label": "Total Efficiency (%)",
+      "cn": "总效率",
+      "aliases": [
+        "total efficiency",
+        "total eff",
+        "total_efficiency"
+      ]
+    },
+    "mismatch_loss_db": {
+      "label": "Mismatch Loss (dB)",
+      "cn": "失配损耗",
+      "aliases": [
+        "mismatch_loss_db",
+        "mismatch",
+        "mismatch loss"
+      ]
+    },
+    "pc_theta_mm": {
+      "label": "PC Theta (mm)",
+      "cn": "相位中心",
+      "aliases": [
+        "pc_theta_mm",
+        "pc",
+        "phase center"
+      ]
+    },
+    "pc_phi_mm": {
+      "label": "PC Phi (mm)",
+      "cn": "相位中心",
+      "aliases": [
+        "pc_phi_mm",
+        "pc",
+        "phase center"
+      ]
+    },
+    "trp": {
+      "label": "Total Radiated Power (TRP)",
+      "cn": "总辐射功率",
+      "aliases": [
+        "trp",
+        "total radiated power"
+      ]
+    },
+    "peak_eirp": {
+      "label": "Peak EIRP",
+      "cn": "峰值EIRP",
+      "aliases": [
+        "pkeirp",
+        "peak_eirp",
+        "peak eirp",
+        "eirp"
+      ]
+    },
+    "nhprp_45": {
+      "label": "NHPRP ±45° (Pi/4)",
+      "cn": "近水平面辐射功率",
+      "aliases": [
+        "nhprp",
+        "nhprp_45",
+        "near horizon"
+      ]
+    },
+    "nhprp_30": {
+      "label": "NHPRP ±30° (Pi/6)",
+      "cn": "近水平面辐射功率",
+      "aliases": [
+        "nhprp",
+        "nhprp_30",
+        "near horizon"
+      ]
+    },
+    "nhprp_225": {
+      "label": "NHPRP ±22.5° (Pi/8)",
+      "cn": "近水平面辐射功率",
+      "aliases": [
+        "nhprp",
+        "nhprp_225",
+        "near horizon"
+      ]
+    },
+    "nhprp_custom": {
+      "label": "NHPRP 自定义角度",
+      "cn": "近水平面辐射功率",
+      "aliases": [
+        "nhprp",
+        "near horizon",
+        "nhprp_custom"
+      ]
+    },
+    "uh_prp": {
+      "label": "Upper Hemisphere PRP",
+      "cn": "上半球辐射功率",
+      "aliases": [
+        "hemisphere",
+        "uh_prp",
+        "prp"
+      ]
+    },
+    "lh_prp": {
+      "label": "Lower Hemisphere PRP",
+      "cn": "下半球辐射功率",
+      "aliases": [
+        "lh_prp",
+        "hemisphere",
+        "prp"
+      ]
+    },
+    "prp_120": {
+      "label": "PRP (theta 0-120°)",
+      "cn": "部分辐射功率",
+      "aliases": [
+        "prp_120",
+        "hemisphere",
+        "prp"
+      ]
+    },
+    "nhprp45_ratio": {
+      "label": "NHPRP45 / TRP",
+      "cn": "近水平面比",
+      "aliases": [
+        "nhprp",
+        "ratio",
+        "near horizon",
+        "nhprp45_ratio"
+      ]
+    },
+    "nhprp30_ratio": {
+      "label": "NHPRP30 / TRP",
+      "cn": "近水平面比",
+      "aliases": [
+        "nhprp",
+        "ratio",
+        "nhprp30_ratio",
+        "near horizon"
+      ]
+    },
+    "nhprp225_ratio": {
+      "label": "NHPRP22.5 / TRP",
+      "cn": "近水平面比",
+      "aliases": [
+        "nhprp225_ratio",
+        "ratio",
+        "near horizon",
+        "nhprp"
+      ]
+    },
+    "uh_ratio": {
+      "label": "UHPRP / TRP",
+      "cn": "上半球比",
+      "aliases": [
+        "uh_ratio",
+        "ratio",
+        "prp"
+      ]
+    },
+    "lh_ratio": {
+      "label": "LHPRP / TRP",
+      "cn": "下半球比",
+      "aliases": [
+        "ratio",
+        "prp",
+        "lh_ratio"
+      ]
+    },
+    "tis": {
+      "label": "Total Isotropic Sensitivity",
+      "cn": "总全向灵敏度",
+      "aliases": [
+        "total isotropic sensitivity",
+        "tis"
+      ]
+    },
+    "nhpis_45": {
+      "label": "NHPIS ±45° (Pi/4)",
+      "cn": "近水平面灵敏度",
+      "aliases": [
+        "nhpis",
+        "nhpis_45",
+        "near horizon"
+      ]
+    },
+    "nhpis_30": {
+      "label": "NHPIS ±30° (Pi/6)",
+      "cn": "近水平面灵敏度",
+      "aliases": [
+        "nhpis",
+        "nhpis_30",
+        "near horizon"
+      ]
+    },
+    "nhpis_225": {
+      "label": "NHPIS ±22.5° (Pi/8)",
+      "cn": "近水平面灵敏度",
+      "aliases": [
+        "nhpis",
+        "nhpis_225",
+        "near horizon"
+      ]
+    },
+    "nhpis_custom": {
+      "label": "NHPIS 自定义角度",
+      "cn": "近水平面灵敏度",
+      "aliases": [
+        "nhpis",
+        "near horizon",
+        "nhpis_custom"
+      ]
+    },
+    "uh_pis": {
+      "label": "Upper Hemisphere PIS",
+      "cn": "上半球灵敏度",
+      "aliases": [
+        "uh_pis",
+        "hemisphere",
+        "pis"
+      ]
+    },
+    "lh_pis": {
+      "label": "Lower Hemisphere PIS",
+      "cn": "下半球灵敏度",
+      "aliases": [
+        "hemisphere",
+        "pis",
+        "lh_pis"
+      ]
+    },
+    "pis_120": {
+      "label": "PIS (theta 0-120°)",
+      "cn": "部分灵敏度",
+      "aliases": [
+        "hemisphere",
+        "pis",
+        "pis_120"
+      ]
+    },
+    "nhpis45_ratio": {
+      "label": "NHPIS45 / TIS",
+      "cn": "近水平面灵敏度比",
+      "aliases": [
+        "ratio",
+        "nhpis",
+        "nhpis45_ratio",
+        "near horizon"
+      ]
+    },
+    "nhpis30_ratio": {
+      "label": "NHPIS30 / TIS",
+      "cn": "近水平面灵敏度比",
+      "aliases": [
+        "nhpis30_ratio",
+        "ratio",
+        "nhpis",
+        "near horizon"
+      ]
+    },
+    "nhpis225_ratio": {
+      "label": "NHPIS22.5 / TIS",
+      "cn": "近水平面灵敏度比",
+      "aliases": [
+        "nhpis225_ratio",
+        "ratio",
+        "nhpis",
+        "near horizon"
+      ]
+    }
+  },
+  "_note": "此文件由 param_patterns.json 维护。\n手写 _reg() 的覆盖规则直接写在 excel_reader.py 中，自动生成的在此文件中。"
+}

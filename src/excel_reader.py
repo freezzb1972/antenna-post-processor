@@ -71,8 +71,59 @@ def _load_column_patterns() -> list[dict]:
     return _COLUMN_PATTERNS
 
 
+def _classify_by_param_patterns(raw_header: str) -> str | None:
+    """用 src/param_patterns.json 中的标准参数名+别名匹配列头。
+
+    优先匹配标准名（label, cn, aliases），只匹配应用定义的参数。
+    不猜不推断——如果模板列头不匹配任何标准名，返回 None。
+    用户应通过编辑 param_patterns.json 添加别名来扩展。
+    """
+    global _PARAM_PATTERNS
+    if _PARAM_PATTERNS is None:
+        _PARAM_PATTERNS = _load_param_patterns()
+    if not _PARAM_PATTERNS:
+        return None
+
+    norm = normalize_header(raw_header).lower()
+    # 移除括号内容 (如 "(dB)", "(dBi)") 便于匹配
+    norm_clean = re.sub(r'\([^)]*\)', '', norm).strip()
+
+    for key, info in _PARAM_PATTERNS.items():
+        aliases = info.get('aliases', [])
+        if not isinstance(aliases, list):
+            aliases = []
+        # 匹配: 任意别名出现在清理后的 header 中
+        for alias in aliases:
+            if alias in norm_clean:
+                return key
+    return None
+
+
+def _load_param_patterns() -> dict | None:
+    """加载 src/param_patterns.json。"""
+    global _PARAM_PATTERNS
+    candidates = []
+    if getattr(sys, 'frozen', False):
+        candidates.append(os.path.join(os.path.dirname(sys.executable), "src", "param_patterns.json"))
+    candidates.append(os.path.join(os.path.dirname(__file__), "param_patterns.json"))
+    for c in candidates:
+        if os.path.isfile(c):
+            try:
+                with open(c, encoding='utf-8') as f:
+                    data = json.load(f)
+                _PARAM_PATTERNS = data.get('params', data)
+                return _PARAM_PATTERNS
+            except (json.JSONDecodeError, OSError):
+                pass
+    _PARAM_PATTERNS = {}
+    return _PARAM_PATTERNS
+
+
+_PARAM_PATTERNS: dict | None = None
+
+
 def _classify_by_json_patterns(raw_header: str) -> str | None:
-    """用 config/column_patterns.json 中的规则匹配列头（唯一分类器）。
+    """用 config/column_patterns.json 中的规则匹配列头（兜底分类器）。
 
     匹配优先级（按 JSON 顺序，先匹配者胜）：
       1. "regex" — 正则匹配
@@ -684,20 +735,24 @@ def _parse_sheet(ws) -> SheetInfo | None:
         norm = normalize_header(raw)
         col_letter = openpyxl.utils.get_column_letter(c)
 
-        # 分类 — 内置函数优先，JSON 仅补充，最后比率列 + unknown
-        builtin_type = _classify_by_builtin(raw, norm)
-        if builtin_type is not None:
-            ctype = builtin_type
+        # 分类优先级: 标准参数名 → 内置规则 → JSON补充 → 比率
+        param_type = _classify_by_param_patterns(raw)
+        if param_type is not None:
+            ctype = param_type
         else:
-            json_type = _classify_by_json_patterns(raw)
-            if json_type is not None:
-                ctype = json_type
+            builtin_type = _classify_by_builtin(raw, norm)
+            if builtin_type is not None:
+                ctype = builtin_type
             else:
-                ratio_type = detect_ratio_column_type(raw)
-                if ratio_type is not None:
-                    ctype = ratio_type
+                json_type = _classify_by_json_patterns(raw)
+                if json_type is not None:
+                    ctype = json_type
                 else:
-                    ctype = "unknown"
+                    ratio_type = detect_ratio_column_type(raw)
+                    if ratio_type is not None:
+                        ctype = ratio_type
+                    else:
+                        ctype = "unknown"
 
         cinfo = ColumnInfo(
             col_letter=col_letter,
