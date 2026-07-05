@@ -610,6 +610,8 @@ def _setup_polar_radial_ticks(ax):
     """
     yl = ax.get_ylim()
     vmin, vmax = yl[0], yl[1]
+    # 极坐标径向轴必须从 0 开始
+    vmin = min(vmin, 0)
     if vmax - vmin <= 0:
         vmax = vmin + 10
 
