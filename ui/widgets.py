@@ -480,7 +480,7 @@ class DataFileSelector(QGroupBox):
         if ly and hasattr(self, '_tight_margins'):
             ly.setContentsMargins(*self._tight_margins)
             ly.setSpacing(self._tight_spacing)
-        self.setStyleSheet("QGroupBox { padding-top: 2px; padding-bottom: 0px; margin-top: 12px; }")
+        self.setStyleSheet("QGroupBox { padding-top: 1px; padding-bottom: 1px; margin-top: 12px; }")
 
     def _setup_widgets(self):
         # 按钮行

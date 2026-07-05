@@ -361,7 +361,7 @@ class FileSettingsPage(QWidget):
                 ds_layout.setContentsMargins(2, 0, 2, 0)
                 ds_layout.setSpacing(0)
         # 直接设置 QSS 为极紧凑值 (绕过全局 QSS)
-        compact_qss = "QGroupBox { padding-top: 2px; padding-bottom: 0px; margin-top: 12px; }"
+        compact_qss = "QGroupBox { padding-top: 1px; padding-bottom: 1px; margin-top: 12px; }"
         for w in [getattr(self, 'excel_grp', None), getattr(self, 'word_grp', None),
                   getattr(self, '_data_sel', None)]:
             if w:
