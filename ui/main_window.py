@@ -689,6 +689,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 if idx >= 0: cp._cmb_test_mode.setCurrentIndex(idx)
                 cp._cmb_test_mode.blockSignals(False)
                 cp._rebuild_chart_categories(ant.test_mode)
+            # 单向同步天线名到图表配置 (用户可在图表页手动修改)
+            if hasattr(cp, '_edit_antenna_name') and ant.name:
+                cur = cp._edit_antenna_name.text().strip()
+                if not cur or cur == getattr(self, '_last_ant_name_synced', ''):
+                    cp._edit_antenna_name.setText(ant.name)
+                    self._last_ant_name_synced = ant.name
 
     def _make_tab_scrollable(self, tab: QWidget):
         """将指定 Tab 的内容包裹在 QScrollArea 中，防止内容溢出被压缩。"""
