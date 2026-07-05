@@ -327,7 +327,7 @@ class FinalSummarySource(DataSource):
                 if self._has_phi_pol and self._phi_pol_start > 0:
                     pl = _read_matrix(ws, self._phi_pol_start, nphi, ntheta)
                 else:
-                    pl = np.full_like(tl, -999.0)
+                    pl = np.full_like(tl, float('nan'))
 
                 pp_data = None
                 if self._has_phase and self._phi_phase_start > 0:
@@ -375,7 +375,7 @@ class FinalSummarySource(DataSource):
             if self._has_phi_pol and self._phi_pol_start > 0:
                 pl = _read_matrix(ws, self._phi_pol_start, nphi, ntheta)
             else:
-                pl = np.full_like(tl, -999.0)
+                pl = np.full_like(tl, float('nan'))
 
             # 读 Phi Pol 相位（如有 Phase 段）
             pp_data = None
@@ -428,17 +428,17 @@ def _read_matrix_pandas(ws, start_row: int, n_rows: int, n_cols: int) -> np.ndar
             break
 
     if not rows_data:
-        return np.full((n_rows, n_cols), -999.0, dtype=np.float64)
+        return np.full((n_rows, n_cols), float('nan'), dtype=np.float64)
 
     # pandas to_numpy 批量转换 (C 级别, 比 Python float() 快 3-5x)
-    return pd.DataFrame(rows_data).to_numpy(dtype=np.float64, na_value=-999.0)[:n_rows, :n_cols]
+    return pd.DataFrame(rows_data).to_numpy(dtype=np.float64, na_value=float('nan'))[:n_rows, :n_cols]
 
 
 def _read_matrix(ws, start_row: int, n_rows: int, n_cols: int) -> np.ndarray:
     """流式读取 n_rows × n_cols 矩阵，自动选择最快路径。"""
     # 小矩阵直接用 openpyxl（pandas 导入有开销）
     if n_rows * n_cols < 1000:
-        data = np.full((n_rows, n_cols), -999.0, dtype=np.float64)
+        data = np.full((n_rows, n_cols), float('nan'), dtype=np.float64)
         rows = ws.iter_rows(min_row=start_row, max_row=start_row + n_rows - 1,
                              min_col=2, max_col=1 + n_cols, values_only=True)
         for pi, row in enumerate(rows):
@@ -462,7 +462,7 @@ def _read_matrix(ws, start_row: int, n_rows: int, n_cols: int) -> np.ndarray:
         pass
 
     # Fallback
-    data = np.full((n_rows, n_cols), -999.0, dtype=np.float64)
+    data = np.full((n_rows, n_cols), float('nan'), dtype=np.float64)
     rows = ws.iter_rows(min_row=start_row, max_row=start_row + n_rows - 1,
                          min_col=2, max_col=1 + n_cols, values_only=True)
     for pi, row in enumerate(rows):

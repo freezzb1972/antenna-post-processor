@@ -391,8 +391,9 @@ def _process_one_frequency(
                 cp_xpi = compute_cp_xpi(rhcp_g, lhcp_g)
 
                 if True:  # RHCP single always computed
+                    rhcp_linear = 10.0 ** (rhcp_g / 10.0)  # dB → linear power
                     for angle, val in compute_lag_at_angles(
-                        rhcp_g, theta_deg,
+                        rhcp_linear, theta_deg,
                         (rhcp_lag_config if rhcp_lag_config and not rhcp_lag_config.is_empty() else lag_config).singles_sorted
                     ).items():
                         row[f"rhcp_single_{angle}"] = round(val, 6)
@@ -405,8 +406,9 @@ def _process_one_frequency(
 
                 cp_cfg = cpxpi_lag_config if cpxpi_lag_config and not cpxpi_lag_config.is_empty() else lag_config
                 if cp_cfg.singles_sorted:
+                    cp_linear = 10.0 ** (cp_xpi / 10.0)  # dB → linear
                     for angle, val in compute_lag_at_angles(
-                        cp_xpi, theta_deg, cp_cfg.singles_sorted
+                        cp_linear, theta_deg, cp_cfg.singles_sorted
                     ).items():
                         row[f"cp_xpi_single_{angle}"] = round(val, 6)
                 if cp_cfg.ranges_sorted:

@@ -51,7 +51,7 @@ def compute_total_gain_linear(
     else:
         peak = float(np.max(total))
 
-    peak_dbi = 10.0 * np.log10(peak) if peak > 0 else -999.0
+    peak_dbi = 10.0 * np.log10(peak) if peak > 0 else float('nan')
     return total, peak_dbi
 
 
@@ -144,7 +144,7 @@ def compute_lag_single(
     cut = gain_linear[:, theta_idx]  # (n_phi,)
     mean_lin = _kahan_mean(cut)
     if mean_lin <= 0:
-        return -999.0
+        return float('nan')
     return float(10.0 * np.log10(mean_lin))
 
 
@@ -188,13 +188,13 @@ def compute_lag_range(
     mask = (theta_angles_deg >= theta_start) & (theta_angles_deg <= theta_end + 1e-9)
     indices = np.where(mask)[0]
     if len(indices) == 0:
-        return -999.0
+        return float('nan')
 
     # 正确: 所有 θ×φ 在线性域取均值, 一次性转 dB
     subset = gain_linear[:, indices]  # (n_phi, n_theta_in_range)
     mean_lin = _kahan_mean(subset)
     if mean_lin <= 0:
-        return -999.0
+        return float('nan')
     return float(10.0 * np.log10(mean_lin))
 
 
@@ -240,7 +240,7 @@ def _weighted_prp(gain_sub: np.ndarray, theta_sub: np.ndarray) -> float:
     w = _clenshaw_curtis_weights(n_theta)
     cut = np.mean(gain_sub, axis=0) * np.sin(theta_sub)
     prp_lin = 0.5 * np.sum(w * cut)
-    return max(prp_lin, 1e-15)
+    return prp_lin if prp_lin > 1e-15 else float('nan')
 
 
 def compute_trp(
@@ -315,7 +315,7 @@ def compute_peak_eirp(
     """
     peak = float(np.max(eirp_linear))
     if peak <= 1e-15:
-        return -999.0
+        return float('nan')
     return float(10.0 * np.log10(peak))
 
 
@@ -383,7 +383,7 @@ def compute_partial_prp(
     mask = (theta_deg >= theta_start_deg) & (theta_deg < theta_end_deg + 1e-9)  # [start, end)
     indices = np.where(mask)[0]
     if len(indices) == 0:
-        return -999.0
+        return float('nan')
 
     gain_sub = gain_linear[:, indices]
     prp_lin = _weighted_prp(gain_sub, theta_rad[indices])
@@ -447,7 +447,7 @@ def compute_min_power_dbm(
     """
     mask = gain_linear > 1e-15
     if not np.any(mask):
-        return -999.0
+        return float('nan')
     min_val = float(np.min(gain_linear[mask]))
     return float(10.0 * np.log10(min_val))
 
@@ -465,7 +465,7 @@ def compute_average_gain_db(
     """
     mean_lin = float(np.mean(gain_linear))
     if mean_lin <= 1e-15:
-        return -999.0
+        return float('nan')
     return float(10.0 * np.log10(mean_lin))
 
 
@@ -780,7 +780,10 @@ def compute_total_efficiency(
         return {"total_efficiency_pct": 0.0, "mismatch_loss_db": None}
 
     total_eff_pct = efficiency_pct * transmission_factor
-    mismatch_loss_db = float(10.0 * np.log10(max(transmission_factor, 1e-15)))
+    if transmission_factor <= 1e-15:
+        mismatch_loss_db = float('nan')
+    else:
+        mismatch_loss_db = float(10.0 * np.log10(transmission_factor))
 
     return {
         "total_efficiency_pct": round(total_eff_pct, 6),
