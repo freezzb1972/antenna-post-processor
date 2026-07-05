@@ -2934,8 +2934,8 @@ class ChartSettingsPage(QWidget):
                 return toggle
             grp.toggled.connect(make_toggle(grp, content_widget, cat_name))
 
-        # 输出方式
-        out_grp = QGroupBox(self.tr("输出方式"))
+        # 输出设置
+        out_grp = QGroupBox(self.tr("输出设置"))
         out_layout = QVBoxLayout(out_grp)
 
         # ── Word 布局 ──
@@ -2945,6 +2945,17 @@ class ChartSettingsPage(QWidget):
         row_wl.addWidget(btn_word_layout)
         row_wl.addStretch()
         out_layout.addLayout(row_wl)
+
+        # 图表标题天线名
+        row_ant = QHBoxLayout()
+        row_ant.addWidget(QLabel(self.tr("图表标题:")))
+        self._edit_antenna_name = QLineEdit()
+        self._edit_antenna_name.setPlaceholderText(self.tr("天线名，用于图表标题"))
+        self._edit_antenna_name.setMaximumWidth(200)
+        self._edit_antenna_name.textChanged.connect(lambda: self._sync_to_mw())
+        row_ant.addWidget(self._edit_antenna_name)
+        row_ant.addStretch()
+        out_layout.addLayout(row_ant)
 
         # 嵌入/PNG 放在最下方
         row_bottom = QHBoxLayout()
@@ -3050,21 +3061,6 @@ class ChartSettingsPage(QWidget):
         row_dpi.addStretch()
         left_layout.addLayout(row_dpi)
 
-        # 天线名
-        sep_az = QFrame()
-        sep_az.setFrameShape(QFrame.HLine)
-        sep_az.setFrameShadow(QFrame.Sunken)
-        left_layout.addWidget(sep_az)
-
-        row_ant = QHBoxLayout()
-        row_ant.addWidget(QLabel(self.tr("天线名:")))
-        self._edit_antenna_name = QLineEdit()
-        self._edit_antenna_name.setPlaceholderText(self.tr("可选，用于图表标题"))
-        self._edit_antenna_name.setMaximumWidth(160)
-        self._edit_antenna_name.textChanged.connect(lambda: self._sync_to_mw())
-        row_ant.addWidget(self._edit_antenna_name)
-        row_ant.addStretch()
-        left_layout.addLayout(row_ant)
 
     def _on_chart_mode_changed(self, idx: int):
         """图表配置页测试模式切换 → 重建分类列表。"""
