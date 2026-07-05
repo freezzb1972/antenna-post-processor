@@ -631,8 +631,8 @@ def _setup_polar_radial_ticks(ax):
         ticks.append(ticks[-1] + step)
     ticks = [round(t, 6) for t in ticks]
 
-    ax.set_ylim(0.0, ticks[-1])  # 极坐标径向轴从 0 开始
-    ticks = [0.0] + [t for t in ticks if t > 0]
+
+    ax.set_ylim(ticks[0], ticks[-1])
     import matplotlib.ticker as _ticker
     ax.yaxis.set_major_locator(_ticker.FixedLocator(ticks))
     ax.yaxis.set_minor_locator(_ticker.NullLocator())
