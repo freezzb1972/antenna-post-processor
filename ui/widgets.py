@@ -466,6 +466,7 @@ class DataFileSelector(QGroupBox):
         self._tight_spacing = 0
         layout.setContentsMargins(*self._tight_margins)
         layout.setSpacing(self._tight_spacing)
+        self._setup_widgets()
 
     def showEvent(self, event):
         """QSS 重置后恢复紧凑间距。"""
@@ -475,6 +476,7 @@ class DataFileSelector(QGroupBox):
             ly.setContentsMargins(*self._tight_margins)
             ly.setSpacing(self._tight_spacing)
 
+    def _setup_widgets(self):
         # 按钮行
         btn_row = QHBoxLayout()
         self.btn_add_files = QPushButton(self.tr("📂 添加数据文件..."))
@@ -485,7 +487,7 @@ class DataFileSelector(QGroupBox):
         btn_row.addWidget(self.btn_clear_selected)
         btn_row.addWidget(self.btn_clear_all)
         btn_row.addStretch()
-        layout.addLayout(btn_row)
+        self.layout().addLayout(btn_row)
 
         # 文件列表
         self.file_list_widget = QTableWidget()
@@ -505,7 +507,7 @@ class DataFileSelector(QGroupBox):
         self.file_list_widget.setAlternatingRowColors(True)
         self.file_list_widget.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.file_list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        layout.addWidget(self.file_list_widget, 1)  # stretch=1, 占满空间
+        self.layout().addWidget(self.file_list_widget, 1)
 
         # 自动匹配按钮行 (底部)
         match_row = QHBoxLayout()
@@ -526,7 +528,7 @@ class DataFileSelector(QGroupBox):
         self.cmb_naming_mode.setFixedWidth(190)
         match_row.addWidget(self.cmb_naming_mode)
         match_row.addStretch()
-        layout.addLayout(match_row)
+        self.layout().addLayout(match_row)
 
 
 # ═══════════════════════════════════════════════════════════════
