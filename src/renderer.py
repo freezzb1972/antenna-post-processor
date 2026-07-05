@@ -358,6 +358,8 @@ class MatplotlibRenderer(BaseRenderer):
             ax.set_title(f"{freq_mhz:.0f}MHz - {ylabel}", fontsize=12, pad=12)
 
         ax.grid(True, alpha=0.4)
+        ax.autoscale_view()       # 先完成自动缩放
+        ax.margins(y=0.05)         # 收紧径向边距
 
         if ticks_override is not None:
             # 共享刻度: 使用预计算值
