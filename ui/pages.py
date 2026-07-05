@@ -165,11 +165,11 @@ class FileSettingsPage(QWidget):
         tpl_row.setSpacing(4)
 
         # Excel 模版组
-        excel_grp = QGroupBox(self.tr("Excel 参数模版"))
-        excel_grp.setStyleSheet("QGroupBox { padding-top: 4px; padding-bottom: 1px; margin-top: 14px; }")
-        excel_layout = QVBoxLayout(excel_grp)
+        self.excel_grp = QGroupBox(self.tr("Excel 参数模版"))
+        excel_layout = QVBoxLayout(self.excel_grp)
         excel_layout.setContentsMargins(2, 0, 2, 0)
         excel_layout.setSpacing(0)
+        excel_layout.setSizeConstraint(excel_layout.SetMinAndMaxSize)
         self._tpl_row = TemplateSourceRow(
             on_browse=self._on_browse_template,
             on_preview=self._on_preview_report,
@@ -187,13 +187,14 @@ class FileSettingsPage(QWidget):
         self._tpl_row.template_changed.connect(self._tpl_path_label.setText)
         self._tpl_path_label.setReadOnly(True)
         self._tpl_path_label.setPlaceholderText(self.tr("(未选择 Excel 参数模版)"))
+        self._tpl_path_label.setFixedHeight(20)
         excel_layout.addWidget(self._tpl_path_label)
-        tpl_row.addWidget(excel_grp, 1)
+        tpl_row.addWidget(self.excel_grp, 1)
 
         # Word 报告模版组
-        word_grp = QGroupBox(self.tr("Word 报告模版"))
-        word_grp.setStyleSheet("QGroupBox { padding-top: 4px; padding-bottom: 1px; margin-top: 14px; }")
-        word_layout = QVBoxLayout(word_grp)
+        self.word_grp = QGroupBox(self.tr("Word 报告模版"))
+        self.word_grp.setStyleSheet("QGroupBox { padding-top: 4px; padding-bottom: 1px; margin-top: 14px; }")
+        word_layout = QVBoxLayout(self.word_grp)
         word_layout.setContentsMargins(2, 0, 2, 0)
         word_layout.setSpacing(0)
         self._word_tpl_row = TemplateSourceRow(
@@ -208,9 +209,10 @@ class FileSettingsPage(QWidget):
         self._edit_word_tpl_widget = QLineEdit()
         self._edit_word_tpl_widget.setReadOnly(True)
         self._edit_word_tpl_widget.setPlaceholderText(self.tr("(未选择 Word 报告模版)"))
+        self._edit_word_tpl_widget.setFixedHeight(20)
         self._word_tpl_row.template_changed.connect(self._edit_word_tpl_widget.setText)
         word_layout.addWidget(self._edit_word_tpl_widget)
-        tpl_row.addWidget(word_grp, 1)
+        tpl_row.addWidget(self.word_grp, 1)
 
         # 模板行打包到一个 widget 加入垂直 splitter
         tpl_widget = QWidget()
@@ -335,6 +337,29 @@ class FileSettingsPage(QWidget):
         scroll_area.setFrameShape(QScrollArea.NoFrame)
         scroll_area.setWidget(h_splitter)
         main_layout.addWidget(scroll_area, 1)
+
+    def showEvent(self, event):
+        """首次显示时强制应用紧凑间距 (QSS 可能已重置)。"""
+        super().showEvent(event)
+        if not hasattr(self, '_spacing_applied'):
+            self._spacing_applied = True
+            self._apply_tight_spacing()
+
+    def _apply_tight_spacing(self):
+        """绕过 QSS, 直接设置紧凑间距。"""
+        excel_layout = self.excel_grp.layout() if hasattr(self, 'excel_grp') else None
+        if excel_layout:
+            excel_layout.setContentsMargins(2, 0, 2, 0)
+            excel_layout.setSpacing(0)
+        word_layout = self.word_grp.layout() if hasattr(self, 'word_grp') else None
+        if word_layout:
+            word_layout.setContentsMargins(2, 0, 2, 0)
+            word_layout.setSpacing(0)
+        if hasattr(self, '_data_sel'):
+            ds_layout = self._data_sel.layout()
+            if ds_layout:
+                ds_layout.setContentsMargins(2, 0, 2, 0)
+                ds_layout.setSpacing(0)
 
     def _init_state(self):
         """初始化本地状态（无 MainWindow 时使用）。"""
