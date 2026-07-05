@@ -2605,10 +2605,10 @@ class PatternManagerDialog(QDialog):
         layout.addWidget(test_grp)
 
         self._table = QTableWidget()
-        self._table.setColumnCount(4)
+        self._table.setColumnCount(6)
         self._table.setHorizontalHeaderLabels([
             self.tr("参数键"), self.tr("英文名"), self.tr("中文名"),
-            self.tr("别名 (逗号分隔)"),
+            self.tr("别名 (逗号分隔)"), self.tr("排除词"), self.tr("必须词"),
         ])
         self._table.horizontalHeader().setStretchLastSection(True)
         self._table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -2652,6 +2652,12 @@ class PatternManagerDialog(QDialog):
             aliases = info.get("aliases", [])
             alias_str = ", ".join(aliases) if isinstance(aliases, list) else str(aliases)
             self._table.setItem(i, 3, QTableWidgetItem(alias_str))
+            negate = info.get("negate", [])
+            neg_str = ", ".join(negate) if isinstance(negate, list) else str(negate)
+            self._table.setItem(i, 4, QTableWidgetItem(neg_str))
+            extra = info.get("extra_req", [])
+            ext_str = ", ".join(extra) if isinstance(extra, list) else str(extra)
+            self._table.setItem(i, 5, QTableWidgetItem(ext_str))
         self._dirty = False
 
     def _save(self):
@@ -2663,8 +2669,14 @@ class PatternManagerDialog(QDialog):
                 continue
             alias_str = self._table.item(i, 3).text().strip() if self._table.item(i, 3) else ""
             aliases = [a.strip() for a in alias_str.split(",") if a.strip()]
+            neg_str = self._table.item(i, 4).text().strip() if self._table.item(i, 4) else ""
+            negate = [n.strip() for n in neg_str.split(",") if n.strip()]
+            ext_str = self._table.item(i, 5).text().strip() if self._table.item(i, 5) else ""
+            extra = [e.strip() for e in ext_str.split(",") if e.strip()]
             if key in params:
                 params[key]["aliases"] = aliases
+                params[key]["negate"] = negate
+                params[key]["extra_req"] = extra
 
         candidates = []
         if getattr(sys, 'frozen', False):
