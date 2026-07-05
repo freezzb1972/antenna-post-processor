@@ -2133,46 +2133,41 @@ class AntennaParamsPage(QWidget):
             gl = QVBoxLayout(grp)
             gl.setSpacing(2)
             for key, label in items:
+                row = QHBoxLayout()
+                row.setSpacing(4)
                 cb = QCheckBox(label)
                 self._left_checkboxes[key] = cb
                 cb.toggled.connect(lambda checked, k=key: self._sync_to_mw())
-                # 反向联动: 子参数 → 主 checkbox
                 tpl = self._template_params
                 cascade_up = (key == "gain" and ("lag_single" in tpl or "lag_range" in tpl)) or                              (key == "ar" and ("ar_single" in tpl or "ar_range" in tpl))
                 cb.setChecked(key in self._template_params or cascade_up)
-                gl.addWidget(cb)
-            if grp_name == "Gain":
-                btn = QPushButton(self.tr("⚙ 参数"))
-                btn.setFixedWidth(60)
-                btn.clicked.connect(lambda: self._show_angle_popup("gain"))
-                gl.addWidget(btn)
-            elif grp_name == "Efficiency / 总效率":
-                pass  # 无角度设置
-            elif grp_name == "Axial Ratio":
-                btn = QPushButton(self.tr("⚙ 参数"))
-                btn.setFixedWidth(60)
-                btn.clicked.connect(lambda: self._show_angle_popup("ar"))
-                gl.addWidget(btn)
-            elif grp_name == "圆极化 (RHCP/LHCP)":
-                row_rhcp = QHBoxLayout()
-                row_rhcp.addWidget(QLabel(self.tr("  ⤷ RHCP:")))
-                btn_rhcp = QPushButton(self.tr("⚙ 参数"))
-                btn_rhcp.setFixedWidth(60)
-                btn_rhcp.setToolTip(self.tr("RHCP Gain 角度配置"))
-                btn_rhcp.clicked.connect(lambda: self._show_angle_popup("rhcp"))
-                row_rhcp.addWidget(btn_rhcp)
-                row_rhcp.addStretch()
-                gl.addLayout(row_rhcp)
-                row_cp = QHBoxLayout()
-                row_cp.addWidget(QLabel(self.tr("  ⤷ CP-XPI:")))
-                btn_cp = QPushButton(self.tr("⚙ 参数"))
-                btn_cp.setFixedWidth(60)
-                btn_cp.setToolTip(self.tr("CP-XPI 角度配置"))
-                btn_cp.clicked.connect(lambda: self._show_angle_popup("cpxpi"))
-                row_cp.addWidget(btn_cp)
-                row_cp.addStretch()
-                gl.addLayout(row_cp)
-            elif grp_name == "Directivity":
+                row.addWidget(cb)
+                # 同行参数按钮
+                if key == "gain":
+                    btn = QPushButton(self.tr("⚙ 参数"))
+                    btn.setFixedWidth(60)
+                    btn.clicked.connect(lambda: self._show_angle_popup("gain"))
+                    row.addWidget(btn)
+                elif key == "ar":
+                    btn = QPushButton(self.tr("⚙ 参数"))
+                    btn.setFixedWidth(60)
+                    btn.clicked.connect(lambda: self._show_angle_popup("ar"))
+                    row.addWidget(btn)
+                elif key == "rhcp_single":
+                    btn = QPushButton(self.tr("⚙ 参数"))
+                    btn.setFixedWidth(60)
+                    btn.setToolTip(self.tr("RHCP 参数设置"))
+                    btn.clicked.connect(lambda: self._show_angle_popup("rhcp"))
+                    row.addWidget(btn)
+                elif key == "cp_xpi_single":
+                    btn = QPushButton(self.tr("⚙ 参数"))
+                    btn.setFixedWidth(60)
+                    btn.setToolTip(self.tr("CP-XPI 参数设置"))
+                    btn.clicked.connect(lambda: self._show_angle_popup("cpxpi"))
+                    row.addWidget(btn)
+                row.addStretch()
+                gl.addLayout(row)
+            if grp_name == "Directivity":
                 row_de = QHBoxLayout()
                 row_de.addWidget(QLabel(self.tr("外推:")))
                 cmb_de = self._make_extrap_combo(include_none=False)
@@ -2200,41 +2195,39 @@ class AntennaParamsPage(QWidget):
             gl = QVBoxLayout(grp)
             gl.setSpacing(2)
             for key, label in items:
+                row = QHBoxLayout()
+                row.setSpacing(4)
                 cb = QCheckBox(label)
                 self._right_checkboxes[key] = cb
                 cb.toggled.connect(lambda checked, k=key: self._sync_to_mw())
                 cb.setChecked(False)
-                gl.addWidget(cb)
-            if grp_name == "Gain":
-                btn = QPushButton(self.tr("⚙ 参数"))
-                btn.setFixedWidth(60)
-                btn.clicked.connect(lambda: self._show_angle_popup("gain"))
-                gl.addWidget(btn)
-            elif grp_name == "Axial Ratio":
-                btn = QPushButton(self.tr("⚙ 参数"))
-                btn.setFixedWidth(60)
-                btn.clicked.connect(lambda: self._show_angle_popup("ar"))
-                gl.addWidget(btn)
-            elif grp_name == "圆极化 (RHCP/LHCP)":
-                row_rhcp = QHBoxLayout()
-                row_rhcp.addWidget(QLabel(self.tr("  ⤷ RHCP:")))
-                btn_rhcp = QPushButton(self.tr("⚙ 参数"))
-                btn_rhcp.setFixedWidth(60)
-                btn_rhcp.setToolTip(self.tr("RHCP Gain 角度配置"))
-                btn_rhcp.clicked.connect(lambda: self._show_angle_popup("rhcp"))
-                row_rhcp.addWidget(btn_rhcp)
-                row_rhcp.addStretch()
-                gl.addLayout(row_rhcp)
-                row_cp = QHBoxLayout()
-                row_cp.addWidget(QLabel(self.tr("  ⤷ CP-XPI:")))
-                btn_cp = QPushButton(self.tr("⚙ 参数"))
-                btn_cp.setFixedWidth(60)
-                btn_cp.setToolTip(self.tr("CP-XPI 角度配置"))
-                btn_cp.clicked.connect(lambda: self._show_angle_popup("cpxpi"))
-                row_cp.addWidget(btn_cp)
-                row_cp.addStretch()
-                gl.addLayout(row_cp)
-            elif grp_name == "Directivity":
+                row.addWidget(cb)
+                # 同行参数按钮
+                if key == "gain":
+                    btn = QPushButton(self.tr("⚙ 参数"))
+                    btn.setFixedWidth(60)
+                    btn.clicked.connect(lambda: self._show_angle_popup("gain"))
+                    row.addWidget(btn)
+                elif key == "ar":
+                    btn = QPushButton(self.tr("⚙ 参数"))
+                    btn.setFixedWidth(60)
+                    btn.clicked.connect(lambda: self._show_angle_popup("ar"))
+                    row.addWidget(btn)
+                elif key == "rhcp_single":
+                    btn = QPushButton(self.tr("⚙ 参数"))
+                    btn.setFixedWidth(60)
+                    btn.setToolTip(self.tr("RHCP 参数设置"))
+                    btn.clicked.connect(lambda: self._show_angle_popup("rhcp"))
+                    row.addWidget(btn)
+                elif key == "cp_xpi_single":
+                    btn = QPushButton(self.tr("⚙ 参数"))
+                    btn.setFixedWidth(60)
+                    btn.setToolTip(self.tr("CP-XPI 参数设置"))
+                    btn.clicked.connect(lambda: self._show_angle_popup("cpxpi"))
+                    row.addWidget(btn)
+                row.addStretch()
+                gl.addLayout(row)
+            if grp_name == "Directivity":
                 row_de = QHBoxLayout()
                 row_de.addWidget(QLabel(self.tr("外推:")))
                 cmb_de = self._make_extrap_combo(include_none=False)

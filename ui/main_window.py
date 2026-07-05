@@ -583,27 +583,41 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     # ═══════════════════════════════════════════════════════════════
 
     def _refresh_antenna_selector(self):
-        """从 FileEntry 列表刷新天线选择器。"""
+        """从 FileSettingsPage._file_entries 刷新天线选择器。"""
         self._antenna_selector.blockSignals(True)
-        current = self._antenna_selector.currentData()  # 保存旧选择
+        current = self._antenna_selector.currentData()
         self._antenna_selector.clear()
         seen = set()
-        for fe in self._file_entries:
-            name = fe.antenna_name or extract_antenna_name(fe.path)
-            if name not in seen:
-                self._antenna_selector.addItem(name, name)
-                seen.add(name)
-                # 首次发现时自动创建 AntennaConfig（继承模板参数）
-                if name not in self._antenna_configs:
-                    ant = AntennaConfig(name=name, data_files=[fe.path],
-                                        test_mode=fe.test_mode,
-                                        required_params=set(self._required_params))
-                    self._antenna_configs[name] = ant
-                else:
-                    # 追加数据文件到已有天线
-                    ant = self._antenna_configs[name]
-                    if fe.path not in ant.data_files:
-                        ant.data_files.append(fe.path)
+        # 从 FileSettingsPage 读取已填充 antenna_name 的 FileEntry 列表
+        file_page = getattr(self, '_file_settings_page', None)
+        entries = file_page._file_entries if file_page else []
+        if not entries and self._data_file_paths:
+            # fallback: 直接从文件路径提取
+            from src.multi_antenna import extract_antenna_name as _extract
+            for p in self._data_file_paths:
+                name = _extract(p)
+                if name not in seen:
+                    self._antenna_selector.addItem(name, name)
+                    seen.add(name)
+                    if name not in self._antenna_configs:
+                        self._antenna_configs[name] = AntennaConfig(
+                            name=name, data_files=[p],
+                            required_params=set(self._required_params))
+        else:
+            for fe in entries:
+                name = fe.antenna_name or extract_antenna_name(fe.path)
+                if name not in seen:
+                    self._antenna_selector.addItem(name, name)
+                    seen.add(name)
+                    if name not in self._antenna_configs:
+                        ant = AntennaConfig(name=name, data_files=[fe.path],
+                                            test_mode=fe.test_mode,
+                                            required_params=set(self._required_params))
+                        self._antenna_configs[name] = ant
+                    else:
+                        ant = self._antenna_configs[name]
+                        if fe.path not in ant.data_files:
+                            ant.data_files.append(fe.path)
         # 恢复选择
         if current and current in seen:
             idx = self._antenna_selector.findData(current)
