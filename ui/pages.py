@@ -83,7 +83,6 @@ class FileSettingsPage(QWidget):
     """
 
     _edit_word_report_tpl = ""  # 内部属性: str, 存储 Word 报告模版路径
-    _edit_word_tpl = ""         # 内部属性: str, 存储含 SDT tag 的 .docx 模版路径
 
     def __init__(self, mainwindow=None):
         super().__init__(mainwindow)
@@ -1357,8 +1356,8 @@ class FileSettingsPage(QWidget):
                 ant = page._config.add_antenna(extract_antenna_name(fp), [fp])
                 page._antenna_list.addItem(ant.name)
             page._antenna_list.setCurrentRow(0)
-        if hasattr(self, '_edit_word_tpl'):
-            word_path = (self._edit_word_tpl or "").strip()
+        if hasattr(self, '_edit_word_report_tpl'):
+            word_path = (self._edit_word_report_tpl or "").strip()
             if word_path:
                 page._edit_word_tpl = word_path
         layout.addWidget(page)

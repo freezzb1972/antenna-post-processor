@@ -2583,8 +2583,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 生成图形数据表
         self._populate_graph_data(results)
         # ── Word 模板填充 ──
-        if file_page and hasattr(file_page, '_edit_word_tpl'):
-            word_tpl = (file_page._edit_word_tpl or "").strip()
+        if file_page and hasattr(file_page, '_edit_word_report_tpl'):
+            word_tpl = (file_page._edit_word_report_tpl or "").strip()
             if word_tpl and Path(word_tpl).exists() and results:
                 try:
                     self.ui.lblProgressMsg.setText(self.tr("📝 正在填充 Word 模板..."))
