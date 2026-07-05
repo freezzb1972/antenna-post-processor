@@ -1045,7 +1045,7 @@ class FileSettingsPage(QWidget):
                 cell_edit.setText(f"{lo:.0f}–{hi:.0f}")
 
     def _on_preview_apply_all(self, dlg, table, n_cols, mappings):
-        """批量应用所有列的修正参数。"""
+        """批量应用: 类型有改动 或 参数值有改动 都生效。"""
         applied = 0
         for ci in range(n_cols):
             cmb = table.cellWidget(4, ci)
@@ -1053,12 +1053,13 @@ class FileSettingsPage(QWidget):
                 continue
             new_type = cmb.currentData()
             orig_type = mappings[ci].detected_type if ci < len(mappings) else "unknown"
-            if new_type == orig_type:
-                continue  # 未修改，跳过
             pw = table.cellWidget(5, ci)
             if not pw:
                 continue
             edit_param = pw.findChild(QLineEdit) if hasattr(pw, 'findChild') else pw
+            param_changed = bool(edit_param.text().strip()) if hasattr(edit_param, 'text') else False
+            if new_type == orig_type and not param_changed:
+                continue  # 类型没变且参数为空, 跳过
             self._on_preview_apply(dlg, ci, orig_type, table)
             applied += 1
         # 更新摘要
