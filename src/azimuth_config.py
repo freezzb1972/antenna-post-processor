@@ -33,7 +33,6 @@ class AzimuthReportConfig:
     dual_y_enabled: bool = False            # B类频点曲线启用双Y轴配对
     share_radial_ticks: bool = False         # 配对图共用径向刻度
     show_caption: bool = True               # Word 图片上方是否显示题注
-    image_width_cm: float = 8.5             # Word 图片宽度 (cm), 半页=8.5
 
     # ── Word 布局模式 ──
     # "side_by_side": 每频点同行 2 列 (左 Gain 右 AR)
@@ -142,7 +141,6 @@ class AzimuthReportConfig:
             "dual_y_enabled": self.dual_y_enabled,
             "share_radial_ticks": self.share_radial_ticks,
             "show_caption": self.show_caption,
-            "image_width_cm": self.image_width_cm,
         }
 
     @classmethod
@@ -171,7 +169,6 @@ class AzimuthReportConfig:
             dual_y_enabled=bool(d.get("dual_y_enabled", False)),
             share_radial_ticks=bool(d.get("share_radial_ticks", False)),
             show_caption=bool(d.get("show_caption", True)),
-            image_width_cm=float(d.get("image_width_cm", 8.5)),
         )
 
     # ═══════════════════════════════════════════════════════════
@@ -203,7 +200,6 @@ class AzimuthReportConfig:
             dual_y_enabled=self.dual_y_enabled or other.dual_y_enabled,
             share_radial_ticks=self.share_radial_ticks or other.share_radial_ticks,
             show_caption=self.show_caption and other.show_caption,
-            image_width_cm=self.image_width_cm or other.image_width_cm,
         )
 
     # ═══════════════════════════════════════════════════════════

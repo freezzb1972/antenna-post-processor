@@ -3148,8 +3148,6 @@ class ChartSettingsPage(QWidget):
                 self._spin_az_img_pct.setValue(az.word_image_width_pct if 10 <= az.word_image_width_pct <= 100 else 90)
             if hasattr(self, '_check_show_caption'):
                 self._check_show_caption.setChecked(getattr(az, 'show_caption', True))
-            if hasattr(self, '_spin_img_cm'):
-                self._spin_img_cm.setValue(getattr(az, 'image_width_cm', 7.5))
             if hasattr(self, '_check_share_ticks'):
                 self._check_share_ticks.setChecked(getattr(az, 'share_radial_ticks', False))
 
@@ -3271,22 +3269,14 @@ class ChartSettingsPage(QWidget):
         check_cap = QCheckBox(self.tr("显示题注"))
         check_cap.setChecked(getattr(self, '_az_show_caption', True))
         fmt_layout.addRow("", check_cap)
-
-        spin_cm = QDoubleSpinBox()
-        spin_cm.setRange(3.0, 16.0); spin_cm.setSingleStep(0.5)
-        spin_cm.setValue(getattr(self, '_az_image_width_cm', 8.5))
-        spin_cm.setSuffix(" cm")
-        fmt_layout.addRow(self.tr("图片宽(cm):"), spin_cm)
         layout.addWidget(fmt_grp)
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         def _on_accept_layout():
             self._word_layout_mode = "by_type" if self._radio_by_type.isChecked() else "by_freq"
-            # 保存为实例属性（_sync_to_mw 读取）
             self._az_columns = spin_cols.value()
             self._az_img_pct = spin_pct.value()
             self._az_show_caption = check_cap.isChecked()
-            self._az_image_width_cm = spin_cm.value()
             self._sync_to_mw()
             dlg.accept()
         btns.accepted.connect(_on_accept_layout)
@@ -3365,7 +3355,6 @@ class ChartSettingsPage(QWidget):
         azimuth.word_columns = getattr(self, '_az_columns', 2)
         azimuth.word_image_width_pct = getattr(self, '_az_img_pct', 90)
         azimuth.show_caption = getattr(self, '_az_show_caption', True)
-        azimuth.image_width_cm = getattr(self, '_az_image_width_cm', 8.5)
         azimuth.share_radial_ticks = self._check_share_ticks.isChecked() if hasattr(self, '_check_share_ticks') else False
 
         # 图表联动: chart_gain_freq → chart_lag_freq

@@ -83,7 +83,7 @@ def write_chart_word_report_by_freq(
     pair_labels: dict[str, str],
     output_path: str,
     antenna_name: str = "",
-    image_width_cm: float = 8.5,
+    image_width_pct: int = 90,
     extra_groups: dict[str, dict[float, io.BytesIO]] = None,
     extra_angles: str = "",
     show_caption: bool = True,
@@ -99,9 +99,11 @@ def write_chart_word_report_by_freq(
         section.left_margin = Cm(2.0)
         section.right_margin = Cm(2.0)
 
-    img_width = Cm(image_width_cm)
+    content_width_cm = 17.0  # A4 21cm - 2×2cm margins
+    n_cols = max(1, len(pair_order))
+    col_width_cm = content_width_cm / n_cols
+    img_width = Cm(col_width_cm * image_width_pct / 100.0)
     freqs = sorted(freq_pairs.keys())
-    n_cols = len(pair_order)
 
     for freq in freqs:
         images = freq_pairs[freq]
@@ -129,7 +131,7 @@ def write_chart_word_report_by_freq(
             heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
             freqs_extra = sorted(images.keys())
             _write_image_grid(doc, images, freqs_extra, antenna_name,
-                              group_name, extra_angles, Cm(image_width_cm), 1,
+                              group_name, extra_angles, img_width, 1,
                               show_caption=show_caption)
 
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)

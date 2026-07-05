@@ -1280,7 +1280,7 @@ def _export_azimuth(
                     },
                     output_path=word_path,
                     antenna_name=az.antenna_name if az else "",
-                    image_width_cm=getattr(az, 'image_width_cm', 7.5) if az else 7.5,
+                    image_width_pct=az.word_image_width_pct if az else 90,
                     show_caption=getattr(az, 'show_caption', True) if az else True,
                     extra_groups=extra_groups if extra_groups else None,
                 )
