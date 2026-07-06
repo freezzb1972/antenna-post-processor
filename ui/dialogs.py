@@ -187,22 +187,22 @@ class DataSourceDialog(QDialog):
             for p in mw._data_file_paths:
                 self._file_list.addItem(p)
                 self._file_list.item(self._file_list.count()-1).setToolTip(p)
-        if hasattr(mw, '_match_table') and mw._match_table:
+        if hasattr(mw, '_last_matches') and mw._last_matches:
             self._copy_match_table()
 
     def _copy_match_table(self):
-        src = self._mw._match_table
-        self._match_table.setRowCount(src.rowCount())
-        for r in range(src.rowCount()):
-            for c in range(3):
-                item = src.item(r, c)
-                if item: self._match_table.setItem(r, c, QTableWidgetItem(item.text()))
-            widget = src.cellWidget(r, 1)
-            if widget:
-                combo = QComboBox()
-                for i in range(widget.count()): combo.addItem(widget.itemText(i))
-                combo.setCurrentIndex(widget.currentIndex())
-                self._match_table.setCellWidget(r, 1, combo)
+        """从 MainWindow._last_matches 填充对话框的匹配表格。"""
+        matches = self._mw._last_matches
+        self._match_table.setRowCount(len(matches))
+        for r, m in enumerate(matches):
+            self._match_table.setItem(r, 0, QTableWidgetItem(m.sheet_name))
+            combo = QComboBox()
+            combo.addItem(m.file_path or "—")
+            if m.file_path:
+                combo.setCurrentIndex(0)
+            self._match_table.setCellWidget(r, 1, combo)
+            status = "✓ 已匹配" if m.file_path else "✗ 未匹配"
+            self._match_table.setItem(r, 2, QTableWidgetItem(status))
 
     def _on_browse_template(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -394,8 +394,8 @@ class DataSourceDialog(QDialog):
             # 对话框替换了文件列表 → 完整重建 UI 和匹配
             if hasattr(mw, '_file_list_widget'):
                 mw._refresh_data_file_ui()
-            if mw._match_table is not None:
-                mw._match_table.setRowCount(0)
+            if hasattr(mw, '_last_matches'):
+                mw._last_matches = []
             if hasattr(mw, '_lbl_match_status') and mw._lbl_match_status is not None:
                 mw._lbl_match_status.setText("")
             # 重建匹配表
@@ -1417,8 +1417,8 @@ class CalcParamsDialog(QDialog):
             self._spin_trim_start.setValue(mw._spin_trim_start.value())
             self._spin_trim_end.setValue(mw._spin_trim_end.value())
         # 算法
-        if hasattr(mw, '_check_extrapolate'):
-            self._check_extrap.setChecked(mw._check_extrapolate.isChecked())
+        if hasattr(mw, '_cmb_extrapolate'):
+            self._check_extrap.setChecked(mw._cmb_extrapolate.currentData() is not None)
         if hasattr(mw, '_check_robust_peak'):
             self._check_robust.setChecked(mw._check_robust_peak.isChecked())
         # AR dB
@@ -1426,9 +1426,6 @@ class CalcParamsDialog(QDialog):
         # NH 自定义角度
         if hasattr(mw, '_nh_custom_angles'):
             self._nh_custom_angles = list(mw._nh_custom_angles)
-        elif hasattr(mw, '_nh_edge_deg') and mw._nh_edge_deg:
-            # 向后兼容: 旧版单角度迁移
-            self._nh_custom_angles = [mw._nh_edge_deg]
         self._sync_nh_angle_display()
 
     def _on_accept(self):
@@ -1474,8 +1471,9 @@ class CalcParamsDialog(QDialog):
             mw._spin_trim_start.setValue(self._spin_trim_start.value())
             mw._spin_trim_end.setValue(self._spin_trim_end.value())
         # 算法
-        if hasattr(mw, '_check_extrapolate'):
-            mw._check_extrapolate.setChecked(self._check_extrap.isChecked())
+        if hasattr(mw, '_cmb_extrapolate'):
+            if not self._check_extrap.isChecked():
+                mw._cmb_extrapolate.setCurrentIndex(0)  # 不外推
         if hasattr(mw, '_check_robust_peak'):
             mw._check_robust_peak.setChecked(self._check_robust.isChecked())
         # AR 输出格式

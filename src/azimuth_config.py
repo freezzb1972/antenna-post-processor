@@ -24,9 +24,9 @@ class AzimuthReportConfig:
     cut_azimuth_polar_ar: bool = False       # AR   方位面极坐标切面
     cut_azimuth_polar_rhcp: bool = False     # RHCP 方位面极坐标切面
     cut_azimuth_polar_lhcp: bool = False     # LHCP 方位面极坐标切面
-    azimuth_cut_angles: list[float] = field(default_factory=list)      # Gain 选定 Theta 角度 (°)
-    azimuth_cut_angles_ar: list[float] = field(default_factory=list)   # AR  选定 Theta 角度 (°)
-    azimuth_cut_angles_rhcp: list[float] = field(default_factory=list) # RHCP 选定 Theta 角度 (°)
+    azimuth_cut_angles: list = field(default_factory=list)      # Gain 图表列表 (list-of-lists 每子列表=一个图表)
+    azimuth_cut_angles_ar: list = field(default_factory=list)   # AR  图表列表
+    azimuth_cut_angles_rhcp: list = field(default_factory=list) # RHCP 图表列表
     azimuth_cut_angles_lhcp: list[float] = field(default_factory=list) # LHCP 选定 Theta 角度 (°)
     antenna_name: str = ""                   # 天线名（标题用）
     freq_gap_mhz: int = 10                  # B类频点曲线多段间隔阈值(MHz), 0=不打断
@@ -75,28 +75,53 @@ class AzimuthReportConfig:
 
     @property
     def angles_sorted(self) -> list[float]:
-        """排序去重后的 Gain 选定角度。"""
-        return sorted(set(self.azimuth_cut_angles))
+        """排序去重后的 Gain 选定角度（平列表，兼容旧代码）。"""
+        return sorted(set(_flatten(self.azimuth_cut_angles)))
+
+    @property
+    def angle_charts(self) -> list[list[float]]:
+        """Gain 图表列表: 每子列表 = 一个图表的 theta 角度集合。"""
+        return _normalize_to_charts(self.azimuth_cut_angles)
+
+    @property
+    def angle_charts_ar(self) -> list[list[float]]:
+        """AR 图表列表。"""
+        return _normalize_to_charts(self.azimuth_cut_angles_ar)
+
+    @property
+    def angle_charts_rhcp(self) -> list[list[float]]:
+        """RHCP 图表列表。"""
+        return _normalize_to_charts(self.azimuth_cut_angles_rhcp)
+
+    @property
+    def angle_charts_lhcp(self) -> list[list[float]]:
+        """LHCP 图表列表。"""
+        return _normalize_to_charts(self.azimuth_cut_angles_lhcp)
 
     @property
     def angles_ar_sorted(self) -> list[float]:
         """排序去重后的 AR 选定角度。"""
-        return sorted(set(self.azimuth_cut_angles_ar))
+        return sorted(set(_flatten(self.azimuth_cut_angles_ar)))
 
     @property
     def angles_rhcp_sorted(self) -> list[float]:
         """排序去重后的 RHCP 选定角度。"""
-        return sorted(set(self.azimuth_cut_angles_rhcp))
+        return sorted(set(_flatten(self.azimuth_cut_angles_rhcp)))
 
     @property
     def angles_lhcp_sorted(self) -> list[float]:
         """排序去重后的 LHCP 选定角度。"""
-        return sorted(set(self.azimuth_cut_angles_lhcp))
+        return sorted(set(_flatten(self.azimuth_cut_angles_lhcp)))
 
     @property
     def is_empty(self) -> bool:
         """是否没有任何方位面图表启用。"""
         return not self.has_any_azimuth
+
+    @staticmethod
+    def normalize_angle_charts(data: list) -> list[list[float]]:
+        """将旧格式(平列表)或新格式(list-of-lists)统一转为图表列表。"""
+        return _normalize_to_charts(data)
 
     @property
     def chart_output_path(self) -> str:
@@ -183,10 +208,10 @@ class AzimuthReportConfig:
             cut_azimuth_polar_ar=self.cut_azimuth_polar_ar or other.cut_azimuth_polar_ar,
             cut_azimuth_polar_rhcp=self.cut_azimuth_polar_rhcp or other.cut_azimuth_polar_rhcp,
             cut_azimuth_polar_lhcp=self.cut_azimuth_polar_lhcp or other.cut_azimuth_polar_lhcp,
-            azimuth_cut_angles=sorted(set(self.azimuth_cut_angles + other.azimuth_cut_angles)),
-            azimuth_cut_angles_ar=sorted(set(self.azimuth_cut_angles_ar + other.azimuth_cut_angles_ar)),
-            azimuth_cut_angles_rhcp=sorted(set(self.azimuth_cut_angles_rhcp + other.azimuth_cut_angles_rhcp)),
-            azimuth_cut_angles_lhcp=sorted(set(self.azimuth_cut_angles_lhcp + other.azimuth_cut_angles_lhcp)),
+            azimuth_cut_angles=sorted(set(_flatten(self.azimuth_cut_angles) + _flatten(other.azimuth_cut_angles))),
+            azimuth_cut_angles_ar=sorted(set(_flatten(self.azimuth_cut_angles_ar) + _flatten(other.azimuth_cut_angles_ar))),
+            azimuth_cut_angles_rhcp=sorted(set(_flatten(self.azimuth_cut_angles_rhcp) + _flatten(other.azimuth_cut_angles_rhcp))),
+            azimuth_cut_angles_lhcp=sorted(set(_flatten(self.azimuth_cut_angles_lhcp) + _flatten(other.azimuth_cut_angles_lhcp))),
             antenna_name=self.antenna_name or other.antenna_name,
             word_layout_mode=self.word_layout_mode,
             word_columns=self.word_columns or other.word_columns,
@@ -219,3 +244,35 @@ class AzimuthReportConfig:
         self.chart_output_filename = f"{source_stem}图表报告.docx"
         self.data_output_dir = source_dir
         self.data_output_filename = f"{source_stem}中间数据.xlsx"
+
+
+# ═══════════════════════════════════════════════════════════════
+# 内部辅助
+# ═══════════════════════════════════════════════════════════════
+
+def _flatten(data: list) -> list[float]:
+    """将数据展平为 float 列表，兼容旧格式（平列表）和新格式（list-of-lists）。"""
+    if not data:
+        return []
+    result = []
+    for item in data:
+        if isinstance(item, (int, float)):
+            result.append(float(item))
+        elif isinstance(item, (list, tuple)):
+            result.extend(float(x) for x in item)
+    return result
+
+
+def _normalize_to_charts(data: list) -> list[list[float]]:
+    """将数据统一转为图表列表格式 (list-of-lists)。
+
+    旧格式: [0, 30, 60] → [[0, 30, 60]]  (单图表)
+    新格式: [[0, 30], [60]] → 保持不变
+    """
+    if not data:
+        return [[]]
+    # 第一个元素是数字 → 旧格式平列表 → 包装为单图表
+    if data and isinstance(data[0], (int, float)):
+        return [[float(x) for x in data]]
+    # 已经是的图表列表 → 深拷贝
+    return [[float(x) for x in ch] for ch in data if ch]

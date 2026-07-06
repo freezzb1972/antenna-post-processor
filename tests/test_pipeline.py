@@ -254,7 +254,7 @@ class TestProcessOneFrequency:
         theta = np.linspace(0, 90, 10)  # only to 90°
         lag = LagConfig()
 
-        row = _process_one_frequency(raw, 699.0, theta, lag, do_extrapolate=True)
+        row = _process_one_frequency(raw, 699.0, theta, lag, theta_extrap_method="linear")
         assert "gain" in row
 
     def test_compute_only_skips_graphics(self):

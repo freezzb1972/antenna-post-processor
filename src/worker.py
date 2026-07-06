@@ -125,6 +125,7 @@ class ProcessingWorker(QObject):
         gen_diff: bool = False,
         gen_diff_chart: bool = False,
         antenna_configs: dict | None = None,
+        chart_instances: list | None = None,
     ):
         super().__init__()
         self.antenna_configs = antenna_configs or {}
@@ -153,6 +154,7 @@ class ProcessingWorker(QObject):
         self.nh_custom_angles = nh_custom_angles
         self.ar_output_db = ar_output_db
         self.worksheet_naming_mode = worksheet_naming_mode
+        self.chart_instances = chart_instances
         self.step_values = step_values or []
         self.skip_original = skip_original
         self.gen_diff = gen_diff
@@ -197,8 +199,8 @@ class ProcessingWorker(QObject):
                 nh_custom_angles=self.nh_custom_angles,
                 ar_output_db=self.ar_output_db,
                 worksheet_naming_mode=self.worksheet_naming_mode,
+                chart_instances=getattr(self, 'chart_instances', None),
                 compute_only=self.compute_only,
-                antenna_configs=self.antenna_configs,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
                 log_callback=self._on_log,

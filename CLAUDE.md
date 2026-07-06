@@ -197,6 +197,32 @@ DESIGN → PLAN → DEVELOP → VERIFY → COMMIT → MANAGE
 | 双 UI 同步: 是否新增了只在一边存在的控件? | grep 关键属性名两边对比 |
 | 隐藏元素: 是否新增了 `setVisible(False)` 或 `hide()`? | 必须写理由 |
 
+#### C2. 接口一致性强制检查（每次修改后必做，不可跳过）
+
+| 场景 | 必须执行的操作 | 为什么 |
+|------|-------------|--------|
+| 修改了 ANY 函数签名（增删参数） | `grep -rn '函数名(' src/ ui/` → 逐条核对所有调用方参数 | 防止 `antenna_configs` 错误 |
+| 修改了 ANY 数据字段类型（如 list→list-of-lists） | `grep -rn '字段名' src/ ui/` → 逐条核对所有读写点 | 防止格式不一致导致静默崩溃 |
+| 写了 `hasattr(x, '_attr')` 或 `getattr(x, '_attr', ...)` | `grep -rn '_attr\s*=' <x的类文件>` → 确认属性被初始化 | 防止静默失效守卫（`_lbl_match_status` 模式） |
+| 写了 `**kwargs` 透传给其他函数 | 核对目标函数签名，确认不包含多余参数 | 防止 `run_batch_pipeline` 错误 |
+| 删除/重命名了控件/属性 | `grep -rn '旧名字' tests/ ui/` → 更新所有引用和测试 | 防止残留引用导致偶发崩溃 |
+
+**违反后果**: 接口不一致的代码 100% 会在运行时出错或静默失效，且 pytest 不覆盖这些路径。
+
+#### C3. 审计脚本自我进化规则
+
+`.claude/hooks/interface-audit.py` 不是一次写完就定型的。每当发现一个**脚本没检测到**的接口不匹配错误时：
+
+1. 先在 CLAUDE.md 中手动加检查规则（C2 表）
+2. 评估能否写成自动化检测 → 能就更新 `interface-audit.py`
+3. 脚本的 `hasattr` 检测已覆盖: 赋值 / AnnAssign / setattr / @property / @setter
+4. 脚本的 `kwargs` 检测覆盖 **var_name 透传
+
+**盲区清单**（暂无法自动化，靠手动检查）:
+- 跨文件属性类型推断（mw = self._mw → 查 MainWindow 类）
+- 装饰器生成的属性（@cached_property 等）
+- 条件赋值路径（if/else 中才赋值的属性）
+
 #### D. 禁止行为
 
 - ❌ 不自动 `pyinstaller` 打包 (需等用户确认)

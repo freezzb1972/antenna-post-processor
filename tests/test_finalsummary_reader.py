@@ -91,7 +91,7 @@ class TestReadMatrix:
 
         result = _read_matrix(ws, 1, 2, 2)
         assert result[0, 0] == 10.0
-        assert result[0, 1] == -999.0  # None → default -999
+        assert np.isnan(result[0, 1])  # None → NaN
         assert result[1, 0] == 20.0
         wb.close()
 

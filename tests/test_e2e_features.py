@@ -190,29 +190,22 @@ class TestThemeI18n:
         assert any("文件" in t or "File" in t for t in menu_texts)
 
     def test_e2e_processing_flow(self, window, qtbot):
-        """端到端: 设置文件 → 开始处理 → 验证线程启动 (模拟)。"""
+        """端到端: 设置文件 → 开始处理 → 验证流程不崩溃。"""
         window._data_file_paths = ["/tmp/test.csv"]
         window._refresh_data_file_ui()
         window.ui.editTemplatePath.setText("/tmp/test_template.xlsx")
-        from PySide6.QtWidgets import QComboBox, QTableWidgetItem
 
-        window._match_table.setRowCount(1)
-        window._match_table.setItem(0, 0, QTableWidgetItem("Test"))
-        combo = QComboBox()
-        combo.addItem("/tmp/test.csv")
-        combo.setCurrentIndex(0)
-        window._match_table.setCellWidget(0, 1, combo)
-        window._match_table.setItem(0, 2, QTableWidgetItem("matched"))
+        # _last_matches 替代了旧的 _match_table
+        from src.sheet_file_matcher import MatchResult
+        window._last_matches = [MatchResult("Test", "/tmp/test.csv", "matched")]
 
-        # 不实际启动处理（需要真实数据文件），只验证流程不崩溃
-        # window._on_start()
-        # 改为验证 _on_start 的前置检查
+        # 验证 _build_datasource_map 不崩溃（文件不存在时返回空 dict 是正常的）
         try:
-            if window._match_table.rowCount() > 0 and window._data_file_paths:
+            if window._last_matches and window._data_file_paths:
                 datasource_map = window._build_datasource_map()
                 assert isinstance(datasource_map, dict)
         except Exception:
-            pass  # 文件不存在时返回空 dict 是正常的
+            pass
 
 
 # ── 4. Help Search (运行时回调验证) ──────────────────────────────

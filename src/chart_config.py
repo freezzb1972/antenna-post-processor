@@ -74,19 +74,19 @@ _COLTYPE_TO_CHART = {
     # B 类: 频点曲线
     "efficiency_pct":  "chart_eff_freq",
     "efficiency_db":   "chart_eff_freq",
-    "gain":            "chart_gain_freq",
+    "gain":            "chart_gain_freq|pattern_3d_gain|cut_azimuth_polar",
     "directivity":     "chart_dir_freq",
     "lag_range":       "chart_lag_freq",
     "lag_single":      "chart_lag_freq",
     "trp":             "chart_trp_freq",
-    "ar_single":       "chart_ar_freq",
-    "ar_range":        "chart_ar_freq",
-    "avg_gain":        "chart_gain_freq",
-    "peak_eirp":       "chart_trp_freq",
+    "ar_single":       "chart_ar_freq|pattern_3d_ar|cut_azimuth_polar_ar",
+    "ar_range":        "chart_ar_freq|pattern_3d_ar|cut_azimuth_polar_ar",
+    "avg_gain":        "chart_gain_freq|pattern_3d_gain",
+    "peak_eirp":       "chart_trp_freq|pattern_3d_eirp",
     "nhprp_45":        "chart_trp_nhprp",
     "nhprp_30":        "chart_trp_nhprp",
     # A 类: 3D 方向图
-    "rhcp_single":     "pattern_3d_gain|pattern_3d_rhcp",   # 多图表用 | 分隔
+    "rhcp_single":     "pattern_3d_gain|pattern_3d_rhcp|cut_azimuth_polar_rhcp",
     "cp_xpi_single":   "pattern_3d_gain",
     # C 类: 切面图 (由 azimuth config 独立控制, 不在此映射)
 }
@@ -99,7 +99,7 @@ def auto_detect_charts(template_params: set) -> dict[str, bool]:
         if col_type in template_params:
             for ck in chart_keys.split("|"):
                 result[ck.strip()] = True
-    # C 类切面图: 只要有 Gain 或 AR 就启用
+    # C 类切面图: 只要有 Gain 或 AR 就启用俯仰面切面
     if "gain" in template_params or "ar_single" in template_params or "ar_range" in template_params:
         result["cut_2d_polar"] = True
         result["cut_2d_rect"] = True

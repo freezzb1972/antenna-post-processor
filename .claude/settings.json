@@ -63,10 +63,20 @@
         "hooks": [
           {
             "type": "command",
-            "command": "find . -type d -name __pycache__ -not -path './.venv/*' -not -path './venv/*' -exec rm -rf {} + 2>/dev/null; find . -type f -name '*.pyc' -delete 2>/dev/null; python3 generate_func_catalog.py; echo '---'; python3 targeted_verify.py 2>&1"
+            "command": "python3 .claude/hooks/interface-audit.py --staged 2>&1; echo '---'; find . -type d -name __pycache__ -not -path './.venv/*' -not -path './venv/*' -exec rm -rf {} + 2>/dev/null; find . -type f -name '*.pyc' -delete 2>/dev/null; python3 generate_func_catalog.py; echo '---'; python3 targeted_verify.py 2>&1"
           }
         ],
-        "description": "每次 git commit 后清理缓存 + 针对性验证"
+        "description": "每次 git commit 前: 接口审计 + 后: 清理缓存 + 针对性验证"
+      },
+      {
+        "matcher": "tool == \"Write\" && path.match(/\\.py$/)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/interface-audit.py \"${CLAUDE_CODE_FILE_PATH}\" 2>&1 || echo '🔍 接口审计有警告 — 请逐一确认'"
+          }
+        ],
+        "description": "每次写入 .py 文件后检查接口变更是否遗漏消费方"
       },
       {
         "matcher": "tool == \"Write\" && path.match(/ui\\//)",

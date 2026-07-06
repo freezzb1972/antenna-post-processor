@@ -156,7 +156,7 @@ class TestFileInput:
         """空输入时弹窗警告。"""
         window._data_file_paths.clear()
         window._file_list_widget.clear()
-        window._match_table.setRowCount(0)
+        window._last_matches = []
         window.ui.editTemplatePath.setText("/tmp/template.xlsx")
         window._on_start()
         QMessageBox.warning.assert_called()
@@ -167,14 +167,8 @@ class TestFileInput:
         """模板不是 Excel 格式时弹窗警告。"""
         from pathlib import Path
         window._data_file_paths = ["/tmp/test.csv"]
-        window._match_table.setRowCount(1)
-        window._match_table.setItem(0, 0, QTableWidgetItem("Sheet1"))
-        from PySide6.QtWidgets import QComboBox
-        combo = QComboBox()
-        combo.addItem("/tmp/test.csv")
-        combo.setCurrentIndex(0)
-        window._match_table.setCellWidget(0, 1, combo)
-        window._match_table.setItem(0, 2, QTableWidgetItem("✓ 已匹配"))
+        from src.sheet_file_matcher import MatchResult
+        window._last_matches = [MatchResult(sheet_name="Sheet1", file_path="/tmp/test.csv", confidence=1.0)]
         window.ui.editTemplatePath.setText("/tmp/bad_template.txt")
         monkeypatch.setattr(Path, "exists", lambda self: True)
         window._on_start()
@@ -326,7 +320,7 @@ class TestProcessingFlow:
         """无数据文件时 _on_start 弹窗警告。"""
         window._data_file_paths.clear()
         window._file_list_widget.clear()
-        window._match_table.setRowCount(0)
+        window._last_matches = []
         window.ui.editTemplatePath.setText("")
         window._on_start()
         QMessageBox.warning.assert_called()
@@ -339,13 +333,8 @@ class TestProcessingFlow:
         window._file_list_widget.setRowCount(1)
         from PySide6.QtWidgets import QTableWidgetItem
         window._file_list_widget.setItem(0, 0, QTableWidgetItem("/tmp/test.csv"))
-        window._match_table.setRowCount(1)
-        window._match_table.setItem(0, 0, QTableWidgetItem("Sheet1"))
-        combo = QComboBox()
-        combo.addItem("/tmp/test.csv")
-        combo.setCurrentIndex(0)
-        window._match_table.setCellWidget(0, 1, combo)
-        window._match_table.setItem(0, 2, QTableWidgetItem("✓ 已匹配"))
+        from src.sheet_file_matcher import MatchResult
+        window._last_matches = [MatchResult(sheet_name="Sheet1", file_path="/tmp/test.csv", confidence=1.0)]
         window.ui.editTemplatePath.setText("")
         window._on_start()
         QMessageBox.warning.assert_called()
@@ -353,13 +342,8 @@ class TestProcessingFlow:
     def test_template_not_exist_blocks_start(self, window):
         """模板路径不存在时 _on_start 弹窗警告。"""
         window._data_file_paths = ["/tmp/test.csv"]
-        window._match_table.setRowCount(1)
-        window._match_table.setItem(0, 0, QTableWidgetItem("Sheet1"))
-        combo = QComboBox()
-        combo.addItem("/tmp/test.csv")
-        combo.setCurrentIndex(0)
-        window._match_table.setCellWidget(0, 1, combo)
-        window._match_table.setItem(0, 2, QTableWidgetItem("✓ 已匹配"))
+        from src.sheet_file_matcher import MatchResult
+        window._last_matches = [MatchResult(sheet_name="Sheet1", file_path="/tmp/test.csv", confidence=1.0)]
         window.ui.editTemplatePath.setText("/nonexistent/template.xlsx")
         # Make sure path doesn't exist
         from pathlib import Path
@@ -379,7 +363,7 @@ class TestProcessingFlow:
         window._refresh_data_file_ui()
         window._on_auto_match()
         qtbot.wait(200)
-        assert window._match_table.rowCount() > 0
+        assert len(window._last_matches) > 0
 
 
 # =========================================================================

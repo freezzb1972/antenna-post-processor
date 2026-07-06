@@ -51,7 +51,7 @@ class TestFileInput:
         """多文件选择 Widget 已创建。"""
         assert window._file_list_widget is not None
         assert window._btn_add_files is not None
-        assert window._match_table is not None
+        assert hasattr(window, '_last_matches'), "_last_matches should exist"
 
     def test_add_data_files_button_text(self, window):
         """添加数据文件按钮存在。"""
@@ -98,7 +98,7 @@ class TestStartValidation:
     def test_empty_input_shows_warning(self, window, qtbot):
         window._data_file_paths.clear()
         window._file_list_widget.clear()
-        window._match_table.setRowCount(0)
+        window._last_matches = []
         window.ui.editTemplatePath.setText("/tmp/template.xlsx")
         window._on_start()
         QMessageBox.warning.assert_called_once()

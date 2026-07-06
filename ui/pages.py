@@ -868,18 +868,15 @@ class FileSettingsPage(QWidget):
         table.item(3, col).setText(param_val)
         # 通用: 按类型前缀写入对应 config
         if self._mw and param_val:
-            _TYPE_CONFIG = {
-                "lag": ("_lag_config", True), "ar": ("_ar_lag_config", True),
-                "rhcp": ("_rhcp_lag_config", False), "cpxpi": ("_cpxpi_lag_config", False),
-            }
-            for prefix, (attr, has_range) in _TYPE_CONFIG.items():
+            from src.ui_utils import ANGLE_TYPE_CONFIG
+            for prefix, info in ANGLE_TYPE_CONFIG.items():
                 if not new_type.startswith(prefix + "_"):
                     continue
-                cfg = getattr(self._mw, attr, None)
+                cfg = getattr(self._mw, info.attr, None)
                 if cfg is None:
                     break
                 try:
-                    if new_type.endswith("_range") and has_range:
+                    if new_type.endswith("_range") and info.has_range:
                         parts = param_val.replace("°", "").split("–")
                         if len(parts) == 2:
                             cfg.add_range(float(parts[0]), float(parts[1]))
@@ -976,11 +973,11 @@ class FileSettingsPage(QWidget):
             return
         if not self._mw:
             return
-        config_attrs = {
-            "gain": "_lag_config", "ar": "_ar_lag_config",
-            "rhcp": "_rhcp_lag_config", "cpxpi": "_cpxpi_lag_config",
-        }
-        cfg = getattr(self._mw, config_attrs.get(target, "_lag_config"), None)
+        from src.ui_utils import ANGLE_TYPE_CONFIG
+        info = ANGLE_TYPE_CONFIG.get(target)
+        if not info:
+            return
+        cfg = getattr(self._mw, info.attr, None)
         if not cfg:
             return
 
@@ -1291,15 +1288,6 @@ class FileSettingsPage(QWidget):
         total_files = max(len(self._data_file_paths), 1)
         file_idx = 0
         use_file_names = self._worksheet_naming_mode == 1
-
-        valid_paths = set(self._data_file_paths)
-        for m in getattr(self, '_last_matches', []):
-            fp = m.file_path or ""
-            if combo:
-                fp = combo.currentData() or ""
-                if fp and fp != "—" and fp not in valid_paths:
-                    combo.setCurrentIndex(0)
-                    self._log(f"⚠ 匹配表中 {fp} 已不在数据文件列表中，已重置")
 
         matched_files = set()
         for m in getattr(self, '_last_matches', []):
@@ -2031,28 +2019,14 @@ class AntennaParamsPage(QWidget):
                 cascade_up = (key == "gain" and ("lag_single" in tpl or "lag_range" in tpl)) or                              (key == "ar" and ("ar_single" in tpl or "ar_range" in tpl))
                 cb.setChecked(key in self._template_params or cascade_up)
                 row.addWidget(cb)
-                # 同行参数按钮
-                if key == "gain":
+                # 同行参数按钮 — 数据驱动，新增角度类型只需在 dict 加一行
+                from src.ui_utils import ANGLE_TYPE_CONFIG, _ANGLE_BY_PARAM_KEY
+                if key in _ANGLE_BY_PARAM_KEY:
+                    info = _ANGLE_BY_PARAM_KEY[key]
                     btn = QPushButton(self.tr("⚙ 参数"))
                     btn.setFixedWidth(60)
-                    btn.clicked.connect(lambda: self._show_angle_popup("gain"))
-                    row.addWidget(btn)
-                elif key == "ar":
-                    btn = QPushButton(self.tr("⚙ 参数"))
-                    btn.setFixedWidth(60)
-                    btn.clicked.connect(lambda: self._show_angle_popup("ar"))
-                    row.addWidget(btn)
-                elif key == "rhcp_single":
-                    btn = QPushButton(self.tr("⚙ 参数"))
-                    btn.setFixedWidth(60)
-                    btn.setToolTip(self.tr("RHCP 参数设置"))
-                    btn.clicked.connect(lambda: self._show_angle_popup("rhcp"))
-                    row.addWidget(btn)
-                elif key == "cp_xpi_single":
-                    btn = QPushButton(self.tr("⚙ 参数"))
-                    btn.setFixedWidth(60)
-                    btn.setToolTip(self.tr("CP-XPI 参数设置"))
-                    btn.clicked.connect(lambda: self._show_angle_popup("cpxpi"))
+                    btn.setToolTip(self.tr(f"{info.label} 参数设置"))
+                    btn.clicked.connect(lambda checked, t=info.popup: self._show_angle_popup(t))
                     row.addWidget(btn)
                 row.addStretch()
                 gl.addLayout(row)
@@ -2091,28 +2065,14 @@ class AntennaParamsPage(QWidget):
                 cb.toggled.connect(lambda checked, k=key: self._sync_to_mw())
                 cb.setChecked(False)
                 row.addWidget(cb)
-                # 同行参数按钮
-                if key == "gain":
+                # 同行参数按钮 — 数据驱动，新增角度类型只需在 dict 加一行
+                from src.ui_utils import ANGLE_TYPE_CONFIG, _ANGLE_BY_PARAM_KEY
+                if key in _ANGLE_BY_PARAM_KEY:
+                    info = _ANGLE_BY_PARAM_KEY[key]
                     btn = QPushButton(self.tr("⚙ 参数"))
                     btn.setFixedWidth(60)
-                    btn.clicked.connect(lambda: self._show_angle_popup("gain"))
-                    row.addWidget(btn)
-                elif key == "ar":
-                    btn = QPushButton(self.tr("⚙ 参数"))
-                    btn.setFixedWidth(60)
-                    btn.clicked.connect(lambda: self._show_angle_popup("ar"))
-                    row.addWidget(btn)
-                elif key == "rhcp_single":
-                    btn = QPushButton(self.tr("⚙ 参数"))
-                    btn.setFixedWidth(60)
-                    btn.setToolTip(self.tr("RHCP 参数设置"))
-                    btn.clicked.connect(lambda: self._show_angle_popup("rhcp"))
-                    row.addWidget(btn)
-                elif key == "cp_xpi_single":
-                    btn = QPushButton(self.tr("⚙ 参数"))
-                    btn.setFixedWidth(60)
-                    btn.setToolTip(self.tr("CP-XPI 参数设置"))
-                    btn.clicked.connect(lambda: self._show_angle_popup("cpxpi"))
+                    btn.setToolTip(self.tr(f"{info.label} 参数设置"))
+                    btn.clicked.connect(lambda checked, t=info.popup: self._show_angle_popup(t))
                     row.addWidget(btn)
                 row.addStretch()
                 gl.addLayout(row)
@@ -2462,10 +2422,9 @@ class AntennaParamsPage(QWidget):
                 idx = self._cmb_extrap.findData(mw._theta_extrap_method)
                 if idx >= 0:
                     self._cmb_extrap.setCurrentIndex(idx)
-            elif hasattr(mw, '_check_extrapolate'):
-                # 兼容旧版 checkbox
-                val = "linear" if mw._check_extrapolate.isChecked() else None
-                idx = self._cmb_extrap.findData(val)
+            elif hasattr(mw, '_cmb_extrapolate'):
+                val = mw._cmb_extrapolate.currentData()
+                idx = self._cmb_extrap.findData(val) if val else 0
                 if idx >= 0:
                     self._cmb_extrap.setCurrentIndex(idx)
             if hasattr(mw, '_check_robust_peak'):
@@ -3166,33 +3125,18 @@ class ChartSettingsPage(QWidget):
         self._word_chart_list = QListWidget()
         self._word_chart_list.setDragDropMode(QAbstractItemView.InternalMove)
         self._word_chart_list.setSelectionMode(QAbstractItemView.SingleSelection)
-        # \u4ec5\u5217\u51fa\u5df2\u9009\u4e2d\u7684\u56fe\u8868 (\u4ece _chart_required + _chart_extra + azimuth flags)
-        from src.chart_config import ChartConfig
-        labels = ChartConfig.chart_labels()
-        mode = getattr(self._mw, '_test_mode', 0) if self._mw else 0
-        categories = ChartConfig.chart_categories(mode)
+        # \u4ece ChartInstance \u5217\u8868\u8bfb\u53d6\uff08\u552f\u4e00\u6570\u636e\u6e90\uff0c\u4e0e Pipeline \u5171\u4eab\uff09
+        from src.chart_plan import ChartCategory
+        instances = getattr(self._mw, '_chart_instances', None) or []
+        cat_badges = {ChartCategory.A_3D: "3D", ChartCategory.B_FREQ: "\u66f2\u7ebf",
+                      ChartCategory.C_2D: "\u5207\u9762", ChartCategory.Z_AZIMUTH: "\u65b9\u4f4d\u9762"}
         active_labels = []
-        for key, cb in self._chart_required.items():
-            if cb.isChecked():
-                active_labels.append(labels.get(key, key))
-        for key, cb in self._chart_extra.items():
-            if cb.isChecked():
-                active_labels.append(labels.get(key, key))
-        # azimuth \u56fe
-        az = getattr(self._mw, '_azimuth_config', None) if self._mw else None
-        if az:
-            if az.cut_azimuth_polar: active_labels.append("Gain Azimuth Cut")
-            if az.cut_azimuth_polar_ar: active_labels.append("AR Azimuth Cut")
-            if az.cut_azimuth_polar_rhcp: active_labels.append("RHCP Azimuth Cut")
-            if az.cut_azimuth_polar_lhcp: active_labels.append("LHCP Azimuth Cut")
-        # B \u7c7b\u66f2\u7ebf
-        b_map = {"efficiency_pct": "Efficiency vs Freq", "gain": "Peak Gain vs Freq",
-                 "directivity": "Directivity vs Freq", "trp": "TRP vs Freq",
-                 "peak_eirp": "Peak EIRP vs Freq", "avg_gain": "Average Gain vs Freq"}
-        for key, cb in self._chart_required.items():
-            if cb.isChecked() and key in b_map:
-                if b_map[key] not in active_labels:
-                    active_labels.append(b_map[key])
+        if instances:
+            for ci in sorted(instances, key=lambda x: x.sort_order):
+                if not ci.enabled:
+                    continue
+                badge = cat_badges.get(ci.category, "?")
+                active_labels.append(f"[{badge}] {ci.label}")
         if not active_labels:
             active_labels = [self.tr("(\u672a\u9009\u62e9\u4efb\u4f55\u56fe\u8868)")]
         for item in active_labels:
@@ -3248,6 +3192,22 @@ class ChartSettingsPage(QWidget):
             self._az_columns = spin_cols.value()
             self._az_img_pct = spin_pct.value()
             self._az_show_caption = check_cap.isChecked()
+            # 将列表顺序回写到 ChartInstance.sort_order
+            instances = getattr(self._mw, '_chart_instances', None) or []
+            if instances:
+                enabled_ids = set()
+                for i in range(self._word_chart_list.count()):
+                    item_text = self._word_chart_list.item(i).text()
+                    # 匹配 label (去掉类别 badge 前缀)
+                    for ci in instances:
+                        if ci.enabled and item_text.endswith(ci.label):
+                            ci.sort_order = i
+                            enabled_ids.add(ci.instance_id)
+                            break
+                # 列表中不存在的实例标记为 disabled
+                for ci in instances:
+                    if ci.instance_id not in enabled_ids:
+                        ci.enabled = False
             self._sync_to_mw()
             dlg.accept()
         btns.accepted.connect(_on_accept_layout)
@@ -3341,6 +3301,13 @@ class ChartSettingsPage(QWidget):
         mw._azimuth_config = azimuth
         mw._chart_config_required = required
         mw._chart_config_extra = extra
+
+        # 展开为 ChartInstance 列表（单一数据源供 Word 布局 + Pipeline）
+        from src.chart_plan import expand_to_instances
+        mw._chart_instances = expand_to_instances(
+            required, azimuth, mode=getattr(mw, '_test_mode', 0),
+            existing_instances=getattr(mw, '_chart_instances', None),
+        )
 
         if hasattr(mw, 'ui'):
             mw.ui.spinElev.setValue(int(getattr(self, '_elev', 30)))
@@ -3499,14 +3466,18 @@ class ChartSettingsPage(QWidget):
             vbox.insertWidget(vbox.count() - 1, g)
 
     def _show_a3d_param_dialog(self, chart_key: str):
-        """A 类 3D 方向图参数设置 — DPI + 采样精度 + 多视角。"""
+        """A 类 3D 方向图参数设置 — DPI + 采样精度 + 图表列表(每视角=一个图表)。"""
         from src.chart_config import ChartConfig
         label_map = ChartConfig.chart_labels()
         label = label_map.get(chart_key, chart_key)
 
+        # 视角对 → 图表列表格式: [(el, az), ...]
+        _pairs: list = [[el, az] for el, az in self._view_angle_pairs] if self._view_angle_pairs else [[30.0, -60.0]]
+        _selected_idx = [0]
+
         dlg = QDialog(self)
         dlg.setWindowTitle(label + " " + self.tr("参数设置"))
-        dlg.setMinimumSize(420, 300)
+        dlg.setMinimumSize(520, 480)
         layout = QVBoxLayout(dlg)
 
         form = QFormLayout()
@@ -3519,19 +3490,80 @@ class ChartSettingsPage(QWidget):
         spin_step.setSuffix("°")
         spin_step.setToolTip(self.tr("3D 采样精度: 1°=最细, 30°=最快"))
         form.addRow(self.tr("采样精度:"), spin_step)
-
         layout.addLayout(form)
 
-        btn_view = QPushButton(self.tr("多视角..."))
-        btn_view.clicked.connect(lambda: (
-            dlg.accept(), self._show_view_angle_popup()))
-        layout.addWidget(btn_view)
+        # ── 图表列表 ──
+        chart_grp = QGroupBox(self.tr("图表列表（每视角 = 一张 3D 图）"))
+        chart_layout = QHBoxLayout(chart_grp)
+        chart_list = QListWidget()
+        chart_list.setMaximumHeight(100)
+
+        def _rebuild_chart_list():
+            chart_list.clear()
+            for i, (el, az) in enumerate(_pairs):
+                chart_list.addItem(f"图表 {i+1}: el={el:.0f}°, az={az:.0f}°")
+            if _selected_idx[0] >= chart_list.count():
+                _selected_idx[0] = chart_list.count() - 1
+            if _selected_idx[0] >= 0 and chart_list.count() > 0:
+                chart_list.setCurrentRow(_selected_idx[0])
+
+        _rebuild_chart_list()
+        chart_layout.addWidget(chart_list, 1)
+
+        btn_col = QVBoxLayout()
+        btn_add = QPushButton("+")
+        btn_add.setFixedWidth(30)
+        btn_add.clicked.connect(lambda: (_pairs.append([30.0, -60.0]), _rebuild_chart_list()))
+        btn_col.addWidget(btn_add)
+        btn_del = QPushButton("✕")
+        btn_del.setFixedWidth(30)
+        btn_del.clicked.connect(lambda: (
+            _pairs.pop(_selected_idx[0]) if len(_pairs) > 1 and 0 <= _selected_idx[0] < len(_pairs) else None,
+            _rebuild_chart_list()))
+        btn_col.addWidget(btn_del)
+        btn_col.addStretch()
+        chart_layout.addLayout(btn_col)
+        layout.addWidget(chart_grp)
+
+        chart_list.currentRowChanged.connect(lambda i: _selected_idx.__setitem__(0, i) if i >= 0 else None)
+
+        # ── 编辑选中图表 ──
+        edit_grp = QGroupBox(self.tr("编辑选中图表的视角"))
+        edit_form = QFormLayout(edit_grp)
+
+        def _get_current():
+            idx = _selected_idx[0]
+            if 0 <= idx < len(_pairs):
+                return _pairs[idx]
+            return _pairs[0] if _pairs else [30.0, -60.0]
+
+        spin_el = QDoubleSpinBox()
+        spin_el.setRange(-90, 90); spin_el.setDecimals(0); spin_el.setSuffix("°")
+        spin_az = QDoubleSpinBox()
+        spin_az.setRange(-180, 180); spin_az.setDecimals(0); spin_az.setSuffix("°")
+
+        def _refresh_edit():
+            cur = _get_current()
+            spin_el.blockSignals(True); spin_az.blockSignals(True)
+            spin_el.setValue(cur[0]); spin_az.setValue(cur[1])
+            spin_el.blockSignals(False); spin_az.blockSignals(False)
+
+        spin_el.valueChanged.connect(lambda v: (_get_current().__setitem__(0, v), _rebuild_chart_list()))
+        spin_az.valueChanged.connect(lambda v: (_get_current().__setitem__(1, v), _rebuild_chart_list()))
+        chart_list.currentRowChanged.connect(lambda i: _refresh_edit())
+
+        edit_form.addRow(self.tr("仰角:"), spin_el)
+        edit_form.addRow(self.tr("方位角:"), spin_az)
+        _refresh_edit()
+        layout.addWidget(edit_grp)
         layout.addStretch()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
             setattr(self, '_dpi', spin_dpi.value()),
             setattr(self, '_step_deg', float(spin_step.value())),
+            self._view_angle_pairs.clear(),
+            [self._view_angle_pairs.append((float(el), float(az))) for el, az in _pairs],
             self._sync_to_mw(),
             dlg.accept()))
         btns.rejected.connect(dlg.reject)
@@ -3633,104 +3665,122 @@ class ChartSettingsPage(QWidget):
         layout.addWidget(btns)
         dlg.exec()
     def _show_2d_phi_angle_popup(self):
-        """弹出 2D 俯仰面切面 Phi 角度选择窗口。"""
+        """弹出 2D 俯仰面切面 Phi 角度选择窗口 — 图表列表模式（每 phi = 一个图表）。"""
+        import copy
+        _charts: list = copy.deepcopy(self._cut_2d_phi_angles) if self._cut_2d_phi_angles else [0.0, 90.0]
+        # 兼容旧格式: 平列表转为图表列表（每角度一个图表）
+        if _charts and not isinstance(_charts[0], list):
+            _charts = [[float(a)] for a in _charts]
+        _selected_idx = [0]
+
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("选择俯仰面切图 Phi 角度"))
-        dlg.setMinimumSize(480, 380)
-        import copy
-        _singles: List[float] = copy.deepcopy(self._cut_2d_phi_angles)
-
+        dlg.setMinimumSize(520, 480)
         layout = QVBoxLayout(dlg)
-        display_grp = QGroupBox(self.tr("已选 Phi 角度"))
-        _display_layout = QVBoxLayout(display_grp)
 
-        def _refresh_display():
-            while _display_layout.count():
-                item = _display_layout.takeAt(0)
-                if item.widget(): item.widget().deleteLater()
-            if _singles:
-                scroll = QScrollArea()
-                scroll.setWidgetResizable(True); scroll.setFrameShape(QScrollArea.NoFrame)
-                scroll.setMaximumHeight(120)
-                tags = QWidget()
-                tag_layout = FlowLayout(tags)
-                for a in sorted(set(_singles)):
-                    row_w = QWidget()
-                    row_h = QHBoxLayout(row_w)
-                    row_h.setContentsMargins(2, 1, 2, 1); row_h.setSpacing(2)
-                    row_h.addWidget(QLabel(f"{a:.0f}°"))
-                    btn_del = QPushButton("✕")
-                    btn_del.setFixedSize(20, 20)
-                    btn_del.clicked.connect(lambda checked, angle=a: (
-                        _singles.remove(angle), _refresh_display()))
-                    row_h.addWidget(btn_del); row_h.addStretch()
-                    tag_layout.addWidget(row_w)
-                scroll.setWidget(tags)
-                _display_layout.addWidget(scroll)
-                btn_clear = QPushButton(self.tr("清空全部"))
-                btn_clear.clicked.connect(lambda: (_singles.clear(), _refresh_display()))
-                _display_layout.addWidget(btn_clear)
-            else:
-                _display_layout.addWidget(QLabel(self.tr("  (未选择，默认 φ=0°, 90°)")))
-        _refresh_display()
-        layout.addWidget(display_grp)
+        # ── 图表列表 ──
+        chart_grp = QGroupBox(self.tr("图表列表（每图表 = 一张切面图）"))
+        chart_layout = QHBoxLayout(chart_grp)
+        chart_list = QListWidget()
+        chart_list.setMaximumHeight(100)
 
-        splitter = QSplitter(Qt.Vertical)
-        bottom = QWidget()
-        bottom_layout = QVBoxLayout(bottom)
-        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        def _rebuild_chart_list():
+            chart_list.clear()
+            for i, ch in enumerate(_charts):
+                if ch:
+                    label = f"图表 {i+1}: φ={ch[0]:.0f}°"
+                else:
+                    label = f"图表 {i+1}: (空)"
+                chart_list.addItem(label)
+            if _selected_idx[0] >= chart_list.count():
+                _selected_idx[0] = chart_list.count() - 1
+            if _selected_idx[0] >= 0 and chart_list.count() > 0:
+                chart_list.setCurrentRow(_selected_idx[0])
 
-        # 自定义 Phi
-        cust_grp = QGroupBox(self.tr("自定义"))
-        cust_layout = QHBoxLayout(cust_grp)
-        spin_custom = QDoubleSpinBox()
-        spin_custom.setRange(0, 360); spin_custom.setDecimals(1)
-        spin_custom.setValue(0); spin_custom.setSuffix("°")
-        cust_layout.addWidget(QLabel(self.tr("Phi:")))
-        cust_layout.addWidget(spin_custom)
-        btn_add = QPushButton("+ " + self.tr("添加"))
-        btn_add.clicked.connect(lambda: (
-            _singles.append(spin_custom.value()) if spin_custom.value() not in _singles else None,
-            _refresh_display()))
-        cust_layout.addWidget(btn_add); cust_layout.addStretch()
-        bottom_layout.addWidget(cust_grp)
+        _rebuild_chart_list()
+        chart_layout.addWidget(chart_list, 1)
 
-        # 步进
+        btn_col = QVBoxLayout()
+        btn_add = QPushButton("+")
+        btn_add.setFixedWidth(30)
+        btn_add.clicked.connect(lambda: (_charts.append([0.0]), _rebuild_chart_list()))
+        btn_col.addWidget(btn_add)
+        btn_del = QPushButton("✕")
+        btn_del.setFixedWidth(30)
+        btn_del.clicked.connect(lambda: (
+            _charts.pop(_selected_idx[0]) if len(_charts) > 1 and 0 <= _selected_idx[0] < len(_charts) else None,
+            _rebuild_chart_list()))
+        btn_col.addWidget(btn_del)
+        btn_col.addStretch()
+        chart_layout.addLayout(btn_col)
+        layout.addWidget(chart_grp)
+
+        chart_list.currentRowChanged.connect(lambda i: _selected_idx.__setitem__(0, i) if i >= 0 else None)
+
+        # ── 编辑选中图表 ──
+        edit_grp = QGroupBox(self.tr("编辑选中图表的 Phi 角度"))
+        edit_layout = QVBoxLayout(edit_grp)
+
+        def _get_current():
+            idx = _selected_idx[0]
+            if 0 <= idx < len(_charts):
+                return _charts[idx]
+            return _charts[0] if _charts else [0.0]
+
+        spin_phi = QDoubleSpinBox()
+        spin_phi.setRange(0, 360); spin_phi.setDecimals(1); spin_phi.setSuffix("°")
+
+        def _refresh_edit():
+            cur = _get_current()
+            spin_phi.blockSignals(True)
+            spin_phi.setValue(cur[0] if cur else 0.0)
+            spin_phi.blockSignals(False)
+
+        spin_phi.valueChanged.connect(lambda v: (
+            (_get_current().__setitem__(0, v) if _get_current() else _get_current().append(v)),
+            _rebuild_chart_list()))
+        chart_list.currentRowChanged.connect(lambda i: _refresh_edit())
+        _refresh_edit()
+
+        phi_row = QHBoxLayout()
+        phi_row.addWidget(QLabel(self.tr("Phi:")))
+        phi_row.addWidget(spin_phi)
+        phi_row.addStretch()
+        edit_layout.addLayout(phi_row)
+
+        # 步进批量生成（追加到选中图表）
         step_grp = QGroupBox(self.tr("步进批量生成"))
         step_layout = QHBoxLayout(step_grp)
-        for label, default in [("起始:", 0), ("结束:", 180), ("步进:", 45)]:
-            step_layout.addWidget(QLabel(self.tr(label)))
-            sp = QDoubleSpinBox()
-            sp.setRange(0, 360); sp.setDecimals(1); sp.setSuffix("°")
-            sp.setValue(default)
-            step_layout.addWidget(sp)
-            if label == "步进:":
-                spin_step = sp
-            elif label == "起始:":
-                spin_start = sp
-            else:
-                spin_end = sp
+        spin_start = QDoubleSpinBox()
+        spin_start.setRange(0, 360); spin_start.setDecimals(1); spin_start.setSuffix("°"); spin_start.setValue(0)
+        spin_end = QDoubleSpinBox()
+        spin_end.setRange(0, 360); spin_end.setDecimals(1); spin_end.setSuffix("°"); spin_end.setValue(180)
+        spin_step = QDoubleSpinBox()
+        spin_step.setRange(1, 90); spin_step.setDecimals(1); spin_step.setSuffix("°"); spin_step.setValue(45)
+        step_layout.addWidget(QLabel(self.tr("起:"))); step_layout.addWidget(spin_start)
+        step_layout.addWidget(QLabel(self.tr("止:"))); step_layout.addWidget(spin_end)
+        step_layout.addWidget(QLabel(self.tr("步:"))); step_layout.addWidget(spin_step)
         btn_gen = QPushButton(self.tr("生成"))
         btn_gen.clicked.connect(lambda: (
-            [_singles.append(float(a)) for a in
+            [_charts.append([float(a)]) for a in
              np.linspace(spin_start.value(), spin_end.value(),
-                         max(1, int((spin_end.value()-spin_start.value())/
-                                    max(1, spin_step.value()))+1))
-             if float(a) not in _singles],
-            _refresh_display()))
+                         max(1, int((spin_end.value()-spin_start.value())/max(1, spin_step.value()))+1))
+             if not any(abs(float(a) - c[0]) < 0.01 for c in _charts)],
+            _rebuild_chart_list()))
         step_layout.addWidget(btn_gen); step_layout.addStretch()
-        bottom_layout.addWidget(step_grp)
+        edit_layout.addWidget(step_grp)
+        layout.addWidget(edit_grp)
+        layout.addStretch()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
             self._cut_2d_phi_angles.clear(),
-            self._cut_2d_phi_angles.extend(sorted(set(_singles))),
+            self._cut_2d_phi_angles.extend([ch[0] for ch in _charts if ch]),
+            self._sync_to_mw(),
             dlg.accept()))
         btns.rejected.connect(dlg.reject)
-        bottom_layout.addWidget(btns)
-
-        splitter.addWidget(bottom)
-        layout.addWidget(splitter)
+        layout.addWidget(btns)
+        dlg.exec()
         dlg.exec()
         self._sync_to_mw()
 
@@ -3884,8 +3934,8 @@ class ChartSettingsPage(QWidget):
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
-            # 保存为 list-of-lists 格式 (单图表时退化为 flat list 兼容旧代码)
-            setattr(self, attr_name, _charts if len(_charts) > 1 else _charts[0] if _charts else []),
+            # 始终保存为 list-of-lists（每子列表 = 一个图表 = 一张图）
+            setattr(self, attr_name, [c for c in _charts if c]),
             self._sync_selected_frequencies(freq_picker.get_selected()),
             dlg.accept()))
         btns.rejected.connect(dlg.reject)

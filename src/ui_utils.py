@@ -152,6 +152,36 @@ def merge_params_from_columns(column_types: set[str]) -> set[str]:
 
 
 # ═══════════════════════════════════════════════════════════════
+# 角度类型配置（单一定义, 底部栏/右边面板/字报告共用）
+# ═══════════════════════════════════════════════════════════════
+
+class AngleTypeInfo:
+    """角度类型元数据: config 属性名、显示名、弹窗 key、是否有区间。"""
+    __slots__ = ("attr", "label", "popup", "has_range", "param_keys")
+
+    def __init__(self, attr: str, label: str, popup: str, has_range: bool, *param_keys: str):
+        self.attr = attr
+        self.label = label
+        self.popup = popup
+        self.has_range = has_range
+        self.param_keys = param_keys
+
+
+ANGLE_TYPE_CONFIG: dict[str, AngleTypeInfo] = {
+    "lag": AngleTypeInfo("_lag_config", "Gain", "gain", True, "gain", "lag_single", "lag_range"),
+    "ar": AngleTypeInfo("_ar_lag_config", "AR", "ar", True, "ar", "ar_single", "ar_range"),
+    "rhcp": AngleTypeInfo("_rhcp_lag_config", "RHCP", "rhcp", False, "rhcp_single"),
+    "cpxpi": AngleTypeInfo("_cpxpi_lag_config", "CP-XPI", "cpxpi", False, "cp_xpi_single"),
+}
+# 反向索引: param_key → info (用于 checkbox 循环中的 key 查找)
+_ANGLE_BY_PARAM_KEY: dict[str, AngleTypeInfo] = {}
+for _info in ANGLE_TYPE_CONFIG.values():
+    for _k in _info.param_keys:
+        _ANGLE_BY_PARAM_KEY[_k] = _info
+"""角度类型 → 元数据的唯一数据源。底部栏、右边面板、Word 报告均从此读取。"""
+
+
+# ═══════════════════════════════════════════════════════════════
 # 通用文件工具
 # ═══════════════════════════════════════════════════════════════
 

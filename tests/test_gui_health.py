@@ -185,8 +185,8 @@ class TestLayoutGeometry:
         for i in range(tc.count()):
             tc.setCurrentIndex(i)
             qtbot.wait(30)
-        # At minimum, match_table should exist
-        assert window._match_table is not None
+        # At minimum, _last_matches should exist
+        assert hasattr(window, '_last_matches'), "_last_matches should exist"
 
     # ── Config Tab ──
 

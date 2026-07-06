@@ -128,6 +128,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             geo = QByteArray.fromBase64(bytes(geo_str, 'utf-8'))
             self.restoreGeometry(geo)
         self._data_file_paths: List[str] = []
+        self._last_matches: list = []        # 工作表-文件匹配结果
+        self._chart_instances: list = []     # 图表实例列表 (ChartInstance)
         self._required_params: set = set()   # 用户确认的报告必需参数
         self._extra_params: set = set()      # 用户额外选择的计算参数
         self._dir_extrap_method: str = "linear"  # Directivity 外推算法
@@ -177,6 +179,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.set_base_qss(self._theme_qss + self._custom_qss)
         # setStyleSheet 会重置子控件的 minimumWidth → 重新应用
         self._apply_minimum_sizes()
+        self._enter_idle()  # 初始化按钮状态机（btnStart/btnExport/btnOneClick/btnStop）
         self._log("天线参数后处理工具已启动")
 
     # ==================================================================
@@ -1452,8 +1455,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._refresh_data_file_ui()
 
         matched = sum(1 for m in matches if m.file_path is not None)
-        if hasattr(self, '_lbl_match_status'):
-            self._lbl_match_status.setText(
+        fp = getattr(self, '_file_settings_page', None)
+        if fp and hasattr(fp, '_lbl_match_status') and fp._lbl_match_status is not None:
+            fp._lbl_match_status.setText(
                 f"✓ {matched}/{len(matches)} 个工作表已匹配"
             )
         self._log(f"自动匹配完成: {matched}/{len(matches)}")
@@ -1461,8 +1465,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _populate_match_table(self, matches):
         self._last_matches = matches
         matched = sum(1 for m in matches if m.file_path is not None)
-        if hasattr(self, '_lbl_match_status'):
-            self._lbl_match_status.setText(f'{matched}/{len(matches)} done')
+        fp = getattr(self, '_file_settings_page', None)
+        if fp and hasattr(fp, '_lbl_match_status') and fp._lbl_match_status is not None:
+            fp._lbl_match_status.setText(f'{matched}/{len(matches)} done')
         fp = getattr(self, '_file_settings_page', None)
         if fp and hasattr(fp, '_populate_match_table'):
             fp._populate_match_table(matches)
@@ -1658,8 +1663,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             except Exception:
                 pass
             # 模板路径变更后，旧的匹配表基于旧模板的工作表名，无效
-            if hasattr(self, '_lbl_match_status') and self._lbl_match_status is not None:
-                self._lbl_match_status.setText("")
+            fp = getattr(self, '_file_settings_page', None)
+            if fp and hasattr(fp, '_lbl_match_status') and fp._lbl_match_status is not None:
+                fp._lbl_match_status.setText("")
             # 若已有数据文件，立即重建匹配表
             if self._data_file_paths:
                 self._on_auto_match()
@@ -2077,6 +2083,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         ready = state == self._READY
         self.ui.btnStart.setEnabled(idle)  # 仅 IDLE 可预览, READY 时禁用以防误点
         self._btn_export.setEnabled(ready)
+        self._btn_one_click.setEnabled(idle or ready)
         self.ui.btnStop.setEnabled(running)
 
     def _enter_previewing(self):
@@ -2333,11 +2340,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             req = self._chart_config_required or ChartConfig()
             xtr = self._chart_config_extra or ChartConfig()
             full_chart_config = req.merge(xtr)
-        # GUI checkbox 状态覆盖 ChartConfig 默认 (用户意图优先)
-        if file_page:
-            chart_flags = file_page.get_lag_checkboxes()
-            full_chart_config.chart_eff_freq = chart_flags["chart_eff"]
-            full_chart_config.chart_gain_freq = chart_flags["chart_lag"]
         png_dir = plot_config.save_png_folder
         full_chart_config.save_png_folder = png_dir
 
@@ -2360,11 +2362,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     az.data_output_filename = f"{src_stem}_中间数据.xlsx"
             # 角度自动加载 (仅首次，之后用户手动管理)
                 if not az._angles_initialized:
-                    az.azimuth_cut_angles = self._lag_config.singles_sorted
-                    az.azimuth_cut_angles_ar = self._lag_config.singles_sorted
-                    if not az.azimuth_cut_angles:
-                        pass  # already handled
-                        az.azimuth_cut_angles = list(self._lag_config.singles_sorted)
+                    gain_singles = self._lag_config.singles_sorted
+                    ar_singles = (self._ar_lag_config.singles_sorted
+                                  if hasattr(self, '_ar_lag_config') else gain_singles)
+                    # 包装为图表列表格式: 每个图表一个角度列表
+                    az.azimuth_cut_angles = [list(gain_singles)] if gain_singles else [[]]
+                    az.azimuth_cut_angles_ar = [list(ar_singles)] if ar_singles else [[]]
                     if not az.azimuth_cut_angles_ar:
                         az.azimuth_cut_angles_ar = list(self._lag_config.singles_sorted)
                     az._angles_initialized = True
@@ -2414,6 +2417,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             gen_diff=gen_diff,
             gen_diff_chart=gen_diff_chart,
             antenna_configs=self._antenna_configs if self._antenna_configs else None,
+            chart_instances=getattr(self, '_chart_instances', None),
         )
         self._worker.moveToThread(self._thread)
 
@@ -2939,11 +2943,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             return
         mode_names = {0: "📡 无源", 1: "📶 TRP", 2: "📻 TIS"}
         mode_str = mode_names.get(self._test_mode, "?")
-        gain_s = self._lag_config.singles_sorted
-        gain_r = self._lag_config.ranges_sorted
-        ar_cfg = getattr(self, '_ar_lag_config', None)
-        ar_s = ar_cfg.singles_sorted if ar_cfg else []
-        ar_r = ar_cfg.ranges_sorted if ar_cfg else []
         freq = self._cmb_freq_source.currentText() if hasattr(self, '_cmb_freq_source') else "—"
         extrap = self._cmb_extrapolate.currentText() if hasattr(self, '_cmb_extrapolate') else "不外推"
         robust = hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked()
@@ -2976,16 +2975,18 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         else:
             lines.append("<b>参数:</b> <span style='color:#888;'>(未选择)</span>")
 
-        if gain_s or gain_r:
-            parts = [f"{a}°" for a in gain_s]
-            if gain_r:
-                parts += [f"({lo}–{hi}°)" for lo, hi in gain_r]
-            lines.append(f"<b>Gain:</b> {', '.join(parts)}")
-        if ar_s or ar_r:
-            parts = [f"{a}°" for a in ar_s]
-            if ar_r:
-                parts += [f"({lo}–{hi}°)" for lo, hi in ar_r]
-            lines.append(f"<b>AR:</b> {', '.join(parts)}")
+        # 角度显示: 从 ANGLE_TYPE_CONFIG 读取，与右边面板共用同一数据源
+        from src.ui_utils import ANGLE_TYPE_CONFIG
+        for info in ANGLE_TYPE_CONFIG.values():
+            cfg = getattr(self, info.attr, None)
+            if cfg is None:
+                continue
+            singles = cfg.singles_sorted
+            ranges = cfg.ranges_sorted
+            if singles or ranges:
+                parts = [f"{a}°" for a in singles]
+                parts += [f"({lo}–{hi}°)" for lo, hi in ranges]
+                lines.append(f"<b>{info.label}:</b> {', '.join(parts)}")
         algo = []
         if extrap: algo.append("外推")
         if robust: algo.append("Robust")
@@ -3036,8 +3037,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 fp = getattr(self, '_file_settings_page', None)
                 if fp: fp._file_entries.clear()
                 self._file_list_widget.setRowCount(0)
-                if hasattr(self, '_lbl_match_status'):
-                    self._lbl_match_status.setText("")
+                if fp and hasattr(fp, '_lbl_match_status') and fp._lbl_match_status is not None:
+                    fp._lbl_match_status.setText("")
             existing = set(self._data_file_paths)
             new = [p for p in valid if p not in existing]
             if new:

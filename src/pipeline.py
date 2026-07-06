@@ -24,7 +24,7 @@ from typing import Any
 
 import numpy as np
 
-from .azimuth_config import AzimuthReportConfig
+from .azimuth_config import AzimuthReportConfig, _flatten
 from .calculator import (
     compute_ar_at_angles,
     compute_ar_range,
@@ -477,18 +477,18 @@ def _process_one_frequency(
                 if images:
                     row["_images"] = images
             # 存储中间数据供方位面导出使用
-            if azimuth_config.cut_azimuth_polar and azimuth_config.azimuth_cut_angles:
+            if azimuth_config.cut_azimuth_polar and azimuth_config.angle_charts:
                 row["_azimuth_gain_dbi"] = gain_dbi
                 row["_azimuth_theta_deg"] = theta_deg.copy()
-            if azimuth_config.cut_azimuth_polar_ar and ar_lin is not None and azimuth_config.azimuth_cut_angles_ar:
+            if azimuth_config.cut_azimuth_polar_ar and ar_lin is not None and azimuth_config.angle_charts_ar:
                 row["_azimuth_ar_db"] = 20.0 * np.log10(np.maximum(ar_lin, 1e-15))
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
-            if azimuth_config.cut_azimuth_polar_rhcp and rhcp_db is not None and azimuth_config.azimuth_cut_angles_rhcp:
+            if azimuth_config.cut_azimuth_polar_rhcp and rhcp_db is not None and azimuth_config.angle_charts_rhcp:
                 row["_azimuth_rhcp_db"] = rhcp_db
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
-            if azimuth_config.cut_azimuth_polar_lhcp and lhcp_db is not None and azimuth_config.azimuth_cut_angles_lhcp:
+            if azimuth_config.cut_azimuth_polar_lhcp and lhcp_db is not None and azimuth_config.angle_charts_lhcp:
                 row["_azimuth_lhcp_db"] = lhcp_db
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
@@ -859,6 +859,7 @@ def run_pipeline(
     nh_custom_angles: list[float] | None = None,
     ar_output_db: bool = True,
     worksheet_naming_mode: int = 0,  # 0=保留模板工作表名, 1=用数据源名
+    chart_instances: list | None = None,  # ChartInstance 列表, 为空则使用旧行为
     parallel: int = 1,
     cancel_callback: Callable[[], bool] | None = None,
     progress_callback: Callable[[int, int, str], None] | None = None,
@@ -1007,7 +1008,8 @@ def run_pipeline(
     if out_word or out_data:
         _export_azimuth(sheet_results, azimuth_config, log_callback,
                         out_word=out_word, out_data=out_data,
-                        word_template_path=word_template_path)
+                        word_template_path=word_template_path,
+                        chart_instances=chart_instances)
 
     elapsed = time.time() - t0
     total_rows = sum(len(v) for v in sheet_results.values())
@@ -1072,11 +1074,14 @@ def _export_azimuth(
     out_word: bool = True,
     out_data: bool = True,
     word_template_path: str | None = None,
+    chart_instances: list | None = None,
 ):
     """从处理结果中收集方位面图片和中间数据，写入 Word 和 Excel。
 
     当 word_template_path 不为空时，使用 WordReporter 填充模板；
     否则使用 chart_word_writer 自动生成 Word 报告。
+
+    chart_instances: 若提供, 仅收集 enabled=True 的实例, 按 sort_order 排序。
     """
     from pathlib import Path
 
@@ -1094,7 +1099,7 @@ def _export_azimuth(
 
     # 图片类型 → 用户可读组名
     def _label_for_image_key(img_key: str) -> str:
-        """将 image key 映射为用户可读组名。"""
+        """将 image key 映射为用户可读组名（支持多图表索引后缀）。"""
         if img_key.startswith("2d_polar_phi"):
             phi = img_key[len("2d_polar_phi"):]
             return f"2D Polar Cut (φ={phi}°)"
@@ -1106,17 +1111,33 @@ def _export_azimuth(
             base = img_key.rsplit("_v", 1)[0]
             known = {"3d_gain": "3D Gain Pattern", "3d_eirp": "3D EIRP Pattern", "3d_ar": "3D Axial Ratio Pattern"}
             return known.get(base, img_key)
-        known = {
-            "3d_gain": "3D Gain Pattern",
-            "3d_eirp": "3D EIRP Pattern",
-            "3d_ar": "3D Axial Ratio Pattern",
+        # azimuth 多图表: azimuth_polar_0 → "Gain Azimuth Cut #1"
+        _AZ_BASE = {
             "azimuth_polar": "Gain Azimuth Cut",
             "azimuth_polar_pk070": "Gain Azimuth (θ=0°-70°)",
             "azimuth_polar_ar": "AR Azimuth Cut",
             "azimuth_polar_rhcp": "RHCP Azimuth Cut",
             "azimuth_polar_lhcp": "LHCP Azimuth Cut",
         }
+        # 尝试精确匹配
+        if img_key in _AZ_BASE:
+            return _AZ_BASE[img_key]
+        # 尝试带索引后缀的 key: azimuth_polar_0, azimuth_polar_ar_1, ...
+        for base, label in _AZ_BASE.items():
+            if img_key.startswith(base + "_") and img_key[len(base)+1:].isdigit():
+                idx = int(img_key[len(base)+1:]) + 1
+                return f"{label} #{idx}"
+        known = {
+            "3d_gain": "3D Gain Pattern",
+            "3d_eirp": "3D EIRP Pattern",
+            "3d_ar": "3D Axial Ratio Pattern",
+        }
         return known.get(img_key, img_key)
+
+    # 若提供实例列表，构建允许的 image_key 集合
+    _enabled_keys: set | None = None
+    if chart_instances:
+        _enabled_keys = {ci.image_key for ci in chart_instances if ci.enabled}
 
     for sheet_name, rows in sheet_results.items():
         for row in rows:
@@ -1127,6 +1148,8 @@ def _export_azimuth(
             for img_key, buf in images.items():
                 if buf is None:
                     continue
+                if _enabled_keys is not None and img_key not in _enabled_keys:
+                    continue  # 不在实例列表中 → 不生成
                 label = _label_for_image_key(img_key)
                 if label not in image_groups:
                     image_groups[label] = {}
@@ -1243,7 +1266,7 @@ def _export_azimuth(
                 freq_gain_vs_theta.append((freq, pk070_db.copy()))
 
 
-    # ── 按频点配对: azimuth_polar + azimuth_polar_pk070 并排 ──
+    # ── 按频点配对: 收集所有 Gain azimuth 图表（含多图表） ──
     freq_pairs: dict[float, dict[str, io.BytesIO]] = {}
     if out_word and azimuth_config and (azimuth_config.cut_azimuth_polar
             or azimuth_config.cut_azimuth_polar_pk070):
@@ -1252,10 +1275,12 @@ def _export_azimuth(
             if f is None: continue
             imgs = row.get("_images", {})
             pair = {}
-            if "azimuth_polar" in imgs:
-                pair["azimuth_polar"] = imgs["azimuth_polar"]
-            if "azimuth_polar_pk070" in imgs:
-                pair["azimuth_polar_pk070"] = imgs["azimuth_polar_pk070"]
+            # 收集所有 Gain 方位面图（azimuth_polar 和 azimuth_polar_0, _1,... 以及 pk070）
+            for k in sorted(imgs):
+                if k.startswith("azimuth_polar") and not k.startswith("azimuth_polar_ar") \
+                        and not k.startswith("azimuth_polar_rhcp") \
+                        and not k.startswith("azimuth_polar_lhcp"):
+                    pair[k] = imgs[k]
             if pair:
                 freq_pairs[f] = pair
 
@@ -1277,13 +1302,19 @@ def _export_azimuth(
             from .chart_word_writer import write_chart_word_report_by_freq
             _log(log_callback, f"生成图表报告 (按频点): {word_path}")
             try:
+                # 构建动态 pair_order: 收集所有出现的 azimuth gain keys
+                all_az_keys = set()
+                for p in freq_pairs.values():
+                    all_az_keys.update(p.keys())
+                pair_order = sorted(k for k in all_az_keys if k != "azimuth_polar_pk070")
+                if "azimuth_polar_pk070" in all_az_keys:
+                    pair_order.append("azimuth_polar_pk070")
+                # pair_labels: 从 _label_for_image_key 生成
+                pair_labels = {k: _label_for_image_key(k) for k in all_az_keys}
                 write_chart_word_report_by_freq(
                     freq_pairs,
-                    pair_order=["azimuth_polar"] + (["azimuth_polar_pk070"] if azimuth_config.cut_azimuth_polar_pk070 else []),
-                    pair_labels={
-                        "azimuth_polar": "Gain Azimuth Cut",
-                        "azimuth_polar_pk070": "Gain Azimuth (θ=0°-70°)",
-                    },
+                    pair_order=pair_order,
+                    pair_labels=pair_labels,
                     output_path=word_path,
                     antenna_name=az.antenna_name if az else "",
                     image_width_pct=az.word_image_width_pct if az else 90,
@@ -1298,9 +1329,8 @@ def _export_azimuth(
             # 无 azimuth 对, 回退到旧 writer
             _log(log_callback, f"生成图表报告: {word_path}")
             try:
-                angles_str = ", ".join(
-                    f"{a:.0f}°" for a in (az.azimuth_cut_angles if az else [])
-                ) if (az and az.azimuth_cut_angles) else ""
+                _az_flat = _flatten(az.azimuth_cut_angles) if az else []
+                angles_str = ", ".join(f"{a:.0f}°" for a in _az_flat) if _az_flat else ""
                 write_chart_word_report(
                     extra_groups, word_path,
                     antenna_name=az.antenna_name if az else "",
@@ -1444,6 +1474,7 @@ def run_batch_pipeline(
     cancel_callback=None,
     progress_callback=None,
     log_callback=None,
+    **_ignored,  # 接受但不使用 worker 可能传入的额外参数
 ):
     """旧版 pipeline: 接受 CSV 路径，内部创建 MergedCSVParser。"""
     ds = MergedCSVParser(csv_path)
