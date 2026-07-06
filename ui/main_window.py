@@ -2227,6 +2227,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         out_data = False
         if file_page and hasattr(file_page, 'get_output_flags'):
             out_excel, out_word, out_data = file_page.get_output_flags()
+        # 有图表配置 → 自动开启 Word 输出
+        if not out_word and getattr(self, '_chart_instances', None):
+            out_word = True
+            if file_page and hasattr(file_page, '_check_out_word'):
+                file_page._check_out_word.setChecked(True)
 
         if not out_excel and not out_word and not out_data:
             self._restore_start_button()
