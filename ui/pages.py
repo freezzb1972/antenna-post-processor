@@ -3577,14 +3577,18 @@ class ChartSettingsPage(QWidget):
         dlg.exec()
 
     def _show_bclass_param_dialog(self, chart_key: str):
-        """B 类频率曲线参数设置对话框 — 频段间隔 + 双Y轴 + 线宽。"""
+        """B 类频率曲线参数设置 — 图表列表 + 频段间隔 + 双Y轴。"""
         from src.chart_config import ChartConfig
         label_map = ChartConfig.chart_labels()
         chart_label = label_map.get(chart_key, chart_key)
 
+        # 图表列表: 每图表 = 一条频率曲线（可指定频段范围）
+        _charts: list = [{"label": chart_label, "freq_start": 0, "freq_end": 0}]  # 0=全频段
+        _selected_idx = [0]
+
         dlg = QDialog(self)
         dlg.setWindowTitle(chart_label + " " + self.tr("参数设置"))
-        dlg.setMinimumSize(400, 280)
+        dlg.setMinimumSize(520, 480)
         layout = QVBoxLayout(dlg)
 
         # 从 AzimuthReportConfig 读取当前值
@@ -3592,32 +3596,97 @@ class ChartSettingsPage(QWidget):
         cur_gap = az.freq_gap_mhz if az else 10
         cur_dual = az.dual_y_enabled if az else False
 
-        form = QFormLayout()
-        spin_gap = QSpinBox()
-        spin_gap.setRange(0, 999)
-        spin_gap.setValue(cur_gap)
-        spin_gap.setToolTip(self.tr("0=不打断单轴；>0=相邻频点差超此值时分段绘制"))
-        form.addRow(self.tr("频段间隔 (MHz):"), spin_gap)
+        # ── 图表列表 ──
+        chart_grp = QGroupBox(self.tr("图表列表（每图表 = 一条独立曲线）"))
+        chart_layout = QHBoxLayout(chart_grp)
+        chart_list = QListWidget()
+        chart_list.setMaximumHeight(100)
 
+        def _rebuild_chart_list():
+            chart_list.clear()
+            for i, ch in enumerate(_charts):
+                label = ch.get("label", f"图表 {i+1}")
+                if ch.get("freq_start") and ch.get("freq_end"):
+                    label += f" ({ch['freq_start']}-{ch['freq_end']} MHz)"
+                chart_list.addItem(label)
+            if _selected_idx[0] >= chart_list.count():
+                _selected_idx[0] = chart_list.count() - 1
+            if _selected_idx[0] >= 0 and chart_list.count() > 0:
+                chart_list.setCurrentRow(_selected_idx[0])
+
+        _rebuild_chart_list()
+        chart_layout.addWidget(chart_list, 1)
+
+        btn_col = QVBoxLayout()
+        btn_add = QPushButton("+")
+        btn_add.setFixedWidth(30)
+        btn_add.clicked.connect(lambda: (
+            _charts.append({"label": f"{chart_label} #{len(_charts)+1}", "freq_start": 0, "freq_end": 0}),
+            _rebuild_chart_list()))
+        btn_col.addWidget(btn_add)
+        btn_del = QPushButton("✕")
+        btn_del.setFixedWidth(30)
+        btn_del.clicked.connect(lambda: (
+            _charts.pop(_selected_idx[0]) if len(_charts) > 1 and 0 <= _selected_idx[0] < len(_charts) else None,
+            _rebuild_chart_list()))
+        btn_col.addWidget(btn_del)
+        btn_col.addStretch()
+        chart_layout.addLayout(btn_col)
+        layout.addWidget(chart_grp)
+
+        chart_list.currentRowChanged.connect(lambda i: _selected_idx.__setitem__(0, i) if i >= 0 else None)
+
+        # ── 编辑选中图表 ──
+        edit_grp = QGroupBox(self.tr("编辑选中图表"))
+        edit_form = QFormLayout(edit_grp)
+
+        def _get_current():
+            idx = _selected_idx[0]
+            if 0 <= idx < len(_charts):
+                return _charts[idx]
+            return _charts[0]
+
+        edit_label = QLineEdit()
+        edit_label.setPlaceholderText(chart_label)
+        spin_fs = QSpinBox(); spin_fs.setRange(0, 100000); spin_fs.setSuffix(" MHz"); spin_fs.setSpecialValueText("全频段")
+        spin_fe = QSpinBox(); spin_fe.setRange(0, 100000); spin_fe.setSuffix(" MHz"); spin_fe.setSpecialValueText("全频段")
+
+        def _refresh_edit():
+            cur = _get_current()
+            edit_label.blockSignals(True); spin_fs.blockSignals(True); spin_fe.blockSignals(True)
+            edit_label.setText(cur.get("label", ""))
+            spin_fs.setValue(cur.get("freq_start", 0)); spin_fe.setValue(cur.get("freq_end", 0))
+            edit_label.blockSignals(False); spin_fs.blockSignals(False); spin_fe.blockSignals(False)
+
+        edit_label.textChanged.connect(lambda t: (_get_current().__setitem__("label", t), _rebuild_chart_list()))
+        spin_fs.valueChanged.connect(lambda v: (_get_current().__setitem__("freq_start", v), _rebuild_chart_list()))
+        spin_fe.valueChanged.connect(lambda v: (_get_current().__setitem__("freq_end", v), _rebuild_chart_list()))
+        chart_list.currentRowChanged.connect(lambda i: _refresh_edit())
+
+        edit_form.addRow(self.tr("名称:"), edit_label)
+        edit_form.addRow(self.tr("频段起:"), spin_fs)
+        edit_form.addRow(self.tr("频段止:"), spin_fe)
+        _refresh_edit()
+        layout.addWidget(edit_grp)
+
+        # ── 全局参数 ──
+        global_grp = QGroupBox(self.tr("全局参数"))
+        global_form = QFormLayout(global_grp)
+        spin_gap = QSpinBox(); spin_gap.setRange(0, 999); spin_gap.setValue(cur_gap)
+        spin_gap.setToolTip(self.tr("0=不打断单轴；>0=相邻频点差超此值时分段绘制"))
+        global_form.addRow(self.tr("频段间隔 (MHz):"), spin_gap)
         check_dual = QCheckBox(self.tr("启用双Y轴配对"))
         check_dual.setChecked(cur_dual)
         check_dual.setToolTip(self.tr("Efficiency%+Gain 和 Directivity+TRP 共用双Y轴"))
-        form.addRow("", check_dual)
-
-        # 线宽
-        spin_lw = QDoubleSpinBox()
-        spin_lw.setRange(0.5, 5.0); spin_lw.setSingleStep(0.5)
-        spin_lw.setValue(1.5)
-        spin_lw.setSuffix(" pt")
-        form.addRow(self.tr("曲线线宽:"), spin_lw)
-
-        layout.addLayout(form)
+        global_form.addRow("", check_dual)
+        layout.addWidget(global_grp)
         layout.addStretch()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
             setattr(az, 'freq_gap_mhz', spin_gap.value()) if az else None,
             setattr(az, 'dual_y_enabled', check_dual.isChecked()) if az else None,
+            self._sync_to_mw(),
             dlg.accept()))
         btns.rejected.connect(dlg.reject)
         layout.addWidget(btns)
