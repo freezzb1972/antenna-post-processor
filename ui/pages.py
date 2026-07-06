@@ -2798,14 +2798,17 @@ class ChartSettingsPage(QWidget):
                     row.addWidget(btn)
 
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
-                    btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
+                    btn = QPushButton("⚙ " + self.tr("参数"))
                     btn.setFixedWidth(85)
                     btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
                     row.addWidget(btn)
                 row.addStretch()
                 left_layout.addLayout(row)
-            # ── 方位面极坐标切面 (Gain + AR) ──
+            # ── 俯仰切面子标题 + 方位面极坐标切面 (Gain + AR) ──
             if "C 类" in cat_name:
+                _phi_title = QLabel(self.tr("▸ 俯仰(Phi轴)切面图"))
+                _phi_title.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                left_layout.addWidget(_phi_title)
                 self._build_azimuth_section(left_layout)
 
             left_layout.addStretch()
