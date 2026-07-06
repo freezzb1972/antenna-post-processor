@@ -2232,6 +2232,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             out_word = True
             if file_page and hasattr(file_page, '_check_out_word'):
                 file_page._check_out_word.setChecked(True)
+        # 同步 Word 输出路径: _edit_word → azimuth_config
+        if out_word and file_page and hasattr(file_page, '_sync_azimuth_state'):
+            file_page._sync_azimuth_state()
 
         if not out_excel and not out_word and not out_data:
             self._restore_start_button()
