@@ -1389,70 +1389,27 @@ def _export_azimuth(
                     data_path = str(Path(gdir) / gfn)
             if data_path:
                 _log(log_callback, f"中间数据: {data_path}")
-                try:
-                    import openpyxl as _xl
-                    wb = _xl.Workbook(); wb.remove(wb.active)
-                    for sheet_name, fd in data_sheets.items():
-                        if not fd: continue
-                        if sheet_name == "Gain 0-70 Pk":
-                            ws = wb.create_sheet(sheet_name)
-                            _, pk_data = fd[0]
-                            ws.cell(1, 1, "Phi (°)")
-                            for ci, (f, _) in enumerate(pk_data):
-                                ws.cell(1, ci + 2, f"{f:.1f} MHz")
-                            n_phi = len(pk_data[0][1])
+
+                def _write_data_sheet(wb, sheet_name, freq_data):
+                    """在 workbook 中添加一个数据 sheet (每频点一个 block)。"""
+                    ws = wb.create_sheet(sheet_name[:31])
+                    for freq_mhz, theta_data in freq_data:
+                        sorted_thetas = sorted(theta_data.keys())
+                        n_phi = len(next(iter(theta_data.values())))
+                        ws.cell(row=ws.max_row + 1 if ws.max_row else 1, column=1,
+                                value=f"Frequency: {freq_mhz:.1f} MHz")
+                        r0 = ws.max_row + 1
+                        ws.cell(row=r0, column=1, value="Theta (°) \\ Phi (°)")
+                        for pi in range(n_phi):
+                            ws.cell(row=r0, column=pi + 2, value=pi)
+                        for ti, theta_val in enumerate(sorted_thetas):
+                            row = r0 + 1 + ti
+                            ws.cell(row=row, column=1, value=f"{theta_val:.1f}")
                             for pi in range(n_phi):
-                                ws.cell(pi + 2, 1, pi)
-                                for ci, (_, vals) in enumerate(pk_data):
-                                    ws.cell(pi + 2, ci + 2, round(float(vals[pi]), 6))
-                        else:
-                            _write_data_sheet(wb, sheet_name, fd)  # noqa: F821
-                    wb.save(data_path); wb.close()
-                    _log(log_callback, f"  ✓ 中间数据已保存 ({len(data_sheets)} sheets)")
-                except Exception as e:
-                    _log(log_callback, f"  ✗ 中间数据导出失败: {e}")
+                                ws.cell(row=row, column=pi + 2,
+                                        value=round(float(theta_data[theta_val][pi]), 6))
+                        ws.max_row = r0 + len(sorted_thetas)
 
-    # _write_data_sheet defined here (called above — module-level, valid at runtime)
-    def _write_data_sheet(wb, sheet_name, freq_data):
-        """在 workbook 中添加一个数据 sheet (每频点一个 block)。"""
-        ws = wb.create_sheet(sheet_name[:31])
-        for freq_mhz, theta_data in freq_data:
-            sorted_thetas = sorted(theta_data.keys())
-            n_phi = len(next(iter(theta_data.values())))
-            ws.cell(row=ws.max_row + 1 if ws.max_row else 1, column=1,
-                    value=f"Frequency: {freq_mhz:.1f} MHz")
-            r0 = ws.max_row + 1
-            ws.cell(r0, 1, "Phi (°)")
-            for ti, theta in enumerate(sorted_thetas):
-                ws.cell(r0, ti + 2, f"{theta:.0f}°")
-            for pi in range(n_phi):
-                r = r0 + 1 + pi
-                ws.cell(r, 1, pi)
-                for ti, theta in enumerate(sorted_thetas):
-                    v = theta_data[theta][pi]
-                    if np.isfinite(v):
-                        ws.cell(r, ti + 2, round(float(v), 6))
-            ws.max_row  # force update
-
-            if azimuth_config.cut_azimuth_polar and freq_gain_data:
-                data_sheets["Gain Azimuth"] = freq_gain_data
-            if azimuth_config.cut_azimuth_polar_ar and freq_ar_data:
-                data_sheets["AR Azimuth"] = freq_ar_data
-            if azimuth_config.cut_azimuth_polar_rhcp and freq_rhcp_data:
-                data_sheets["RHCP Azimuth"] = freq_rhcp_data
-            if azimuth_config.cut_azimuth_polar_lhcp and freq_lhcp_data:
-                data_sheets["LHCP Azimuth"] = freq_lhcp_data
-            if azimuth_config.cut_azimuth_polar_pk070 and freq_gain_vs_theta:
-                data_sheets["Gain 0-70 Pk"] = [("phi_matrix", freq_gain_vs_theta)]
-        if data_sheets:
-            # 生成路径
-            if not data_path:
-                gdir = getattr(azimuth_config, 'data_output_dir', '') if azimuth_config else ''
-                gfn = getattr(azimuth_config, 'data_output_filename', '') if azimuth_config else ''
-                if gdir and gfn:
-                    data_path = str(Path(gdir) / gfn)
-            if data_path:
-                _log(log_callback, f"中间数据: {data_path}")
                 try:
                     import openpyxl as _xl
                     wb = _xl.Workbook(); wb.remove(wb.active)

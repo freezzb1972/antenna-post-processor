@@ -147,6 +147,7 @@ def export_results(
     progress_callback: Callable[[int, int, str], None] | None = None,
     log_callback: Callable[[str], None] | None = None,
     remove_template_sheets: list[str] | None = None,
+    generate_embedded_charts: bool = False,
     **kwargs,
 ) -> str:
     """基于模板填充数据 + 嵌入图片。
@@ -298,8 +299,9 @@ def export_results(
             for name in sheets_to_remove:
                 del wb[name]
 
-    # ---- 嵌入图表 ----
-    _add_charts(wb, sheet_results, info_map, chart_config, log_callback)
+    # ---- 嵌入图表 (仅完整报告模式) ----
+    if generate_embedded_charts:
+        _add_charts(wb, sheet_results, info_map, chart_config, log_callback)
     _add_phi_charts(wb, sheet_results, chart_config, log_callback)
 
     # ---- 嵌入 A/C 类图形（PNG 图片） ----
