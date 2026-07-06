@@ -1174,12 +1174,15 @@ def _export_azimuth(
                     image_groups[label] = {}
                 image_groups[label][freq] = buf
 
-    # ── B 类: 频点曲线 PNG (Word 报告) ──
-    _B_PARAM_MAP = {
-        "efficiency_pct": "Efficiency (%)", "gain": "Peak Gain (dBi)",
-        "directivity": "Directivity (dBi)", "trp": "TRP (dBm)",
-        "peak_eirp": "Peak EIRP (dBm)", "avg_gain": "Average Gain (dB)",
-        "nhprp_45": "NHPRP ±45°", "nhprp_30": "NHPRP ±30°",
+    # ── B 类: 频点曲线 PNG (Word 报告), 按 ChartInstance 驱动 ──
+    _B_CHART_TO_PARAM = {
+        "chart_eff_freq": ("efficiency_pct", "Efficiency (%)"),
+        "chart_gain_freq": ("gain", "Peak Gain (dBi)"),
+        "chart_dir_freq": ("directivity", "Directivity (dBi)"),
+        "chart_trp_freq": ("trp", "TRP (dBm)"),
+        "chart_lag_freq": ("lag_single", "LAG (dBi)"),
+        "chart_ar_freq": ("ar_single", "AR (dB)"),
+        "chart_trp_nhprp": ("nhprp_45", "NHPRP ±45°"),
     }
     # 当模板无 Efficiency 列但有 Gain+Directivity 时, 推导效率
     _flat = [r for rows in sheet_results.values() for r in rows]
@@ -1188,9 +1191,17 @@ def _export_azimuth(
             g = r.get("gain"); d = r.get("directivity")
             if g is not None and d is not None:
                 r["efficiency_pct"] = 10 ** ((g - d) / 10) * 100
+
+    # 按 ChartInstance 渲染 B 类曲线: 仅生成 enabled 的实例
+    _b_instances = [ci for ci in (chart_instances or [])
+                    if ci.category.value == "B" and ci.enabled] if chart_instances else None
     from .plotter import _renderer as _freq_renderer
     for sheet_name, rows in sheet_results.items():
-        for param_key, param_label in _B_PARAM_MAP.items():
+        for ci in (_b_instances or []):
+            param_info = _B_CHART_TO_PARAM.get(ci.parent_type)
+            if not param_info:
+                continue
+            param_key, param_label = param_info
             freqs = []; values = []
             for row in rows:
                 v = row.get(param_key)
@@ -1201,13 +1212,12 @@ def _export_azimuth(
                     gap = getattr(azimuth_config, 'freq_gap_mhz', 10) if azimuth_config else 10
                     png = _freq_renderer.render_freq_curve(
                         freqs, values, ylabel=param_label,
-                        title=f"{param_label} vs Frequency",
+                        title=f"{ci.label}",
                         gap_mhz=gap)
-                    group = f"B: {param_label} vs Freq"
-                    # B 类图表不按频点分组，用 0.0 做占位 key
-                    if group not in image_groups:
-                        image_groups[group] = {}
-                    image_groups[group][0.0] = png
+                    # 使用 ChartInstance.label 做 key
+                    if ci.label not in image_groups:
+                        image_groups[ci.label] = {}
+                    image_groups[ci.label][0.0] = png
                 except Exception:
                     pass
 
@@ -1285,80 +1295,34 @@ def _export_azimuth(
                 freq_gain_vs_theta.append((freq, pk070_db.copy()))
 
 
-    # ── 按频点配对: 收集所有 Gain azimuth 图表（含多图表） ──
-    freq_pairs: dict[float, dict[str, io.BytesIO]] = {}
-    if out_word and azimuth_config and (azimuth_config.cut_azimuth_polar
-            or azimuth_config.cut_azimuth_polar_pk070):
-        for row in (r for rows in sheet_results.values() for r in rows):
-            f = row.get("frequency")
-            if f is None: continue
-            imgs = row.get("_images", {})
-            pair = {}
-            # 收集所有 Gain 方位面图（azimuth_polar 和 azimuth_polar_0, _1,... 以及 pk070）
-            for k in sorted(imgs):
-                if k.startswith("azimuth_polar") and not k.startswith("azimuth_polar_ar") \
-                        and not k.startswith("azimuth_polar_rhcp") \
-                        and not k.startswith("azimuth_polar_lhcp"):
-                    pair[k] = imgs[k]
-            if pair:
-                freq_pairs[f] = pair
-
-    # 分离 B 类 (非 azimuth) 图片
-    extra_groups = {k: v for k, v in image_groups.items()
-                    if not k.startswith("Gain Azimuth") and not k.startswith("Gain 0-70")} \
-        if image_groups else {}
-
-    # Write Word
-    if out_word and (freq_pairs or extra_groups):
+    # ── Write Word: 统一输出所有图表到 Word ──
+    if out_word and image_groups:
         az = azimuth_config or None
         word_path = az.chart_output_path if az else ""
         if not word_path:
             _log(log_callback, "  ⚠ 未设置 Word 输出路径, 跳过图表报告")
         elif word_template_path and os.path.exists(word_template_path):
-            # 模板模式略 (暂不处理 freq_pairs)
-            pass
-        elif freq_pairs:
-            from .chart_word_writer import write_chart_word_report_by_freq
-            _log(log_callback, f"生成图表报告 (按频点): {word_path}")
-            try:
-                # 构建动态 pair_order: 收集所有出现的 azimuth gain keys
-                all_az_keys = set()
-                for p in freq_pairs.values():
-                    all_az_keys.update(p.keys())
-                pair_order = sorted(k for k in all_az_keys if k != "azimuth_polar_pk070")
-                if "azimuth_polar_pk070" in all_az_keys:
-                    pair_order.append("azimuth_polar_pk070")
-                # pair_labels: 从 _label_for_image_key 生成
-                pair_labels = {k: _label_for_image_key(k) for k in all_az_keys}
-                write_chart_word_report_by_freq(
-                    freq_pairs,
-                    pair_order=pair_order,
-                    pair_labels=pair_labels,
-                    output_path=word_path,
-                    antenna_name=az.antenna_name if az else "",
-                    image_width_pct=az.word_image_width_pct if az else 90,
-                    show_caption=getattr(az, 'show_caption', True) if az else True,
-                    extra_groups=extra_groups if extra_groups else None,
-                )
-                total = len(freq_pairs) * 2 + sum(len(v) for v in extra_groups.values())
-                _log(log_callback, f"  ✓ Word 报告已保存 ({len(freq_pairs)} 频点, {total} 张图)")
-            except Exception as e:
-                _log(log_callback, f"  ✗ Word 报告生成失败: {e}")
+            pass  # 模板模式 — 后续实现
         else:
-            # 无 azimuth 对, 回退到旧 writer
+            from .chart_word_writer import write_chart_word_report
             _log(log_callback, f"生成图表报告: {word_path}")
             try:
-                _az_flat = _flatten(az.azimuth_cut_angles) if az else []
-                angles_str = ", ".join(f"{a:.0f}°" for a in _az_flat) if _az_flat else ""
+                # 按 ChartInstance.sort_order 排序 image_groups 的 key 顺序
+                if chart_instances:
+                    _label_order = [ci.label for ci in sorted(chart_instances, key=lambda x: x.sort_order) if ci.enabled]
+                else:
+                    _label_order = list(image_groups.keys())
                 write_chart_word_report(
-                    extra_groups, word_path,
+                    image_groups, word_path,
                     antenna_name=az.antenna_name if az else "",
-                    angles_str=angles_str,
+                    label_order=_label_order,
+                    layout_mode=az.word_layout_mode if az else "side_by_side",
                     layout_columns=az.word_columns if az else 2,
                     image_width_pct=az.word_image_width_pct if az else 90,
+                    show_caption=getattr(az, 'show_caption', True) if az else True,
                 )
-                total_imgs = sum(len(v) for v in extra_groups.values())
-                _log(log_callback, f"  ✓ Word 报告已保存 ({len(extra_groups)} 组, {total_imgs} 张图)")
+                total_imgs = sum(len(v) for v in image_groups.values())
+                _log(log_callback, f"  ✓ Word 报告已保存 ({len(image_groups)} 组, {total_imgs} 张图)")
             except Exception as e:
                 _log(log_callback, f"  ✗ Word 报告生成失败: {e}")
 

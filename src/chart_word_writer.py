@@ -36,16 +36,22 @@ def write_chart_word_report(
     angles_str: str = "",
     layout_columns: int = 2,
     image_width_pct: int = 90,
+    label_order: list[str] | None = None,
+    layout_mode: str = "side_by_side",
+    show_caption: bool = True,
 ) -> None:
     """将多组图表图片写入 Word 文档。
 
     Args:
-        image_groups: {组名: {频率MHz: PNG BytesIO}}. 组顺序即输出顺序。
+        image_groups: {组名: {频率MHz: PNG BytesIO}}.
         output_path: 输出 .docx 路径。
         antenna_name: 天线名，用于标题。
         angles_str: 角度描述串（如 "60°, 70°, 80°, 90°"），用于题注。
         layout_columns: 每行列数 (1 或 2)。
         image_width_pct: 图片宽度占列宽的百分比 (10-100)。
+        label_order: 图表组输出顺序列表（如按 ChartInstance.sort_order）。
+        layout_mode: "side_by_side", "by_freq", "by_type"。
+        show_caption: 是否显示图片上方题注。
     """
     doc = Document()
 
@@ -61,13 +67,23 @@ def write_chart_word_report(
     col_width_cm = content_width_cm / max(1, layout_columns)
     img_width = Cm(col_width_cm * image_width_pct / 100.0)
 
-    for group_name, images in image_groups.items():
-        if not images:
-            continue
+    # 按 label_order 排序输出（若提供）
+    if label_order:
+        ordered_groups = [(name, image_groups[name]) for name in label_order
+                          if name in image_groups and image_groups[name]]
+        # 追加未在 order 中的 group
+        seen = set(label_order)
+        for name, images in image_groups.items():
+            if name not in seen and images:
+                ordered_groups.append((name, images))
+    else:
+        ordered_groups = [(name, images) for name, images in image_groups.items() if images]
 
+    for group_name, images in ordered_groups:
         # Group heading
-        heading = doc.add_heading(group_name, level=1)
-        heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        if show_caption:
+            heading = doc.add_heading(group_name, level=1)
+            heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
         freqs = sorted(images.keys())
         _write_image_grid(doc, images, freqs, antenna_name, group_name,
