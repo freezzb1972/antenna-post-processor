@@ -179,6 +179,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.set_base_qss(self._theme_qss + self._custom_qss)
         # setStyleSheet 会重置子控件的 minimumWidth → 重新应用
         self._apply_minimum_sizes()
+        # 输出默认: 嵌入Excel 默认关闭, 图片优先输出到 Word
+        self.ui.checkEmbedExcel.setChecked(False)
         self._enter_idle()  # 初始化按钮状态机（btnStart/btnExport/btnOneClick/btnStop）
         self._log("天线参数后处理工具已启动")
 
@@ -2474,7 +2476,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _on_progress(self, current: int, total: int, message: str):
         self.ui.progressBar.setMaximum(total)
         self.ui.progressBar.setValue(current)
-        self.ui.lblProgressMsg.setText(message)
+        pct = int(current / max(total, 1) * 100)
+        self.ui.lblProgressMsg.setText(f"[{pct}%] {message}")
         from PySide6.QtWidgets import QApplication
         QApplication.processEvents()
 

@@ -746,11 +746,14 @@ def _load_and_compute(
     if sheet_ar_configs is None:
         sheet_ar_configs = {}
 
-    progress_max = total * 2 + 50  # 加载+计算=2×total, 导出留 50 步
+    # 阶段化进度: 读取(15%) → 计算(55%) → 预留导出(30%)
+    _load_weight = max(total, 1)
+    _compute_weight = max(total * 3, 1)
+    progress_max = _load_weight + _compute_weight
 
-    # 阶段 A: 加载数据
-    _log(log_callback, f"读取 {total} 个频点数据...")
-    _report(progress_callback, 0, progress_max, "📂 加载数据 0%")
+    # ── 阶段 1: 读取源文件 ──
+    _log(log_callback, f"📂 读取 {total} 个频点数据...")
+    _report(progress_callback, 0, progress_max, f"📂 读取源文件 0/{total}")
     compute_tasks = []
     for i, (sheet_name, freq, csv_idx, lag_cfg, task_ds, needed_params) in enumerate(tasks):
         if cancel_callback and cancel_callback():
@@ -759,14 +762,15 @@ def _load_and_compute(
         theta_list = list(task_ds.theta_angles)
         ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
         compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, theta_extrap_method, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, azimuth_config, compute_only))
-        _report(progress_callback, i + 1, progress_max, f"📂 加载数据 ({i+1}/{total})")
+        pct = int((i + 1) / _load_weight * 100)
+        _report(progress_callback, i + 1, progress_max, f"📂 读取源文件 {i+1}/{total}")
 
-    data_done = len(compute_tasks)
-    _report(progress_callback, data_done, progress_max, "🧮 计算中...")
+    data_done = _load_weight
+    _report(progress_callback, data_done, progress_max, f"🧮 计算参数 0/{len(compute_tasks)}")
 
-    # 阶段 B: 计算（支持并行）
-    if parallel > 1 and data_done > 1:
-        _log(log_callback, f"并行计算: {parallel} 进程 × {data_done} 频点")
+    # ── 阶段 2: 计算天线参数 ──
+    if parallel > 1 and len(compute_tasks) > 1:
+        _log(log_callback, f"并行计算: {parallel} 进程 × {len(compute_tasks)} 频点")
         chunk_size = max(1, len(compute_tasks) // parallel)
         chunks = [compute_tasks[i:i + chunk_size] for i in range(0, len(compute_tasks), chunk_size)]
         with ProcessPoolExecutor(max_workers=parallel) as executor:
@@ -780,13 +784,14 @@ def _load_and_compute(
                 for sheet_name, row in fut.result():
                     sheet_results[sheet_name].append(row)
                     completed += 1
-                _report(progress_callback, data_done + completed, progress_max,
-                        f"🧮 计算中 {int((data_done+completed)/progress_max*100)}%")
+                _report(progress_callback, data_done + completed * (max(1, _compute_weight // len(compute_tasks))),
+                        progress_max, f"🧮 计算参数 {completed}/{len(compute_tasks)}")
     else:
         _run_compute_serial(compute_tasks, sheet_results, data_done, progress_max,
                             cancel_callback, progress_callback, log_cb=log_callback,
                             azimuth_config=azimuth_config,
-                            dir_extrap_method=dir_extrap_method)
+                            dir_extrap_method=dir_extrap_method,
+                            compute_weight=_compute_weight, compute_total=len(compute_tasks))
 
     return sheet_results
 
@@ -795,8 +800,11 @@ def _run_compute_serial(
     compute_tasks, sheet_results, data_done, progress_max,
     cancel_callback, progress_callback, log_cb=None, azimuth_config=None,
     dir_extrap_method="linear",
+    compute_weight=None, compute_total=None,
 ):
     """串行逐频点计算（单进程或 parallel=1）。"""
+    total_tasks = compute_total or len(compute_tasks)
+    cw = compute_weight or max(total_tasks * 3, 1)
     for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co) in enumerate(compute_tasks):
         if cancel_callback and cancel_callback():
             break
@@ -806,9 +814,10 @@ def _run_compute_serial(
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
-        if (i + 1) % 10 == 0 or (i + 1) == data_done:
-            _report(progress_callback, data_done + i + 1, progress_max,
-                    f"🧮 计算中 {int((data_done+i+1)/progress_max*100)}%")
+        if (i + 1) % 5 == 0 or (i + 1) == total_tasks:
+            step = int(cw * (i + 1) / total_tasks)
+            _report(progress_callback, data_done + step, progress_max,
+                    f"🧮 计算参数 {i+1}/{total_tasks}")
 
 
 def _close_datasources(
@@ -972,12 +981,18 @@ def run_pipeline(
         _report(progress_callback, 1, 1, "✅ 预览就绪")
         return sheet_results
 
-    # ---- 3. 写入 Excel (可选) ----
+    # ── 阶段 3: 输出 Excel 天线参数 ──
     total = len(tasks)
-    progress_max = total * 2 + 50  # 加载+计算=2×total, 导出留 50 步
+    _load_w = max(total, 1)
+    _compute_w = max(total * 3, 1)
+    _base = _load_w + _compute_w
+    _export_w = 15  # Excel 导出权重
+    _word_w = 15    # Word 导出权重
+    progress_max = _base + _export_w + _word_w
+
     if out_excel and output_path:
-        _log(log_callback, f"写入输出: {output_path}")
-        _report(progress_callback, progress_max - 3, progress_max, "💾 写入 Excel...")
+        _log(log_callback, f"📊 写入 Excel: {output_path}")
+        _report(progress_callback, _base, progress_max, "📊 输出 Excel 天线参数...")
         export_results(
             template_path=template_path,
             output_path=output_path,
@@ -988,9 +1003,10 @@ def run_pipeline(
             log_callback=log_callback,
             remove_template_sheets=template_sheet_names_to_remove,
         )
-        _report(progress_callback, progress_max - 1, progress_max, "✅ Excel 写入完成")
+        _report(progress_callback, _base + _export_w, progress_max, "✅ Excel 写入完成")
     elif not out_excel:
         _log(log_callback, "⏭ 跳过天线参数 Excel 输出")
+        _report(progress_callback, _base + _export_w, progress_max, "⏭ 跳过 Excel")
 
     # ---- 4. 完整报告 (可选) ----
     if full_report_path:
@@ -1004,17 +1020,20 @@ def run_pipeline(
             pattern_images_2d_rect=imgs_2d_rect if imgs_2d_rect else None,
         )
 
-    # ---- 5. 方位面报告 (可选) ----
+    # ── 阶段 5: 输出 Word 图表报告 ──
     if out_word or out_data:
+        _report(progress_callback, _base + _export_w, progress_max, "📄 输出 Word 图表报告...")
         _export_azimuth(sheet_results, azimuth_config, log_callback,
                         out_word=out_word, out_data=out_data,
                         word_template_path=word_template_path,
                         chart_instances=chart_instances)
+        _report(progress_callback, progress_max, progress_max, "✅ 完成")
+    else:
+        _report(progress_callback, progress_max, progress_max, "✅ 完成")
 
     elapsed = time.time() - t0
     total_rows = sum(len(v) for v in sheet_results.values())
     _log(log_callback, f"✓ 完成: {total_rows} 行, {elapsed:.1f}s")
-    _report(progress_callback, progress_max, progress_max, "✅ 完成")
 
     return sheet_results
 
