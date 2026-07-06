@@ -2840,30 +2840,54 @@ class ChartSettingsPage(QWidget):
                     row.addWidget(btn)
 
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
-                    btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
+                    btn = QPushButton("⚙ " + self.tr("参数"))
                     btn.setFixedWidth(85)
                     btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
                     row.addWidget(btn)
                 row.addStretch()
                 right_layout.addLayout(row)
-            right_layout.addStretch()
-            # 方位面切面 (C类右列: 存 _chart_extra)
+            # ── 俯仰切面子标题 + 方位面极坐标切面 (右列: 存 _chart_extra) ──
             if "C 类" in cat_name:
+                _phi_title_r = QLabel(self.tr("▸ 俯仰(Phi轴)切面图"))
+                _phi_title_r.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                right_layout.addWidget(_phi_title_r)
                 sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
                 right_layout.addWidget(sep)
                 right_layout.addWidget(QLabel(self.tr("极坐标方位面切面图:")))
+                _AZ_POPUP = {"cut_azimuth_polar": "gain", "cut_azimuth_polar_ar": "ar",
+                             "cut_azimuth_polar_rhcp": "rhcp", "cut_azimuth_polar_lhcp": "lhcp"}
                 for az_key, az_label in [
                     ("cut_azimuth_polar", "Gain 极坐标方位面"),
                     ("cut_azimuth_polar_ar", "AR 极坐标方位面"),
                     ("cut_azimuth_polar_rhcp", "RHCP 极坐标方位面"),
+                    ("cut_azimuth_polar_lhcp", "LHCP 极坐标方位面"),
                 ]:
                     row_az = QHBoxLayout()
                     cb_az = QCheckBox(self.tr(az_label))
                     cb_az.toggled.connect(lambda: self._sync_to_mw())
                     row_az.addWidget(cb_az)
                     self._chart_extra[az_key] = cb_az
+                    btn_az = QPushButton("⚙ " + self.tr("参数"))
+                    btn_az.setFixedWidth(80)
+                    btn_az.clicked.connect(lambda checked, t=_AZ_POPUP[az_key]: self._show_azimuth_angle_popup(t))
+                    row_az.addWidget(btn_az)
                     row_az.addStretch()
                     right_layout.addLayout(row_az)
+                # DPI
+                row_dpi_r = QHBoxLayout()
+                row_dpi_r.addWidget(QLabel(self.tr("方位图 DPI:")))
+                self._spin_azimuth_dpi_xtr = QSpinBox()
+                self._spin_azimuth_dpi_xtr.setRange(150, 1000)
+                _az_cfg = getattr(self._mw, '_azimuth_config', None) if self._mw else None
+                _az_dpi = getattr(_az_cfg, 'dpi', 150) if _az_cfg else 150
+                self._spin_azimuth_dpi_xtr.setValue(_az_dpi if _az_dpi >= 150 else 150)
+                self._spin_azimuth_dpi_xtr.setSingleStep(50)
+                self._spin_azimuth_dpi_xtr.setFixedWidth(70)
+                self._spin_azimuth_dpi_xtr.valueChanged.connect(lambda: self._sync_to_mw())
+                row_dpi_r.addWidget(self._spin_azimuth_dpi_xtr)
+                row_dpi_r.addStretch()
+                right_layout.addLayout(row_dpi_r)
+            right_layout.addStretch()
 
             row_layout.addWidget(right_box, 1)
 
@@ -3073,6 +3097,8 @@ class ChartSettingsPage(QWidget):
 
             if hasattr(self, '_spin_azimuth_dpi'):
                 self._spin_azimuth_dpi.setValue(az.dpi if az.dpi >= 150 else 150)
+            if hasattr(self, '_spin_azimuth_dpi_xtr'):
+                self._spin_azimuth_dpi_xtr.setValue(az.dpi if az.dpi >= 150 else 150)
             if hasattr(self, '_combo_az_columns'):
                 idx2 = self._spin_az_columns.findData(az.word_columns if az.word_columns in (1, 2) else 2)
                 if idx2 >= 0:
@@ -3286,6 +3312,8 @@ class ChartSettingsPage(QWidget):
         azimuth.antenna_name = self._edit_antenna_name.text().strip() if hasattr(self, '_edit_antenna_name') else ""
         azimuth.word_layout_mode = self._word_layout_mode if hasattr(self, '_word_layout_mode') else "side_by_side"
         azimuth.dpi = self._spin_azimuth_dpi.value() if hasattr(self, '_spin_azimuth_dpi') else 150
+        if hasattr(self, '_spin_azimuth_dpi_xtr'):
+            azimuth.dpi = self._spin_azimuth_dpi_xtr.value()  # 右侧优先(最后设置)
         azimuth.word_columns = getattr(self, '_az_columns', 2)
         azimuth.word_image_width_pct = getattr(self, '_az_img_pct', 90)
         azimuth.show_caption = getattr(self, '_az_show_caption', True)
@@ -3440,21 +3468,27 @@ class ChartSettingsPage(QWidget):
                     btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
-                    btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
+                    btn = QPushButton("⚙ " + self.tr("参数"))
                     btn.setFixedWidth(85)
                     btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
                     row.addWidget(btn)
                 row.addStretch()
                 right_layout.addLayout(row)
-            # 方位面切面 (C类右列重建: 存 _chart_extra)
+            # ── 俯仰切面子标题 + 方位面极坐标切面 (右列重建: 存 _chart_extra) ──
             if "C 类" in cat_name:
+                _phi_title_r = QLabel(self.tr("▸ 俯仰(Phi轴)切面图"))
+                _phi_title_r.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                right_layout.addWidget(_phi_title_r)
                 sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
                 right_layout.addWidget(sep)
                 right_layout.addWidget(QLabel(self.tr("极坐标方位面切面图:")))
+                _AZ_POPUP = {"cut_azimuth_polar": "gain", "cut_azimuth_polar_ar": "ar",
+                             "cut_azimuth_polar_rhcp": "rhcp", "cut_azimuth_polar_lhcp": "lhcp"}
                 for az_key, az_label in [
                     ("cut_azimuth_polar", "Gain 极坐标方位面"),
                     ("cut_azimuth_polar_ar", "AR 极坐标方位面"),
                     ("cut_azimuth_polar_rhcp", "RHCP 极坐标方位面"),
+                    ("cut_azimuth_polar_lhcp", "LHCP 极坐标方位面"),
                 ]:
                     row_az = QHBoxLayout()
                     cb_az = QCheckBox(self.tr(az_label))
@@ -3462,8 +3496,26 @@ class ChartSettingsPage(QWidget):
                     cb_az.toggled.connect(lambda: self._sync_to_mw())
                     row_az.addWidget(cb_az)
                     self._chart_extra[az_key] = cb_az
+                    btn_az = QPushButton("⚙ " + self.tr("参数"))
+                    btn_az.setFixedWidth(80)
+                    btn_az.clicked.connect(lambda checked, t=_AZ_POPUP[az_key]: self._show_azimuth_angle_popup(t))
+                    row_az.addWidget(btn_az)
                     row_az.addStretch()
                     right_layout.addLayout(row_az)
+                # DPI
+                row_dpi_r = QHBoxLayout()
+                row_dpi_r.addWidget(QLabel(self.tr("方位图 DPI:")))
+                self._spin_azimuth_dpi_xtr = QSpinBox()
+                self._spin_azimuth_dpi_xtr.setRange(150, 1000)
+                _az_cfg = getattr(self._mw, '_azimuth_config', None) if self._mw else None
+                _az_dpi = getattr(_az_cfg, 'dpi', 150) if _az_cfg else 150
+                self._spin_azimuth_dpi_xtr.setValue(_az_dpi if _az_dpi >= 150 else 150)
+                self._spin_azimuth_dpi_xtr.setSingleStep(50)
+                self._spin_azimuth_dpi_xtr.setFixedWidth(70)
+                self._spin_azimuth_dpi_xtr.valueChanged.connect(lambda: self._sync_to_mw())
+                row_dpi_r.addWidget(self._spin_azimuth_dpi_xtr)
+                row_dpi_r.addStretch()
+                right_layout.addLayout(row_dpi_r)
             right_layout.addStretch()
             row_layout.addWidget(right_box, 1)
 
