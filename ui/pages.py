@@ -264,69 +264,102 @@ class FileSettingsPage(QWidget):
         out_grp = QGroupBox(self.tr("输出设置"))
         out_layout = QVBoxLayout(out_grp)
         out_layout.setContentsMargins(4, 0, 4, 0)
-        out_layout.setSpacing(1)
+        out_layout.setSpacing(0)
 
-        # 1) 天线参数报告 (.xlsx)
+        def _make_block_sep():
+            """分隔块: 匹配当前主题的细线。"""
+            sep = QFrame()
+            sep.setFrameShape(QFrame.HLine)
+            sep.setFrameShadow(QFrame.Sunken)
+            sep.setStyleSheet("QFrame { color: palette(mid); margin: 6px 0; }")
+            return sep
+
+        def _default_output_dir() -> str:
+            """从第一个数据源文件推导 output 子目录。"""
+            mw = getattr(self, '_mw', None)
+            files = getattr(mw, '_data_file_paths', []) if mw else []
+            if files:
+                d = Path(files[0]).parent / "output"
+                return str(d)
+            return str(Path.cwd() / "output")
+
+        def _make_two_line_output(check, edit, btn, parent_layout):
+            """统一的两行布局: checkbox 行 + 路径/浏览 行。"""
+            # 行1: checkbox
+            row1 = QHBoxLayout()
+            row1.addWidget(check)
+            row1.addStretch()
+            parent_layout.addLayout(row1)
+            # 行2: 路径 + 浏览
+            row2 = QHBoxLayout()
+            row2.setContentsMargins(10, 0, 0, 0)  # 缩进区分
+            row2.addWidget(edit, 1)
+            row2.addWidget(btn)
+            parent_layout.addLayout(row2)
+
+        # ── 1) 天线参数报告 (.xlsx) ──
         self._check_out_excel = QCheckBox(self.tr("天线参数报告 (.xlsx)"))
         self._check_out_excel.setChecked(True)
         self._edit_xlsx = QLineEdit()
-        self._edit_xlsx.setPlaceholderText(self.tr("默认: ./output/antenna_report.xlsx"))
+        self._edit_xlsx.setPlaceholderText(self.tr("选择输出路径..."))
         btn_xl = QPushButton(self.tr("浏览..."))
         btn_xl.clicked.connect(self._on_browse_xlsx)
-        row_xl = QHBoxLayout()
-        row_xl.addWidget(self._check_out_excel)
-        row_xl.addWidget(self._edit_xlsx, 1)
-        row_xl.addWidget(btn_xl)
-        out_layout.addLayout(row_xl)
-
+        _make_two_line_output(self._check_out_excel, self._edit_xlsx, btn_xl, out_layout)
         self._check_out_excel.toggled.connect(lambda c: self._edit_xlsx.setEnabled(c))
+        out_layout.addWidget(_make_block_sep())
 
-        out_layout.addWidget(_make_hsep())
-
-        # 2) 图表报告 (.docx)
+        # ── 2) 图表报告 (.docx) ──
         self._check_out_word = QCheckBox(self.tr("测试报告 (.docx)"))
         self._edit_word = QLineEdit()
-        self._edit_word.setPlaceholderText(self.tr("默认: 源文件名图表报告.docx"))
+        self._edit_word.setPlaceholderText(self.tr("选择输出路径..."))
         btn_wd = QPushButton(self.tr("浏览..."))
         btn_wd.clicked.connect(self._on_browse_word)
-        row_wd = QHBoxLayout()
-        row_wd.addWidget(self._check_out_word)
-        row_wd.addWidget(self._edit_word, 1)
-        row_wd.addWidget(btn_wd)
-        out_layout.addLayout(row_wd)
-
+        _make_two_line_output(self._check_out_word, self._edit_word, btn_wd, out_layout)
         self._check_out_word.toggled.connect(lambda c: (
             self._edit_word.setEnabled(c),
             self._sync_azimuth_cut_switch(),
         ))
+        out_layout.addWidget(_make_block_sep())
 
-        out_layout.addWidget(_make_hsep())
-
-        # 3) 中间数据文件 (.xlsx)
+        # ── 3) 中间数据文件 (.xlsx) ──
         self._check_out_data = QCheckBox(self.tr("中间数据文件 (.xlsx)"))
         self._edit_data = QLineEdit()
-        self._edit_data.setPlaceholderText(self.tr("默认: 源文件名中间数据.xlsx"))
+        self._edit_data.setPlaceholderText(self.tr("选择输出路径..."))
         btn_dt = QPushButton(self.tr("浏览..."))
         btn_dt.clicked.connect(self._on_browse_data)
-        row_dt = QHBoxLayout()
-        row_dt.addWidget(self._check_out_data)
-        row_dt.addWidget(self._edit_data, 1)
-        row_dt.addWidget(btn_dt)
-        out_layout.addLayout(row_dt)
-
+        _make_two_line_output(self._check_out_data, self._edit_data, btn_dt, out_layout)
         self._check_out_data.toggled.connect(lambda c: (
             self._edit_data.setEnabled(c),
             self._sync_azimuth_cut_switch(),
         ))
+        out_layout.addWidget(_make_block_sep())
 
-        right_layout.addWidget(out_grp)
-
+        # ── 4) 保存任务包 (.ant) ──
         self._check_save_task = QCheckBox(
             self.tr("保存任务包 (.ant) — 下次双击秒开，不重算"))
         self._check_save_task.setChecked(False)
         self._check_save_task.setToolTip(
             self.tr("保存为 .ant 任务包后，下次双击即可直接查看结果，无需重新计算。"))
-        right_layout.addWidget(self._check_save_task)
+        self._edit_task = QLineEdit()
+        self._edit_task.setPlaceholderText(self.tr("选择保存路径..."))
+        self._edit_task.setEnabled(False)
+        btn_tsk = QPushButton(self.tr("浏览..."))
+        btn_tsk.clicked.connect(self._on_browse_task)
+        _make_two_line_output(self._check_save_task, self._edit_task, btn_tsk, out_layout)
+        self._check_save_task.toggled.connect(lambda c: self._edit_task.setEnabled(c))
+
+        right_layout.addWidget(out_grp)
+
+        # 设置默认输出目录
+        self._default_out_dir = _default_output_dir()
+        if not self._edit_xlsx.text():
+            self._edit_xlsx.setText(str(Path(self._default_out_dir) / "antenna_report.xlsx"))
+        if not self._edit_word.text():
+            self._edit_word.setText(str(Path(self._default_out_dir) / "图表报告.docx"))
+        if not self._edit_data.text():
+            self._edit_data.setText(str(Path(self._default_out_dir) / "中间数据.xlsx"))
+        if not self._edit_task.text():
+            self._edit_task.setText(str(Path(self._default_out_dir) / "task.ant"))
 
         right_layout.addStretch()
 
@@ -455,6 +488,16 @@ class FileSettingsPage(QWidget):
         if path:
             self._edit_data.setText(path)
             self._sync_azimuth_state()
+
+    def _on_browse_task(self):
+        """浏览: 任务包保存路径。"""
+        from pathlib import Path
+        start = self._edit_task.text().strip() or str(Path.cwd() / "output" / "task.ant")
+        path, _ = QFileDialog.getSaveFileName(
+            self, self.tr("保存任务包"), start,
+            self.tr("任务包文件 (*.ant)"))
+        if path:
+            self._edit_task.setText(path)
 
     def _on_browse_word_template(self):
         """选择带 SDT tag 的 Word 模板（不自动预览）。"""
@@ -1155,6 +1198,26 @@ class FileSettingsPage(QWidget):
             t.setCellWidget(i, 2, mode_combo)
             t.setRowHeight(i, 28)
         self._update_window_title()
+        self._auto_set_output_defaults()
+
+    def _auto_set_output_defaults(self):
+        """若输出路径为空，自动填充为源文件目录下 output 子目录。"""
+        if not self._data_file_paths:
+            return
+        src_dir = str(Path(self._data_file_paths[0]).parent)
+        out_dir = str(Path(src_dir) / "output")
+        os.makedirs(out_dir, exist_ok=True)  # 自动创建 output 子目录
+
+        defaults = [
+            ("_edit_xlsx", "antenna_report.xlsx"),
+            ("_edit_word", "图表报告.docx"),
+            ("_edit_data", "中间数据.xlsx"),
+            ("_edit_task", "task.ant"),
+        ]
+        for attr, fname in defaults:
+            w = getattr(self, attr, None)
+            if w and not w.text().strip():
+                w.setText(str(Path(out_dir) / fname))
 
     def _on_antenna_name_changed(self, row: int, text: str):
         if row < len(self._file_entries):
