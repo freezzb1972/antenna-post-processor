@@ -302,7 +302,7 @@ def export_results(
     # ---- 嵌入图表 (仅完整报告模式) ----
     if generate_embedded_charts:
         _add_charts(wb, sheet_results, info_map, chart_config, log_callback)
-    _add_phi_charts(wb, sheet_results, chart_config, log_callback)
+        _add_phi_charts(wb, sheet_results, chart_config, log_callback)
 
     # ---- 嵌入 A/C 类图形（PNG 图片） ----
     from .chart_config import ChartConfig
