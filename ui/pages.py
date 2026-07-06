@@ -2168,6 +2168,15 @@ class AntennaParamsPage(QWidget):
         right_box = QGroupBox(self.tr("额外 (full_report)"))
         right_layout = QVBoxLayout(right_box)
         right_layout.setSpacing(2)
+        # full_report 总开关
+        self._check_full_report_enable = QCheckBox(self.tr("启用 Full Report 计算和输出"))
+        self._check_full_report_enable.setChecked(
+            getattr(self._mw, '_full_report_enabled', False) if self._mw else False)
+        self._check_full_report_enable.toggled.connect(self._on_full_report_toggled)
+        right_layout.addWidget(self._check_full_report_enable)
+        # 分隔
+        sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
+        right_layout.addWidget(sep)
         for grp_name, items in params:
             grp = QGroupBox(grp_name)
             gl = QVBoxLayout(grp)
@@ -2375,6 +2384,11 @@ class AntennaParamsPage(QWidget):
     def _update_summary(self):
         """摘要已移至下方执行栏显示，此处留空。"""
         pass
+
+    def _on_full_report_toggled(self, checked: bool):
+        """Full Report 总开关切换。"""
+        if self._mw:
+            self._mw._full_report_enabled = checked
 
     # ── 同步到 MainWindow ──
 
@@ -2934,6 +2948,15 @@ class ChartSettingsPage(QWidget):
             right_layout = QVBoxLayout(right_box)
             right_layout.setSpacing(3)
 
+            # full_report 总开关
+            self._check_full_report_enable = QCheckBox(self.tr("启用 Full Report 计算和输出"))
+            self._check_full_report_enable.setChecked(
+                getattr(self._mw, '_full_report_enabled', False) if self._mw else False)
+            self._check_full_report_enable.toggled.connect(self._on_fr_enable_toggled)
+            right_layout.addWidget(self._check_full_report_enable)
+            sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
+            right_layout.addWidget(sep)
+
             # full_report 独立全选/取消全选按钮
             self._add_select_all_row(self._chart_extra, keys, right_layout)
 
@@ -3040,7 +3063,6 @@ class ChartSettingsPage(QWidget):
         out_layout.addLayout(row_ant)
 
         # 嵌入/PNG 已移除 — 所有图表统一输出到 Word
-        out_layout.addLayout(row_bottom)
 
         grp_list.append(out_grp)
 
@@ -3400,6 +3422,11 @@ class ChartSettingsPage(QWidget):
         extra.gain_chart_ranges = list(self._gain_ranges_x)
         extra.ar_chart_angles = list(self._ar_angles_x)
         extra.ar_chart_ranges = list(self._ar_ranges_x)
+
+        # ── 左侧 → 右侧单向同步: 报告需要的图表自动纳入 full_report ──
+        for key, cb in self._chart_required.items():
+            if cb.isChecked() and key in self._chart_extra:
+                self._chart_extra[key].setChecked(True)
 
         # ── 方位面配置 ──
         from src.azimuth_config import AzimuthReportConfig
