@@ -3016,16 +3016,7 @@ class ChartSettingsPage(QWidget):
         row_ant.addStretch()
         out_layout.addLayout(row_ant)
 
-        # 嵌入/PNG 放在最下方
-        row_bottom = QHBoxLayout()
-        self._check_embed = QCheckBox(self.tr("嵌入 Excel"))
-        self._check_embed.setChecked(False)
-        self._check_embed.toggled.connect(lambda: self._sync_to_mw())
-        self._check_png = QCheckBox(self.tr("保存 PNG 文件夹"))
-        self._check_png.toggled.connect(lambda: self._sync_to_mw())
-        row_bottom.addWidget(self._check_embed)
-        row_bottom.addWidget(self._check_png)
-        row_bottom.addStretch()
+        # 嵌入/PNG 已移除 — 所有图表统一输出到 Word
         out_layout.addLayout(row_bottom)
 
         grp_list.append(out_grp)
@@ -3139,8 +3130,6 @@ class ChartSettingsPage(QWidget):
                 self._elev = mw.ui.spinElev.value()
                 self._azim = mw.ui.spinAzim.value()
                 self._dpi = mw.ui.spinDpi.value()
-                self._check_embed.setChecked(mw.ui.checkEmbedExcel.isChecked())
-                self._check_png.setChecked(mw.ui.checkSavePng.isChecked())
 
         if hasattr(mw, '_chart_config_required') and mw._chart_config_required is not None:
             self._step_deg = int(getattr(mw._chart_config_required, 'step_deg', 5))
@@ -3371,7 +3360,7 @@ class ChartSettingsPage(QWidget):
         required.azim = getattr(self, '_azim', -60.0)
         required.dpi = getattr(self, '_dpi', 150)
         required.step_deg = getattr(self, '_step_deg', 5.0)
-        required.embed_in_excel = self._check_embed.isChecked()
+        required.embed_in_excel = False  # 图表统一到 Word
         extra.elev = required.elev
         extra.azim = required.azim
         extra.dpi = required.dpi
@@ -3442,8 +3431,8 @@ class ChartSettingsPage(QWidget):
             mw.ui.spinElev.setValue(int(getattr(self, '_elev', 30)))
             mw.ui.spinAzim.setValue(int(getattr(self, '_azim', -60)))
             mw.ui.spinDpi.setValue(getattr(self, '_dpi', 150))
-            mw.ui.checkEmbedExcel.setChecked(self._check_embed.isChecked())
-            mw.ui.checkSavePng.setChecked(self._check_png.isChecked())
+            mw.ui.checkEmbedExcel.setChecked(False)  # 图表统一到 Word
+            mw.ui.checkSavePng.setChecked(False)
 
         self.chart_config_changed.emit()
 
@@ -4189,7 +4178,7 @@ class ChartSettingsPage(QWidget):
             cfg.azim = getattr(self, '_azim', -60.0)
             cfg.dpi = getattr(self, '_dpi', 150)
             cfg.step_deg = self._parse_step_deg()
-            cfg.embed_in_excel = self._check_embed.isChecked()
+            cfg.embed_in_excel = False  # 图表统一到 Word
             cfg.gain_chart_angles = list(gain_angles)
             cfg.gain_chart_ranges = list(gain_ranges)
             cfg.ar_chart_angles = list(ar_angles)

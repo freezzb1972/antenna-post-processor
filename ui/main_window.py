@@ -180,7 +180,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # setStyleSheet 会重置子控件的 minimumWidth → 重新应用
         self._apply_minimum_sizes()
         # 输出默认: 嵌入Excel 默认关闭, 图片优先输出到 Word
-        self.ui.checkEmbedExcel.setChecked(False)
+        self.ui.checkEmbedExcel.hide()  # 图表统一到 Word
+        self.ui.checkSavePng.hide()
         self._enter_idle()  # 初始化按钮状态机（btnStart/btnExport/btnOneClick/btnStop）
         self._log("天线参数后处理工具已启动")
 
@@ -2298,8 +2299,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             azim=self.ui.spinAzim.value(),
             dpi=self.ui.spinDpi.value(),
             step_deg=getattr(self._chart_config_required, 'step_deg', 5.0) if self._chart_config_required else 5.0,
-            embed_in_excel=self.ui.checkEmbedExcel.isChecked(),
-            save_png_folder=str(Path(output_dir) / "png") if self.ui.checkSavePng.isChecked() else None,
+            embed_in_excel=False,  # 图表统一到 Word
+            save_png_folder=None,
         )
 
 
