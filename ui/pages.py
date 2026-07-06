@@ -3048,6 +3048,9 @@ class ChartSettingsPage(QWidget):
         btn_word_layout = QPushButton(self.tr("Word 输出布局设置..."))
         btn_word_layout.clicked.connect(self._show_word_layout_dialog)
         row_wl.addWidget(btn_word_layout)
+        btn_fr_layout = QPushButton(self.tr("Full Report Word 布局设置..."))
+        btn_fr_layout.clicked.connect(lambda: self._show_word_layout_dialog(fr_mode=True))
+        row_wl.addWidget(btn_fr_layout)
         row_wl.addStretch()
         out_layout.addLayout(row_wl)
 
@@ -3260,18 +3263,30 @@ class ChartSettingsPage(QWidget):
 
     # ── Word 输出布局子对话框 ──
 
-    def _show_word_layout_dialog(self):
-        """Word 输出布局设置: 批量模式 + 图表排序 + 排版参数。"""
+    def _show_word_layout_dialog(self, fr_mode: bool = False):
+        """Word 输出布局设置: 批量模式 + 图表排序 + 排版参数。
+
+        Args:
+            fr_mode: True=Full Report布局, False=普通Word布局
+        """
+        az = getattr(self._mw, '_azimuth_config', None) if self._mw else None
+        prefix = "fr_" if fr_mode else ""
+        title = self.tr("Full Report Word 布局设置") if fr_mode else self.tr("Word 输出布局设置")
+        cur_mode = getattr(az, f"{prefix}word_layout_mode", "side_by_side") if az else "side_by_side"
+        cur_cols = getattr(az, f"{prefix}word_columns", 2) if az else 2
+        cur_pct = getattr(az, f"{prefix}word_image_width_pct", 90) if az else 90
+        cur_cap = getattr(az, f"{prefix}show_caption", True) if az else True
+
         dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("Word 输出布局设置"))
+        dlg.setWindowTitle(title)
         dlg.setMinimumSize(550, 500)
         layout = QVBoxLayout(dlg)
         mode_grp = QGroupBox(self.tr("批量输出模式"))
         mode_layout = QVBoxLayout(mode_grp)
         self._radio_by_freq = QRadioButton(self.tr("按频点: 每频点全部图 → 下一频点"))
         self._radio_by_type = QRadioButton(self.tr("按图表类型: 每类图全频点 → 下一类"))
-        self._radio_by_freq.setChecked(self._word_layout_mode != "by_type")
-        self._radio_by_type.setChecked(self._word_layout_mode == "by_type")
+        self._radio_by_freq.setChecked(cur_mode != "by_type")
+        self._radio_by_type.setChecked(cur_mode == "by_type")
         mode_layout.addWidget(self._radio_by_freq)
         mode_layout.addWidget(self._radio_by_type)
         layout.addWidget(mode_grp)
@@ -3323,30 +3338,35 @@ class ChartSettingsPage(QWidget):
         fmt_grp = QGroupBox(self.tr("排版参数"))
         fmt_layout = QFormLayout(fmt_grp)
         spin_cols = QSpinBox()
-        spin_cols.setRange(1, 6)
-        spin_cols.setValue(getattr(self, '_az_columns', 2))
-        spin_cols.setPrefix(self.tr("每行 "))
-        spin_cols.setSuffix(self.tr(" 列"))
+        spin_cols.setRange(1, 6); spin_cols.setValue(cur_cols)
+        spin_cols.setPrefix(self.tr("每行 ")); spin_cols.setSuffix(self.tr(" 列"))
         fmt_layout.addRow(self.tr("列数:"), spin_cols)
 
         spin_pct = QSpinBox()
-        spin_pct.setRange(10, 100)
-        spin_pct.setValue(getattr(self, '_az_img_pct', 90))
+        spin_pct.setRange(10, 100); spin_pct.setValue(cur_pct)
         spin_pct.setSuffix("%")
         spin_pct.setToolTip(self.tr("图片宽度占列宽的百分比"))
         fmt_layout.addRow(self.tr("图片宽(%):"), spin_pct)
 
         check_cap = QCheckBox(self.tr("显示题注"))
-        check_cap.setChecked(getattr(self, '_az_show_caption', True))
+        check_cap.setChecked(cur_cap)
         fmt_layout.addRow("", check_cap)
         layout.addWidget(fmt_grp)
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         def _on_accept_layout():
-            self._word_layout_mode = "by_type" if self._radio_by_type.isChecked() else "by_freq"
-            self._az_columns = spin_cols.value()
-            self._az_img_pct = spin_pct.value()
-            self._az_show_caption = check_cap.isChecked()
+            mode_val = "by_type" if self._radio_by_type.isChecked() else "by_freq"
+            if fr_mode:
+                if az:
+                    az.fr_word_layout_mode = mode_val
+                    az.fr_word_columns = spin_cols.value()
+                    az.fr_word_image_width_pct = spin_pct.value()
+                    az.fr_show_caption = check_cap.isChecked()
+            else:
+                self._word_layout_mode = mode_val
+                self._az_columns = spin_cols.value()
+                self._az_img_pct = spin_pct.value()
+                self._az_show_caption = check_cap.isChecked()
             # 将列表顺序回写到 ChartInstance.sort_order
             instances = getattr(self._mw, '_chart_instances', None) or []
             if instances:

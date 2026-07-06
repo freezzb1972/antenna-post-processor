@@ -43,6 +43,12 @@ class AzimuthReportConfig:
     word_columns: int = 2                       # 列数: 1=单列, 2=双列
     word_image_width_pct: int = 90              # 图片宽度占列宽的百分比 (10-100)
 
+    # ── Full Report 独立 Word 布局 ──
+    fr_word_layout_mode: str = "side_by_side"
+    fr_word_columns: int = 2
+    fr_word_image_width_pct: int = 90
+    fr_show_caption: bool = True
+
     # ── 输出路径 — 图表 (Word) ──
     chart_output_dir: str = ""               # 图表输出目录
     chart_output_filename: str = ""          # 图表输出文件名
@@ -157,6 +163,10 @@ class AzimuthReportConfig:
             "word_layout_mode": self.word_layout_mode,
             "word_columns": self.word_columns,
             "word_image_width_pct": self.word_image_width_pct,
+            "fr_word_layout_mode": self.fr_word_layout_mode,
+            "fr_word_columns": self.fr_word_columns,
+            "fr_word_image_width_pct": self.fr_word_image_width_pct,
+            "fr_show_caption": self.fr_show_caption,
             "chart_output_dir": self.chart_output_dir,
             "chart_output_filename": self.chart_output_filename,
             "data_output_dir": self.data_output_dir,
@@ -185,6 +195,10 @@ class AzimuthReportConfig:
             word_layout_mode=str(d.get("word_layout_mode", "side_by_side")),
             word_columns=int(d.get("word_columns", 2)),
             word_image_width_pct=int(d.get("word_image_width_pct", 90)),
+            fr_word_layout_mode=str(d.get("fr_word_layout_mode", "side_by_side")),
+            fr_word_columns=int(d.get("fr_word_columns", 2)),
+            fr_word_image_width_pct=int(d.get("fr_word_image_width_pct", 90)),
+            fr_show_caption=bool(d.get("fr_show_caption", True)),
             chart_output_dir=str(d.get("chart_output_dir", "")),
             chart_output_filename=str(d.get("chart_output_filename", "")),
             data_output_dir=str(d.get("data_output_dir", "")),
@@ -216,6 +230,10 @@ class AzimuthReportConfig:
             word_layout_mode=self.word_layout_mode,
             word_columns=self.word_columns or other.word_columns,
             word_image_width_pct=self.word_image_width_pct or other.word_image_width_pct,
+            fr_word_layout_mode=self.fr_word_layout_mode,
+            fr_word_columns=self.fr_word_columns or other.fr_word_columns,
+            fr_word_image_width_pct=self.fr_word_image_width_pct or other.fr_word_image_width_pct,
+            fr_show_caption=self.fr_show_caption,
             chart_output_dir=self.chart_output_dir or other.chart_output_dir,
             chart_output_filename=self.chart_output_filename or other.chart_output_filename,
             data_output_dir=self.data_output_dir or other.data_output_dir,

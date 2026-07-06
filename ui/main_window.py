@@ -130,6 +130,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._data_file_paths: List[str] = []
         self._last_matches: list = []        # 工作表-文件匹配结果
         self._chart_instances: list = []     # 图表实例列表 (ChartInstance)
+        self._full_report_enabled: bool = False  # full_report 计算/输出开关
         self._required_params: set = set()   # 用户确认的报告必需参数
         self._extra_params: set = set()      # 用户额外选择的计算参数
         self._dir_extrap_method: str = "linear"  # Directivity 外推算法
@@ -2292,12 +2293,19 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     output_path = self._auto_rename_if_exists(fr_xlsx)
                 else:
                     output_path = str(Path(output_dir) / f"{Path(output_name).stem}_FullReport.xlsx")
-            # 完整报告独立 Word 路径
+            # 完整报告独立 Word 路径 + 独立布局参数
             if file_page and hasattr(file_page, '_edit_full_graph'):
                 fr_graph = file_page._edit_full_graph.text().strip()
                 if fr_graph and hasattr(self, '_azimuth_config') and self._azimuth_config:
                     self._azimuth_config.chart_output_filename = Path(fr_graph).name
                     self._azimuth_config.chart_output_dir = str(Path(fr_graph).parent)
+            # 完整报告使用 fr_* 独立布局
+            if hasattr(self, '_azimuth_config') and self._azimuth_config:
+                az = self._azimuth_config
+                az.word_layout_mode = az.fr_word_layout_mode
+                az.word_columns = az.fr_word_columns
+                az.word_image_width_pct = az.fr_word_image_width_pct
+                az.show_caption = az.fr_show_caption
             full_report_path = None
 
         plot_config = PlotConfig(
