@@ -302,7 +302,7 @@ def generate_all_for_frequency(
     # ── 方位面极坐标切面图 (Gain + AR) ──
     if azimuth_config is not None and azimuth_config.has_any_azimuth:
         az_antenna = azimuth_config.antenna_name or antenna_name
-        az_dpi = azimuth_config.dpi or getattr(chart_config, 'dpi', 150)
+        az_dpi = azimuth_config.dpi or getattr(chart_config, 'dpi', 100)
 
         def _render_azimuth(data_db, angles, image_key, ylabel, title=None):
             curves = _build_azimuth_curves(theta_deg, data_db, angles, len(phi_deg))

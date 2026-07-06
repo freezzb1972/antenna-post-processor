@@ -52,7 +52,7 @@ class AzimuthReportConfig:
     data_output_filename: str = ""
 
     # ── 渲染 ──
-    dpi: int = 150
+    dpi: int = 100
 
     # ── 内部标志 ──
     _angles_initialized: bool = False  # 角度是否已从 LAG 初始化过
@@ -189,7 +189,7 @@ class AzimuthReportConfig:
             chart_output_filename=str(d.get("chart_output_filename", "")),
             data_output_dir=str(d.get("data_output_dir", "")),
             data_output_filename=str(d.get("data_output_filename", "")),
-            dpi=int(d.get("dpi", 150)),
+            dpi=int(d.get("dpi", 100)),
             freq_gap_mhz=int(d.get("freq_gap_mhz", 10)),
             dual_y_enabled=bool(d.get("dual_y_enabled", False)),
             share_radial_ticks=bool(d.get("share_radial_ticks", False)),

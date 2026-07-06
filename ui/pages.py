@@ -347,6 +347,19 @@ class FileSettingsPage(QWidget):
         btn_tsk.clicked.connect(self._on_browse_task)
         _make_two_line_output(self._check_save_task, self._edit_task, btn_tsk, out_layout)
         self._check_save_task.toggled.connect(lambda c: self._edit_task.setEnabled(c))
+        out_layout.addWidget(_make_block_sep())
+
+        # ── 5) 完整报告 · 独立文件 (.xlsx) ──
+        self._check_full_report = QCheckBox(
+            self.tr("生成完整报告（独立文件，含全部指标 + 图表）"))
+        self._check_full_report.setChecked(False)
+        self._edit_full_report = QLineEdit()
+        self._edit_full_report.setPlaceholderText(self.tr("选择保存路径..."))
+        self._edit_full_report.setEnabled(False)
+        btn_fr = QPushButton(self.tr("浏览..."))
+        btn_fr.clicked.connect(self._on_browse_full_report)
+        _make_two_line_output(self._check_full_report, self._edit_full_report, btn_fr, out_layout)
+        self._check_full_report.toggled.connect(lambda c: self._edit_full_report.setEnabled(c))
 
         right_layout.addWidget(out_grp)
 
@@ -360,6 +373,8 @@ class FileSettingsPage(QWidget):
             self._edit_data.setText(str(Path(self._default_out_dir) / "中间数据.xlsx"))
         if not self._edit_task.text():
             self._edit_task.setText(str(Path(self._default_out_dir) / "task.ant"))
+        if not self._edit_full_report.text():
+            self._edit_full_report.setText(str(Path(self._default_out_dir) / "full_report.xlsx"))
 
         right_layout.addStretch()
 
@@ -498,6 +513,16 @@ class FileSettingsPage(QWidget):
             self.tr("任务包文件 (*.ant)"))
         if path:
             self._edit_task.setText(path)
+
+    def _on_browse_full_report(self):
+        """浏览: 完整报告输出路径。"""
+        from pathlib import Path
+        start = self._edit_full_report.text().strip() or str(Path.cwd() / "output" / "full_report.xlsx")
+        path, _ = QFileDialog.getSaveFileName(
+            self, self.tr("保存完整报告"), start,
+            self.tr("Excel 文件 (*.xlsx)"))
+        if path:
+            self._edit_full_report.setText(path)
 
     def _on_browse_word_template(self):
         """选择带 SDT tag 的 Word 模板（不自动预览）。"""
@@ -1213,6 +1238,7 @@ class FileSettingsPage(QWidget):
             ("_edit_word", "图表报告.docx"),
             ("_edit_data", "中间数据.xlsx"),
             ("_edit_task", "task.ant"),
+            ("_edit_full_report", "full_report.xlsx"),
         ]
         for attr, fname in defaults:
             w = getattr(self, attr, None)
@@ -2940,9 +2966,9 @@ class ChartSettingsPage(QWidget):
                 row_dpi_r = QHBoxLayout()
                 row_dpi_r.addWidget(QLabel(self.tr("方位图 DPI:")))
                 self._spin_azimuth_dpi_xtr = QSpinBox()
-                self._spin_azimuth_dpi_xtr.setRange(150, 1000)
+                self._spin_azimuth_dpi_xtr.setRange(72, 1000)
                 _az_cfg = getattr(self._mw, '_azimuth_config', None) if self._mw else None
-                _az_dpi = getattr(_az_cfg, 'dpi', 150) if _az_cfg else 150
+                _az_dpi = getattr(_az_cfg, 'dpi', 100) if _az_cfg else 100
                 self._spin_azimuth_dpi_xtr.setValue(_az_dpi if _az_dpi >= 150 else 150)
                 self._spin_azimuth_dpi_xtr.setSingleStep(50)
                 self._spin_azimuth_dpi_xtr.setFixedWidth(70)
@@ -3082,8 +3108,8 @@ class ChartSettingsPage(QWidget):
         row_dpi = QHBoxLayout()
         row_dpi.addWidget(QLabel(self.tr("方位图 DPI:")))
         self._spin_azimuth_dpi = QSpinBox()
-        self._spin_azimuth_dpi.setRange(150, 1000)
-        self._spin_azimuth_dpi.setValue(150)
+        self._spin_azimuth_dpi.setRange(72, 1000)
+        self._spin_azimuth_dpi.setValue(100)
         self._spin_azimuth_dpi.setSingleStep(50)
         self._spin_azimuth_dpi.setFixedWidth(70)
         self._spin_azimuth_dpi.valueChanged.connect(lambda: self._sync_to_mw())
@@ -3159,9 +3185,9 @@ class ChartSettingsPage(QWidget):
                 self._edit_antenna_name.setText(az.antenna_name)
 
             if hasattr(self, '_spin_azimuth_dpi'):
-                self._spin_azimuth_dpi.setValue(az.dpi if az.dpi >= 150 else 150)
+                self._spin_azimuth_dpi.setValue(az.dpi if az.dpi >= 72 else 100)
             if hasattr(self, '_spin_azimuth_dpi_xtr'):
-                self._spin_azimuth_dpi_xtr.setValue(az.dpi if az.dpi >= 150 else 150)
+                self._spin_azimuth_dpi_xtr.setValue(az.dpi if az.dpi >= 72 else 100)
             if hasattr(self, '_combo_az_columns'):
                 idx2 = self._spin_az_columns.findData(az.word_columns if az.word_columns in (1, 2) else 2)
                 if idx2 >= 0:
@@ -3374,7 +3400,7 @@ class ChartSettingsPage(QWidget):
         azimuth.azimuth_cut_angles_lhcp = list(self._azimuth_angles_lhcp)
         azimuth.antenna_name = self._edit_antenna_name.text().strip() if hasattr(self, '_edit_antenna_name') else ""
         azimuth.word_layout_mode = self._word_layout_mode if hasattr(self, '_word_layout_mode') else "side_by_side"
-        azimuth.dpi = self._spin_azimuth_dpi.value() if hasattr(self, '_spin_azimuth_dpi') else 150
+        azimuth.dpi = self._spin_azimuth_dpi.value() if hasattr(self, '_spin_azimuth_dpi') else 100
         if hasattr(self, '_spin_azimuth_dpi_xtr'):
             azimuth.dpi = self._spin_azimuth_dpi_xtr.value()  # 右侧优先(最后设置)
         azimuth.word_columns = getattr(self, '_az_columns', 2)
@@ -3569,9 +3595,9 @@ class ChartSettingsPage(QWidget):
                 row_dpi_r = QHBoxLayout()
                 row_dpi_r.addWidget(QLabel(self.tr("方位图 DPI:")))
                 self._spin_azimuth_dpi_xtr = QSpinBox()
-                self._spin_azimuth_dpi_xtr.setRange(150, 1000)
+                self._spin_azimuth_dpi_xtr.setRange(72, 1000)
                 _az_cfg = getattr(self._mw, '_azimuth_config', None) if self._mw else None
-                _az_dpi = getattr(_az_cfg, 'dpi', 150) if _az_cfg else 150
+                _az_dpi = getattr(_az_cfg, 'dpi', 100) if _az_cfg else 100
                 self._spin_azimuth_dpi_xtr.setValue(_az_dpi if _az_dpi >= 150 else 150)
                 self._spin_azimuth_dpi_xtr.setSingleStep(50)
                 self._spin_azimuth_dpi_xtr.setFixedWidth(70)

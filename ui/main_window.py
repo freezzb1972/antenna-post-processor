@@ -2266,11 +2266,26 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         output_path = str(Path(output_dir) / output_name) if out_excel else ""
         output_path = self._auto_rename_if_exists(output_path) if output_path else ""
 
-        full_report_path: Optional[str] = None
-        if self.ui.checkFullReport.isChecked():
-            path_text = self.ui.editFullReportPath.text().strip()
-            full_report_path = path_text if path_text else str(Path(output_dir) / "full_report.xlsx")
-            full_report_path = self._auto_rename_if_exists(full_report_path)
+        # 完整报告: 参数 → Excel, 图表 → Word (覆盖独立输出设置)
+        full_report_enabled = False
+        if file_page and hasattr(file_page, '_check_full_report'):
+            full_report_enabled = file_page._check_full_report.isChecked()
+        else:
+            full_report_enabled = self.ui.checkFullReport.isChecked()
+
+        if full_report_enabled:
+            out_excel = True
+            out_word = True
+            full_base = str(Path(output_dir) / output_name.replace(".xlsx", ""))
+            output_path = full_base + "_参数.xlsx"
+            # Word 输出路径: 使用 azimuth_config
+            if hasattr(self, '_azimuth_config') and self._azimuth_config:
+                if not self._azimuth_config.chart_output_filename:
+                    self._azimuth_config.chart_output_filename = Path(full_base).name + "_图表.docx"
+                if not self._azimuth_config.chart_output_dir:
+                    self._azimuth_config.chart_output_dir = str(Path(full_base).parent)
+            output_path = self._auto_rename_if_exists(output_path)
+            full_report_path = None  # 不再生成旧的综合 Excel
 
         plot_config = PlotConfig(
             elev=self.ui.spinElev.value(),
