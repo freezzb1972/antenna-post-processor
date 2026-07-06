@@ -223,6 +223,21 @@ DESIGN → PLAN → DEVELOP → VERIFY → COMMIT → MANAGE
 - 装饰器生成的属性（@cached_property 等）
 - 条件赋值路径（if/else 中才赋值的属性）
 
+**事后进化规则**（每次发现接口不匹配 bug 后强制执行）:
+
+发现 bug → 分析两步:
+1. **脚本能不能检测到？** → 跑 `python3 .claude/hooks/interface-audit.py <出错文件>` → 看有没有告警
+2. **没告警 = 脚本盲区** → 立即评估能否写成检测规则 → 能就更新脚本，不能就加到盲区清单
+
+```
+检测流程:
+  发现 bug 后立即跑: python3 .claude/hooks/interface-audit.py <bug-file>
+  ├─ 有告警 → 验证已覆盖 ✅
+  └─ 无告警 → 盲区 🚨
+       ├─ 可自动化 → 更新 interface-audit.py
+       └─ 不可自动化 → 更新盲区清单 + 强制每次人工检查
+```
+
 #### D. 禁止行为
 
 - ❌ 不自动 `pyinstaller` 打包 (需等用户确认)
