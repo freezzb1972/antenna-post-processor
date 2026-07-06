@@ -204,6 +204,89 @@ def _resolve_target_class(filepath: str, target_var: str) -> tuple[str | None, s
     return None, None
 
 
+def check_unbound_references(filepath: str) -> list[str]:
+    """检查函数体内引用但从未赋值的变量名 (典型: 删控件漏删调用)。
+
+    扫描每个函数，收集局部赋值和引用，找出引用了但未赋值的变量。
+    只对首字母大写的 widget 变量名 (如 row_bottom, btn_xl) 告警。
+    """
+    import ast as _ast
+    warnings = []
+    try:
+        with open(filepath) as f:
+            tree = _ast.parse(f.read(), filename=filepath)
+    except SyntaxError:
+        return warnings
+
+    for node in _ast.walk(tree):
+        if not isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+            continue
+
+        # 收集函数内所有赋值目标 (Name nodes)
+        assigned = set()
+        for child in _ast.walk(node):
+            if isinstance(child, _ast.Assign):
+                for t in child.targets:
+                    _collect_names(t, assigned)
+            elif isinstance(child, _ast.AnnAssign) and child.target:
+                _collect_names(child.target, assigned)
+            elif isinstance(child, _ast.For):
+                _collect_names(child.target, assigned)
+
+        if not assigned:
+            continue
+
+        # 跳过 Python builtins 和常见参数名
+        assigned.discard('self')
+
+        # 找所有引用但未赋值的 Name
+        for child in _ast.walk(node):
+            if isinstance(child, _ast.Name) and isinstance(child.ctx, _ast.Load):
+                name = child.id
+                if name in assigned:
+                    continue  # 已赋值，跳过
+                # 跳过单字符和 lambda 常用参数
+                if len(name) <= 1:
+                    continue
+                if name in ('True', 'False', 'None', 'self', 'mw', 'app', 'dlg', 'btns',
+                            'checked', 'k', 't', 'v', 'cb', 'cw', 'ks', 'name',
+                            'QDialog', 'QPushButton', 'QVBoxLayout', 'QHBoxLayout',
+                            'QFormLayout', 'QGroupBox', 'QLabel', 'QWidget', 'QLineEdit',
+                            'QCheckBox', 'QComboBox', 'QSpinBox', 'QDoubleSpinBox',
+                            'QTableWidget', 'QFileDialog', 'QMessageBox', 'QThread',
+                            'QApplication', 'Path', 'os', 'np', 'pd', 'io', 'time',
+                            'Qt', 'QFrame', 'QScrollArea', 'QDialogButtonBox',
+                            'QTextEdit', 'QSplitter', 'QHeaderView', 'QAbstractItemView',
+                            'WD_ALIGN_PARAGRAPH', 'WD_TABLE_ALIGNMENT', 'Cm', 'Pt',
+                            'Document', 'BytesIO', 'Figure', 'Axes', 'Optional',
+                            'List', 'Dict', 'Tuple', 'Any', 'Set', 'Union', 'Callable',
+                            'str', 'int', 'float', 'bool', 'list', 'dict', 'set', 'tuple',
+                            'True', 'False', 'None', 'range', 'len', 'max', 'min', 'abs',
+                            'enumerate', 'zip', 'sorted', 'reversed', 'round', 'isinstance',
+                            'hasattr', 'getattr', 'setattr', 'type', 'print',
+                            ):
+                    continue
+                # 只报告首字母小写的 widget 变量
+                if name and name[0].islower():
+                    warnings.append(
+                        f"  ⚠ 未绑定变量引用: '{name}' 在函数 {node.name}"
+                        f" (行 {child.lineno}) — 该变量从未赋值, 可能漏删了引用"
+                    )
+    return warnings
+
+
+def _collect_names(node, result: set):
+    """递归收集 AST 节点中的所有 Name.id。"""
+    import ast as _ast
+    if isinstance(node, _ast.Name):
+        result.add(node.id)
+    elif isinstance(node, (_ast.Tuple, _ast.List)):
+        for elt in node.elts:
+            _collect_names(elt, result)
+    elif isinstance(node, _ast.Starred):
+        _collect_names(node.value, result)
+
+
 def check_hasattr_dead_code(filepath: str) -> list[str]:
     """检查 hasattr/getattr 守卫引用的属性是否真的存在。
 
@@ -335,6 +418,10 @@ def main():
         # 3. hasattr/getattr 死代码检查
         ha_warnings = check_hasattr_dead_code(f)
         all_warnings.extend(ha_warnings)
+
+        # 4. 未绑定变量引用 (删控件漏删调用)
+        ub_warnings = check_unbound_references(f)
+        all_warnings.extend(ub_warnings)
 
     if all_warnings:
         print("\n📋 接口审计发现潜在问题:\n")
