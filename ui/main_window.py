@@ -2285,14 +2285,20 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if full_report_enabled:
             out_excel = True
             out_word = True
-            # Word 图表路径: 从 FileSettingsPage 读取
+            # 完整报告独立 Excel 路径
+            if file_page and hasattr(file_page, '_edit_full_xlsx'):
+                fr_xlsx = file_page._edit_full_xlsx.text().strip()
+                if fr_xlsx:
+                    output_path = self._auto_rename_if_exists(fr_xlsx)
+                else:
+                    output_path = str(Path(output_dir) / f"{Path(output_name).stem}_FullReport.xlsx")
+            # 完整报告独立 Word 路径
             if file_page and hasattr(file_page, '_edit_full_graph'):
-                fg_path = file_page._edit_full_graph.text().strip()
-                if fg_path and hasattr(self, '_azimuth_config') and self._azimuth_config:
-                    self._azimuth_config.chart_output_filename = Path(fg_path).name
-                    self._azimuth_config.chart_output_dir = str(Path(fg_path).parent)
-            output_path = self._auto_rename_if_exists(output_path)
-            full_report_path = None  # 不再生成旧的综合 Excel
+                fr_graph = file_page._edit_full_graph.text().strip()
+                if fr_graph and hasattr(self, '_azimuth_config') and self._azimuth_config:
+                    self._azimuth_config.chart_output_filename = Path(fr_graph).name
+                    self._azimuth_config.chart_output_dir = str(Path(fr_graph).parent)
+            full_report_path = None
 
         plot_config = PlotConfig(
             elev=self.ui.spinElev.value(),

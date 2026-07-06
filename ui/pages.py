@@ -349,17 +349,28 @@ class FileSettingsPage(QWidget):
         self._check_save_task.toggled.connect(lambda c: self._edit_task.setEnabled(c))
         out_layout.addWidget(_make_block_sep())
 
-        # ── 5) 完整报告: 参数→Excel(同天线参数路径) + 图表→Word ──
+        # ── 5) 完整报告: 独立 Excel + 独立 Word ──
         self._check_full_report = QCheckBox(
-            self.tr("生成完整报告（天线参数→Excel + 全部图表→Word）"))
+            self.tr("生成完整报告（独立 Excel + 独立 Word，含全部参数和图表）"))
         self._check_full_report.setChecked(False)
+        # Excel 路径
+        self._edit_full_xlsx = QLineEdit()
+        self._edit_full_xlsx.setPlaceholderText(self.tr("完整报告 Excel 路径..."))
+        self._edit_full_xlsx.setEnabled(False)
+        btn_fx = QPushButton(self.tr("浏览..."))
+        btn_fx.clicked.connect(self._on_browse_full_xlsx)
+        _make_two_line_output(None, self._edit_full_xlsx, btn_fx, out_layout)
+        # Word 路径
         self._edit_full_graph = QLineEdit()
-        self._edit_full_graph.setPlaceholderText(self.tr("Word 图表报告路径..."))
+        self._edit_full_graph.setPlaceholderText(self.tr("完整报告 Word 路径..."))
         self._edit_full_graph.setEnabled(False)
         btn_fg = QPushButton(self.tr("浏览..."))
         btn_fg.clicked.connect(self._on_browse_full_graph)
         _make_two_line_output(self._check_full_report, self._edit_full_graph, btn_fg, out_layout)
-        self._check_full_report.toggled.connect(lambda c: self._edit_full_graph.setEnabled(c))
+        self._check_full_report.toggled.connect(lambda c: (
+            self._edit_full_xlsx.setEnabled(c),
+            self._edit_full_graph.setEnabled(c),
+        ))
 
         right_layout.addWidget(out_grp)
 
@@ -373,6 +384,8 @@ class FileSettingsPage(QWidget):
             self._edit_data.setPlaceholderText(self.tr("加载源文件后自动生成"))
         if not self._edit_task.text():
             self._edit_task.setPlaceholderText(self.tr("加载源文件后自动生成"))
+        if not self._edit_full_xlsx.text():
+            self._edit_full_xlsx.setPlaceholderText(self.tr("加载源文件后自动生成"))
         if not self._edit_full_graph.text():
             self._edit_full_graph.setPlaceholderText(self.tr("加载源文件后自动生成"))
 
@@ -513,6 +526,16 @@ class FileSettingsPage(QWidget):
             self.tr("任务包文件 (*.ant)"))
         if path:
             self._edit_task.setText(path)
+
+    def _on_browse_full_xlsx(self):
+        """浏览: 完整报告 Excel 输出路径。"""
+        from pathlib import Path
+        start = self._edit_full_xlsx.text().strip() or str(self._default_out_dir / "FullReport.xlsx")
+        path, _ = QFileDialog.getSaveFileName(
+            self, self.tr("保存完整报告 Excel"), start,
+            self.tr("Excel 文件 (*.xlsx)"))
+        if path:
+            self._edit_full_xlsx.setText(path)
 
     def _on_browse_full_graph(self):
         """浏览: 完整报告 Word 图表输出路径。"""
@@ -1240,8 +1263,8 @@ class FileSettingsPage(QWidget):
             ("_edit_word", f"{stem}_Graph.docx"),
             ("_edit_data", f"{stem}_internaldata.xlsx"),
             ("_edit_task", f"{stem}.ant"),
-            ("_edit_full_report_ant", f"{stem}_AntennaReport.xlsx"),
-            ("_edit_full_report_word", f"{stem}_fullGraph.docx"),
+            ("_edit_full_xlsx", f"{stem}_FullReport.xlsx"),
+            ("_edit_full_graph", f"{stem}_FullGraph.docx"),
         ]
         for attr, fname in defaults:
             w = getattr(self, attr, None)
