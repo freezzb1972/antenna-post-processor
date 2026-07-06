@@ -3309,6 +3309,12 @@ class ChartSettingsPage(QWidget):
             existing_instances=getattr(mw, '_chart_instances', None),
         )
 
+        # 有图表 → 自动开启 Word 输出
+        if mw._chart_instances:
+            fp = getattr(mw, '_file_settings_page', None)
+            if fp and hasattr(fp, '_check_out_word'):
+                fp._check_out_word.setChecked(True)
+
         if hasattr(mw, 'ui'):
             mw.ui.spinElev.setValue(int(getattr(self, '_elev', 30)))
             mw.ui.spinAzim.setValue(int(getattr(self, '_azim', -60)))
