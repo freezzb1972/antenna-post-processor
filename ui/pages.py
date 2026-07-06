@@ -349,32 +349,32 @@ class FileSettingsPage(QWidget):
         self._check_save_task.toggled.connect(lambda c: self._edit_task.setEnabled(c))
         out_layout.addWidget(_make_block_sep())
 
-        # ── 5) 完整报告 · 独立文件 (.xlsx) ──
+        # ── 5) 完整报告: 参数→Excel(同天线参数路径) + 图表→Word ──
         self._check_full_report = QCheckBox(
-            self.tr("生成完整报告（独立文件，含全部指标 + 图表）"))
+            self.tr("生成完整报告（天线参数→Excel + 全部图表→Word）"))
         self._check_full_report.setChecked(False)
-        self._edit_full_report = QLineEdit()
-        self._edit_full_report.setPlaceholderText(self.tr("选择保存路径..."))
-        self._edit_full_report.setEnabled(False)
-        btn_fr = QPushButton(self.tr("浏览..."))
-        btn_fr.clicked.connect(self._on_browse_full_report)
-        _make_two_line_output(self._check_full_report, self._edit_full_report, btn_fr, out_layout)
-        self._check_full_report.toggled.connect(lambda c: self._edit_full_report.setEnabled(c))
+        self._edit_full_graph = QLineEdit()
+        self._edit_full_graph.setPlaceholderText(self.tr("Word 图表报告路径..."))
+        self._edit_full_graph.setEnabled(False)
+        btn_fg = QPushButton(self.tr("浏览..."))
+        btn_fg.clicked.connect(self._on_browse_full_graph)
+        _make_two_line_output(self._check_full_report, self._edit_full_graph, btn_fg, out_layout)
+        self._check_full_report.toggled.connect(lambda c: self._edit_full_graph.setEnabled(c))
 
         right_layout.addWidget(out_grp)
 
-        # 设置默认输出目录
+        # 设置默认输出目录 (初始占位，加载文件后 _auto_set_output_defaults 更新)
         self._default_out_dir = _default_output_dir()
         if not self._edit_xlsx.text():
-            self._edit_xlsx.setText(str(Path(self._default_out_dir) / "antenna_report.xlsx"))
+            self._edit_xlsx.setPlaceholderText(self.tr("加载源文件后自动生成"))
         if not self._edit_word.text():
-            self._edit_word.setText(str(Path(self._default_out_dir) / "图表报告.docx"))
+            self._edit_word.setPlaceholderText(self.tr("加载源文件后自动生成"))
         if not self._edit_data.text():
-            self._edit_data.setText(str(Path(self._default_out_dir) / "中间数据.xlsx"))
+            self._edit_data.setPlaceholderText(self.tr("加载源文件后自动生成"))
         if not self._edit_task.text():
-            self._edit_task.setText(str(Path(self._default_out_dir) / "task.ant"))
-        if not self._edit_full_report.text():
-            self._edit_full_report.setText(str(Path(self._default_out_dir) / "full_report.xlsx"))
+            self._edit_task.setPlaceholderText(self.tr("加载源文件后自动生成"))
+        if not self._edit_full_graph.text():
+            self._edit_full_graph.setPlaceholderText(self.tr("加载源文件后自动生成"))
 
         right_layout.addStretch()
 
@@ -474,7 +474,7 @@ class FileSettingsPage(QWidget):
     def _on_browse_xlsx(self):
         """浏览: Excel 报告输出路径。"""
         from pathlib import Path
-        start = self._edit_xlsx.text().strip() or str(Path.cwd() / "output" / "antenna_report.xlsx")
+        start = self._edit_xlsx.text().strip() or str(self._default_out_dir / "AntennaReport.xlsx")
         path, _ = QFileDialog.getSaveFileName(
             self, self.tr("保存天线参数报告"), start,
             self.tr("Excel 文件 (*.xlsx)"))
@@ -485,7 +485,7 @@ class FileSettingsPage(QWidget):
     def _on_browse_word(self):
         """浏览: Word 报告输出路径。"""
         from pathlib import Path
-        start = self._edit_word.text().strip() or str(Path.cwd() / "output" / "图表报告.docx")
+        start = self._edit_word.text().strip() or str(self._default_out_dir / "Graph.docx")
         path, _ = QFileDialog.getSaveFileName(
             self, self.tr("保存测试报告"), start,
             self.tr("Word 文档 (*.docx)"))
@@ -496,7 +496,7 @@ class FileSettingsPage(QWidget):
     def _on_browse_data(self):
         """浏览: 中间数据输出路径。"""
         from pathlib import Path
-        start = self._edit_data.text().strip() or str(Path.cwd() / "output" / "中间数据.xlsx")
+        start = self._edit_data.text().strip() or str(self._default_out_dir / "internaldata.xlsx")
         path, _ = QFileDialog.getSaveFileName(
             self, self.tr("保存中间数据"), start,
             self.tr("Excel 文件 (*.xlsx)"))
@@ -507,22 +507,22 @@ class FileSettingsPage(QWidget):
     def _on_browse_task(self):
         """浏览: 任务包保存路径。"""
         from pathlib import Path
-        start = self._edit_task.text().strip() or str(Path.cwd() / "output" / "task.ant")
+        start = self._edit_task.text().strip() or str(self._default_out_dir / "task.ant")
         path, _ = QFileDialog.getSaveFileName(
             self, self.tr("保存任务包"), start,
             self.tr("任务包文件 (*.ant)"))
         if path:
             self._edit_task.setText(path)
 
-    def _on_browse_full_report(self):
-        """浏览: 完整报告输出路径。"""
+    def _on_browse_full_graph(self):
+        """浏览: 完整报告 Word 图表输出路径。"""
         from pathlib import Path
-        start = self._edit_full_report.text().strip() or str(Path.cwd() / "output" / "full_report.xlsx")
+        start = self._edit_full_graph.text().strip() or str(self._default_out_dir / "fullGraph.docx")
         path, _ = QFileDialog.getSaveFileName(
-            self, self.tr("保存完整报告"), start,
-            self.tr("Excel 文件 (*.xlsx)"))
+            self, self.tr("保存完整报告图表"), start,
+            self.tr("Word 文档 (*.docx)"))
         if path:
-            self._edit_full_report.setText(path)
+            self._edit_full_graph.setText(path)
 
     def _on_browse_word_template(self):
         """选择带 SDT tag 的 Word 模板（不自动预览）。"""
@@ -1229,16 +1229,19 @@ class FileSettingsPage(QWidget):
         """若输出路径为空，自动填充为源文件目录下 output 子目录。"""
         if not self._data_file_paths:
             return
-        src_dir = str(Path(self._data_file_paths[0]).parent)
+        src_path = Path(self._data_file_paths[0])
+        src_dir = str(src_path.parent)
+        stem = src_path.stem  # 源文件名(无扩展名)
         out_dir = str(Path(src_dir) / "output")
         os.makedirs(out_dir, exist_ok=True)  # 自动创建 output 子目录
 
         defaults = [
-            ("_edit_xlsx", "antenna_report.xlsx"),
-            ("_edit_word", "图表报告.docx"),
-            ("_edit_data", "中间数据.xlsx"),
-            ("_edit_task", "task.ant"),
-            ("_edit_full_report", "full_report.xlsx"),
+            ("_edit_xlsx", f"{stem}_AntennaReport.xlsx"),
+            ("_edit_word", f"{stem}_Graph.docx"),
+            ("_edit_data", f"{stem}_internaldata.xlsx"),
+            ("_edit_task", f"{stem}.ant"),
+            ("_edit_full_report_ant", f"{stem}_AntennaReport.xlsx"),
+            ("_edit_full_report_word", f"{stem}_fullGraph.docx"),
         ]
         for attr, fname in defaults:
             w = getattr(self, attr, None)

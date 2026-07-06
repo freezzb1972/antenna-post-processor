@@ -2276,14 +2276,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if full_report_enabled:
             out_excel = True
             out_word = True
-            full_base = str(Path(output_dir) / output_name.replace(".xlsx", ""))
-            output_path = full_base + "_参数.xlsx"
-            # Word 输出路径: 使用 azimuth_config
-            if hasattr(self, '_azimuth_config') and self._azimuth_config:
-                if not self._azimuth_config.chart_output_filename:
-                    self._azimuth_config.chart_output_filename = Path(full_base).name + "_图表.docx"
-                if not self._azimuth_config.chart_output_dir:
-                    self._azimuth_config.chart_output_dir = str(Path(full_base).parent)
+            # Word 图表路径: 从 FileSettingsPage 读取
+            if file_page and hasattr(file_page, '_edit_full_graph'):
+                fg_path = file_page._edit_full_graph.text().strip()
+                if fg_path and hasattr(self, '_azimuth_config') and self._azimuth_config:
+                    self._azimuth_config.chart_output_filename = Path(fg_path).name
+                    self._azimuth_config.chart_output_dir = str(Path(fg_path).parent)
             output_path = self._auto_rename_if_exists(output_path)
             full_report_path = None  # 不再生成旧的综合 Excel
 
