@@ -79,15 +79,15 @@ def write_chart_word_report(
     else:
         ordered_groups = [(name, images) for name, images in image_groups.items() if images]
 
-    for group_name, images in ordered_groups:
-        # Group heading
-        if show_caption:
-            heading = doc.add_heading(group_name, level=1)
-            heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
-        freqs = sorted(images.keys())
-        _write_image_grid(doc, images, freqs, antenna_name, group_name,
-                          angles_str, img_width, layout_columns)
+    if layout_mode == "by_freq":
+        # by_freq: 每频点一行, 展示所有图表类型
+        _write_by_freq(doc, ordered_groups, antenna_name, angles_str, img_width, layout_columns, show_caption)
+    elif layout_mode == "by_type":
+        # by_type: 每图表类型一节, 展示所有频点 (等同于默认逐组排列)
+        _write_by_type(doc, ordered_groups, antenna_name, angles_str, img_width, layout_columns, show_caption)
+    else:
+        # side_by_side / default: 逐组排列
+        _write_by_type(doc, ordered_groups, antenna_name, angles_str, img_width, layout_columns, show_caption)
 
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     doc.save(output_path)
@@ -231,3 +231,55 @@ def _write_image_grid(
                     cap = _make_caption(antenna_name, freq, group_name, angles_str) if show_caption else ""
                     _add_cell_image(table.cell(0, j), images[freq], cap, width=img_width, show_caption=show_caption)
                 # 图片间不加空段 — 紧凑排列
+
+
+def _write_by_freq(doc, ordered_groups, antenna_name, angles_str, img_width, columns, show_caption):
+    """按频点布局: 每个频点展示该频点下的所有图表类型。"""
+    # 收集所有频点 + 所有图表类型
+    all_freqs = set()
+    for _, images in ordered_groups:
+        all_freqs.update(images.keys())
+    all_freqs = sorted(all_freqs)
+
+    group_names = [name for name, _ in ordered_groups]
+
+    for freq in all_freqs:
+        # 频点标题
+        heading = doc.add_heading(f"Frequency: {freq:.0f} MHz", level=1)
+        heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+        # 收集该频点的所有图片
+        freq_images = {}
+        for group_name, images in ordered_groups:
+            if freq in images:
+                freq_images[group_name] = {freq: images[freq]}
+
+        if not freq_images:
+            continue
+
+        # 用表格排列 (每行最多 columns 列)
+        entries = list(freq_images.items())
+        for i in range(0, len(entries), columns):
+            row_entries = entries[i:i + columns]
+            if len(row_entries) == 1:
+                gn, imgs = row_entries[0]
+                cap = _make_caption(antenna_name, freq, gn, angles_str) if show_caption else ""
+                _add_single_image(doc, imgs[freq], cap, width=img_width, show_caption=show_caption)
+            else:
+                table = doc.add_table(rows=1, cols=len(row_entries))
+                table.alignment = WD_TABLE_ALIGNMENT.CENTER
+                for j, (gn, imgs) in enumerate(row_entries):
+                    cap = _make_caption(antenna_name, freq, gn, angles_str) if show_caption else ""
+                    _add_cell_image(table.cell(0, j), imgs[freq], cap, width=img_width, show_caption=show_caption)
+
+
+def _write_by_type(doc, ordered_groups, antenna_name, angles_str, img_width, columns, show_caption):
+    """按图表类型布局: 每种图表类型展示其所有频点的图片。"""
+    for group_name, images in ordered_groups:
+        if show_caption:
+            heading = doc.add_heading(group_name, level=1)
+            heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+        freqs = sorted(images.keys())
+        _write_image_grid(doc, images, freqs, antenna_name, group_name,
+                          angles_str, img_width, columns, show_caption=show_caption)
