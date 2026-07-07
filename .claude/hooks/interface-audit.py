@@ -351,6 +351,100 @@ def check_hasattr_dead_code(filepath: str) -> list[str]:
     return warnings
 
 
+def check_conditional_assignment(filepath: str) -> list[str]:
+    """检查变量只在条件分支内赋值但在分支外引用 (UnboundLocalError)。
+
+    典型 bug: full_report_path 只在 if block 内赋值, 但 if 外用。
+    """
+    import ast as _ast
+    warnings = []
+    try:
+        with open(filepath) as f:
+            tree = _ast.parse(f.read(), filename=filepath)
+    except SyntaxError:
+        return warnings
+
+    # 设置所有节点的 parent 引用
+    for parent in _ast.walk(tree):
+        for child in _ast.iter_child_nodes(parent):
+            child._parent = parent  # type: ignore
+
+    for node in _ast.walk(tree):
+        if not isinstance(node, _ast.FunctionDef):
+            continue
+
+        # 收集每个变量在函数作用域内的所有赋值位置和引用位置
+        assigned_in_all_paths = set()       # 在所有路径都赋值
+        assigned_in_conditional_only = {}   # {name: [linenos]}
+        referenced_anywhere = {}            # {name: [linenos]}
+
+        for child in _ast.walk(node):
+            # 跳过 inner functions
+            if isinstance(child, _ast.FunctionDef) and child != node:
+                continue
+
+            # 收集赋值
+            if isinstance(child, _ast.Assign):
+                for t in child.targets:
+                    _collect_conditional_names(t, child, assigned_in_all_paths, assigned_in_conditional_only)
+
+            # 收集引用
+            if isinstance(child, _ast.Name) and isinstance(child.ctx, _ast.Load):
+                name = child.id
+                if name.startswith('_') or name.startswith('self.'):
+                    continue
+                if name not in referenced_anywhere:
+                    referenced_anywhere[name] = []
+                referenced_anywhere[name].append(child.lineno)
+
+        # 检查: referenced but only conditionally assigned
+        for name, ref_lines in referenced_anywhere.items():
+            if name in assigned_in_conditional_only and name not in assigned_in_all_paths:
+                warnings.append(
+                    f"  ⚠ 条件赋值变量 '{name}' 可能未初始化"
+                    f" (仅在 if 内赋值, 但在行 {ref_lines[0]} 等处引用)"
+                    f" — 可能 UnboundLocalError"
+                )
+
+    return warnings
+
+
+def _collect_conditional_names(target, assign_node, all_paths, conditional_only):
+    """收集赋值目标名, 判断是否在条件分支内。"""
+    import ast as _ast
+    names = []
+    _collect_assign_names(target, names)
+    in_conditional = _is_inside_conditional(assign_node)
+    for n in names:
+        if in_conditional:
+            if n not in conditional_only:
+                conditional_only[n] = []
+            conditional_only[n].append(assign_node.lineno)
+        else:
+            all_paths.add(n)
+
+
+def _collect_assign_names(node, result):
+    """递归收集赋值目标中的所有 Name。"""
+    import ast as _ast
+    if isinstance(node, _ast.Name):
+        result.append(node.id)
+    elif isinstance(node, (_ast.Tuple, _ast.List)):
+        for e in node.elts:
+            _collect_assign_names(e, result)
+
+
+def _is_inside_conditional(node) -> bool:
+    """检查节点是否在 if/else/try 块内 (相对于父函数)。"""
+    import ast as _ast
+    parent = getattr(node, '_parent', None)
+    while parent is not None:
+        if isinstance(parent, (_ast.If, _ast.Try, _ast.With, _ast.ExceptHandler)):
+            return True
+        parent = getattr(parent, '_parent', None)
+    return False
+
+
 def check_attr_initialization(filepath: str) -> list[str]:
     """检查类属性是否在 __init__ 中初始化。"""
     warnings = []
@@ -422,6 +516,10 @@ def main():
         # 4. 未绑定变量引用 (删控件漏删调用)
         ub_warnings = check_unbound_references(f)
         all_warnings.extend(ub_warnings)
+
+        # 5. 条件赋值变量 (UnboundLocalError)
+        ca_warnings = check_conditional_assignment(f)
+        all_warnings.extend(ca_warnings)
 
     if all_warnings:
         print("\n📋 接口审计发现潜在问题:\n")
