@@ -3445,11 +3445,6 @@ class ChartSettingsPage(QWidget):
         extra.ar_chart_angles = list(self._ar_angles_x)
         extra.ar_chart_ranges = list(self._ar_ranges_x)
 
-        # ── 左侧 → 右侧单向同步: 报告需要的图表自动纳入 full_report ──
-        for key, cb in self._chart_required.items():
-            if cb.isChecked() and key in self._chart_extra:
-                self._chart_extra[key].setChecked(True)
-
         # ── 方位面配置 ──
         from src.azimuth_config import AzimuthReportConfig
         existing = getattr(mw, '_azimuth_config', None)
