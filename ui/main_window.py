@@ -2283,6 +2283,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         else:
             full_report_enabled = self.ui.checkFullReport.isChecked()
 
+        full_report_path = None
         if full_report_enabled:
             out_excel = True
             out_word = True
