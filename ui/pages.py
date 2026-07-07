@@ -2953,7 +2953,8 @@ class ChartSettingsPage(QWidget):
             self._check_full_report_enable = QCheckBox(self.tr("启用 Full Report 计算和输出"))
             self._check_full_report_enable.setChecked(
                 getattr(self._mw, '_full_report_enabled', False) if self._mw else False)
-            self._check_full_report_enable.toggled.connect(self._on_fr_enable_toggled)
+            self._check_full_report_enable.toggled.connect(
+                lambda checked: setattr(self._mw, '_full_report_enabled', checked) if self._mw else None)
             right_layout.addWidget(self._check_full_report_enable)
             sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
             right_layout.addWidget(sep)
