@@ -954,26 +954,43 @@ def run_pipeline(
             total_angles = sum(len(c.singles_sorted) + len(c.ranges_sorted) for c in sheet_ar_configs.values())
             _log(log_callback, f"自动检测到 {total_angles} 个 AR 角度 (来自 {len(sheet_ar_configs)} 个 sheet)")
 
-    # ---- 2. 收集任务 + 加载数据 + 计算 ----
-    tasks = _collect_tasks(sheets_info, datasource, datasource_map, freq_source, trim_start, trim_end, sheet_mode_map, log_callback)
-    try:
-        sheet_results = _load_and_compute(
-            tasks, sheets_info, theta_extrap_method, robust_peak, parallel,
-            extra_params=extra_params, chart_config=chart_config_obj,
-            ar_lag_config=ar_lag_config_override,
-            sheet_ar_configs=sheet_ar_configs,
-            azimuth_config=azimuth_config,
-            nh_custom_angles=nh_custom_angles,
-            ar_output_db=ar_output_db,
-            dir_extrap_method=dir_extrap_method,
-            compute_only=compute_only,
-            cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,
-        )
-    finally:
-        _close_datasources(use_multi_ds, datasource, datasource_map)
+    # ---- 2. 预览缓存: 非 compute_only 时尝试加载缓存跳过计算 ----
+    if not compute_only and output_path:
+        cached = _load_preview_cache(output_path, template_path)
+        if cached is not None:
+            _log(log_callback, "📦 复用预览缓存数据, 跳过计算")
+            sheet_results = cached
+            _close_datasources(use_multi_ds, datasource, datasource_map)
+            # 直接跳到导出阶段
+            skip_to_export = True
+        else:
+            skip_to_export = False
+    else:
+        skip_to_export = False
+
+    # ---- 3. 收集任务 + 加载数据 + 计算 ----
+    if not skip_to_export:
+        tasks = _collect_tasks(sheets_info, datasource, datasource_map, freq_source, trim_start, trim_end, sheet_mode_map, log_callback)
+        try:
+            sheet_results = _load_and_compute(
+                tasks, sheets_info, theta_extrap_method, robust_peak, parallel,
+                extra_params=extra_params, chart_config=chart_config_obj,
+                ar_lag_config=ar_lag_config_override,
+                sheet_ar_configs=sheet_ar_configs,
+                azimuth_config=azimuth_config,
+                nh_custom_angles=nh_custom_angles,
+                ar_output_db=ar_output_db,
+                dir_extrap_method=dir_extrap_method,
+                compute_only=compute_only,
+                cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,
+            )
+        finally:
+            _close_datasources(use_multi_ds, datasource, datasource_map)
 
     # ── compute_only 模式下跳过所有导出步骤 ──
     if compute_only:
+        # 保存预览缓存（不含图片 bytes，供下次导出复用）
+        _save_preview_cache(sheet_results, output_path, template_path)
         _log(log_callback, "⏭ 预览模式 — 跳过 Excel/Word/报告导出")
         elapsed = time.time() - t0
         total_rows = sum(len(v) for v in sheet_results.values())
@@ -1468,3 +1485,57 @@ def _compute_chunk(
         except Exception as e:
             results.append((sheet_name, {"frequency": freq, "_error": str(e)}))
     return results
+
+
+# ═══════════════════════════════════════════════════════════════
+# 预览缓存: compute_only 时保存 → 导出时复用
+# ═══════════════════════════════════════════════════════════════
+
+def _cache_path(output_path: str) -> str:
+    """预览缓存文件路径。"""
+    return output_path.replace(".xlsx", "") + ".preview_cache.pkl"
+
+
+def _save_preview_cache(sheet_results, output_path, template_path):
+    """保存预览缓存 (不含图片 bytes, 不含渲染结果)。"""
+    import pickle
+    if not output_path:
+        return
+    try:
+        cache_file = _cache_path(output_path)
+        # 只保存数值数据, 去掉 _images (bytes 无法 pickle 或太大)
+        clean = {}
+        for name, rows in sheet_results.items():
+            clean_rows = []
+            for r in rows:
+                clean_row = {k: v for k, v in r.items()
+                             if not k.startswith('_') and not isinstance(v, io.BytesIO)}
+                clean_rows.append(clean_row)
+            clean[name] = clean_rows
+        data = {
+            "template_path": template_path,
+            "sheet_results": clean,
+        }
+        with open(cache_file, 'wb') as f:
+            pickle.dump(data, f)
+    except Exception:
+        pass  # 缓存保存失败不阻塞
+
+
+def _load_preview_cache(output_path, template_path):
+    """加载预览缓存, 如果模板匹配则返回 sheet_results, 否则返回 None。"""
+    import pickle
+    if not output_path:
+        return None
+    cache_file = _cache_path(output_path)
+    if not os.path.exists(cache_file):
+        return None
+    try:
+        with open(cache_file, 'rb') as f:
+            data = pickle.load(f)
+        # 模板路径必须匹配
+        if data.get("template_path") != template_path:
+            return None
+        return data.get("sheet_results", {})
+    except Exception:
+        return None
