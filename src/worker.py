@@ -200,6 +200,7 @@ class ProcessingWorker(QObject):
                 ar_output_db=self.ar_output_db,
                 worksheet_naming_mode=self.worksheet_naming_mode,
                 chart_instances=getattr(self, 'chart_instances', None),
+                parallel=max(1, (os.cpu_count() or 4) - 1),  # 预留1核给UI
                 compute_only=self.compute_only,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
