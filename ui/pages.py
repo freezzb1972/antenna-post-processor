@@ -3467,15 +3467,7 @@ class ChartSettingsPage(QWidget):
         azimuth.show_caption = getattr(self, '_az_show_caption', True)
         azimuth.share_radial_ticks = self._check_share_ticks.isChecked() if hasattr(self, '_check_share_ticks') else False
 
-        # 图表联动: chart_gain_freq → chart_lag_freq
-        if required.chart_gain_freq:
-            required.chart_lag_freq = True
-        if extra.chart_gain_freq:
-            extra.chart_lag_freq = True
-        if required.chart_trp_freq:
-            required.chart_trp_nhprp = True
-        if extra.chart_trp_freq:
-            extra.chart_trp_nhprp = True
+        # 图表联动已移除 — 用户手动控制每个图表类型
 
         mw._azimuth_config = azimuth
         mw._chart_config_required = required
