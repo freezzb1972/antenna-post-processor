@@ -284,12 +284,13 @@ class FileSettingsPage(QWidget):
             return str(Path.cwd() / "output")
 
         def _make_two_line_output(check, edit, btn, parent_layout):
-            """统一的两行布局: checkbox 行 + 路径/浏览 行。"""
-            # 行1: checkbox
-            row1 = QHBoxLayout()
-            row1.addWidget(check)
-            row1.addStretch()
-            parent_layout.addLayout(row1)
+            """统一的两行布局: checkbox 行 + 路径/浏览 行。check 可为 None。"""
+            # 行1: checkbox (可为 None → 跳过)
+            if check is not None:
+                row1 = QHBoxLayout()
+                row1.addWidget(check)
+                row1.addStretch()
+                parent_layout.addLayout(row1)
             # 行2: 路径 + 浏览
             row2 = QHBoxLayout()
             row2.setContentsMargins(10, 0, 0, 0)  # 缩进区分
