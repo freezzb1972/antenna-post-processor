@@ -4074,7 +4074,7 @@ class ChartSettingsPage(QWidget):
         btn_col = QVBoxLayout()
         btn_add_chart = QPushButton("+"); btn_add_chart.setFixedWidth(30)
         btn_add_chart.clicked.connect(lambda: (
-            _entries.append(("gain", [])), _rebuild_list()))
+            _entries.append((cmb_param.currentData(), [])), _rebuild_list()))
         btn_col.addWidget(btn_add_chart)
         btn_del_chart = QPushButton("✕"); btn_del_chart.setFixedWidth(30)
         btn_del_chart.clicked.connect(lambda: (
@@ -4151,6 +4151,29 @@ class ChartSettingsPage(QWidget):
         add_row.addWidget(btn_add_angle)
         add_row.addStretch()
         edit_lo.addLayout(add_row)
+
+        # 批量生成
+        batch_row = QHBoxLayout()
+        spin_start = QDoubleSpinBox(); spin_start.setRange(-180, 360)
+        spin_start.setValue(0); spin_start.setSuffix("°"); spin_start.setDecimals(0)
+        spin_end = QDoubleSpinBox(); spin_end.setRange(-180, 360)
+        spin_end.setValue(90); spin_end.setSuffix("°"); spin_end.setDecimals(0)
+        spin_step = QDoubleSpinBox(); spin_step.setRange(1, 180)
+        spin_step.setValue(10); spin_step.setSuffix("°"); spin_step.setDecimals(0)
+        batch_row.addWidget(QLabel(self.tr("起:"))); batch_row.addWidget(spin_start)
+        batch_row.addWidget(QLabel(self.tr("止:"))); batch_row.addWidget(spin_end)
+        batch_row.addWidget(QLabel(self.tr("步:"))); batch_row.addWidget(spin_step)
+        btn_gen = QPushButton(self.tr("生成"))
+        btn_gen.clicked.connect(lambda: (
+            [_get_current()[1].append(float(a)) for a in
+             np.linspace(spin_start.value(), spin_end.value(),
+                         max(1, int((spin_end.value()-spin_start.value())/
+                                    max(1, spin_step.value()))+1))
+             if float(a) not in _get_current()[1]],
+            _refresh_editor(), _rebuild_list(),
+        ))
+        batch_row.addWidget(btn_gen); batch_row.addStretch()
+        edit_lo.addLayout(batch_row)
         layout.addWidget(edit_grp)
 
         # ── 参数更新 ──
