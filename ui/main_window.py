@@ -2276,8 +2276,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 有图表配置 → 自动开启 Word 输出
         has_charts = bool(getattr(self, '_chart_instances', None))
         ccfg = getattr(self, '_chart_config_required', None)
-        if not has_charts and ccfg and ccfg.has_any_c_class:
-            has_charts = True
+        if not has_charts and ccfg:
+            has_charts = ccfg.has_any_a_class or ccfg.has_any_b_class or ccfg.has_any_c_class
         if not out_word and has_charts:
             out_word = True
             if file_page and hasattr(file_page, '_check_out_word'):
