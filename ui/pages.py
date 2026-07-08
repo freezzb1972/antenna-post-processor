@@ -2910,36 +2910,62 @@ class ChartSettingsPage(QWidget):
         self._dpi = 150; self._step_deg = 5.0
 
         grp_list: list = []
+        _AZ_POPUP = {"cut_azimuth_polar": "gain", "cut_azimuth_polar_ar": "ar",
+                      "cut_azimuth_polar_rhcp": "rhcp", "cut_azimuth_polar_lhcp": "lhcp"}
+
+        # ── 外层左右列 (只创建一次, 各包含全部类别) ──
+        # 左列: 测试报告
+        left_box = QGroupBox()
+        left_outer = QVBoxLayout(left_box)
+        left_outer.setSpacing(6)
+        hdr_l = QHBoxLayout()
+        hdr_l.addWidget(QLabel(self.tr("测试报告")))
+        self._check_test_report_enable = QCheckBox(self.tr("启用"))
+        self._check_test_report_enable.setChecked(True)
+        self._check_test_report_enable.toggled.connect(self._on_test_report_toggled)
+        hdr_l.addWidget(self._check_test_report_enable)
+        hdr_l.addStretch()
+        left_outer.addLayout(hdr_l)
+        sep_l = QFrame(); sep_l.setFrameShape(QFrame.HLine); sep_l.setFrameShadow(QFrame.Sunken)
+        left_outer.addWidget(sep_l)
+
+        # 右列: 额外报告
+        right_box = QGroupBox()
+        right_outer = QVBoxLayout(right_box)
+        right_outer.setSpacing(6)
+        hdr_r = QHBoxLayout()
+        hdr_r.addWidget(QLabel(self.tr("额外报告")))
+        self._check_full_report_enable = QCheckBox(self.tr("启用"))
+        self._check_full_report_enable.setChecked(
+            getattr(self._mw, '_full_report_enabled', False) if self._mw else False)
+        self._check_full_report_enable.toggled.connect(
+            lambda checked: setattr(self._mw, '_full_report_enabled', checked) if self._mw else None)
+        hdr_r.addWidget(self._check_full_report_enable)
+        hdr_r.addStretch()
+        right_outer.addLayout(hdr_r)
+        sep_r = QFrame(); sep_r.setFrameShape(QFrame.HLine); sep_r.setFrameShadow(QFrame.Sunken)
+        right_outer.addWidget(sep_r)
 
         for cat_name, keys in categories.items():
-            grp = QGroupBox(cat_name)
-            grp.setCheckable(True)
-            grp.setChecked(True)
-            grp.setStyleSheet("""
+            # ── 左列: 本类别 ──
+            cat_left = QGroupBox(cat_name)
+            cat_left.setCheckable(True)
+            cat_left.setChecked(True)
+            cat_left.setStyleSheet("""
                 QGroupBox { font-weight: bold; padding-top: 16px; }
                 QGroupBox::indicator { width: 14px; height: 14px; margin-right: 4px; }
             """)
-            grp.setCursor(Qt.PointingHandCursor)
-            outer_layout = QVBoxLayout(grp)
-            outer_layout.setSpacing(4)
-            self._collapse_map[cat_name] = {"grp": grp, "hidden": False}
-            content_widget = QWidget()
-            content_layout = QVBoxLayout(content_widget)
-            content_layout.setContentsMargins(0, 0, 0, 0)
-            content_layout.setSpacing(4)
-            outer_layout.addWidget(content_widget)
+            cat_left.setCursor(Qt.PointingHandCursor)
+            cat_left_ly = QVBoxLayout(cat_left)
+            cat_left_ly.setSpacing(3)
+            self._collapse_map[cat_name] = {"grp": cat_left, "hidden": False}
 
-            content_layout.addStretch()  # 占位, 左右 box 内自有按钮
-
-            row_layout = QHBoxLayout()
-            row_layout.setSpacing(8)
-
-            # 左列: 报告需要
-            left_box = QGroupBox(self.tr("报告需要"))
-            left_layout = QVBoxLayout(left_box)
-            left_layout.setSpacing(3)
-
-            self._add_select_all_row(self._chart_required, keys, left_layout)
+            self._add_select_all_row(self._chart_required, keys, cat_left_ly)
+            # C 类: 俯仰面切面图标题 (在 checkbox 之前)
+            if "C 类" in cat_name:
+                _phi_l = QLabel(self.tr("▸ 俯仰面切面图"))
+                _phi_l.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                cat_left_ly.addWidget(_phi_l)
             for key in keys:
                 row = QHBoxLayout()
                 cb = QCheckBox(labels.get(key, key))
@@ -2947,55 +2973,42 @@ class ChartSettingsPage(QWidget):
                 row.addWidget(cb)
                 self._chart_required[key] = cb
                 if key.startswith("pattern_3d_"):
-                    btn = QPushButton("⚙ " + self.tr("参数"))
-                    btn.setFixedWidth(80)
+                    btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
                     row.addWidget(btn)
                 elif key.startswith("chart_") and "_freq" in key:
-                    btn = QPushButton("⚙ " + self.tr("参数"))
-                    btn.setFixedWidth(80)
+                    btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
-
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
-                    btn = QPushButton("⚙ " + self.tr("参数"))
-                    btn.setFixedWidth(85)
+                    btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
                     btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
                     row.addWidget(btn)
                 row.addStretch()
-                left_layout.addLayout(row)
-            # ── 俯仰切面子标题 + 方位面极坐标切面 (Gain + AR) ──
+                cat_left_ly.addLayout(row)
+            # C 类: 方位面切面图
             if "C 类" in cat_name:
-                _phi_title = QLabel(self.tr("▸ 俯仰(Phi轴)切面图"))
-                _phi_title.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
-                left_layout.addWidget(_phi_title)
-                self._build_azimuth_section(left_layout)
+                self._build_azimuth_section(cat_left_ly)
+            cat_left_ly.addStretch()
+            left_outer.addWidget(cat_left)
 
-            left_layout.addStretch()
-            row_layout.addWidget(left_box, 1)
+            # ── 右列: 本类别 ──
+            cat_right = QGroupBox(cat_name)
+            cat_right.setCheckable(True)
+            cat_right.setChecked(True)
+            cat_right.setStyleSheet("""
+                QGroupBox { font-weight: bold; padding-top: 16px; }
+                QGroupBox::indicator { width: 14px; height: 14px; margin-right: 4px; }
+            """)
+            cat_right.setCursor(Qt.PointingHandCursor)
+            cat_right_ly = QVBoxLayout(cat_right)
+            cat_right_ly.setSpacing(3)
 
-            # 右列: 额外报告
-            right_box = QGroupBox()
-            right_layout = QVBoxLayout(right_box)
-            right_layout.setSpacing(3)
-
-            # 标题 + full_report 总开关 (同行)
-            hdr = QHBoxLayout()
-            hdr.addWidget(QLabel(self.tr("额外报告")))
-            self._check_full_report_enable = QCheckBox(self.tr("启用"))
-            self._check_full_report_enable.setChecked(
-                getattr(self._mw, '_full_report_enabled', False) if self._mw else False)
-            self._check_full_report_enable.toggled.connect(
-                lambda checked: setattr(self._mw, '_full_report_enabled', checked) if self._mw else None)
-            hdr.addWidget(self._check_full_report_enable)
-            hdr.addStretch()
-            right_layout.addLayout(hdr)
-            sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
-            right_layout.addWidget(sep)
-
-            # full_report 独立全选/取消全选按钮
-            self._add_select_all_row(self._chart_extra, keys, right_layout)
-
+            self._add_select_all_row(self._chart_extra, keys, cat_right_ly)
+            if "C 类" in cat_name:
+                _phi_r = QLabel(self.tr("▸ 俯仰面切面图"))
+                _phi_r.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                cat_right_ly.addWidget(_phi_r)
             for key in keys:
                 row = QHBoxLayout()
                 cb = QCheckBox(labels.get(key, key))
@@ -3003,33 +3016,27 @@ class ChartSettingsPage(QWidget):
                 row.addWidget(cb)
                 self._chart_extra[key] = cb
                 if key.startswith("pattern_3d_"):
-                    btn = QPushButton("⚙ " + self.tr("参数"))
-                    btn.setFixedWidth(80)
+                    btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
                     row.addWidget(btn)
                 elif key.startswith("chart_") and "_freq" in key:
-                    btn = QPushButton("⚙ " + self.tr("参数"))
-                    btn.setFixedWidth(80)
+                    btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
-
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
-                    btn = QPushButton("⚙ " + self.tr("参数"))
-                    btn.setFixedWidth(85)
+                    btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
                     btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
                     row.addWidget(btn)
                 row.addStretch()
-                right_layout.addLayout(row)
-            # ── 俯仰切面子标题 + 方位面极坐标切面 (右列: 存 _chart_extra) ──
+                cat_right_ly.addLayout(row)
+            # C 类: 方位面切面图 + DPI
             if "C 类" in cat_name:
-                _phi_title_r = QLabel(self.tr("▸ 俯仰(Phi轴)切面图"))
-                _phi_title_r.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
-                right_layout.addWidget(_phi_title_r)
-                sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
-                right_layout.addWidget(sep)
-                right_layout.addWidget(QLabel(self.tr("极坐标方位面切面图:")))
-                _AZ_POPUP = {"cut_azimuth_polar": "gain", "cut_azimuth_polar_ar": "ar",
-                             "cut_azimuth_polar_rhcp": "rhcp", "cut_azimuth_polar_lhcp": "lhcp"}
+                _az_lbl_r = QLabel(self.tr("▸ 方位面切面图"))
+                _az_lbl_r.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                cat_right_ly.addWidget(_az_lbl_r)
+                _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
+                            "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
+                self._add_select_all_row(self._chart_extra, _az_keys, cat_right_ly)
                 for az_key, az_label in [
                     ("cut_azimuth_polar", "Gain 极坐标方位面"),
                     ("cut_azimuth_polar_ar", "AR 极坐标方位面"),
@@ -3041,12 +3048,11 @@ class ChartSettingsPage(QWidget):
                     cb_az.toggled.connect(lambda: self._sync_to_mw())
                     row_az.addWidget(cb_az)
                     self._chart_extra[az_key] = cb_az
-                    btn_az = QPushButton("⚙ " + self.tr("参数"))
-                    btn_az.setFixedWidth(80)
+                    btn_az = QPushButton("⚙ " + self.tr("参数")); btn_az.setFixedWidth(80)
                     btn_az.clicked.connect(lambda checked, t=_AZ_POPUP[az_key]: self._show_azimuth_angle_popup(t))
                     row_az.addWidget(btn_az)
                     row_az.addStretch()
-                    right_layout.addLayout(row_az)
+                    cat_right_ly.addLayout(row_az)
                 # DPI
                 row_dpi_r = QHBoxLayout()
                 row_dpi_r.addWidget(QLabel(self.tr("方位图 DPI:")))
@@ -3055,25 +3061,35 @@ class ChartSettingsPage(QWidget):
                 _az_cfg = getattr(self._mw, '_azimuth_config', None) if self._mw else None
                 _az_dpi = getattr(_az_cfg, 'dpi', 100) if _az_cfg else 100
                 self._spin_azimuth_dpi_xtr.setValue(_az_dpi if _az_dpi >= 150 else 150)
-                self._spin_azimuth_dpi_xtr.setSingleStep(50)
-                self._spin_azimuth_dpi_xtr.setFixedWidth(70)
+                self._spin_azimuth_dpi_xtr.setSingleStep(50); self._spin_azimuth_dpi_xtr.setFixedWidth(70)
                 self._spin_azimuth_dpi_xtr.valueChanged.connect(lambda: self._sync_to_mw())
                 row_dpi_r.addWidget(self._spin_azimuth_dpi_xtr)
                 row_dpi_r.addStretch()
-                right_layout.addLayout(row_dpi_r)
-            right_layout.addStretch()
+                cat_right_ly.addLayout(row_dpi_r)
+            cat_right_ly.addStretch()
+            right_outer.addWidget(cat_right)
 
-            row_layout.addWidget(right_box, 1)
+            # 记录到 grp_list (用于 scroll 添加)
+            grp_list.append(cat_left)
+            grp_list.append(cat_right)
 
-            content_layout.addLayout(row_layout)
-            grp_list.append(grp)
-
-            def make_toggle(g=grp, cw=content_widget, name=cat_name):
+            def make_toggle_l(g=cat_left, name=cat_name):
                 def toggle(checked):
-                    cw.setVisible(checked)
                     self._collapse_map[name]["hidden"] = not checked
+                    # 同步折叠右列同一类别
+                    for _g in grp_list:
+                        if _g is not g and _g.title() == name:
+                            _g.setChecked(checked)
                 return toggle
-            grp.toggled.connect(make_toggle(grp, content_widget, cat_name))
+            cat_left.toggled.connect(make_toggle_l(cat_left, cat_name))
+            def make_toggle_r(g=cat_right, name=cat_name):
+                def toggle(checked):
+                    for _g in grp_list:
+                        if _g is not g and _g.title() == name:
+                            _g.setChecked(checked)
+                return toggle
+            cat_right.toggled.connect(make_toggle_r(cat_right, cat_name))
+
 
         # 输出设置
         out_grp = QGroupBox(self.tr("输出设置"))
@@ -3126,8 +3142,11 @@ class ChartSettingsPage(QWidget):
         scroll.setFrameShape(QScrollArea.NoFrame)
         scroll_content = QWidget()
         scroll_vbox = QVBoxLayout(scroll_content)
+        # 将左右列加入外层 scroll 布局 (在类别组之前)
         self._chart_grp_list = grp_list
         self._chart_scroll_vbox = scroll_vbox
+        scroll_vbox.addWidget(left_box)
+        scroll_vbox.addWidget(right_box)
         for g in grp_list:
             scroll_vbox.addWidget(g)
         scroll_vbox.addStretch()
@@ -3136,12 +3155,14 @@ class ChartSettingsPage(QWidget):
 
     def _build_azimuth_section(self, left_layout: QVBoxLayout):
         """构建方位面极坐标切面控件 (可复用 — setup_ui + rebuild 共用)。"""
-        sep = QFrame()
-        sep.setFrameShape(QFrame.HLine)
-        sep.setFrameShadow(QFrame.Sunken)
-        left_layout.addWidget(sep)
-
-        left_layout.addWidget(QLabel(self.tr("极坐标方位面切面图:")))
+        # 标题
+        _az_lbl = QLabel(self.tr("▸ 方位面切面图"))
+        _az_lbl.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+        left_layout.addWidget(_az_lbl)
+        # 全选/取消全选
+        _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
+                    "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
+        self._add_select_all_row(self._chart_required, _az_keys, left_layout)
 
         # Gain azimuth
         row_az_g = QHBoxLayout()
@@ -3181,6 +3202,19 @@ class ChartSettingsPage(QWidget):
         row_az_rhcp.addWidget(btn_az_rhcp)
         row_az_rhcp.addStretch()
         left_layout.addLayout(row_az_rhcp)
+
+        # LHCP azimuth
+        row_az_lhcp = QHBoxLayout()
+        cb_az_lhcp = QCheckBox(self.tr("LHCP 极坐标方位面"))
+        cb_az_lhcp.toggled.connect(lambda: self._sync_to_mw())
+        row_az_lhcp.addWidget(cb_az_lhcp)
+        self._chart_required["cut_azimuth_polar_lhcp"] = cb_az_lhcp
+        btn_az_lhcp = QPushButton("⚙ " + self.tr("参数"))
+        btn_az_lhcp.setFixedWidth(80)
+        btn_az_lhcp.clicked.connect(lambda checked: self._show_azimuth_angle_popup("lhcp"))
+        row_az_lhcp.addWidget(btn_az_lhcp)
+        row_az_lhcp.addStretch()
+        left_layout.addLayout(row_az_lhcp)
 
         # DPI
         row_dpi = QHBoxLayout()
@@ -3426,6 +3460,13 @@ class ChartSettingsPage(QWidget):
         layout.addWidget(btns)
         dlg.exec()
 
+    def _on_test_report_toggled(self, checked: bool):
+        """测试报告总开关: 控制 Word 输出自动选中/取消。"""
+        if self._mw:
+            fp = getattr(self._mw, '_file_settings_page', None)
+            if fp and hasattr(fp, '_check_out_word'):
+                fp._check_out_word.setChecked(checked)
+
     def _sync_to_mw(self):
         """同步当前配置到 MainWindow。"""
         if not self._mw:
@@ -3558,123 +3599,120 @@ class ChartSettingsPage(QWidget):
                 item.widget().hide()
                 item.widget().deleteLater()
 
-        # 重建
+        # 重建: 清除旧的类别 QGroupBox (保留 left_box/right_box 和 stretch)
+        # vbox 顺序: left_box, right_box, cat_left_0, cat_right_0, ..., stretch
+        # 保留前 2 个 (left_box, right_box), 清除其余中间项直到 stretch
+        while vbox.count() > 3:  # left_box + right_box + stretch
+            item = vbox.takeAt(2)  # 从 index 2 开始删除
+            if item.widget():
+                item.widget().hide()
+                item.widget().deleteLater()
+
         grp_list = []
+        _AZ_POPUP = {"cut_azimuth_polar": "gain", "cut_azimuth_polar_ar": "ar",
+                      "cut_azimuth_polar_rhcp": "rhcp", "cut_azimuth_polar_lhcp": "lhcp"}
+
+        # 找到现有的 left_box 和 right_box (setup_ui 已创建)
+        left_box = vbox.itemAt(0).widget()
+        right_box = vbox.itemAt(1).widget()
+        left_outer = left_box.layout()
+        right_outer = right_box.layout()
+        # 清除内部旧类别 (保留 header: hdr_l + sep_l / hdr_r + sep_r)
+        while left_outer.count() > 2:
+            item = left_outer.takeAt(2)
+            if item.widget():
+                item.widget().hide(); item.widget().deleteLater()
+        while right_outer.count() > 2:
+            item = right_outer.takeAt(2)
+            if item.widget():
+                item.widget().hide(); item.widget().deleteLater()
+
         for cat_name, keys in categories.items():
-            grp = QGroupBox(cat_name)
-            grp.setCheckable(True)
-            grp.setChecked(True)
-            grp.setStyleSheet("""
+            # ── 左列: 本类别 ──
+            cat_left = QGroupBox(cat_name)
+            cat_left.setCheckable(True); cat_left.setChecked(True)
+            cat_left.setStyleSheet("""
                 QGroupBox { font-weight: bold; padding-top: 16px; }
                 QGroupBox::indicator { width: 14px; height: 14px; margin-right: 4px; }
             """)
-            grp.setCursor(Qt.PointingHandCursor)
-            outer_layout = QVBoxLayout(grp)
-            outer_layout.setSpacing(4)
-            self._collapse_map[cat_name] = {"grp": grp, "hidden": False}
-            content_widget = QWidget()
-            content_layout = QVBoxLayout(content_widget)
-            content_layout.setContentsMargins(0, 0, 0, 0)
-            content_layout.setSpacing(4)
-            outer_layout.addWidget(content_widget)
-            content_layout.addStretch()
+            cat_left.setCursor(Qt.PointingHandCursor)
+            cat_left_ly = QVBoxLayout(cat_left); cat_left_ly.setSpacing(3)
+            self._collapse_map[cat_name] = {"grp": cat_left, "hidden": False}
 
-            row_layout = QHBoxLayout()
-            row_layout.setSpacing(8)
-
-            # 左列
-            left_box = QGroupBox(self.tr("报告需要"))
-            left_layout = QVBoxLayout(left_box)
-            left_layout.setSpacing(3)
-            self._add_select_all_row(self._chart_required, keys, left_layout)
+            self._add_select_all_row(self._chart_required, keys, cat_left_ly)
+            if "C 类" in cat_name:
+                _phi_l = QLabel(self.tr("▸ 俯仰面切面图"))
+                _phi_l.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                cat_left_ly.addWidget(_phi_l)
             for key in keys:
                 row = QHBoxLayout()
                 cb = QCheckBox(labels.get(key, key))
                 cb.setChecked(saved.get(key, False))
                 cb.toggled.connect(lambda: self._sync_to_mw())
-                row.addWidget(cb)
-                self._chart_required[key] = cb
+                row.addWidget(cb); self._chart_required[key] = cb
                 if key.startswith("pattern_3d_"):
-                    btn = QPushButton("⚙ " + self.tr("参数"))
-                    btn.setFixedWidth(80)
+                    btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
                     row.addWidget(btn)
                 elif key.startswith("chart_") and "_freq" in key:
-                    btn = QPushButton("⚙ " + self.tr("参数"))
-                    btn.setFixedWidth(80)
+                    btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
-                    btn = QPushButton("⚙ " + self.tr("Phi 角度..."))
-                    btn.setFixedWidth(85)
+                    btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
                     btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
                     row.addWidget(btn)
-                row.addStretch()
-                left_layout.addLayout(row)
-            # ── 方位面极坐标切面 (仅 C 类) ──
+                row.addStretch(); cat_left_ly.addLayout(row)
             if "C 类" in cat_name:
-                self._build_azimuth_section(left_layout)
-                # 恢复方位面 checkbox 状态
+                self._build_azimuth_section(cat_left_ly)
                 for az_key in ("cut_azimuth_polar", "cut_azimuth_polar_ar",
-                               "cut_azimuth_polar_rhcp"):
+                               "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"):
                     if az_key in self._chart_required and az_key in saved:
                         self._chart_required[az_key].setChecked(saved[az_key])
-            left_layout.addStretch()
-            row_layout.addWidget(left_box, 1)
+            cat_left_ly.addStretch()
+            left_outer.addWidget(cat_left)
 
-            # 右列: 额外报告
-            right_box = QGroupBox()
-            right_layout = QVBoxLayout(right_box)
-            right_layout.setSpacing(3)
+            # ── 右列: 本类别 ──
+            cat_right = QGroupBox(cat_name)
+            cat_right.setCheckable(True); cat_right.setChecked(True)
+            cat_right.setStyleSheet("""
+                QGroupBox { font-weight: bold; padding-top: 16px; }
+                QGroupBox::indicator { width: 14px; height: 14px; margin-right: 4px; }
+            """)
+            cat_right.setCursor(Qt.PointingHandCursor)
+            cat_right_ly = QVBoxLayout(cat_right); cat_right_ly.setSpacing(3)
 
-            # 标题 + full_report 总开关 (同行)
-            hdr = QHBoxLayout()
-            hdr.addWidget(QLabel(self.tr("额外报告")))
-            self._check_full_report_enable = QCheckBox(self.tr("启用"))
-            self._check_full_report_enable.setChecked(
-                getattr(self._mw, '_full_report_enabled', False) if self._mw else False)
-            self._check_full_report_enable.toggled.connect(
-                lambda checked: setattr(self._mw, '_full_report_enabled', checked) if self._mw else None)
-            hdr.addWidget(self._check_full_report_enable)
-            hdr.addStretch()
-            right_layout.addLayout(hdr)
-            sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
-            right_layout.addWidget(sep)
-            self._add_select_all_row(self._chart_extra, keys, right_layout)
+            self._add_select_all_row(self._chart_extra, keys, cat_right_ly)
+            if "C 类" in cat_name:
+                _phi_r = QLabel(self.tr("▸ 俯仰面切面图"))
+                _phi_r.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                cat_right_ly.addWidget(_phi_r)
             for key in keys:
                 row = QHBoxLayout()
                 cb = QCheckBox(labels.get(key, key))
                 cb.setChecked(saved.get(key, False))
                 cb.toggled.connect(lambda: self._sync_to_mw())
-                row.addWidget(cb)
-                self._chart_extra[key] = cb
+                row.addWidget(cb); self._chart_extra[key] = cb
                 if key.startswith("pattern_3d_"):
-                    btn = QPushButton("⚙ " + self.tr("参数"))
-                    btn.setFixedWidth(80)
+                    btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_a3d_param_dialog(k))
                     row.addWidget(btn)
                 elif key.startswith("chart_") and "_freq" in key:
-                    btn = QPushButton("⚙ " + self.tr("参数"))
-                    btn.setFixedWidth(80)
+                    btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
                 elif key in ("cut_2d_polar", "cut_2d_rect"):
-                    btn = QPushButton("⚙ " + self.tr("参数"))
-                    btn.setFixedWidth(85)
+                    btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
                     btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
                     row.addWidget(btn)
-                row.addStretch()
-                right_layout.addLayout(row)
-            # ── 俯仰切面子标题 + 方位面极坐标切面 (右列重建: 存 _chart_extra) ──
+                row.addStretch(); cat_right_ly.addLayout(row)
             if "C 类" in cat_name:
-                _phi_title_r = QLabel(self.tr("▸ 俯仰(Phi轴)切面图"))
-                _phi_title_r.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
-                right_layout.addWidget(_phi_title_r)
-                sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
-                right_layout.addWidget(sep)
-                right_layout.addWidget(QLabel(self.tr("极坐标方位面切面图:")))
-                _AZ_POPUP = {"cut_azimuth_polar": "gain", "cut_azimuth_polar_ar": "ar",
-                             "cut_azimuth_polar_rhcp": "rhcp", "cut_azimuth_polar_lhcp": "lhcp"}
+                _az_lbl_r = QLabel(self.tr("▸ 方位面切面图"))
+                _az_lbl_r.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                cat_right_ly.addWidget(_az_lbl_r)
+                _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
+                            "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
+                self._add_select_all_row(self._chart_extra, _az_keys, cat_right_ly)
                 for az_key, az_label in [
                     ("cut_azimuth_polar", "Gain 极坐标方位面"),
                     ("cut_azimuth_polar_ar", "AR 极坐标方位面"),
@@ -3685,15 +3723,11 @@ class ChartSettingsPage(QWidget):
                     cb_az = QCheckBox(self.tr(az_label))
                     cb_az.setChecked(saved.get(az_key, False))
                     cb_az.toggled.connect(lambda: self._sync_to_mw())
-                    row_az.addWidget(cb_az)
-                    self._chart_extra[az_key] = cb_az
-                    btn_az = QPushButton("⚙ " + self.tr("参数"))
-                    btn_az.setFixedWidth(80)
+                    row_az.addWidget(cb_az); self._chart_extra[az_key] = cb_az
+                    btn_az = QPushButton("⚙ " + self.tr("参数")); btn_az.setFixedWidth(80)
                     btn_az.clicked.connect(lambda checked, t=_AZ_POPUP[az_key]: self._show_azimuth_angle_popup(t))
-                    row_az.addWidget(btn_az)
-                    row_az.addStretch()
-                    right_layout.addLayout(row_az)
-                # DPI
+                    row_az.addWidget(btn_az); row_az.addStretch()
+                    cat_right_ly.addLayout(row_az)
                 row_dpi_r = QHBoxLayout()
                 row_dpi_r.addWidget(QLabel(self.tr("方位图 DPI:")))
                 self._spin_azimuth_dpi_xtr = QSpinBox()
@@ -3701,21 +3735,37 @@ class ChartSettingsPage(QWidget):
                 _az_cfg = getattr(self._mw, '_azimuth_config', None) if self._mw else None
                 _az_dpi = getattr(_az_cfg, 'dpi', 100) if _az_cfg else 100
                 self._spin_azimuth_dpi_xtr.setValue(_az_dpi if _az_dpi >= 150 else 150)
-                self._spin_azimuth_dpi_xtr.setSingleStep(50)
-                self._spin_azimuth_dpi_xtr.setFixedWidth(70)
+                self._spin_azimuth_dpi_xtr.setSingleStep(50); self._spin_azimuth_dpi_xtr.setFixedWidth(70)
                 self._spin_azimuth_dpi_xtr.valueChanged.connect(lambda: self._sync_to_mw())
-                row_dpi_r.addWidget(self._spin_azimuth_dpi_xtr)
-                row_dpi_r.addStretch()
-                right_layout.addLayout(row_dpi_r)
-            right_layout.addStretch()
-            row_layout.addWidget(right_box, 1)
+                row_dpi_r.addWidget(self._spin_azimuth_dpi_xtr); row_dpi_r.addStretch()
+                cat_right_ly.addLayout(row_dpi_r)
+            cat_right_ly.addStretch()
+            right_outer.addWidget(cat_right)
 
-            content_layout.addLayout(row_layout)
-            grp_list.append(grp)
+            grp_list.append(cat_left); grp_list.append(cat_right)
+
+            def make_toggle_l(g=cat_left, name=cat_name):
+                def toggle(checked):
+                    self._collapse_map[name]["hidden"] = not checked
+                    for _g in grp_list:
+                        if _g is not g and _g.title() == name:
+                            _g.setChecked(checked)
+                return toggle
+            cat_left.toggled.connect(make_toggle_l(cat_left, cat_name))
+            def make_toggle_r(g=cat_right, name=cat_name):
+                def toggle(checked):
+                    for _g in grp_list:
+                        if _g is not g and _g.title() == name:
+                            _g.setChecked(checked)
+                return toggle
+            cat_right.toggled.connect(make_toggle_r(cat_right, cat_name))
 
         self._chart_grp_list = grp_list
+        # 将新类别插入到 right_box 之后、stretch 之前
+        idx = vbox.count() - 1  # stretch 的位置
         for g in grp_list:
-            vbox.insertWidget(vbox.count() - 1, g)
+            vbox.insertWidget(idx, g)
+            idx += 1
 
     def _show_a3d_param_dialog(self, chart_key: str):
         """A 类 3D 方向图参数设置 — DPI + 采样精度 + 图表列表(每视角=一个图表)。"""
