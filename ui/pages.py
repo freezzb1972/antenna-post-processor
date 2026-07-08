@@ -2984,7 +2984,7 @@ class ChartSettingsPage(QWidget):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
-                elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
+                elif key in ("cut_2d_polar", "cut_2d_rect"):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
                     btn.clicked.connect(lambda checked, k=key: self._show_cut_param_dialog(k))
                     row.addWidget(btn)
@@ -3027,7 +3027,7 @@ class ChartSettingsPage(QWidget):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
-                elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
+                elif key in ("cut_2d_polar", "cut_2d_rect"):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
                     btn.clicked.connect(lambda checked, k=key: self._show_cut_param_dialog(k))
                     row.addWidget(btn)
@@ -3514,8 +3514,7 @@ class ChartSettingsPage(QWidget):
         required.ar_chart_angles = list(self._ar_angles)
         required.ar_chart_ranges = list(self._ar_ranges)
         required.cut_2d_phi_angles = list(self._cut_2d_phi_angles)
-        for attr in ("_cut_2d_polar_entries", "_cut_2d_rect_entries",
-                      "_cut_azimuth_polar_entries", "_cut_azimuth_rect_entries"):
+        for attr in ("_cut_2d_polar_entries", "_cut_2d_rect_entries"):
             if hasattr(self, attr):
                 setattr(required, attr[1:], list(getattr(self, attr)))
         required.view_angle_pairs = list(self._view_angle_pairs)
@@ -3656,7 +3655,7 @@ class ChartSettingsPage(QWidget):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
-                elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
+                elif key in ("cut_2d_polar", "cut_2d_rect"):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
                     btn.clicked.connect(lambda checked, k=key: self._show_cut_param_dialog(k))
                     row.addWidget(btn)
@@ -3699,7 +3698,7 @@ class ChartSettingsPage(QWidget):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
-                elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
+                elif key in ("cut_2d_polar", "cut_2d_rect"):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
                     btn.clicked.connect(lambda checked, k=key: self._show_cut_param_dialog(k))
                     row.addWidget(btn)

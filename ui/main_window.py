@@ -1918,7 +1918,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             fp._check_out_excel.setChecked(has_template)
         # 图表 → Word + 数据
         ccfg = getattr(self, '_chart_config_required', None)
-        has_charts = bool(ccfg and (ccfg.has_any_a_class or ccfg.has_any_b_class or ccfg.has_any_c_class))
+        az = getattr(self, '_azimuth_config', None)
+        has_charts = bool(
+            (ccfg and (ccfg.has_any_a_class or ccfg.has_any_b_class or ccfg.has_any_c_class))
+            or (az and az.has_any_azimuth)
+        )
         if hasattr(fp, '_check_out_word'):
             fp._check_out_word.setChecked(has_charts)
         if hasattr(fp, '_check_out_data'):
@@ -2287,8 +2291,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 有图表配置 → 自动开启 Word 输出
         has_charts = bool(getattr(self, '_chart_instances', None))
         ccfg = getattr(self, '_chart_config_required', None)
-        if not has_charts and ccfg:
-            has_charts = ccfg.has_any_a_class or ccfg.has_any_b_class or ccfg.has_any_c_class
+        az = getattr(self, '_azimuth_config', None)
+        if not has_charts:
+            if ccfg:
+                has_charts = ccfg.has_any_a_class or ccfg.has_any_b_class or ccfg.has_any_c_class
+            if az and not has_charts:
+                has_charts = az.has_any_azimuth
         if not out_word and has_charts:
             out_word = True
             if file_page and hasattr(file_page, '_check_out_word'):

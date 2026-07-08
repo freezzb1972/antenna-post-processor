@@ -288,8 +288,7 @@ def generate_all_for_frequency(
     # 优先使用 4 组独立图表列表, 回退到旧字段
     phi_entries = (getattr(chart_config, 'cut_2d_polar_entries', None) or []) + \
                   (getattr(chart_config, 'cut_2d_rect_entries', None) or [])
-    theta_entries = (getattr(chart_config, 'cut_azimuth_polar_entries', None) or []) + \
-                    (getattr(chart_config, 'cut_azimuth_rect_entries', None) or [])
+    theta_entries = []  # 方位面 entries 由 azimuth_config 独立管理
     if phi_entries or theta_entries:
         from .cut_param import CutChartEntry as _CE
         all_entries = []
