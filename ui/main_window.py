@@ -503,6 +503,26 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         progress_row.addWidget(self.ui.lblProgressMsg)
         exec_layout.addLayout(progress_row)
 
+        # 阶段指示器: 4 个阶段标签，当前阶段高亮
+        stage_row = QHBoxLayout()
+        stage_row.setSpacing(2)
+        self._stage_labels: list[QLabel] = []
+        stage_names = [
+            self.tr("📂 读取数据"), self.tr("🧮 计算参数"),
+            self.tr("📊 Excel输出"), self.tr("📄 Word输出"),
+        ]
+        for name in stage_names:
+            lbl = QLabel(name)
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setStyleSheet(
+                "padding: 2px 6px; font-size: 11px; color: #888;"
+                "border: 1px solid #ccc; border-radius: 3px;"
+            )
+            stage_row.addWidget(lbl)
+            self._stage_labels.append(lbl)
+        stage_row.addStretch()
+        exec_layout.addLayout(stage_row)
+
         h_splitter = ThinSplitter(Qt.Horizontal)
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
@@ -2393,8 +2413,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             sheet_mode_map: Dict[str, int] = self._build_sheet_mode_map(datasource_map)
 
         self.ui.logOutput.clear()
-        self._max_progress_pct = 0
         self.ui.progressBar.setValue(0)
+        # 重置阶段指示器
+        if hasattr(self, '_stage_labels'):
+            for lbl in self._stage_labels:
+                lbl.setStyleSheet(
+                    "padding: 2px 6px; font-size: 11px; color: #888;"
+                    "border: 1px solid #ccc; border-radius: 3px;"
+                )
         self.ui.lblProgressMsg.setText(self.tr("启动中..."))
 
         self._thread = QThread(self)
@@ -2547,13 +2573,35 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
     def _on_progress(self, current: int, total: int, message: str):
         pct = int(current / max(total, 1) * 100)
-        # 固定 100 刻度, 防止阶段间 progress_max 变化导致进度条倒退
-        if not hasattr(self, '_max_progress_pct'):
-            self._max_progress_pct = 0
-        if pct > self._max_progress_pct:
-            self._max_progress_pct = pct
-            self.ui.progressBar.setMaximum(100)
-            self.ui.progressBar.setValue(pct)
+        # 统一 progress_max → 百分比单调递增, 不再需要 _max_progress_pct 守卫
+        self.ui.progressBar.setMaximum(100)
+        self.ui.progressBar.setValue(pct)
+        # 阶段切换检测: 从消息前缀 [emoji] 提取阶段索引
+        stage_map = {"📂": 0, "🧮": 1, "📊": 2, "📄": 3, "✅": -1}
+        stage_idx = -1
+        for emoji, idx in stage_map.items():
+            if message.startswith(f"[{emoji}]"):
+                stage_idx = idx
+                break
+        # 高亮当前阶段
+        if hasattr(self, '_stage_labels'):
+            for i, lbl in enumerate(self._stage_labels):
+                if i == stage_idx:
+                    lbl.setStyleSheet(
+                        "padding: 2px 6px; font-size: 11px; font-weight: bold;"
+                        "color: #fff; background: #2196F3;"
+                        "border: 1px solid #1976D2; border-radius: 3px;"
+                    )
+                elif i < stage_idx:
+                    lbl.setStyleSheet(
+                        "padding: 2px 6px; font-size: 11px; color: #4CAF50;"
+                        "border: 1px solid #4CAF50; border-radius: 3px;"
+                    )
+                else:
+                    lbl.setStyleSheet(
+                        "padding: 2px 6px; font-size: 11px; color: #888;"
+                        "border: 1px solid #ccc; border-radius: 3px;"
+                    )
         self.ui.lblProgressMsg.setText(f"[{pct}%] {message}")
         from PySide6.QtWidgets import QApplication
         QApplication.processEvents()

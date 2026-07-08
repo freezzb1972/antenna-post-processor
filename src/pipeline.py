@@ -154,7 +154,7 @@ def _process_one_frequency(
     azimuth_config: AzimuthReportConfig = None,
     nh_custom_angles: list[float] | None = None,
     ar_output_db: bool = True,
-    dir_extrap_method: str = "linear",
+    dir_extrap_method: str = "none",
     compute_only: bool = False,
     log_cb=None,
 ) -> dict[str, Any]:
@@ -185,7 +185,7 @@ def _process_one_frequency(
     need_dir_or_eff = ("directivity" in compute_set or "efficiency_pct" in need
                        or "efficiency_db" in compute_set or not need)
     if need_dir_or_eff:
-        if theta_deg[-1] < 175 and theta_extrap_method is None:
+        if theta_deg[-1] < 175 and theta_extrap_method is None and dir_extrap_method != "none":
             # 外推 LogMag 数据到 180° 仅用于 Directivity, 不覆盖原始数据
             ext_th, ext_tl = extrapolate_theta(theta_deg, theta_lm, dir_extrap_method)
             _, ext_pl = extrapolate_theta(theta_deg, phi_lm, dir_extrap_method)
@@ -390,12 +390,11 @@ def _process_one_frequency(
                 rhcp_g, lhcp_g = compute_rhcp_lhcp_gain(theta_lm, tp, phi_lm, pp)
                 cp_xpi = compute_cp_xpi(rhcp_g, lhcp_g)
 
-                if True:  # RHCP single always computed
-                    rhcp_linear = 10.0 ** (rhcp_g / 10.0)  # dB → linear power
-                    for angle, val in compute_lag_at_angles(
-                        rhcp_linear, theta_deg,
-                        (rhcp_lag_config if rhcp_lag_config and not rhcp_lag_config.is_empty() else lag_config).singles_sorted
-                    ).items():
+                if True:  # RHCP single always computed — 与 AR 一致取 φ 最大值
+                    singles = (rhcp_lag_config if rhcp_lag_config and not rhcp_lag_config.is_empty() else lag_config).singles_sorted
+                    for angle in singles:
+                        idx = int(np.argmin(np.abs(theta_deg - angle)))
+                        val = float(np.max(rhcp_g[:, idx]))  # max over φ, same as AR
                         row[f"rhcp_single_{angle}"] = round(val, 6)
                 if (rhcp_lag_config if rhcp_lag_config and not rhcp_lag_config.is_empty() else lag_config).ranges_sorted:
                     for (lo, hi), val in compute_lag_ranges(
@@ -731,7 +730,7 @@ def _load_and_compute(
     azimuth_config: AzimuthReportConfig = None,
     nh_custom_angles: list[float] | None = None,
     ar_output_db: bool = True,
-    dir_extrap_method: str = "linear",
+    dir_extrap_method: str = "none",
     compute_only: bool = False,
     cancel_callback=None,
     progress_callback=None,
@@ -746,14 +745,16 @@ def _load_and_compute(
     if sheet_ar_configs is None:
         sheet_ar_configs = {}
 
-    # 阶段化进度: 读取(15%) → 计算(55%) → 预留导出(30%)
-    _load_weight = max(total, 1)
-    _compute_weight = max(total * 3, 1)
-    progress_max = _load_weight + _compute_weight
+    # 统一进度条: 单次 progress_max 覆盖全部阶段 (读取→计算→Excel→Word)
+    _load_w = max(total, 1)            # 阶段1: 读取源文件
+    _compute_w = max(total * 6, 1)     # 阶段2: 计算 (6x 保证每任务多次更新)
+    _export_w = 10                      # 阶段3: Excel 导出
+    _word_w = 10                        # 阶段4: Word 输出
+    progress_max = _load_w + _compute_w + _export_w + _word_w
 
     # ── 阶段 1: 读取源文件 ──
     _log(log_callback, f"📂 读取 {total} 个频点数据...")
-    _report(progress_callback, 0, progress_max, f"📂 读取源文件 0/{total}")
+    _report(progress_callback, 0, progress_max, f"[📂] 读取源文件 0/{total}")
     compute_tasks = []
     for i, (sheet_name, freq, csv_idx, lag_cfg, task_ds, needed_params) in enumerate(tasks):
         if cancel_callback and cancel_callback():
@@ -762,17 +763,16 @@ def _load_and_compute(
         theta_list = list(task_ds.theta_angles)
         ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
         compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, theta_extrap_method, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, azimuth_config, compute_only))
-        pct = int((i + 1) / _load_weight * 100)
-        _report(progress_callback, i + 1, progress_max, f"📂 读取源文件 {i+1}/{total}")
+        _report(progress_callback, i + 1, progress_max, f"[📂] 读取源文件 {i+1}/{total}")
 
-    data_done = _load_weight
-    _report(progress_callback, data_done, progress_max, f"🧮 计算参数 0/{len(compute_tasks)}")
+    data_done = _load_w
+    _report(progress_callback, data_done, progress_max, f"[🧮] 计算参数 0/{len(compute_tasks)}")
 
     # ── 阶段 2: 计算天线参数 ──
     if parallel > 1 and len(compute_tasks) > 1:
         _log(log_callback, f"并行计算: {parallel} 进程 × {len(compute_tasks)} 频点")
-        chunk_size = max(1, len(compute_tasks) // parallel)
-        chunks = [compute_tasks[i:i + chunk_size] for i in range(0, len(compute_tasks), chunk_size)]
+        # chunk_size=1 → 每任务独立 future, 逐任务报告进度
+        chunks = [compute_tasks[i:i + 1] for i in range(0, len(compute_tasks), 1)]
         with ProcessPoolExecutor(max_workers=parallel) as executor:
             futures = [executor.submit(_compute_chunk, chunk) for chunk in chunks]
             completed = 0
@@ -784,14 +784,15 @@ def _load_and_compute(
                 for sheet_name, row in fut.result():
                     sheet_results[sheet_name].append(row)
                     completed += 1
-                _report(progress_callback, data_done + completed * (max(1, _compute_weight // len(compute_tasks))),
-                        progress_max, f"🧮 计算参数 {completed}/{len(compute_tasks)}")
+                step = data_done + int(_compute_w * completed / len(compute_tasks))
+                _report(progress_callback, step, progress_max,
+                        f"[🧮] 计算参数 {completed}/{len(compute_tasks)}")
     else:
         _run_compute_serial(compute_tasks, sheet_results, data_done, progress_max,
                             cancel_callback, progress_callback, log_cb=log_callback,
                             azimuth_config=azimuth_config,
                             dir_extrap_method=dir_extrap_method,
-                            compute_weight=_compute_weight, compute_total=len(compute_tasks))
+                            compute_weight=_compute_w, compute_total=len(compute_tasks))
 
     return sheet_results
 
@@ -799,7 +800,7 @@ def _load_and_compute(
 def _run_compute_serial(
     compute_tasks, sheet_results, data_done, progress_max,
     cancel_callback, progress_callback, log_cb=None, azimuth_config=None,
-    dir_extrap_method="linear",
+    dir_extrap_method="none",
     compute_weight=None, compute_total=None,
 ):
     """串行逐频点计算（单进程或 parallel=1）。"""
@@ -814,10 +815,10 @@ def _run_compute_serial(
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
-        if (i + 1) % 5 == 0 or (i + 1) == total_tasks:
+        if (i + 1) % 3 == 0 or (i + 1) == total_tasks:
             step = int(cw * (i + 1) / total_tasks)
             _report(progress_callback, data_done + step, progress_max,
-                    f"🧮 计算参数 {i+1}/{total_tasks}")
+                    f"[🧮] 计算参数 {i+1}/{total_tasks}")
 
 
 def _close_datasources(
@@ -862,7 +863,7 @@ def run_pipeline(
     out_word: bool = False,
     out_data: bool = False,
     word_template_path: str | None = None,  # Word 模板路径 (为空则自动生成)
-    dir_extrap_method: str = "linear",  # Directivity 外推方法: linear|constant|mirror
+    dir_extrap_method: str = "none",  # Directivity 外推: none|linear|constant|mirror
     robust_peak: bool = False,
     extra_params: set | None = None,
     nh_custom_angles: list[float] | None = None,
@@ -998,18 +999,18 @@ def run_pipeline(
         _report(progress_callback, 1, 1, "✅ 预览就绪")
         return sheet_results
 
-    # ── 阶段 3: 输出 Excel 天线参数 ──
+    # ── 阶段 3: 输出 Excel 天线参数 (统一 progress_max) ──
     total = len(tasks)
     _load_w = max(total, 1)
-    _compute_w = max(total * 3, 1)
+    _compute_w = max(total * 6, 1)
     _base = _load_w + _compute_w
-    _export_w = 15  # Excel 导出权重
-    _word_w = 15    # Word 导出权重
+    _export_w = 10  # Excel 导出权重
+    _word_w = 10    # Word 导出权重
     progress_max = _base + _export_w + _word_w
 
     if out_excel and output_path:
         _log(log_callback, f"📊 写入 Excel: {output_path}")
-        _report(progress_callback, _base, progress_max, "📊 输出 Excel 天线参数...")
+        _report(progress_callback, _base, progress_max, "[📊] 输出 Excel 天线参数...")
         export_results(
             template_path=template_path,
             output_path=output_path,
@@ -1020,10 +1021,10 @@ def run_pipeline(
             log_callback=log_callback,
             remove_template_sheets=template_sheet_names_to_remove,
         )
-        _report(progress_callback, _base + _export_w, progress_max, "✅ Excel 写入完成")
+        _report(progress_callback, _base + _export_w, progress_max, "[📊] Excel 写入完成")
     elif not out_excel:
         _log(log_callback, "⏭ 跳过天线参数 Excel 输出")
-        _report(progress_callback, _base + _export_w, progress_max, "⏭ 跳过 Excel")
+        _report(progress_callback, _base + _export_w, progress_max, "[📊] 跳过 Excel")
 
     # ---- 4. 完整报告 (可选) ----
     if full_report_path:
@@ -1039,14 +1040,14 @@ def run_pipeline(
 
     # ── 阶段 5: 输出 Word 图表报告 ──
     if out_word or out_data:
-        _report(progress_callback, _base + _export_w, progress_max, "📄 输出 Word 图表报告...")
+        _report(progress_callback, _base + _export_w, progress_max, "[📄] 输出 Word 图表报告...")
         _export_azimuth(sheet_results, azimuth_config, log_callback,
                         out_word=out_word, out_data=out_data,
                         word_template_path=word_template_path,
                         chart_instances=chart_instances)
-        _report(progress_callback, progress_max, progress_max, "✅ 完成")
+        _report(progress_callback, progress_max, progress_max, "[✅] 完成")
     else:
-        _report(progress_callback, progress_max, progress_max, "✅ 完成")
+        _report(progress_callback, progress_max, progress_max, "[✅] 完成")
 
     elapsed = time.time() - t0
     total_rows = sum(len(v) for v in sheet_results.values())
@@ -1152,7 +1153,7 @@ def _export_azimuth(
             "azimuth_polar": "Gain Azimuth Cut",
             "azimuth_polar_pk070": "Gain Azimuth (θ=0°-70°)",
             "azimuth_polar_ar": "AR Azimuth Cut",
-            "azimuth_polar_rhcp": "RHCP Azimuth Cut",
+            "azimuth_polar_rhcp": "RC Azimuth Cut",
             "azimuth_polar_lhcp": "LHCP Azimuth Cut",
         }
         # 尝试精确匹配
@@ -1374,22 +1375,24 @@ def _export_azimuth(
                 def _write_data_sheet(wb, sheet_name, freq_data):
                     """在 workbook 中添加一个数据 sheet (每频点一个 block)。"""
                     ws = wb.create_sheet(sheet_name[:31])
+                    next_row = 1
                     for freq_mhz, theta_data in freq_data:
                         sorted_thetas = sorted(theta_data.keys())
                         n_phi = len(next(iter(theta_data.values())))
-                        ws.cell(row=ws.max_row + 1 if ws.max_row else 1, column=1,
+                        ws.cell(row=next_row, column=1,
                                 value=f"Frequency: {freq_mhz:.1f} MHz")
-                        r0 = ws.max_row + 1
+                        next_row += 1
+                        r0 = next_row
                         ws.cell(row=r0, column=1, value="Theta (°) \\ Phi (°)")
                         for pi in range(n_phi):
                             ws.cell(row=r0, column=pi + 2, value=pi)
                         for ti, theta_val in enumerate(sorted_thetas):
-                            row = r0 + 1 + ti
-                            ws.cell(row=row, column=1, value=f"{theta_val:.1f}")
+                            crow = r0 + 1 + ti
+                            ws.cell(row=crow, column=1, value=f"{theta_val:.1f}")
                             for pi in range(n_phi):
-                                ws.cell(row=row, column=pi + 2,
+                                ws.cell(row=crow, column=pi + 2,
                                         value=round(float(theta_data[theta_val][pi]), 6))
-                        ws.max_row = r0 + len(sorted_thetas)
+                        next_row = r0 + len(sorted_thetas) + 1
 
                 try:
                     import openpyxl as _xl
