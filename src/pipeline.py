@@ -855,6 +855,22 @@ def _close_datasources(
 
 
 # ---------------------------------------------------------------------------
+# 无模板时的数据源推导
+# ---------------------------------------------------------------------------
+
+def _build_sheets_from_datasource(
+    datasource_map: dict[str, DataSource],
+) -> list[SheetInfo]:
+    """无模板时从数据源构建最小 SheetInfo 列表。"""
+    from .excel_reader import SheetInfo
+    sheets = []
+    for name, ds in datasource_map.items():
+        freqs = sorted(set(ds.frequencies()))
+        sheets.append(SheetInfo(name=name, frequencies=freqs))
+    return sheets
+
+
+# ---------------------------------------------------------------------------
 # 主管线
 # ---------------------------------------------------------------------------
 
@@ -925,11 +941,17 @@ def run_pipeline(
         raise ValueError("必须提供 datasource 或 datasource_map")
     use_multi_ds = datasource_map is not None
 
-    # ---- 1. 读取模板 + LAG ----
-    _log(log_callback, f"读取模板: {template_path}")
-    sheets_info = read_template(template_path)
-    for si in sheets_info:
-        _log(log_callback, f"  {si.name}: {len(si.frequencies)} 频点")
+    # ---- 1. 读取模板 (无模板时从数据源推导) ----
+    if template_path and os.path.exists(template_path):
+        _log(log_callback, f"读取模板: {template_path}")
+        sheets_info = read_template(template_path)
+        for si in sheets_info:
+            _log(log_callback, f"  {si.name}: {len(si.frequencies)} 频点")
+    else:
+        _log(log_callback, "无模板 — 从数据源推导频点")
+        sheets_info = _build_sheets_from_datasource(datasource_map or {"default": datasource})
+        for si in sheets_info:
+            _log(log_callback, f"  {si.name}: {len(si.frequencies)} 频点")
 
     # ---- 1.5: 自动扩增工作表 (模板 sheet 数 < 数据源数, 或文件名模式) ----
     template_sheet_names_to_remove: list[str] | None = None
