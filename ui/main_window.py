@@ -256,16 +256,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             fname = TM.next_available_filename(out_dir, src_name)
             self.ui.editOutputName.setText(fname)
 
-        # 同步启动默认值到 azimuth_config
-        az = getattr(self, '_azimuth_config', None)
-        if az:
-            d = self.ui.editOutputDir.text().strip()
-            n = self.ui.editOutputName.text().strip()
-            if d and not az.excel_output_dir:
-                az.excel_output_dir = d
-            if n and not az.excel_output_filename:
-                az.excel_output_filename = n
-
         # 模板预设管理已移至「文件→系统设置」对话框
 
 
