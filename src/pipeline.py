@@ -462,13 +462,15 @@ def _process_one_frequency(
                 if ccfg.pattern_3d_ephi:
                     extra_patterns["3d_ephi"] = phi_lm
                 extra_patterns = extra_patterns if extra_patterns else None
-                # RHCP/LHCP 增益矩阵 (供方位图)
+                # RHCP/LHCP/CP-XPI 矩阵 (供切面图)
                 rhcp_db = row.get("_rhcp_gain")
                 lhcp_db = row.get("_lhcp_gain")
+                cpxpi_db = row.get("_cp_xpi")
                 images = generate_all_for_frequency(
                     theta_deg, phi_angles, gain_dbi,
                     freq, ccfg, ar_linear=ar_lin,
                     rhcp_db=rhcp_db, lhcp_db=lhcp_db,
+                    cpxpi_db=cpxpi_db,
                     antenna_name="",
                     azimuth_config=azimuth_config,
                     extra_patterns=extra_patterns,

@@ -115,6 +115,29 @@ class BaseRenderer(ABC):
         ...
 
     @abstractmethod
+    def render_azimuth_rect(
+        self,
+        phi_deg: np.ndarray,
+        values: np.ndarray,
+        freq_mhz: float,
+        *,
+        ylabel: str = "Gain (dBi)",
+        dpi: int = 150,
+        antenna_name: str = "",
+        cut_label: str = "",
+    ) -> io.BytesIO:
+        """2D 直角坐标方位面切面图 (Theta 切 — 固定 θ, 扫描 φ)。
+
+        Args:
+            phi_deg: Phi 角度数组 (°)，作为 X 轴。
+            values: 每个 phi 角度对应的参数值。
+            freq_mhz: 频率 (MHz)。
+            ylabel: Y 轴标签。
+            dpi: 图像分辨率。
+        """
+        ...
+
+    @abstractmethod
     def render_gain_vs_theta(
         self,
         theta_deg: np.ndarray,
@@ -243,14 +266,27 @@ class MatplotlibRenderer(BaseRenderer):
         cut_label: str = "",
         dpi: int = 150,
         antenna_name: str = "",
+        ylabel: str = "Gain (dBi)",
+        mirror_angles_deg: np.ndarray | None = None,
+        mirror_gain_dbi: np.ndarray | None = None,
     ) -> io.BytesIO:
-        """2D 极坐标切面图。"""
+        """2D 极坐标切面图。
+
+        若提供 mirror_angles_deg 和 mirror_gain_dbi，则绘制 Phi+180°
+        切面的镜像曲线，形成完整的 360° 极坐标图形。
+        """
         theta_rad = np.deg2rad(angles_deg)
         fig, ax = plt.subplots(subplot_kw={"projection": "polar"},
                                dpi=dpi, figsize=(7, 6))
 
         ax.plot(theta_rad, gain_dbi, "b-", linewidth=1.2)
         ax.fill(theta_rad, gain_dbi, alpha=0.1, color="blue")
+
+        # Phi+180° 镜像曲线: 绘于负 theta 半区 (左半平面)
+        if mirror_angles_deg is not None and mirror_gain_dbi is not None:
+            mirror_rad = np.deg2rad(mirror_angles_deg)
+            ax.plot(mirror_rad, mirror_gain_dbi, "b-", linewidth=1.2)
+            ax.fill(mirror_rad, mirror_gain_dbi, alpha=0.08, color="blue")
 
         ax.set_theta_zero_location("N")
         ax.set_theta_direction(-1)
@@ -268,7 +304,7 @@ class MatplotlibRenderer(BaseRenderer):
 
         _setup_polar_radial_ticks(ax)
 
-        ax.set_ylabel("Gain (dBi)", fontsize=10, labelpad=20)
+        ax.set_ylabel(ylabel, fontsize=10, labelpad=20)
         ax.grid(True, alpha=0.4)
 
         fig.tight_layout(pad=1.5)
@@ -284,6 +320,7 @@ class MatplotlibRenderer(BaseRenderer):
         cut_label: str = "",
         dpi: int = 150,
         antenna_name: str = "",
+        ylabel: str = "Gain (dBi)",
     ) -> io.BytesIO:
         """2D 直角坐标切面图。"""
         fig, ax = plt.subplots(dpi=dpi, figsize=(8, 5))
@@ -293,7 +330,40 @@ class MatplotlibRenderer(BaseRenderer):
                         alpha=0.08, color="blue")
 
         ax.set_xlabel(xlabel, fontsize=10)
-        ax.set_ylabel("Gain (dBi)", fontsize=10)
+        ax.set_ylabel(ylabel, fontsize=10)
+        ax.grid(True, alpha=0.3)
+
+        title_parts = []
+        if antenna_name:
+            title_parts.append(antenna_name)
+        title_parts.append(f"{freq_mhz:.0f} MHz")
+        if cut_label:
+            title_parts.append(cut_label)
+        ax.set_title(" — ".join(title_parts), fontsize=12)
+
+        fig.tight_layout(pad=1.2)
+        return _fig_to_png_buffer(fig, dpi)
+
+    def render_azimuth_rect(
+        self,
+        phi_deg: np.ndarray,
+        values: np.ndarray,
+        freq_mhz: float,
+        *,
+        ylabel: str = "Gain (dBi)",
+        dpi: int = 150,
+        antenna_name: str = "",
+        cut_label: str = "",
+    ) -> io.BytesIO:
+        """2D 直角坐标方位面切面图 (Theta 切 — 固定 θ, 扫描 φ)。"""
+        fig, ax = plt.subplots(dpi=dpi, figsize=(8, 5))
+
+        ax.plot(phi_deg, values, "b-", linewidth=1.2)
+        ax.fill_between(phi_deg, values, values.min() - 5,
+                        alpha=0.08, color="blue")
+
+        ax.set_xlabel("Phi (deg)", fontsize=10)
+        ax.set_ylabel(ylabel, fontsize=10)
         ax.grid(True, alpha=0.3)
 
         title_parts = []
@@ -625,7 +695,10 @@ def _setup_polar_radial_ticks(ax):
     elif r <= 5: step = 5 * mag
     else: step = 10 * mag
 
-    inner = int(np.floor(vmin / step)) * step
+    # 动态内缩: max(span×5%, step) 防止低值曲线贴中心
+    span = vmax - vmin
+    pad = max(span * 0.05, step)
+    inner = int(np.floor((vmin - pad) / step)) * step
     outer = int(np.ceil(vmax / step)) * step
 
     ticks = [inner]
@@ -761,14 +834,22 @@ class CloudRenderer(BaseRenderer):
              "title": title, "antenna_name": antenna_name, "colormap": colormap})
 
     def render_2d_polar(self, angles_deg, gain_dbi, freq_mhz,
-                        *, cut_label="", dpi=150, antenna_name=""):
+                        *, cut_label="", dpi=150, antenna_name="",
+                        mirror_angles_deg=None, mirror_gain_dbi=None):
+        kwargs = {"cut_label": cut_label, "dpi": dpi, "antenna_name": antenna_name}
+        fallback_args = (angles_deg, gain_dbi, freq_mhz)
+        if mirror_angles_deg is not None:
+            kwargs["mirror_angles_deg"] = mirror_angles_deg
+            kwargs["mirror_gain_dbi"] = mirror_gain_dbi
+            fallback_args = (angles_deg, gain_dbi, freq_mhz,
+                             mirror_angles_deg, mirror_gain_dbi)
         return self._render_remote_or_fallback(
             "render_2d_polar", "/api/v1/render/2d/polar",
             {"angles": angles_deg.tolist(), "gain": gain_dbi.tolist(),
              "freq_mhz": freq_mhz, "cut_label": cut_label, "dpi": dpi,
              "antenna_name": antenna_name},
-            (angles_deg, gain_dbi, freq_mhz),
-            {"cut_label": cut_label, "dpi": dpi, "antenna_name": antenna_name})
+            fallback_args,
+            kwargs)
 
     def render_2d_rect(self, angles_deg, gain_dbi, freq_mhz,
                        *, xlabel="Theta (deg)", cut_label="", dpi=150,
@@ -793,6 +874,18 @@ class CloudRenderer(BaseRenderer):
              "dpi": dpi, "ylabel": ylabel},
             (phi_deg, curves, freq_mhz),
             {"antenna_name": antenna_name, "dpi": dpi, "ylabel": ylabel})
+
+    def render_azimuth_rect(self, phi_deg, values, freq_mhz, *,
+                             ylabel="Gain (dBi)", dpi=150,
+                             antenna_name="", cut_label=""):
+        return self._render_remote_or_fallback(
+            "render_azimuth_rect", "/api/v1/render/2d/azimuth_rect",
+            {"phi": phi_deg.tolist(), "values": values.tolist(),
+             "freq_mhz": freq_mhz, "antenna_name": antenna_name,
+             "dpi": dpi, "ylabel": ylabel, "cut_label": cut_label},
+            (phi_deg, values, freq_mhz),
+            {"ylabel": ylabel, "dpi": dpi, "antenna_name": antenna_name,
+             "cut_label": cut_label})
 
     def render_gain_vs_theta(self, theta_deg, values, freq_mhz, *,
                               antenna_name="", dpi=150, ylabel="Gain (dBi)"):

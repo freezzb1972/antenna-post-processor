@@ -2980,9 +2980,9 @@ class ChartSettingsPage(QWidget):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
-                elif key in ("cut_2d_polar", "cut_2d_rect"):
+                elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
-                    btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
+                    btn.clicked.connect(lambda checked: self._show_cut_param_dialog())
                     row.addWidget(btn)
                 row.addStretch()
                 cat_left_ly.addLayout(row)
@@ -3023,9 +3023,9 @@ class ChartSettingsPage(QWidget):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
-                elif key in ("cut_2d_polar", "cut_2d_rect"):
+                elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
-                    btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
+                    btn.clicked.connect(lambda checked: self._show_cut_param_dialog())
                     row.addWidget(btn)
                 row.addStretch()
                 cat_right_ly.addLayout(row)
@@ -3658,9 +3658,9 @@ class ChartSettingsPage(QWidget):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
-                elif key in ("cut_2d_polar", "cut_2d_rect"):
+                elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
-                    btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
+                    btn.clicked.connect(lambda checked: self._show_cut_param_dialog())
                     row.addWidget(btn)
                 row.addStretch(); cat_left_ly.addLayout(row)
             if "C 类" in cat_name:
@@ -3701,9 +3701,9 @@ class ChartSettingsPage(QWidget):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
                     row.addWidget(btn)
-                elif key in ("cut_2d_polar", "cut_2d_rect"):
+                elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
-                    btn.clicked.connect(lambda checked: self._show_2d_phi_angle_popup())
+                    btn.clicked.connect(lambda checked: self._show_cut_param_dialog())
                     row.addWidget(btn)
                 row.addStretch(); cat_right_ly.addLayout(row)
             if "C 类" in cat_name:
@@ -4035,6 +4035,83 @@ class ChartSettingsPage(QWidget):
         btns.rejected.connect(dlg.reject)
         layout.addWidget(btns)
         dlg.exec()
+
+    def _show_cut_param_dialog(self):
+        """2D 切面图统一参数弹窗: 多参数选择 + Phi/Theta 角度 + DPI。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("2D 切面图参数"))
+        dlg.setMinimumSize(400, 280)
+        layout = QVBoxLayout(dlg)
+
+        # ── 当前状态 ──
+        current = getattr(self._mw, '_chart_config_required', None) if self._mw else None
+
+        # ── 参数选择 ──
+        param_grp = QGroupBox(self.tr("天线参数"))
+        param_layout = QVBoxLayout(param_grp)
+        param_names = [
+            ("gain", "Gain"), ("ar", "AR"), ("rhcp", "RHCP"),
+            ("lhcp", "LHCP"), ("cpxpi", "CP-XPI"),
+        ]
+        param_cbs = {}
+        current_params = getattr(current, 'cut_2d_params', {"gain"}) if current else {"gain"}
+        for key, label in param_names:
+            cb = QCheckBox(self.tr(label))
+            cb.setChecked(key in current_params)
+            param_cbs[key] = cb
+            param_layout.addWidget(cb)
+        layout.addWidget(param_grp)
+
+        # ── Phi 角度 (俯仰面) ──
+        phi_row = QHBoxLayout()
+        phi_row.addWidget(QLabel(self.tr("俯仰面 Phi 角度 (°):")))
+        phi_cfg = getattr(current, 'cut_2d_phi_angles', []) if current else []
+        phi_defaults = ", ".join(str(a) for a in phi_cfg) if phi_cfg else "0, 90"
+        edit_phi = QLineEdit(phi_defaults)
+        edit_phi.setPlaceholderText("0, 90")
+        phi_row.addWidget(edit_phi)
+        layout.addLayout(phi_row)
+
+        # ── Theta 角度 (方位面) ──
+        theta_row = QHBoxLayout()
+        theta_row.addWidget(QLabel(self.tr("方位面 Theta 角度 (°):")))
+        theta_cfg = getattr(current, 'cut_2d_theta_angles', []) if current else []
+        theta_defaults = ", ".join(str(a) for a in theta_cfg) if theta_cfg else "30, 60"
+        edit_theta = QLineEdit(theta_defaults)
+        edit_theta.setPlaceholderText("30, 60")
+        theta_row.addWidget(edit_theta)
+        layout.addLayout(theta_row)
+
+        # ── DPI ──
+        dpi_row = QHBoxLayout()
+        dpi_row.addWidget(QLabel(self.tr("DPI:")))
+        spin_dpi = QSpinBox()
+        spin_dpi.setRange(72, 600)
+        spin_dpi.setValue(getattr(current, 'dpi', 150) if current else 150)
+        dpi_row.addWidget(spin_dpi)
+        dpi_row.addStretch()
+        layout.addLayout(dpi_row)
+
+        # ── 按钮 ──
+        def _parse_angles(text: str) -> list[float]:
+            try:
+                return [float(x.strip()) for x in text.split(",") if x.strip()]
+            except ValueError:
+                return []
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(lambda: (
+            setattr(self, '_cut_2d_params', {k for k, cb in param_cbs.items() if cb.isChecked()}),
+            setattr(self, '_cut_2d_phi_angles', _parse_angles(edit_phi.text())),
+            setattr(self, '_cut_2d_theta_angles', _parse_angles(edit_theta.text())),
+            setattr(self, '_dpi', spin_dpi.value()),
+            self._sync_to_mw(),
+            dlg.accept(),
+        ))
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
+
     def _show_2d_phi_angle_popup(self):
         """弹出 2D 俯仰面切面 Phi 角度选择窗口 — 图表列表模式（每 phi = 一个图表）。"""
         import copy

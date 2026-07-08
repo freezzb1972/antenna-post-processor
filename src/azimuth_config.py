@@ -24,6 +24,8 @@ class AzimuthReportConfig:
     cut_azimuth_polar_ar: bool = False       # AR   方位面极坐标切面
     cut_azimuth_polar_rhcp: bool = False     # RHCP 方位面极坐标切面
     cut_azimuth_polar_lhcp: bool = False     # LHCP 方位面极坐标切面
+    cut_azimuth_polar_cpxpi: bool = False    # CP-XPI 方位面极坐标切面
+    cut_azimuth_rect: bool = False           # 方位面直角坐标切面
     azimuth_cut_angles: list = field(default_factory=list)      # Gain 图表列表 (list-of-lists 每子列表=一个图表)
     azimuth_cut_angles_ar: list = field(default_factory=list)   # AR  图表列表
     azimuth_cut_angles_rhcp: list = field(default_factory=list) # RHCP 图表列表
@@ -74,9 +76,10 @@ class AzimuthReportConfig:
     @property
     def has_any_azimuth(self) -> bool:
         """是否启用了任一 azimuth 切面。"""
-        return self.cut_azimuth_polar or self.cut_azimuth_polar_pk070 \
-            or self.cut_azimuth_polar_ar \
-            or self.cut_azimuth_polar_rhcp or self.cut_azimuth_polar_lhcp
+        return (self.cut_azimuth_polar or self.cut_azimuth_polar_pk070
+                or self.cut_azimuth_polar_ar
+                or self.cut_azimuth_polar_rhcp or self.cut_azimuth_polar_lhcp
+                or self.cut_azimuth_polar_cpxpi or self.cut_azimuth_rect)
 
     @property
     def has_both(self) -> bool:
@@ -166,6 +169,8 @@ class AzimuthReportConfig:
             "cut_azimuth_polar_ar": self.cut_azimuth_polar_ar,
             "cut_azimuth_polar_rhcp": self.cut_azimuth_polar_rhcp,
             "cut_azimuth_polar_lhcp": self.cut_azimuth_polar_lhcp,
+            "cut_azimuth_polar_cpxpi": self.cut_azimuth_polar_cpxpi,
+            "cut_azimuth_rect": self.cut_azimuth_rect,
             "azimuth_cut_angles": self.azimuth_cut_angles,
             "azimuth_cut_angles_ar": self.azimuth_cut_angles_ar,
             "azimuth_cut_angles_rhcp": self.azimuth_cut_angles_rhcp,
@@ -200,6 +205,8 @@ class AzimuthReportConfig:
             cut_azimuth_polar_ar=bool(d.get("cut_azimuth_polar_ar", False)),
             cut_azimuth_polar_rhcp=bool(d.get("cut_azimuth_polar_rhcp", False)),
             cut_azimuth_polar_lhcp=bool(d.get("cut_azimuth_polar_lhcp", False)),
+            cut_azimuth_polar_cpxpi=bool(d.get("cut_azimuth_polar_cpxpi", False)),
+            cut_azimuth_rect=bool(d.get("cut_azimuth_rect", False)),
             azimuth_cut_angles=list(d.get("azimuth_cut_angles", [])),
             azimuth_cut_angles_ar=list(d.get("azimuth_cut_angles_ar", [])),
             azimuth_cut_angles_rhcp=list(d.get("azimuth_cut_angles_rhcp", [])),
@@ -237,6 +244,8 @@ class AzimuthReportConfig:
             cut_azimuth_polar_ar=self.cut_azimuth_polar_ar or other.cut_azimuth_polar_ar,
             cut_azimuth_polar_rhcp=self.cut_azimuth_polar_rhcp or other.cut_azimuth_polar_rhcp,
             cut_azimuth_polar_lhcp=self.cut_azimuth_polar_lhcp or other.cut_azimuth_polar_lhcp,
+            cut_azimuth_polar_cpxpi=self.cut_azimuth_polar_cpxpi or other.cut_azimuth_polar_cpxpi,
+            cut_azimuth_rect=self.cut_azimuth_rect or other.cut_azimuth_rect,
             azimuth_cut_angles=sorted(set(_flatten(self.azimuth_cut_angles) + _flatten(other.azimuth_cut_angles))),
             azimuth_cut_angles_ar=sorted(set(_flatten(self.azimuth_cut_angles_ar) + _flatten(other.azimuth_cut_angles_ar))),
             azimuth_cut_angles_rhcp=sorted(set(_flatten(self.azimuth_cut_angles_rhcp) + _flatten(other.azimuth_cut_angles_rhcp))),

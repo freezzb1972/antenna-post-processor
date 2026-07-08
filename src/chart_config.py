@@ -99,7 +99,7 @@ def auto_detect_charts(template_params: set) -> dict[str, bool]:
         if col_type in template_params:
             for ck in chart_keys.split("|"):
                 result[ck.strip()] = True
-    # C 类切面图: 只要有 Gain 或 AR 就启用俯仰面切面
+    # C 类切面图: 只要有 Gain 或 AR 就启用 (默认只 Gain 参数)
     if "gain" in template_params or "ar_single" in template_params or "ar_range" in template_params:
         result["cut_2d_polar"] = True
         result["cut_2d_rect"] = True
@@ -138,10 +138,14 @@ class ChartConfig:
     ar_chart_angles: list[float] = field(default_factory=list)     # AR 指定 θ 单角度
     ar_chart_ranges: list[tuple] = field(default_factory=list)     # AR 指定 θ 范围
 
-    # C 类: 俯仰面切面
+    # C 类: 2D 切面 (俯仰面 + 方位面)
     cut_2d_polar: bool = False
     cut_2d_rect: bool = False
-    cut_2d_phi_angles: list[float] = field(default_factory=list)  # 选定 Phi 切面角度 (°)
+    cut_azimuth_polar: bool = False      # 方位面极坐标 (与 azimuth_config 独立)
+    cut_azimuth_rect: bool = False       # 方位面直角坐标
+    cut_2d_phi_angles: list[float] = field(default_factory=list)    # 俯仰面 Phi 角度 (°)
+    cut_2d_theta_angles: list[float] = field(default_factory=list)  # 方位面 Theta 角度 (°)
+    cut_2d_params: set = field(default_factory=lambda: {"gain"})    # 启用的参数: "gain"|"ar"|"rhcp"|"lhcp"|"cpxpi"
 
     # 视角参数
     elev: float = 30.0
@@ -172,7 +176,8 @@ class ChartConfig:
 
     @property
     def has_any_c_class(self) -> bool:
-        return self.cut_2d_polar or self.cut_2d_rect
+        return (self.cut_2d_polar or self.cut_2d_rect or
+                self.cut_azimuth_polar or self.cut_azimuth_rect)
 
     @property
     def has_any_pattern_or_cut(self) -> bool:
@@ -189,6 +194,7 @@ class ChartConfig:
             "chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
             "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp",
             "chart_ar_freq", "cut_2d_polar", "cut_2d_rect",
+            "cut_azimuth_polar", "cut_azimuth_rect",
         ]
         merged = ChartConfig(
             elev=self.elev, azim=self.azim, dpi=self.dpi,
@@ -203,6 +209,10 @@ class ChartConfig:
         )
         for f in fields:
             setattr(merged, f, getattr(self, f) or getattr(other, f))
+        # 合并角度 + 参数选择
+        merged.cut_2d_phi_angles = list(set(self.cut_2d_phi_angles + other.cut_2d_phi_angles))
+        merged.cut_2d_theta_angles = list(set(self.cut_2d_theta_angles + other.cut_2d_theta_angles))
+        merged.cut_2d_params = self.cut_2d_params | other.cut_2d_params
         return merged
 
     # ── 工厂方法 ──
@@ -307,6 +317,7 @@ class ChartConfig:
             "chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
             "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp",
             "chart_ar_freq", "cut_2d_polar", "cut_2d_rect",
+            "cut_azimuth_polar", "cut_azimuth_rect",
         ]
 
     @classmethod
@@ -358,6 +369,8 @@ class ChartConfig:
             "chart_ar_freq": "AR vs 频率",
             "cut_2d_polar": "极坐标俯仰面切面图",
             "cut_2d_rect": "直角坐标俯仰面切面图",
+            "cut_azimuth_polar": "极坐标方位面切面图",
+            "cut_azimuth_rect": "直角坐标方位面切面图",
         }
 
     @classmethod
@@ -381,8 +394,8 @@ class ChartConfig:
         elif mode == 1:
             vs_freq.append("chart_trp_freq")
 
-        # 2D 切面图: 共用
-        cuts = ["cut_2d_polar", "cut_2d_rect"]
+        # 2D 切面图: 俯仰面 + 方位面
+        cuts = ["cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"]
 
         return {
             "A 类: 3D 方向图": pattern_3d,

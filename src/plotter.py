@@ -180,6 +180,7 @@ def generate_all_for_frequency(
     ar_linear: np.ndarray | None = None,
     rhcp_db: np.ndarray | None = None,
     lhcp_db: np.ndarray | None = None,
+    cpxpi_db: np.ndarray | None = None,
     antenna_name: str = "",
     azimuth_config: AzimuthReportConfig | None = None,
     extra_patterns: dict[str, np.ndarray] = None,
@@ -269,37 +270,33 @@ def generate_all_for_frequency(
                 colormap="emquest",
             )
 
-    # ── C 类: 俯仰面切面图 ──
-    if chart_config.cut_2d_polar or chart_config.cut_2d_rect:
-        n_phi = len(phi_deg)
-        if n_phi > 0:
-            # 选定 Phi 角度（默认 0° 和 90°）
-            phi_angles = list(chart_config.cut_2d_phi_angles) if chart_config.cut_2d_phi_angles else [0.0, 90.0]
+    # ── C 类: 2D 切面图 (俯仰面 + 方位面, 统一使用 cut_param) ──
+    from .cut_param import build_cut_params, render_phi_cuts, render_theta_cuts
 
-            for phi_deg_target in sorted(set(phi_angles)):
-                # 找最近 phi 索引
-                phi_idx = int(np.argmin(np.abs(phi_deg - phi_deg_target)))
-                nearest_phi = float(phi_deg[phi_idx])
-                cut_label = f"φ={nearest_phi:.0f}°"
-                cut_gain = gain_dbi[phi_idx, :]
+    # 构建数据映射
+    ar_db_vals = (20.0 * np.log10(np.maximum(ar_linear, 1e-15))
+                  if ar_linear is not None else None)
+    data_map = {
+        "gain_dbi": gain_dbi,
+        "ar_db": ar_db_vals,
+        "rhcp_db": rhcp_db,
+        "lhcp_db": lhcp_db,
+        "cp_xpi": cpxpi_db,
+    }
 
-                if chart_config.cut_2d_polar:
-                    key = f"2d_polar_phi{nearest_phi:.0f}"
-                    images[key] = _renderer.render_2d_polar(
-                        theta_deg, cut_gain, freq_mhz,
-                        cut_label=cut_label, dpi=chart_config.dpi,
-                        antenna_name=antenna_name,
-                    )
+    # 俯仰面切面 (Phi 切 → 扫描 Theta)
+    phi_angles = (list(chart_config.cut_2d_phi_angles) if chart_config.cut_2d_phi_angles
+                  else [0.0, 90.0])
+    theta_cut_angles = (list(chart_config.cut_2d_theta_angles) if chart_config.cut_2d_theta_angles
+                        else [30.0, 60.0])
+    params = build_cut_params(chart_config.cut_2d_params, data_map,
+                              phi_angles=phi_angles, theta_angles=theta_cut_angles)
+    images.update(render_phi_cuts(params, theta_deg, phi_deg, freq_mhz,
+                                  chart_config, _renderer))
+    images.update(render_theta_cuts(params, theta_deg, phi_deg, freq_mhz,
+                                    chart_config, azimuth_config, _renderer))
 
-                if chart_config.cut_2d_rect:
-                    key = f"2d_rect_phi{nearest_phi:.0f}"
-                    images[key] = _renderer.render_2d_rect(
-                        theta_deg, cut_gain, freq_mhz,
-                        xlabel="Theta (deg)", cut_label=cut_label,
-                        dpi=chart_config.dpi, antenna_name=antenna_name,
-                    )
-
-    # ── 方位面极坐标切面图 (Gain + AR) ──
+    # ── 方位面极坐标切面 (azimuth_config 独立控制, 保持向后兼容) ──
     if azimuth_config is not None and azimuth_config.has_any_azimuth:
         az_antenna = azimuth_config.antenna_name or antenna_name
         az_dpi = azimuth_config.dpi or getattr(chart_config, 'dpi', 100)
@@ -313,78 +310,37 @@ def generate_all_for_frequency(
                     title=title or f"{freq_mhz:.0f}MHz - {ylabel}",
                 )
 
-        # 共享刻度: 预计算 combined ticks
-        shared_ticks = None
-        if (azimuth_config.cut_azimuth_polar and azimuth_config.cut_azimuth_polar_pk070
-                and azimuth_config.share_radial_ticks):
-            mask070 = theta_deg <= 70.1
-            pk_070 = np.max(gain_dbi[:, mask070], axis=1)
-            vmin = min(np.min(gain_dbi[:, mask070]), np.min(pk_070))
-            vmax = max(np.max(gain_dbi[:, mask070]), np.max(pk_070))
-            # 调用 Heckbert 算刻度
-            from .renderer import _setup_polar_radial_ticks
-            import matplotlib; matplotlib.use('Agg')
-            import matplotlib.pyplot as _plt
-            _fig, _ax = _plt.subplots(subplot_kw={"projection": "polar"})
-            _ax.set_ylim(vmin, vmax)
-            _setup_polar_radial_ticks(_ax)
-            shared_ticks = list(_ax.get_yticks())
-            _plt.close(_fig)
-
         if azimuth_config.cut_azimuth_polar:
-            charts = azimuth_config.angle_charts
-            for ci, angles in enumerate(charts):
-                key = "azimuth_polar" if len(charts) == 1 else f"azimuth_polar_{ci}"
-                label = "Gain (dBi)"
-                _render_azimuth(gain_dbi, sorted(set(angles)), key, label,
-                               title=f"{freq_mhz:.0f}MHz - {label}")
+            for ci, angles in enumerate(azimuth_config.angle_charts):
+                key = "azimuth_polar" if len(azimuth_config.angle_charts) == 1 else f"azimuth_polar_{ci}"
+                _render_azimuth(gain_dbi, sorted(set(angles)), key, "Gain (dBi)")
         if azimuth_config.cut_azimuth_polar_pk070:
             try:
                 mask = theta_deg <= 70.1
                 pk_070 = np.max(gain_dbi[:, mask], axis=1)
-                t = f"{freq_mhz:.0f}MHz - Gain (dBi) Theta 0°-70° (step=1°)"
-                curves_070 = [(70.0, pk_070)]
                 images["azimuth_polar_pk070"] = _renderer.render_azimuth_polar(
-                    phi_deg, curves_070, freq_mhz,
-                    antenna_name=az_antenna, dpi=az_dpi,
-                    ylabel="Gain (dBi)", title=t,
+                    phi_deg, [(70.0, pk_070)], freq_mhz,
+                    antenna_name=az_antenna, dpi=az_dpi, ylabel="Gain (dBi)",
+                    title=f"{freq_mhz:.0f}MHz - Gain (dBi) Theta 0°-70°",
                 )
             except Exception:
                 pass
-        # 应用共享刻度
-        if shared_ticks and azimuth_config.cut_azimuth_polar_pk070:
-            gain_keys = [k for k in images if k.startswith("azimuth_polar") and k != "azimuth_polar_pk070"]
-            gain_keys.append("azimuth_polar_pk070")
-            pk_key_ready = "azimuth_polar_pk070" in images
-            if gain_keys and pk_key_ready:
-                from io import BytesIO
-                for key in gain_keys:
-                    if key == "azimuth_polar_pk070":
-                        curves_src = [(70.0, np.max(gain_dbi[:, theta_deg <= 70.1], axis=1))]
-                        t = f"{freq_mhz:.0f}MHz - Gain (dBi) Theta 0°-70° (step=1°)"
-                    else:
-                        ci = 0 if key == "azimuth_polar" else int(key.rsplit("_", 1)[-1])
-                        charts = azimuth_config.angle_charts
-                        angles = charts[ci] if ci < len(charts) else charts[0]
-                        curves_src = _build_azimuth_curves(theta_deg, gain_dbi, sorted(set(angles)), len(phi_deg))
-                        t = f"{freq_mhz:.0f}MHz - Gain (dBi)"
-                    images[key] = _renderer.render_azimuth_polar(
-                        phi_deg, curves_src, freq_mhz,
-                        antenna_name=az_antenna, dpi=az_dpi, ylabel="Gain (dBi)",
-                        title=t, ticks_override=shared_ticks,
-                    )
         if azimuth_config.cut_azimuth_polar_ar and ar_linear is not None:
-            ar_db_vals = 20.0 * np.log10(np.maximum(ar_linear, 1e-15))
+            ar_db = 20.0 * np.log10(np.maximum(ar_linear, 1e-15))
             for ci, angles in enumerate(azimuth_config.angle_charts_ar):
                 key = "azimuth_polar_ar" if len(azimuth_config.angle_charts_ar) == 1 else f"azimuth_polar_ar_{ci}"
-                _render_azimuth(ar_db_vals, sorted(set(angles)), key, "AR (dB)")
+                _render_azimuth(ar_db, sorted(set(angles)), key, "AR (dB)")
         if azimuth_config.cut_azimuth_polar_rhcp and rhcp_db is not None:
             for ci, angles in enumerate(azimuth_config.angle_charts_rhcp):
                 key = "azimuth_polar_rhcp" if len(azimuth_config.angle_charts_rhcp) == 1 else f"azimuth_polar_rhcp_{ci}"
-                _render_azimuth(rhcp_db, sorted(set(angles)), key, "RHCP (dB)")
+                _render_azimuth(rhcp_db, sorted(set(angles)), key, "RC (dB)")
         if azimuth_config.cut_azimuth_polar_lhcp and lhcp_db is not None:
             for ci, angles in enumerate(azimuth_config.angle_charts_lhcp):
                 key = "azimuth_polar_lhcp" if len(azimuth_config.angle_charts_lhcp) == 1 else f"azimuth_polar_lhcp_{ci}"
                 _render_azimuth(lhcp_db, sorted(set(angles)), key, "LHCP (dB)")
+        if azimuth_config.cut_azimuth_polar_cpxpi and cpxpi_db is not None:
+            for ci, angles in enumerate(getattr(azimuth_config, 'angle_charts_cpxpi', azimuth_config.angle_charts)):
+                key = "azimuth_polar_cpxpi" if ci == 0 else f"azimuth_polar_cpxpi_{ci}"
+                _render_azimuth(cpxpi_db, sorted(set(angles)), key, "CP-XPI (dB)")
 
     return images
