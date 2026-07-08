@@ -138,6 +138,9 @@ class ChartConfig:
     ar_chart_angles: list[float] = field(default_factory=list)     # AR 指定 θ 单角度
     ar_chart_ranges: list[tuple] = field(default_factory=list)     # AR 指定 θ 范围
 
+    # ── 图表渲染总开关 ──
+    render_charts: bool = True  # False=跳过所有图表渲染, 仅计算参数
+
     # C 类: 2D 切面 (俯仰面 + 方位面)
     cut_2d_polar: bool = False
     cut_2d_rect: bool = False

@@ -284,6 +284,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._make_tab_scrollable(self.ui.tabLag)
 
         # ---- 图形展示 Tab: 启动时创建空 GraphViewer (工具栏立即可见) ----
+        self._check_enable_chart_viewer = QCheckBox(self.tr("启用图表查看"))
+        self._check_enable_chart_viewer.setChecked(True)
+        self._check_enable_chart_viewer.setToolTip(self.tr("关闭可跳过图表查看数据准备，加速出报告"))
+        self.ui.vTabCharts.addWidget(self._check_enable_chart_viewer)
         from ui.graph_viewer import GraphViewer
         viewer = GraphViewer()
         viewer._mw = self  # 用于 _on_apply_angles_to_config 回写
@@ -2681,15 +2685,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 填充参数结果表 (当前天线)
         self._populate_results_table(results, ant_name)
-        # 生成图形展示
-        self._populate_charts(results)
-        # 更新图形查看器模式标签 + 天线列表
-        if self._graph_viewer:
-            self._graph_viewer.update_mode_display()
-            self._graph_viewer.set_antenna_list(list(self._antenna_results.keys()),
-                                                ant_name)
-        # 生成图形数据表
-        self._populate_graph_data(results)
+        # 图表查看 (可通过标签页顶部开关关闭, 加速出报告)
+        if self._check_enable_chart_viewer.isChecked():
+            self._populate_charts(results)
+            if self._graph_viewer:
+                self._graph_viewer.update_mode_display()
+                self._graph_viewer.set_antenna_list(list(self._antenna_results.keys()),
+                                                    ant_name)
+            self._populate_graph_data(results)
         # ── Word 模板填充 ──
         if file_page and hasattr(file_page, '_edit_word_report_tpl'):
             word_tpl = (file_page._edit_word_report_tpl or "").strip()
