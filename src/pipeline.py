@@ -1214,6 +1214,7 @@ def _export_azimuth(
             return True  # 所有 azimuth_rect 都是新格式
         return False
 
+    _total_imgs = 0
     for sheet_name, rows in sheet_results.items():
         for row in rows:
             freq = row.get("frequency")
@@ -1230,6 +1231,9 @@ def _export_azimuth(
                 if label not in image_groups:
                     image_groups[label] = {}
                 image_groups[label][freq] = buf
+                _total_imgs += 1
+    if _total_imgs == 0:
+        _log(log_callback, "  ⚠ 未收集到任何图片 — 检查 chart_config 和 _enabled_keys 过滤")
 
     # ── B 类: 频点曲线 PNG (Word 报告), 按 ChartInstance 驱动 ──
     _B_CHART_TO_PARAM = {
@@ -1355,7 +1359,13 @@ def _export_azimuth(
 
 
     # ── Write Word: 统一输出所有图表到 Word ──
-    if out_word and image_groups:
+    _log(log_callback, f"  📊 收集到 {len(image_groups)} 组图片"
+         + (f" ({sum(len(v) for v in image_groups.values())} 张)" if image_groups else ""))
+    if not out_word:
+        pass  # 用户未请求 Word 输出
+    elif not image_groups:
+        _log(log_callback, "  ⚠ image_groups 为空 — 无图片可输出到 Word")
+    else:
         az = azimuth_config or None
         word_path = az.chart_output_path if az else ""
         if not word_path:
