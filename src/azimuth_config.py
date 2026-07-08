@@ -53,6 +53,10 @@ class AzimuthReportConfig:
     chart_output_dir: str = ""               # 图表输出目录
     chart_output_filename: str = ""          # 图表输出文件名
 
+    # ── 输出路径 — 天线参数报告 (Excel) ──
+    excel_output_dir: str = ""
+    excel_output_filename: str = ""
+
     # ── 输出路径 — 中间数据 (多 sheet 单文件) ──
     data_output_dir: str = ""
     data_output_filename: str = ""
@@ -137,6 +141,13 @@ class AzimuthReportConfig:
         return ""
 
     @property
+    def excel_output_path(self) -> str:
+        """完整的天线参数报告输出路径。"""
+        if self.excel_output_dir and self.excel_output_filename:
+            return str(Path(self.excel_output_dir) / self.excel_output_filename)
+        return ""
+
+    @property
     def data_output_path(self) -> str:
         """中间数据完整输出路径。"""
         if self.data_output_dir and self.data_output_filename:
@@ -169,6 +180,8 @@ class AzimuthReportConfig:
             "fr_show_caption": self.fr_show_caption,
             "chart_output_dir": self.chart_output_dir,
             "chart_output_filename": self.chart_output_filename,
+            "excel_output_dir": self.excel_output_dir,
+            "excel_output_filename": self.excel_output_filename,
             "data_output_dir": self.data_output_dir,
             "data_output_filename": self.data_output_filename,
             "dpi": self.dpi,
@@ -201,6 +214,8 @@ class AzimuthReportConfig:
             fr_show_caption=bool(d.get("fr_show_caption", True)),
             chart_output_dir=str(d.get("chart_output_dir", "")),
             chart_output_filename=str(d.get("chart_output_filename", "")),
+            excel_output_dir=str(d.get("excel_output_dir", "")),
+            excel_output_filename=str(d.get("excel_output_filename", "")),
             data_output_dir=str(d.get("data_output_dir", "")),
             data_output_filename=str(d.get("data_output_filename", "")),
             dpi=int(d.get("dpi", 100)),
@@ -236,6 +251,8 @@ class AzimuthReportConfig:
             fr_show_caption=self.fr_show_caption,
             chart_output_dir=self.chart_output_dir or other.chart_output_dir,
             chart_output_filename=self.chart_output_filename or other.chart_output_filename,
+            excel_output_dir=self.excel_output_dir or other.excel_output_dir,
+            excel_output_filename=self.excel_output_filename or other.excel_output_filename,
             data_output_dir=self.data_output_dir or other.data_output_dir,
             data_output_filename=self.data_output_filename or other.data_output_filename,
             dpi=self.dpi or other.dpi,
@@ -260,6 +277,8 @@ class AzimuthReportConfig:
 
         self.chart_output_dir = source_dir
         self.chart_output_filename = f"{source_stem}图表报告.docx"
+        self.excel_output_dir = source_dir
+        self.excel_output_filename = f"{source_stem}_AntennaReport.xlsx"
         self.data_output_dir = source_dir
         self.data_output_filename = f"{source_stem}中间数据.xlsx"
 

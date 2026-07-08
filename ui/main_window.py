@@ -183,6 +183,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 输出默认: 嵌入Excel 默认关闭, 图片优先输出到 Word
         self.ui.checkEmbedExcel.hide()  # 图表统一到 Word
         self.ui.checkSavePng.hide()
+        self.ui.groupOutput.hide()  # 旧输出控件 → 已迁移到 FileSettingsPage
         self._enter_idle()  # 初始化按钮状态机（btnStart/btnExport/btnOneClick/btnStop）
         self._log("天线参数后处理工具已启动")
 
@@ -254,6 +255,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 src_name = Path(template_path).stem
             fname = TM.next_available_filename(out_dir, src_name)
             self.ui.editOutputName.setText(fname)
+
+        # 同步启动默认值到 azimuth_config
+        az = getattr(self, '_azimuth_config', None)
+        if az:
+            d = self.ui.editOutputDir.text().strip()
+            n = self.ui.editOutputName.text().strip()
+            if d and not az.excel_output_dir:
+                az.excel_output_dir = d
+            if n and not az.excel_output_filename:
+                az.excel_output_filename = n
 
         # 模板预设管理已移至「文件→系统设置」对话框
 
@@ -920,7 +931,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _on_save_task_package(self):
         """快速保存任务包（自动命名，覆盖已存在）。"""
         tpl_name = Path(self.ui.editTemplatePath.text().strip()).stem if self.ui.editTemplatePath.text().strip() else "task"
-        output_dir = self.ui.editOutputDir.text().strip() or "."
+        az = getattr(self, '_azimuth_config', None)
+        output_dir = (az.excel_output_dir if az else "") or self.ui.editOutputDir.text().strip() or "."
         from src.task_package import next_available_filename, save_task_package
         ant_path = next_available_filename(output_dir, tpl_name)
         config_snapshot = {
@@ -1031,6 +1043,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             out = t.get('output_dir', '')
             if out and Path(out).exists():
                 self.ui.editOutputDir.setText(out)
+                az = getattr(self, '_azimuth_config', None)
+                if az:
+                    az.excel_output_dir = out
             from src.config_manager import get_config_manager
             cfg = get_config_manager()
             cfg.config.metadata = t.get('metadata', {})
@@ -1702,14 +1717,22 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """应用模板预设: 设置模板路径 + 输出目录 + 文件名。"""
         self.ui.editTemplatePath.setText(path)
         self._save_template_path(path)
+        az = getattr(self, '_azimuth_config', None)
         if output_dir:
             self.ui.editOutputDir.setText(output_dir)
+            if az:
+                az.excel_output_dir = output_dir
         elif self._data_file_paths:
-            self.ui.editOutputDir.setText(str(Path(self._data_file_paths[0]).parent))
+            d = str(Path(self._data_file_paths[0]).parent)
+            self.ui.editOutputDir.setText(d)
+            if az:
+                az.excel_output_dir = d
         if tpl_name:
             out_dir = self.ui.editOutputDir.text() or "."
             fname = self._tm.next_available_filename(out_dir, tpl_name)
             self.ui.editOutputName.setText(fname)
+            if az:
+                az.excel_output_filename = fname
         # 模板变更后自动识别并应用计算参数
         self._cached_template_params = set()
         self._auto_apply_template_params()
@@ -2178,6 +2201,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
     def _on_start(self, compute_only: bool = False, reuse_datasource: bool = False):
         """启动后台处理。支持单文件或多文件模式。"""
+        full_report_path = None  # 必须在所有条件分支之前初始化
         # 懒导入：处理链模块较重，仅在首次点击处理时加载
         from src.chart_config import ChartConfig
         from src.plot_config import PlotConfig
@@ -2245,8 +2269,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             return
 
         template_path = self.ui.editTemplatePath.text().strip()
-        output_dir = self.ui.editOutputDir.text().strip() or str(Path.cwd() / "output")
-        output_name = self.ui.editOutputName.text().strip() or "antenna_report.xlsx"
+        # 从 azimuth_config 读取 Excel 报告路径
+        az = getattr(self, '_azimuth_config', None)
+        if az and az.excel_output_dir and az.excel_output_filename:
+            output_dir = az.excel_output_dir
+            output_name = az.excel_output_filename
+        else:
+            output_dir = self.ui.editOutputDir.text().strip() or str(Path.cwd() / "output")
+            output_name = self.ui.editOutputName.text().strip() or "antenna_report.xlsx"
         output_name = output_name.replace("\\", "").replace("/", "")
 
         if out_excel and not template_path:
@@ -2277,13 +2307,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         output_path = self._auto_rename_if_exists(output_path) if output_path else ""
 
         # 完整报告: 参数 → Excel, 图表 → Word (覆盖独立输出设置)
-        full_report_enabled = False
-        if file_page and hasattr(file_page, '_check_full_report'):
-            full_report_enabled = file_page._check_full_report.isChecked()
-        else:
-            full_report_enabled = self.ui.checkFullReport.isChecked()
+        full_report_enabled = (
+            file_page and hasattr(file_page, '_check_full_report')
+            and file_page._check_full_report.isChecked()
+        )
 
-        full_report_path = None
         if full_report_enabled:
             out_excel = True
             out_word = True
@@ -2365,6 +2393,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             sheet_mode_map: Dict[str, int] = self._build_sheet_mode_map(datasource_map)
 
         self.ui.logOutput.clear()
+        self._max_progress_pct = 0
         self.ui.progressBar.setValue(0)
         self.ui.lblProgressMsg.setText(self.tr("启动中..."))
 
@@ -2391,6 +2420,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 p = Path(first_path)
                 src_dir = str(p.parent)
                 src_stem = p.stem
+                if not az.excel_output_dir:
+                    az.excel_output_dir = str(Path(src_dir) / "output")
+                if not az.excel_output_filename:
+                    az.excel_output_filename = f"{src_stem}_AntennaReport.xlsx"
                 if not az.chart_output_dir:
                     az.chart_output_dir = src_dir
                 if not az.chart_output_filename:
@@ -2399,16 +2432,18 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     az.data_output_dir = src_dir
                 if not az.data_output_filename:
                     az.data_output_filename = f"{src_stem}_中间数据.xlsx"
-            # 角度自动加载 (仅首次，之后用户手动管理)
+            # 角度自动加载 (仅首次且用户未手动配置时)
                 if not az._angles_initialized:
-                    gain_singles = self._lag_config.singles_sorted
-                    ar_singles = (self._ar_lag_config.singles_sorted
-                                  if hasattr(self, '_ar_lag_config') else gain_singles)
-                    # 包装为图表列表格式: 每个图表一个角度列表
-                    az.azimuth_cut_angles = [list(gain_singles)] if gain_singles else [[]]
-                    az.azimuth_cut_angles_ar = [list(ar_singles)] if ar_singles else [[]]
+                    if not az.azimuth_cut_angles:
+                        gain_singles = self._lag_config.singles_sorted
+                        az.azimuth_cut_angles = [list(gain_singles)] if gain_singles else [[]]
                     if not az.azimuth_cut_angles_ar:
-                        az.azimuth_cut_angles_ar = list(self._lag_config.singles_sorted)
+                        ar_singles = (self._ar_lag_config.singles_sorted
+                                      if hasattr(self, '_ar_lag_config') else [])
+                        az.azimuth_cut_angles_ar = [list(ar_singles)] if ar_singles else [[]]
+                        if not az.azimuth_cut_angles_ar:
+                            az.azimuth_cut_angles_ar = [list(self._lag_config.singles_sorted)] if self._lag_config.singles_sorted else [[]]
+                    # RHCP/LHCP 通常为空, 只在用户显式配置后才保留(不自动填充)
                     az._angles_initialized = True
 
         # 从 MainWindow widget 读取（天线参数 dialog 通过 _sync_to_mw 写入此处）
@@ -2511,9 +2546,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # _btn_export 不由这里管 — 状态机(_enter_ready/_enter_idle)负责
 
     def _on_progress(self, current: int, total: int, message: str):
-        self.ui.progressBar.setMaximum(total)
-        self.ui.progressBar.setValue(current)
         pct = int(current / max(total, 1) * 100)
+        # 固定 100 刻度, 防止阶段间 progress_max 变化导致进度条倒退
+        if not hasattr(self, '_max_progress_pct'):
+            self._max_progress_pct = 0
+        if pct > self._max_progress_pct:
+            self._max_progress_pct = pct
+            self.ui.progressBar.setMaximum(100)
+            self.ui.progressBar.setValue(pct)
         self.ui.lblProgressMsg.setText(f"[{pct}%] {message}")
         from PySide6.QtWidgets import QApplication
         QApplication.processEvents()
@@ -2546,14 +2586,18 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         file_page = getattr(self, '_file_settings_page', None)
         if file_page and getattr(file_page, '_check_save_task', None) and file_page._check_save_task.isChecked():
             self.ui.lblProgressMsg.setText(self.tr("📦 正在打包任务包..."))
-            self.ui.progressBar.setMaximum(100)
-            self.ui.progressBar.setValue(70)
             QApplication.processEvents()
             try:
                 from src.task_package import save_task_package, next_available_filename
-                output_dir = self.ui.editOutputDir.text().strip() or "."
-                tpl_name = Path(self.ui.editTemplatePath.text().strip()).stem if self.ui.editTemplatePath.text().strip() else "task"
-                ant_path = next_available_filename(output_dir, tpl_name)
+                # 优先使用 FileSettingsPage 的任务包路径
+                task_widget = getattr(file_page, '_edit_task', None)
+                if task_widget and task_widget.text().strip():
+                    ant_path = task_widget.text().strip()
+                else:
+                    az = getattr(self, '_azimuth_config', None)
+                    output_dir = (az.excel_output_dir if az else "") or self.ui.editOutputDir.text().strip() or "."
+                    tpl_name = Path(self.ui.editTemplatePath.text().strip()).stem if self.ui.editTemplatePath.text().strip() else "task"
+                    ant_path = next_available_filename(output_dir, tpl_name)
                 config_snapshot = {
                     "test_mode": self._test_mode,
                     "template_path": self.ui.editTemplatePath.text().strip(),
@@ -2585,6 +2629,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 self._enter_ready()
         else:
             self._enter_idle()
+        self.ui.progressBar.setMaximum(100)
         self.ui.progressBar.setValue(100)
         self.ui.lblProgressMsg.setText(self.tr("✓ 处理完成"))
         self._update_status()
@@ -2771,7 +2816,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     pass
 
         # ── 保存 ──
-        output_dir = self.ui.editOutputDir.text().strip() or "."
+        az = getattr(self, '_azimuth_config', None)
+        output_dir = (az.chart_output_dir if az else "") or self.ui.editOutputDir.text().strip() or "."
         src_stem = Path(self._data_file_paths[0]).stem if self._data_file_paths else "report"
         out_path = str(Path(output_dir) / f"{src_stem}_测试报告.docx")
         filler.save(out_path)
@@ -2984,7 +3030,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         mode_names = {0: "📡 无源", 1: "📶 TRP", 2: "📻 TIS"}
         mode_str = mode_names.get(self._test_mode, "?")
         freq = self._cmb_freq_source.currentText() if hasattr(self, '_cmb_freq_source') else "—"
-        extrap = self._cmb_extrapolate.currentText() if hasattr(self, '_cmb_extrapolate') else "不外推"
+        extrap = self._cmb_extrapolate.currentData() if hasattr(self, '_cmb_extrapolate') else None
         robust = hasattr(self, '_check_robust_peak') and self._check_robust_peak.isChecked()
 
         # ── 上方参数面板 ──

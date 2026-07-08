@@ -425,41 +425,50 @@ class FileSettingsPage(QWidget):
         self._load_azimuth_state()
 
     def _load_azimuth_state(self):
-        """从 MainWindow 加载输出设置。"""
+        """从 AzimuthReportConfig 恢复输出路径。"""
         if not self._mw:
             return
-        if hasattr(self._mw, 'ui') and hasattr(self, '_edit_xlsx'):
-            d = self._mw.ui.editOutputDir.text().strip()
-            n = self._mw.ui.editOutputName.text().strip()
-            if d and n:
-                self._edit_xlsx.setText(str(Path(d) / n))
         az = getattr(self._mw, '_azimuth_config', None)
-        if az is not None and hasattr(self, '_edit_word'):
-            if az.chart_output_dir and az.chart_output_filename:
-                self._edit_word.setText(str(Path(az.chart_output_dir) / az.chart_output_filename))
+        if az is None:
+            return
+        # Excel 报告: 从 azimuth_config 恢复
+        if hasattr(self, '_edit_xlsx') and az.excel_output_dir and az.excel_output_filename:
+            self._edit_xlsx.setText(str(Path(az.excel_output_dir) / az.excel_output_filename))
+        # Word 报告
+        if hasattr(self, '_edit_word') and az.chart_output_dir and az.chart_output_filename:
+            self._edit_word.setText(str(Path(az.chart_output_dir) / az.chart_output_filename))
+        # 中间数据: 新增恢复
+        if hasattr(self, '_edit_data') and az.data_output_dir and az.data_output_filename:
+            self._edit_data.setText(str(Path(az.data_output_dir) / az.data_output_filename))
 
     def _sync_azimuth_state(self):
-        """将输出设置写回 MainWindow。"""
+        """将输出路径写回 AzimuthReportConfig。"""
         if not self._mw:
             return
-        if hasattr(self._mw, 'ui') and hasattr(self, '_edit_xlsx'):
+        az = getattr(self._mw, '_azimuth_config', None)
+        if az is None:
+            return
+        # Excel 报告 → azimuth_config
+        if hasattr(self, '_edit_xlsx'):
             txt = self._edit_xlsx.text().strip()
             if txt:
                 p = Path(txt)
-                self._mw.ui.editOutputDir.setText(str(p.parent))
-                self._mw.ui.editOutputName.setText(p.name)
-        az = getattr(self._mw, '_azimuth_config', None)
-        if az is not None:
-            if hasattr(self, '_edit_word'):
-                txt = self._edit_word.text().strip()
-                if txt:
-                    p = Path(txt)
-                    az.chart_output_dir = str(p.parent)
-                    az.chart_output_filename = p.name
-            if hasattr(self, '_edit_data'):
-                txt = self._edit_data.text().strip()
-                if txt:
-                    az.data_output_filename = Path(txt).name
+                az.excel_output_dir = str(p.parent)
+                az.excel_output_filename = p.name
+        # Word 报告
+        if hasattr(self, '_edit_word'):
+            txt = self._edit_word.text().strip()
+            if txt:
+                p = Path(txt)
+                az.chart_output_dir = str(p.parent)
+                az.chart_output_filename = p.name
+        # 中间数据: 修复 — 同时保存 dir + filename
+        if hasattr(self, '_edit_data'):
+            txt = self._edit_data.text().strip()
+            if txt:
+                p = Path(txt)
+                az.data_output_dir = str(p.parent)
+                az.data_output_filename = p.name
 
     def _sync_azimuth_cut_switch(self):
         """勾选 Word 或数据输出时自动开启/关闭方位面开关。"""
@@ -1271,6 +1280,23 @@ class FileSettingsPage(QWidget):
             w = getattr(self, attr, None)
             if w and not w.text().strip():
                 w.setText(str(Path(out_dir) / fname))
+
+        # 同步到 azimuth_config (确保 pipeline 消费端有默认值)
+        az = getattr(self._mw, '_azimuth_config', None) if self._mw else None
+        if az:
+            for attr, fname in defaults:
+                w = getattr(self, attr, None)
+                if w and w.text().strip():
+                    p = Path(w.text().strip())
+                    if attr == "_edit_xlsx":
+                        az.excel_output_dir = str(p.parent)
+                        az.excel_output_filename = p.name
+                    elif attr == "_edit_word":
+                        az.chart_output_dir = str(p.parent)
+                        az.chart_output_filename = p.name
+                    elif attr == "_edit_data":
+                        az.data_output_dir = str(p.parent)
+                        az.data_output_filename = p.name
 
     def _on_antenna_name_changed(self, row: int, text: str):
         if row < len(self._file_entries):
@@ -2149,12 +2175,12 @@ class AntennaParamsPage(QWidget):
             if grp_name == "Directivity":
                 row_de = QHBoxLayout()
                 row_de.addWidget(QLabel(self.tr("外推:")))
-                cmb_de = self._make_extrap_combo(include_none=False)
+                cmb_de = self._make_extrap_combo(include_none=True)
                 cmb_de.setToolTip(self.tr("Directivity 外推算法"))
                 cmb_de.currentIndexChanged.connect(lambda: self._sync_to_mw())
                 mw = getattr(self, '_mw', None)
                 if mw:
-                    cur = getattr(mw, '_dir_extrap_method', 'linear')
+                    cur = getattr(mw, '_dir_extrap_method', 'none')
                     idx = cmb_de.findData(cur)
                     if idx >= 0: cmb_de.setCurrentIndex(idx)
                 row_de.addWidget(cmb_de)
@@ -2165,16 +2191,20 @@ class AntennaParamsPage(QWidget):
         left_layout.addStretch()
         hbox.addWidget(left_box, 1)
 
-        # 右列: 额外 (full_report, 默认不选)
-        right_box = QGroupBox(self.tr("额外 (full_report)"))
+        # 右列: 额外报告
+        right_box = QGroupBox()
         right_layout = QVBoxLayout(right_box)
         right_layout.setSpacing(2)
-        # full_report 总开关
-        self._check_full_report_enable = QCheckBox(self.tr("启用 Full Report 计算和输出"))
+        # 标题 + full_report 总开关 (同行)
+        hdr = QHBoxLayout()
+        hdr.addWidget(QLabel(self.tr("额外报告")))
+        self._check_full_report_enable = QCheckBox(self.tr("启用"))
         self._check_full_report_enable.setChecked(
             getattr(self._mw, '_full_report_enabled', False) if self._mw else False)
         self._check_full_report_enable.toggled.connect(self._on_full_report_toggled)
-        right_layout.addWidget(self._check_full_report_enable)
+        hdr.addWidget(self._check_full_report_enable)
+        hdr.addStretch()
+        right_layout.addLayout(hdr)
         # 分隔
         sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
         right_layout.addWidget(sep)
@@ -2204,11 +2234,11 @@ class AntennaParamsPage(QWidget):
             if grp_name == "Directivity":
                 row_de = QHBoxLayout()
                 row_de.addWidget(QLabel(self.tr("外推:")))
-                cmb_de = self._make_extrap_combo(include_none=False)
+                cmb_de = self._make_extrap_combo(include_none=True)
                 cmb_de.setToolTip(self.tr("Directivity 外推算法"))
                 mw = getattr(self, '_mw', None)
                 if mw:
-                    cur = getattr(mw, '_dir_extrap_method', 'linear')
+                    cur = getattr(mw, '_dir_extrap_method', 'none')
                     idx = cmb_de.findData(cur)
                     if idx >= 0: cmb_de.setCurrentIndex(idx)
                 cmb_de.currentIndexChanged.connect(lambda: self._on_dir_extrap_xtr_changed(cmb_de))
@@ -2371,7 +2401,7 @@ class AntennaParamsPage(QWidget):
         """创建外推算法下拉框。include_none=True 时首项为"不外推"。"""
         cmb = QComboBox()
         if include_none:
-            cmb.addItem(self.tr("不外推"), None)
+            cmb.addItem(self.tr("不外推"), "none")
         cmb.addItem(self.tr("线性"), "linear")
         cmb.addItem(self.tr("常数"), "constant")
         cmb.addItem(self.tr("镜像"), "mirror")
@@ -2944,18 +2974,22 @@ class ChartSettingsPage(QWidget):
             left_layout.addStretch()
             row_layout.addWidget(left_box, 1)
 
-            # 右列: 额外 (full_report)
-            right_box = QGroupBox(self.tr("额外 (full_report)"))
+            # 右列: 额外报告
+            right_box = QGroupBox()
             right_layout = QVBoxLayout(right_box)
             right_layout.setSpacing(3)
 
-            # full_report 总开关
-            self._check_full_report_enable = QCheckBox(self.tr("启用 Full Report 计算和输出"))
+            # 标题 + full_report 总开关 (同行)
+            hdr = QHBoxLayout()
+            hdr.addWidget(QLabel(self.tr("额外报告")))
+            self._check_full_report_enable = QCheckBox(self.tr("启用"))
             self._check_full_report_enable.setChecked(
                 getattr(self._mw, '_full_report_enabled', False) if self._mw else False)
             self._check_full_report_enable.toggled.connect(
                 lambda checked: setattr(self._mw, '_full_report_enabled', checked) if self._mw else None)
-            right_layout.addWidget(self._check_full_report_enable)
+            hdr.addWidget(self._check_full_report_enable)
+            hdr.addStretch()
+            right_layout.addLayout(hdr)
             sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
             right_layout.addWidget(sep)
 
@@ -3469,6 +3503,9 @@ class ChartSettingsPage(QWidget):
 
         # 图表联动已移除 — 用户手动控制每个图表类型
 
+        # 标记角度已由用户配置, 防止 _start_processing 中自动用 LAG 角度覆盖
+        azimuth._angles_initialized = True
+
         mw._azimuth_config = azimuth
         mw._chart_config_required = required
         mw._chart_config_extra = extra
@@ -3585,10 +3622,24 @@ class ChartSettingsPage(QWidget):
             left_layout.addStretch()
             row_layout.addWidget(left_box, 1)
 
-            # 右列: 额外 (full_report)
-            right_box = QGroupBox(self.tr("额外 (full_report)"))
+            # 右列: 额外报告
+            right_box = QGroupBox()
             right_layout = QVBoxLayout(right_box)
             right_layout.setSpacing(3)
+
+            # 标题 + full_report 总开关 (同行)
+            hdr = QHBoxLayout()
+            hdr.addWidget(QLabel(self.tr("额外报告")))
+            self._check_full_report_enable = QCheckBox(self.tr("启用"))
+            self._check_full_report_enable.setChecked(
+                getattr(self._mw, '_full_report_enabled', False) if self._mw else False)
+            self._check_full_report_enable.toggled.connect(
+                lambda checked: setattr(self._mw, '_full_report_enabled', checked) if self._mw else None)
+            hdr.addWidget(self._check_full_report_enable)
+            hdr.addStretch()
+            right_layout.addLayout(hdr)
+            sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
+            right_layout.addWidget(sep)
             self._add_select_all_row(self._chart_extra, keys, right_layout)
             for key in keys:
                 row = QHBoxLayout()

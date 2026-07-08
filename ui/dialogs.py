@@ -360,6 +360,11 @@ class DataSourceDialog(QDialog):
         mw.ui.editTemplatePath.setText(self._edit_template.text())
         mw.ui.editOutputDir.setText(self._edit_dir.text())
         mw.ui.editOutputName.setText(self._edit_name.text())
+        # 同步到 azimuth_config
+        az = getattr(mw, '_azimuth_config', None)
+        if az:
+            az.excel_output_dir = self._edit_dir.text().strip()
+            az.excel_output_filename = self._edit_name.text().strip()
         mw.ui.checkFullReport.setChecked(self._check_full.isChecked())
         mw.ui.editFullReportPath.setText(self._edit_report.text())
         # 持久化模板和输出路径到配置文件
@@ -601,8 +606,8 @@ class CalcParamsDialog(QDialog):
         left_layout.addWidget(self._left_scroll)
         splitter.addWidget(left_grp, 1)
 
-        # 右列: 额外计算参数
-        right_grp = QGroupBox("额外计算参数（送 full_report）")
+        # 右列: 额外报告
+        right_grp = QGroupBox("额外报告")
         right_layout = QVBoxLayout(right_grp)
         self._right_scroll = QScrollArea()
         self._right_scroll.setWidgetResizable(True)
@@ -1625,8 +1630,8 @@ class PlotConfigDialog(QDialog):
             left_layout.addStretch()
             row_layout.addWidget(left_box, 1)
 
-            # 右列: 额外(full_report)
-            right_box = QGroupBox("额外 (full_report)")
+            # 右列: 额外报告
+            right_box = QGroupBox("额外报告")
             right_layout = QVBoxLayout(right_box)
             right_layout.setSpacing(3)
             for key in keys:

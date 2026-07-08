@@ -26,25 +26,24 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 # G1: 必须存在且可见的 widget
 REQUIRED_VISIBLE = [
-    "editOutputName", "editOutputDir", "editTemplatePath",
+    "editTemplatePath",
     "btnStart", "btnStop", "progressBar", "logOutput",
 ]
 
 # G1: 必须隐藏的 widget
 REQUIRED_HIDDEN = [
     "editCsvPath", "btnBrowseCsv", "lblCsv",
+    "groupOutput",  # 旧输出控件组 → 已迁移到 FileSettingsPage
 ]
 
 # G1: 最小尺寸要求 (widget_attr, min_w, min_h)
 MIN_SIZE_REQUIREMENTS = [
-    ("editOutputName", 180, 0),
-    ("editOutputDir", 180, 0),
     ("editFullReportPath", 180, 0),
 ]
 
 # G7: 动态创建的 widget 必须存在
 DYNAMIC_WIDGETS_REQUIRED = [
-    "_file_list_widget", "_match_table", "_btn_add_files",
+    "_file_list_widget", "_btn_add_files",
     "_btn_auto_match", "_cmb_extrapolate",
     "_btn_export",  # Phase 3: 出报告按钮
 ]
@@ -410,23 +409,20 @@ def check_g5b_dialog_state() -> List[str]:
 
 def check_g6_gui_flow() -> List[str]:
     """G6: 完整GUI流程 — 对话框写入状态→_on_start→验证线程启动。"""
-    from PySide6.QtWidgets import QApplication, QComboBox, QTableWidgetItem
+    from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication(sys.argv)
     from ui.main_window import MainWindow
     w = MainWindow(app)
     errors = []
 
-    # 模拟数据源对话框流程
+    # 模拟数据源流程: 设置模板+文件 → 直接设 _last_matches 跳过弹窗
+    csv_path = str(PROJECT_ROOT / "data" / "5G1_merged.csv")
     w.ui.editTemplatePath.setText(str(PROJECT_ROOT / "data" / "template_5G1.xlsx"))
-    w._data_file_paths = [str(PROJECT_ROOT / "data" / "5G1_merged.csv")]
+    w._data_file_paths = [csv_path]
     w._refresh_data_file_ui()
-    w._match_table.setRowCount(1)
-    w._match_table.setItem(0, 0, QTableWidgetItem("5G1"))
-    combo = QComboBox()
-    combo.addItem(str(PROJECT_ROOT / "data" / "5G1_merged.csv"))
-    combo.setCurrentIndex(0)
-    w._match_table.setCellWidget(0, 1, combo)
-    w._match_table.setItem(0, 2, QTableWidgetItem("matched"))
+    # _match_table 已迁移到 DataSourceDialog, 直接注入匹配结果绕过弹窗
+    from src.sheet_file_matcher import MatchResult
+    w._last_matches = [MatchResult(sheet_name="5G1", file_path=csv_path, confidence=1.0)]
 
     # 触发开始
     try:
@@ -435,19 +431,12 @@ def check_g6_gui_flow() -> List[str]:
         pass
 
     # 验证线程启动 (处理可能很快完成, 此时 _running=False/_thread=None 也是正常的)
-    if not w._running and w._thread is None and not hasattr(w, '_g6_processing_done'):
-        errors.append("G6_FLOW: _running=False — 线程未启动")
-    if w._thread is None and not hasattr(w, '_g6_processing_done'):
-        errors.append("G6_FLOW: _thread=None — 未创建线程")
+    if not w._running and w._thread is None:
+        errors.append("G6_FLOW: _running=False, _thread=None — 线程未启动")
     elif w._thread is not None and not w._thread.isRunning():
         errors.append("G6_FLOW: thread.isRunning()=False — 线程未run")
 
-    # 验证管线确实跑了数据
-    if w._thread and w._thread.isRunning():
-        w._thread.wait(10000)  # 等最多10秒
-
-    # 清理
-    # 清理 (处理可能已完成, _thread 已为 None)
+    # 不等完成, 立即停止清理
     if w._thread and w._thread.isRunning():
         try: w._on_stop(); w._thread.quit(); w._thread.wait(3000)
         except Exception: pass
