@@ -3108,12 +3108,22 @@ class ChartSettingsPage(QWidget):
         _az_lbl = QLabel(self.tr("▸ 方位面切面图"))
         _az_lbl.setStyleSheet("font-weight: bold; margin-top: 4px;")
         layout.addWidget(_az_lbl)
-        _az_keys = ["cut_azimuth_polar_ar", "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
+        _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
+                    "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
         self._add_select_all_row(target_dict, _az_keys, layout)
 
-        _az_gap = QLabel(self.tr("Gain: 请使用上方「极坐标方位面切面图」"))
-        _az_gap.setStyleSheet("color: #888; font-size: 11px; padding-left: 4px;")
-        layout.addWidget(_az_gap)
+        # Gain azimuth
+        row_az_g = QHBoxLayout()
+        cb_az_g = QCheckBox(self.tr("Gain 极坐标方位面"))
+        if saved and "cut_azimuth_polar" in saved:
+            cb_az_g.setChecked(saved["cut_azimuth_polar"])
+        cb_az_g.toggled.connect(lambda: self._sync_to_mw())
+        row_az_g.addWidget(cb_az_g)
+        target_dict["cut_azimuth_polar"] = cb_az_g
+        btn_az_g = QPushButton("⚙ " + self.tr("参数")); btn_az_g.setFixedWidth(80)
+        btn_az_g.clicked.connect(lambda checked: self._show_azimuth_angle_popup("gain"))
+        row_az_g.addWidget(btn_az_g); row_az_g.addStretch()
+        layout.addLayout(row_az_g)
 
         for az_key, az_label, popup_target in [
             ("cut_azimuth_polar_ar", "AR 极坐标方位面", "ar"),
