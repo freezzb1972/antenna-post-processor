@@ -1200,6 +1200,19 @@ def _export_azimuth(
     _enabled_keys: set | None = None
     if chart_instances:
         _enabled_keys = {ci.image_key for ci in chart_instances if ci.enabled}
+    # cut_param 生成的新格式 key (含参数名), 豁免 chart_instances 过滤
+    # 旧 key: 2d_polar_phi0, azimuth_polar
+    # 新 key: 2d_polar_gain_phi0, azimuth_polar_gain_t30
+    def _is_new_cut_key(k: str) -> bool:
+        if k.startswith("2d_polar_") or k.startswith("2d_rect_"):
+            return True  # 所有 2d_* 都是新格式
+        if k.startswith("azimuth_polar_"):
+            # azimuth_polar_{param}_*  = 新格式, azimuth_polar (无后缀) = 旧
+            rest = k[len("azimuth_polar_"):]
+            return "_" in rest
+        if k.startswith("azimuth_rect_"):
+            return True  # 所有 azimuth_rect 都是新格式
+        return False
 
     for sheet_name, rows in sheet_results.items():
         for row in rows:
@@ -1211,7 +1224,8 @@ def _export_azimuth(
                 if buf is None:
                     continue
                 if _enabled_keys is not None and img_key not in _enabled_keys:
-                    continue  # 不在实例列表中 → 不生成
+                    if not _is_new_cut_key(img_key):
+                        continue
                 label = _label_for_image_key(img_key)
                 if label not in image_groups:
                     image_groups[label] = {}
