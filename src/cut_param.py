@@ -65,6 +65,7 @@ def build_cut_params_from_entries(
             continue
         p = CutParam(
             key=entry.param, data=data, ylabel=defn["ylabel"], enabled=True,
+            phi_angles=[], theta_angles=[],  # 清空默认值
         )
         if entry.direction == "phi":
             p.phi_angles = list(entry.angles)
