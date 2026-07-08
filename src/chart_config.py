@@ -218,6 +218,12 @@ class ChartConfig:
         merged.cut_2d_phi_angles = list(set(self.cut_2d_phi_angles + other.cut_2d_phi_angles))
         merged.cut_2d_theta_angles = list(set(self.cut_2d_theta_angles + other.cut_2d_theta_angles))
         merged.cut_2d_params = self.cut_2d_params | other.cut_2d_params
+        # 合并 4 组图表条目
+        for attr in ("cut_2d_polar_entries", "cut_2d_rect_entries",
+                      "cut_azimuth_polar_entries", "cut_azimuth_rect_entries"):
+            sl = list(getattr(self, attr, []))
+            ol = list(getattr(other, attr, []))
+            setattr(merged, attr, sl + ol)
         return merged
 
     # ── 工厂方法 ──
