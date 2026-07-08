@@ -3038,11 +3038,10 @@ class ChartSettingsPage(QWidget):
                 _az_lbl_r = QLabel(self.tr("▸ 方位面切面图"))
                 _az_lbl_r.setStyleSheet("font-weight: bold; margin-top: 4px;")
                 cat_right_ly.addWidget(_az_lbl_r)
-                _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
+                _az_keys = ["cut_azimuth_polar_ar",
                             "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
                 self._add_select_all_row(self._chart_extra, _az_keys, cat_right_ly)
                 for az_key, az_label in [
-                    ("cut_azimuth_polar", "Gain 极坐标方位面"),
                     ("cut_azimuth_polar_ar", "AR 极坐标方位面"),
                     ("cut_azimuth_polar_rhcp", "RHCP 极坐标方位面"),
                     ("cut_azimuth_polar_lhcp", "LHCP 极坐标方位面"),
@@ -3169,22 +3168,14 @@ class ChartSettingsPage(QWidget):
         _az_lbl.setStyleSheet("font-weight: bold; margin-top: 4px;")
         left_layout.addWidget(_az_lbl)
         # 全选/取消全选
-        _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
+        _az_keys = ["cut_azimuth_polar_ar",
                     "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
         self._add_select_all_row(self._chart_required, _az_keys, left_layout)
 
-        # Gain azimuth
-        row_az_g = QHBoxLayout()
-        cb_az_g = QCheckBox(self.tr("Gain 极坐标方位面"))
-        cb_az_g.toggled.connect(lambda: self._sync_to_mw())
-        row_az_g.addWidget(cb_az_g)
-        self._chart_required["cut_azimuth_polar"] = cb_az_g
-        btn_az = QPushButton("⚙ " + self.tr("参数"))
-        btn_az.setFixedWidth(80)
-        btn_az.clicked.connect(lambda checked: self._show_azimuth_angle_popup("gain"))
-        row_az_g.addWidget(btn_az)
-        row_az_g.addStretch()
-        left_layout.addLayout(row_az_g)
+        # Gain azimuth — 由 C 类主循环统一管理, 此处不重复创建
+        _az_gap = QLabel(self.tr("Gain: 请使用上方「极坐标方位面切面图」"))
+        _az_gap.setStyleSheet("color: #888; font-size: 11px; padding-left: 4px;")
+        left_layout.addWidget(_az_gap)
 
         # AR azimuth
         row_az_ar = QHBoxLayout()
@@ -3672,7 +3663,7 @@ class ChartSettingsPage(QWidget):
                 row.addStretch(); cat_left_ly.addLayout(row)
             if "C 类" in cat_name:
                 self._build_azimuth_section(cat_left_ly)
-                for az_key in ("cut_azimuth_polar", "cut_azimuth_polar_ar",
+                for az_key in ("cut_azimuth_polar_ar",
                                "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"):
                     if az_key in self._chart_required and az_key in saved:
                         self._chart_required[az_key].setChecked(saved[az_key])
@@ -3717,11 +3708,10 @@ class ChartSettingsPage(QWidget):
                 _az_lbl_r = QLabel(self.tr("▸ 方位面切面图"))
                 _az_lbl_r.setStyleSheet("font-weight: bold; margin-top: 4px;")
                 cat_right_ly.addWidget(_az_lbl_r)
-                _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
+                _az_keys = ["cut_azimuth_polar_ar",
                             "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
                 self._add_select_all_row(self._chart_extra, _az_keys, cat_right_ly)
                 for az_key, az_label in [
-                    ("cut_azimuth_polar", "Gain 极坐标方位面"),
                     ("cut_azimuth_polar_ar", "AR 极坐标方位面"),
                     ("cut_azimuth_polar_rhcp", "RHCP 极坐标方位面"),
                     ("cut_azimuth_polar_lhcp", "LHCP 极坐标方位面"),
