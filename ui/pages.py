@@ -3559,6 +3559,8 @@ class ChartSettingsPage(QWidget):
         mw._azimuth_config = azimuth
         mw._chart_config_required = required
         mw._chart_config_extra = extra
+        if hasattr(mw, '_auto_check_output_flags'):
+            mw._auto_check_output_flags()
 
         # 展开为 ChartInstance 列表（单一数据源供 Word 布局 + Pipeline）
         from src.chart_plan import expand_to_instances

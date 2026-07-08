@@ -1686,6 +1686,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._cached_template_params = set()  # 强制刷新模板参数缓存
             # 自动应用模板检测到的计算参数
             self._auto_apply_template_params()
+            self._auto_check_output_flags()
             # 立即从模板更新角度配置（不等自动匹配）
             try:
                 from src.excel_reader import read_template
@@ -1748,6 +1749,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 模板变更后自动识别并应用计算参数
         self._cached_template_params = set()
         self._auto_apply_template_params()
+        self._auto_check_output_flags()
 
     def _show_save_preset_dialog(self, template_path: str, output_dir: str):
         """弹出保存模板预设对话框 (公共方法, SystemSettingsDialog 也调用)。"""
@@ -1904,6 +1906,23 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._log(f"从模板自动更新 CP-XPI 角度: 单角度={cpxpi_cfg.singles_sorted}")
 
         self._update_params_display()
+
+    def _auto_check_output_flags(self):
+        """根据当前状态自动勾选/取消输出开关。"""
+        fp = getattr(self, '_file_settings_page', None)
+        if not fp:
+            return
+        # 模板 → Excel
+        has_template = bool(self.ui.editTemplatePath.text().strip())
+        if hasattr(fp, '_check_out_excel'):
+            fp._check_out_excel.setChecked(has_template)
+        # 图表 → Word + 数据
+        ccfg = getattr(self, '_chart_config_required', None)
+        has_charts = bool(ccfg and (ccfg.has_any_a_class or ccfg.has_any_b_class or ccfg.has_any_c_class))
+        if hasattr(fp, '_check_out_word'):
+            fp._check_out_word.setChecked(has_charts)
+        if hasattr(fp, '_check_out_data'):
+            fp._check_out_data.setChecked(has_charts)
 
     def _auto_apply_template_params(self):
         """从模板自动识别并应用计算参数到主窗口 + AntennaParamsPage。
