@@ -3153,6 +3153,7 @@ class ChartSettingsPage(QWidget):
         col_row.addWidget(left_box, 1)
         col_row.addWidget(right_box, 1)
         scroll_vbox.addLayout(col_row)
+        scroll_vbox.addWidget(out_grp)  # 输出设置 (Word 布局等)
         scroll_vbox.addStretch()
         scroll.setWidget(scroll_content)
         main_layout.addWidget(scroll)
