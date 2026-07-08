@@ -2968,7 +2968,7 @@ class ChartSettingsPage(QWidget):
             # C 类: 俯仰面切面图标题 (在 checkbox 之前)
             if "C 类" in cat_name:
                 _phi_l = QLabel(self.tr("▸ 俯仰面切面图"))
-                _phi_l.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
+                _phi_l.setStyleSheet("font-weight: bold; margin-top: 4px;")
                 cat_left_ly.addWidget(_phi_l)
             for key in keys:
                 row = QHBoxLayout()
@@ -3011,7 +3011,7 @@ class ChartSettingsPage(QWidget):
             self._add_select_all_row(self._chart_extra, keys, cat_right_ly)
             if "C 类" in cat_name:
                 _phi_r = QLabel(self.tr("▸ 俯仰面切面图"))
-                _phi_r.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
+                _phi_r.setStyleSheet("font-weight: bold; margin-top: 4px;")
                 cat_right_ly.addWidget(_phi_r)
             for key in keys:
                 row = QHBoxLayout()
@@ -3036,7 +3036,7 @@ class ChartSettingsPage(QWidget):
             # C 类: 方位面切面图 + DPI
             if "C 类" in cat_name:
                 _az_lbl_r = QLabel(self.tr("▸ 方位面切面图"))
-                _az_lbl_r.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
+                _az_lbl_r.setStyleSheet("font-weight: bold; margin-top: 4px;")
                 cat_right_ly.addWidget(_az_lbl_r)
                 _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
                             "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
@@ -3163,7 +3163,7 @@ class ChartSettingsPage(QWidget):
         """构建方位面极坐标切面控件 (可复用 — setup_ui + rebuild 共用)。"""
         # 标题
         _az_lbl = QLabel(self.tr("▸ 方位面切面图"))
-        _az_lbl.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
+        _az_lbl.setStyleSheet("font-weight: bold; margin-top: 4px;")
         left_layout.addWidget(_az_lbl)
         # 全选/取消全选
         _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
@@ -3642,7 +3642,7 @@ class ChartSettingsPage(QWidget):
             self._add_select_all_row(self._chart_required, keys, cat_left_ly)
             if "C 类" in cat_name:
                 _phi_l = QLabel(self.tr("▸ 俯仰面切面图"))
-                _phi_l.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
+                _phi_l.setStyleSheet("font-weight: bold; margin-top: 4px;")
                 cat_left_ly.addWidget(_phi_l)
             for key in keys:
                 row = QHBoxLayout()
@@ -3685,7 +3685,7 @@ class ChartSettingsPage(QWidget):
             self._add_select_all_row(self._chart_extra, keys, cat_right_ly)
             if "C 类" in cat_name:
                 _phi_r = QLabel(self.tr("▸ 俯仰面切面图"))
-                _phi_r.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
+                _phi_r.setStyleSheet("font-weight: bold; margin-top: 4px;")
                 cat_right_ly.addWidget(_phi_r)
             for key in keys:
                 row = QHBoxLayout()
@@ -3708,7 +3708,7 @@ class ChartSettingsPage(QWidget):
                 row.addStretch(); cat_right_ly.addLayout(row)
             if "C 类" in cat_name:
                 _az_lbl_r = QLabel(self.tr("▸ 方位面切面图"))
-                _az_lbl_r.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
+                _az_lbl_r.setStyleSheet("font-weight: bold; margin-top: 4px;")
                 cat_right_ly.addWidget(_az_lbl_r)
                 _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
                             "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
