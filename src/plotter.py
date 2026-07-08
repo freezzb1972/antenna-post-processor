@@ -271,7 +271,8 @@ def generate_all_for_frequency(
             )
 
     # ── C 类: 2D 切面图 (俯仰面 + 方位面, 统一使用 cut_param) ──
-    from .cut_param import build_cut_params, render_phi_cuts, render_theta_cuts
+    from .cut_param import (build_cut_params, build_cut_params_from_entries,
+                             render_phi_cuts, render_theta_cuts, CutChartEntry)
 
     # 构建数据映射
     ar_db_vals = (20.0 * np.log10(np.maximum(ar_linear, 1e-15))
@@ -284,13 +285,17 @@ def generate_all_for_frequency(
         "cp_xpi": cpxpi_db,
     }
 
-    # 俯仰面切面 (Phi 切 → 扫描 Theta)
-    phi_angles = (list(chart_config.cut_2d_phi_angles) if chart_config.cut_2d_phi_angles
-                  else [0.0, 90.0])
-    theta_cut_angles = (list(chart_config.cut_2d_theta_angles) if chart_config.cut_2d_theta_angles
-                        else [30.0, 60.0])
-    params = build_cut_params(chart_config.cut_2d_params, data_map,
-                              phi_angles=phi_angles, theta_angles=theta_cut_angles)
+    # 优先使用 cut_chart_entries (图表列表模式), 回退到旧字段
+    entries = getattr(chart_config, 'cut_chart_entries', None)
+    if entries:
+        params = build_cut_params_from_entries(entries, data_map)
+    else:
+        phi_angles = (list(chart_config.cut_2d_phi_angles) if chart_config.cut_2d_phi_angles
+                      else [0.0, 90.0])
+        theta_cut_angles = (list(chart_config.cut_2d_theta_angles) if chart_config.cut_2d_theta_angles
+                            else [30.0, 60.0])
+        params = build_cut_params(chart_config.cut_2d_params, data_map,
+                                  phi_angles=phi_angles, theta_angles=theta_cut_angles)
     images.update(render_phi_cuts(params, theta_deg, phi_deg, freq_mhz,
                                   chart_config, _renderer))
     images.update(render_theta_cuts(params, theta_deg, phi_deg, freq_mhz,

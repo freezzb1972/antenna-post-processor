@@ -15,8 +15,24 @@ import numpy as np
 # ═══════════════════════════════════════════════════════════════
 
 @dataclass
+class CutChartEntry:
+    """单个 2D 切面图条目 — 参数 + 方向 + 角度。"""
+    param: str = "gain"                  # "gain" | "ar" | "rhcp" | "lhcp"
+    direction: str = "phi"               # "phi"=俯仰面(固定φ扫θ), "theta"=方位面(固定θ扫φ)
+    angles: list[float] = field(default_factory=lambda: [0.0])
+
+    @property
+    def label(self) -> str:
+        """用户可读标签。"""
+        pname = _PARAM_REGISTRY.get(self.param, {}).get("ylabel", self.param)
+        dname = "俯仰面 φ" if self.direction == "phi" else "方位面 θ"
+        ang = ", ".join(f"{a:.0f}°" for a in self.angles)
+        return f"{pname}  {dname}={ang}"
+
+
+@dataclass
 class CutParam:
-    """单个切面参数定义 — 俯仰面/方位面共用。"""
+    """单个切面参数定义 — 俯仰面/方位面共用（运行时）。"""
     key: str = ""                        # "gain" | "ar" | "rhcp" | "lhcp" | "cpxpi"
     data: np.ndarray | None = None       # (n_phi, n_theta) 矩阵
     ylabel: str = ""                     # "Gain (dBi)" | "AR (dB)" | ...
@@ -33,6 +49,29 @@ _PARAM_REGISTRY = {
     "lhcp":  {"ylabel": "LHCP (dBi)",  "attr": "lhcp_db"},
     "cpxpi": {"ylabel": "CP-XPI (dB)", "attr": "cp_xpi"},
 }
+
+
+def build_cut_params_from_entries(
+    entries: list[CutChartEntry], data_map: dict,
+) -> list[CutParam]:
+    """从图表条目列表 + 数据字典构建 CutParam 列表。"""
+    params = []
+    for entry in entries:
+        defn = _PARAM_REGISTRY.get(entry.param)
+        if defn is None:
+            continue
+        data = data_map.get(defn["attr"])
+        if data is None:
+            continue
+        p = CutParam(
+            key=entry.param, data=data, ylabel=defn["ylabel"], enabled=True,
+        )
+        if entry.direction == "phi":
+            p.phi_angles = list(entry.angles)
+        else:
+            p.theta_angles = list(entry.angles)
+        params.append(p)
+    return params
 
 
 def build_cut_params(enabled_keys: set[str], data_map: dict,

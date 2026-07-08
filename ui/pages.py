@@ -3518,6 +3518,9 @@ class ChartSettingsPage(QWidget):
         required.ar_chart_angles = list(self._ar_angles)
         required.ar_chart_ranges = list(self._ar_ranges)
         required.cut_2d_phi_angles = list(self._cut_2d_phi_angles)
+        if hasattr(self, '_cut_chart_entries'):
+            from src.cut_param import CutChartEntry
+            required.cut_chart_entries = list(self._cut_chart_entries)
         required.view_angle_pairs = list(self._view_angle_pairs)
         extra.gain_chart_angles = list(self._gain_angles_x)
         extra.gain_chart_ranges = list(self._gain_ranges_x)
@@ -4025,73 +4028,105 @@ class ChartSettingsPage(QWidget):
         dlg.exec()
 
     def _show_cut_param_dialog(self):
-        """2D 切面图统一参数弹窗: 多参数选择 + Phi/Theta 角度 + DPI。"""
-        dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("2D 切面图参数"))
-        dlg.setMinimumSize(400, 280)
-        layout = QVBoxLayout(dlg)
+        """2D 切面图参数弹窗 — 图表列表 + 参数下拉 + 添加/删除。"""
+        import copy
+        from src.cut_param import CutChartEntry
 
-        # ── 当前状态 ──
-        current = getattr(self._mw, '_chart_config_required', None) if self._mw else None
-
-        # ── 参数选择 ──
-        param_grp = QGroupBox(self.tr("天线参数"))
-        param_layout = QVBoxLayout(param_grp)
-        param_names = [
-            ("gain", "Gain"), ("ar", "AR"), ("rhcp", "RHCP"),
-            ("lhcp", "LHCP"), ("cpxpi", "CP-XPI"),
-        ]
-        param_cbs = {}
-        current_params = getattr(current, 'cut_2d_params', {"gain"}) if current else {"gain"}
-        for key, label in param_names:
-            cb = QCheckBox(self.tr(label))
-            cb.setChecked(key in current_params)
-            param_cbs[key] = cb
-            param_layout.addWidget(cb)
-        layout.addWidget(param_grp)
-
-        # ── Phi 角度 (俯仰面) ──
-        phi_row = QHBoxLayout()
-        phi_row.addWidget(QLabel(self.tr("俯仰面 Phi 角度 (°):")))
-        phi_cfg = getattr(current, 'cut_2d_phi_angles', []) if current else []
-        phi_defaults = ", ".join(str(a) for a in phi_cfg) if phi_cfg else "0, 90"
-        edit_phi = QLineEdit(phi_defaults)
-        edit_phi.setPlaceholderText("0, 90")
-        phi_row.addWidget(edit_phi)
-        layout.addLayout(phi_row)
-
-        # ── Theta 角度 (方位面) ──
-        theta_row = QHBoxLayout()
-        theta_row.addWidget(QLabel(self.tr("方位面 Theta 角度 (°):")))
-        theta_cfg = getattr(current, 'cut_2d_theta_angles', []) if current else []
-        theta_defaults = ", ".join(str(a) for a in theta_cfg) if theta_cfg else "30, 60"
-        edit_theta = QLineEdit(theta_defaults)
-        edit_theta.setPlaceholderText("30, 60")
-        theta_row.addWidget(edit_theta)
-        layout.addLayout(theta_row)
-
-        # ── DPI ──
-        dpi_row = QHBoxLayout()
-        dpi_row.addWidget(QLabel(self.tr("DPI:")))
-        spin_dpi = QSpinBox()
-        spin_dpi.setRange(72, 600)
-        spin_dpi.setValue(getattr(current, 'dpi', 150) if current else 150)
-        dpi_row.addWidget(spin_dpi)
-        dpi_row.addStretch()
-        layout.addLayout(dpi_row)
-
-        # ── 按钮 ──
         def _parse_angles(text: str) -> list[float]:
             try:
                 return [float(x.strip()) for x in text.split(",") if x.strip()]
             except ValueError:
-                return []
+                return [0.0]
 
+        current = getattr(self._mw, '_chart_config_required', None) if self._mw else None
+        # 加载已有条目
+        raw = getattr(current, 'cut_chart_entries', None) if current else None
+        if raw:
+            _entries: list = copy.deepcopy(raw)
+        else:
+            _entries = [CutChartEntry(param="gain", direction="phi", angles=[0.0, 90.0])]
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("2D 切面图参数"))
+        dlg.setMinimumSize(500, 420)
+        layout = QVBoxLayout(dlg)
+
+        # ── 图表列表 ──
+        chart_grp = QGroupBox(self.tr("图表列表"))
+        chart_lo = QHBoxLayout(chart_grp)
+        chart_list = QListWidget()
+        chart_list.setMaximumHeight(120)
+        _sel_idx = [0]
+
+        def _rebuild_list():
+            chart_list.clear()
+            for e in _entries:
+                chart_list.addItem(f"{chart_list.count() + 1}. {e.label}")
+            if _sel_idx[0] >= chart_list.count():
+                _sel_idx[0] = max(0, chart_list.count() - 1)
+            if chart_list.count() > 0:
+                chart_list.setCurrentRow(_sel_idx[0])
+
+        _rebuild_list()
+        chart_lo.addWidget(chart_list, 1)
+        btn_col = QVBoxLayout()
+        btn_del = QPushButton("✕")
+        btn_del.setFixedWidth(30)
+        btn_del.clicked.connect(lambda: (
+            _entries.pop(_sel_idx[0]) if len(_entries) > 1 and 0 <= _sel_idx[0] < len(_entries) else None,
+            _rebuild_list()))
+        btn_col.addWidget(btn_del)
+        btn_col.addStretch()
+        chart_lo.addLayout(btn_col)
+        layout.addWidget(chart_grp)
+        chart_list.currentRowChanged.connect(lambda i: _sel_idx.__setitem__(0, i) if i >= 0 else None)
+
+        # ── 添加新图表 ──
+        add_grp = QGroupBox(self.tr("添加图表"))
+        add_lo = QVBoxLayout(add_grp)
+        row1 = QHBoxLayout()
+        row1.addWidget(QLabel(self.tr("参数:")))
+        cmb_param = QComboBox()
+        for key, defn in [("gain", "Gain"), ("ar", "AR"), ("rhcp", "RHCP"), ("lhcp", "LHCP")]:
+            cmb_param.addItem(defn, key)
+        row1.addWidget(cmb_param)
+        row1.addWidget(QLabel(self.tr("方向:")))
+        cmb_dir = QComboBox()
+        cmb_dir.addItem(self.tr("俯仰面 (Phi切)"), "phi")
+        cmb_dir.addItem(self.tr("方位面 (Theta切)"), "theta")
+        row1.addWidget(cmb_dir)
+        add_lo.addLayout(row1)
+
+        row2 = QHBoxLayout()
+        lbl_angle = QLabel(self.tr("角度 (°):"))
+        row2.addWidget(lbl_angle)
+        edit_angle = QLineEdit("0, 90")
+        edit_angle.setPlaceholderText("0, 90")
+        row2.addWidget(edit_angle)
+        btn_add = QPushButton(self.tr("+ 添加到列表"))
+        btn_add.clicked.connect(lambda: (
+            _entries.append(CutChartEntry(
+                param=cmb_param.currentData(), direction=cmb_dir.currentData(),
+                angles=_parse_angles(edit_angle.text()),
+            )),
+            _rebuild_list(),
+        ))
+        row2.addWidget(btn_add)
+        add_lo.addLayout(row2)
+        layout.addWidget(add_grp)
+
+        # ── DPI ──
+        dpi_row = QHBoxLayout()
+        dpi_row.addWidget(QLabel(self.tr("DPI:")))
+        spin_dpi = QSpinBox(); spin_dpi.setRange(72, 600)
+        spin_dpi.setValue(getattr(current, 'dpi', 150) if current else 150)
+        dpi_row.addWidget(spin_dpi); dpi_row.addStretch()
+        layout.addLayout(dpi_row)
+
+        # ── 按钮 ──
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
-            setattr(self, '_cut_2d_params', {k for k, cb in param_cbs.items() if cb.isChecked()}),
-            setattr(self, '_cut_2d_phi_angles', _parse_angles(edit_phi.text())),
-            setattr(self, '_cut_2d_theta_angles', _parse_angles(edit_theta.text())),
+            setattr(self, '_cut_chart_entries', list(_entries)),
             setattr(self, '_dpi', spin_dpi.value()),
             self._sync_to_mw(),
             dlg.accept(),
