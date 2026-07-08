@@ -865,7 +865,7 @@ def _build_sheets_from_datasource(
     from .excel_reader import SheetInfo
     sheets = []
     for name, ds in datasource_map.items():
-        freqs = sorted(set(ds.frequencies()))
+        freqs = sorted(set(ds.frequencies))
         sheets.append(SheetInfo(name=name, frequencies=freqs))
     return sheets
 
