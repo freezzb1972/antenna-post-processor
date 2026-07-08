@@ -2120,15 +2120,15 @@ class AntennaParamsPage(QWidget):
         idx = self._cmb_extrap.findData(cur)
         if idx >= 0:
             self._cmb_extrap.setCurrentIndex(idx)
-        self._check_robust.setChecked(s["robust_peak"])
+        self._check_robust.setChecked(s.get("robust_peak", False))
         self._cmb_ar_output.setCurrentIndex(0 if s.get("ar_output_db", True) else 1)
-        idx = self._cmb_freq_src.findData(s["freq_source"])
+        idx = self._cmb_freq_src.findData(s.get("freq_source"))
         if idx >= 0:
             self._cmb_freq_src.setCurrentIndex(idx)
-        self._spin_trim_start.setValue(s["trim_start"])
-        self._spin_trim_end.setValue(s["trim_end"])
-        self._required_params = s["required"]
-        self._extra_params = s["extra"]
+        self._spin_trim_start.setValue(s.get("trim_start", 0))
+        self._spin_trim_end.setValue(s.get("trim_end", 0))
+        self._required_params = s.get("required", set())
+        self._extra_params = s.get("extra", set())
 
     # ── 参数列重建 ──
 
