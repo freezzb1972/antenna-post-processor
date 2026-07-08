@@ -493,7 +493,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         progress_row.addWidget(self.ui.lblProgressMsg)
         exec_layout.addLayout(progress_row)
 
-        # 阶段指示器: 5 个阶段标签，右对齐
+        # 阶段指示器: 5 个阶段标签，居中
         stage_row = QHBoxLayout()
         stage_row.setSpacing(2)
         stage_row.addStretch()
@@ -511,6 +511,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             )
             stage_row.addWidget(lbl)
             self._stage_labels.append(lbl)
+        stage_row.addStretch()
         exec_layout.addLayout(stage_row)
 
         h_splitter = ThinSplitter(Qt.Horizontal)
