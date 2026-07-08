@@ -3146,13 +3146,13 @@ class ChartSettingsPage(QWidget):
         scroll.setFrameShape(QScrollArea.NoFrame)
         scroll_content = QWidget()
         scroll_vbox = QVBoxLayout(scroll_content)
-        # 将左右列加入外层 scroll 布局 (在类别组之前)
+        # 左右列水平并排放入 scroll
         self._chart_grp_list = grp_list
         self._chart_scroll_vbox = scroll_vbox
-        scroll_vbox.addWidget(left_box)
-        scroll_vbox.addWidget(right_box)
-        for g in grp_list:
-            scroll_vbox.addWidget(g)
+        col_row = QHBoxLayout()
+        col_row.addWidget(left_box, 1)
+        col_row.addWidget(right_box, 1)
+        scroll_vbox.addLayout(col_row)
         scroll_vbox.addStretch()
         scroll.setWidget(scroll_content)
         main_layout.addWidget(scroll)
@@ -3595,30 +3595,14 @@ class ChartSettingsPage(QWidget):
             for k, cb in cb_dict.items():
                 saved[k] = cb.isChecked()
 
-        # 清除旧的图表分类组 (保留 stretch at end)
+        # 清除旧的类别 QGroupBox (保留 left_box/right_box 的 header)
         vbox = self._chart_scroll_vbox
-        while vbox.count() > 1:
-            item = vbox.takeAt(0)
-            if item.widget():
-                item.widget().hide()
-                item.widget().deleteLater()
-
-        # 重建: 清除旧的类别 QGroupBox (保留 left_box/right_box 和 stretch)
-        # vbox 顺序: left_box, right_box, cat_left_0, cat_right_0, ..., stretch
-        # 保留前 2 个 (left_box, right_box), 清除其余中间项直到 stretch
-        while vbox.count() > 3:  # left_box + right_box + stretch
-            item = vbox.takeAt(2)  # 从 index 2 开始删除
-            if item.widget():
-                item.widget().hide()
-                item.widget().deleteLater()
-
-        grp_list = []
-        _AZ_POPUP = {"cut_azimuth_polar": "gain", "cut_azimuth_polar_ar": "ar",
-                      "cut_azimuth_polar_rhcp": "rhcp", "cut_azimuth_polar_lhcp": "lhcp"}
-
-        # 找到现有的 left_box 和 right_box (setup_ui 已创建)
-        left_box = vbox.itemAt(0).widget()
-        right_box = vbox.itemAt(1).widget()
+        # vbox 结构: col_row(HBox: left_box + right_box) + stretch
+        col_row = vbox.itemAt(0).layout()
+        if col_row is None:
+            return
+        left_box = col_row.itemAt(0).widget()
+        right_box = col_row.itemAt(1).widget()
         left_outer = left_box.layout()
         right_outer = right_box.layout()
         # 清除内部旧类别 (保留 header: hdr_l + sep_l / hdr_r + sep_r)
@@ -3630,6 +3614,10 @@ class ChartSettingsPage(QWidget):
             item = right_outer.takeAt(2)
             if item.widget():
                 item.widget().hide(); item.widget().deleteLater()
+
+        grp_list = []
+        _AZ_POPUP = {"cut_azimuth_polar": "gain", "cut_azimuth_polar_ar": "ar",
+                      "cut_azimuth_polar_rhcp": "rhcp", "cut_azimuth_polar_lhcp": "lhcp"}
 
         for cat_name, keys in categories.items():
             # ── 左列: 本类别 ──
@@ -3765,11 +3753,7 @@ class ChartSettingsPage(QWidget):
             cat_right.toggled.connect(make_toggle_r(cat_right, cat_name))
 
         self._chart_grp_list = grp_list
-        # 将新类别插入到 right_box 之后、stretch 之前
-        idx = vbox.count() - 1  # stretch 的位置
-        for g in grp_list:
-            vbox.insertWidget(idx, g)
-            idx += 1
+        self._chart_grp_list = [g for g in grp_list]  # 用于引用,不需要插入 vbox
 
     def _show_a3d_param_dialog(self, chart_key: str):
         """A 类 3D 方向图参数设置 — DPI + 采样精度 + 图表列表(每视角=一个图表)。"""
