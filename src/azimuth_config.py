@@ -42,16 +42,16 @@ class AzimuthReportConfig:
     show_caption: bool = True               # Word 图片上方是否显示题注
 
     # ── Word 布局模式 ──
-    # "side_by_side": 每频点同行 2 列 (左 Gain 右 AR)
+    # "by_type": 每频点同行 2 列 (左 Gain 右 AR)
     # "sequential":   先全部 Gain（前加 Heading1），再全部 AR（前加 Heading1）
-    word_layout_mode: str = "side_by_side"
+    word_layout_mode: str = "by_type"
 
     # ── Word 图片尺寸 ──
     word_columns: int = 2                       # 列数: 1=单列, 2=双列
     word_image_width_pct: int = 90              # 图片宽度占列宽的百分比 (10-100)
 
     # ── Full Report 独立 Word 布局 ──
-    fr_word_layout_mode: str = "side_by_side"
+    fr_word_layout_mode: str = "by_type"
     fr_word_columns: int = 2
     fr_word_image_width_pct: int = 90
     fr_show_caption: bool = True
@@ -217,10 +217,10 @@ class AzimuthReportConfig:
             azimuth_cut_angles_rhcp=list(d.get("azimuth_cut_angles_rhcp", [])),
             azimuth_cut_angles_lhcp=list(d.get("azimuth_cut_angles_lhcp", [])),
             antenna_name=str(d.get("antenna_name", "")),
-            word_layout_mode=str(d.get("word_layout_mode", "side_by_side")),
+            word_layout_mode=str(d.get("word_layout_mode", "by_type")),
             word_columns=int(d.get("word_columns", 2)),
             word_image_width_pct=int(d.get("word_image_width_pct", 90)),
-            fr_word_layout_mode=str(d.get("fr_word_layout_mode", "side_by_side")),
+            fr_word_layout_mode=str(d.get("fr_word_layout_mode", "by_type")),
             fr_word_columns=int(d.get("fr_word_columns", 2)),
             fr_word_image_width_pct=int(d.get("fr_word_image_width_pct", 90)),
             fr_show_caption=bool(d.get("fr_show_caption", True)),
