@@ -866,7 +866,9 @@ def _build_sheets_from_datasource(
     sheets = []
     for name, ds in datasource_map.items():
         freqs = sorted(set(ds.frequencies))
-        sheets.append(SheetInfo(name=name, frequencies=freqs))
+        sheets.append(SheetInfo(
+            name=name, header_row=0, data_start_row=0, data_end_row=0,
+            frequencies=freqs))
     return sheets
 
 

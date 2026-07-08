@@ -3141,23 +3141,26 @@ class ChartSettingsPage(QWidget):
         mode_row.addStretch()
         main_layout.addLayout(mode_row)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QScrollArea.NoFrame)
-        scroll_content = QWidget()
-        scroll_vbox = QVBoxLayout(scroll_content)
-        # 左右列用 QSplitter 水平并排 (中间可拖拽分隔线)
+        # 左右列各独立滚动 (左滚动条在中间, 右滚动条在右侧)
         self._chart_grp_list = grp_list
-        self._chart_scroll_vbox = scroll_vbox
+        scroll_left = QScrollArea()
+        scroll_left.setWidgetResizable(True); scroll_left.setFrameShape(QScrollArea.NoFrame)
+        scroll_left.setWidget(left_box)
+        scroll_right = QScrollArea()
+        scroll_right.setWidgetResizable(True); scroll_right.setFrameShape(QScrollArea.NoFrame)
+        scroll_right.setWidget(right_box)
         splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(left_box)
-        splitter.addWidget(right_box)
+        splitter.addWidget(scroll_left)
+        splitter.addWidget(scroll_right)
         splitter.setSizes([400, 400])
-        scroll_vbox.addWidget(splitter)
-        scroll_vbox.addWidget(out_grp)  # 输出设置 (Word 布局等)
-        scroll_vbox.addStretch()
-        scroll.setWidget(scroll_content)
-        main_layout.addWidget(scroll)
+        # 将 splitter 放入外层容器 (含输出设置)
+        outer_w = QWidget()
+        outer_lo = QVBoxLayout(outer_w); outer_lo.setContentsMargins(0,0,0,0)
+        outer_lo.addWidget(splitter)
+        outer_lo.addWidget(out_grp)
+        outer_lo.addStretch()
+        self._chart_scroll_vbox = outer_lo  # rebuild 用
+        main_layout.addWidget(outer_w)
 
     def _build_azimuth_section(self, left_layout: QVBoxLayout):
         """构建方位面极坐标切面控件 (可复用 — setup_ui + rebuild 共用)。"""
@@ -3605,12 +3608,16 @@ class ChartSettingsPage(QWidget):
 
         # 清除旧的类别 QGroupBox (保留 left_box/right_box 的 header)
         vbox = self._chart_scroll_vbox
-        # vbox 结构: splitter(left_box + right_box) + stretch
+        # vbox 结构: splitter(scroll_left + scroll_right) + out_grp + stretch
         splitter = vbox.itemAt(0).widget()
         if splitter is None:
             return
-        left_box = splitter.widget(0)
-        right_box = splitter.widget(1)
+        scroll_left = splitter.widget(0)
+        scroll_right = splitter.widget(1)
+        left_box = scroll_left.widget()
+        right_box = scroll_right.widget()
+        if left_box is None or right_box is None:
+            return
         left_outer = left_box.layout()
         right_outer = right_box.layout()
         # 清除内部旧类别 (保留 header: hdr_l + sep_l / hdr_r + sep_r)
