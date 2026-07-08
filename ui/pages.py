@@ -300,7 +300,7 @@ class FileSettingsPage(QWidget):
 
         # ── 1) 天线参数报告 (.xlsx) ──
         self._check_out_excel = QCheckBox(self.tr("天线参数报告 (.xlsx)"))
-        self._check_out_excel.setChecked(True)
+        self._check_out_excel.setChecked(False)
         self._edit_xlsx = QLineEdit()
         self._edit_xlsx.setPlaceholderText(self.tr("选择输出路径..."))
         btn_xl = QPushButton(self.tr("浏览..."))

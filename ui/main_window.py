@@ -2259,7 +2259,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # ── 输出选项 ──
         file_page = getattr(self, '_file_settings_page', None)
-        out_excel = True
+        out_excel = False
         out_word = False
         out_data = False
         if file_page and hasattr(file_page, 'get_output_flags'):
