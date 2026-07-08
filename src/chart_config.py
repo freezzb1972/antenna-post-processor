@@ -143,10 +143,14 @@ class ChartConfig:
     cut_2d_rect: bool = False
     cut_azimuth_polar: bool = False      # 方位面极坐标 (与 azimuth_config 独立)
     cut_azimuth_rect: bool = False       # 方位面直角坐标
-    cut_2d_phi_angles: list[float] = field(default_factory=list)    # 俯仰面 Phi 角度 (°) — 向后兼容
-    cut_2d_theta_angles: list[float] = field(default_factory=list)  # 方位面 Theta 角度 (°) — 向后兼容
-    cut_2d_params: set = field(default_factory=lambda: {"gain"})    # 启用的参数 — 向后兼容
-    cut_chart_entries: list = field(default_factory=list)  # CutChartEntry 列表 (新)
+    cut_2d_phi_angles: list[float] = field(default_factory=list)    # 向后兼容
+    cut_2d_theta_angles: list[float] = field(default_factory=list)  # 向后兼容
+    cut_2d_params: set = field(default_factory=lambda: {"gain"})    # 向后兼容
+    # 4 组独立图表条目 (每组 = (param, [angles]) 的 list)
+    cut_2d_polar_entries: list = field(default_factory=list)
+    cut_2d_rect_entries: list = field(default_factory=list)
+    cut_azimuth_polar_entries: list = field(default_factory=list)
+    cut_azimuth_rect_entries: list = field(default_factory=list)
 
     # 视角参数
     elev: float = 30.0

@@ -285,10 +285,19 @@ def generate_all_for_frequency(
         "cp_xpi": cpxpi_db,
     }
 
-    # 优先使用 cut_chart_entries (图表列表模式), 回退到旧字段
-    entries = getattr(chart_config, 'cut_chart_entries', None)
-    if entries:
-        params = build_cut_params_from_entries(entries, data_map)
+    # 优先使用 4 组独立图表列表, 回退到旧字段
+    phi_entries = (getattr(chart_config, 'cut_2d_polar_entries', None) or []) + \
+                  (getattr(chart_config, 'cut_2d_rect_entries', None) or [])
+    theta_entries = (getattr(chart_config, 'cut_azimuth_polar_entries', None) or []) + \
+                    (getattr(chart_config, 'cut_azimuth_rect_entries', None) or [])
+    if phi_entries or theta_entries:
+        from .cut_param import CutChartEntry as _CE
+        all_entries = []
+        for param, angles in phi_entries:
+            all_entries.append(_CE(param=param, direction="phi", angles=angles))
+        for param, angles in theta_entries:
+            all_entries.append(_CE(param=param, direction="theta", angles=angles))
+        params = build_cut_params_from_entries(all_entries, data_map)
     else:
         phi_angles = (list(chart_config.cut_2d_phi_angles) if chart_config.cut_2d_phi_angles
                       else [0.0, 90.0])

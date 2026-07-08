@@ -2986,7 +2986,7 @@ class ChartSettingsPage(QWidget):
                     row.addWidget(btn)
                 elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
-                    btn.clicked.connect(lambda checked: self._show_cut_param_dialog())
+                    btn.clicked.connect(lambda checked, k=key: self._show_cut_param_dialog(k))
                     row.addWidget(btn)
                 row.addStretch()
                 cat_left_ly.addLayout(row)
@@ -3029,7 +3029,7 @@ class ChartSettingsPage(QWidget):
                     row.addWidget(btn)
                 elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
-                    btn.clicked.connect(lambda checked: self._show_cut_param_dialog())
+                    btn.clicked.connect(lambda checked, k=key: self._show_cut_param_dialog(k))
                     row.addWidget(btn)
                 row.addStretch()
                 cat_right_ly.addLayout(row)
@@ -3518,9 +3518,10 @@ class ChartSettingsPage(QWidget):
         required.ar_chart_angles = list(self._ar_angles)
         required.ar_chart_ranges = list(self._ar_ranges)
         required.cut_2d_phi_angles = list(self._cut_2d_phi_angles)
-        if hasattr(self, '_cut_chart_entries'):
-            from src.cut_param import CutChartEntry
-            required.cut_chart_entries = list(self._cut_chart_entries)
+        for attr in ("_cut_2d_polar_entries", "_cut_2d_rect_entries",
+                      "_cut_azimuth_polar_entries", "_cut_azimuth_rect_entries"):
+            if hasattr(self, attr):
+                setattr(required, attr[1:], list(getattr(self, attr)))
         required.view_angle_pairs = list(self._view_angle_pairs)
         extra.gain_chart_angles = list(self._gain_angles_x)
         extra.gain_chart_ranges = list(self._gain_ranges_x)
@@ -3655,7 +3656,7 @@ class ChartSettingsPage(QWidget):
                     row.addWidget(btn)
                 elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
-                    btn.clicked.connect(lambda checked: self._show_cut_param_dialog())
+                    btn.clicked.connect(lambda checked, k=key: self._show_cut_param_dialog(k))
                     row.addWidget(btn)
                 row.addStretch(); cat_left_ly.addLayout(row)
             if "C 类" in cat_name:
@@ -3698,7 +3699,7 @@ class ChartSettingsPage(QWidget):
                     row.addWidget(btn)
                 elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
                     btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
-                    btn.clicked.connect(lambda checked: self._show_cut_param_dialog())
+                    btn.clicked.connect(lambda checked, k=key: self._show_cut_param_dialog(k))
                     row.addWidget(btn)
                 row.addStretch(); cat_right_ly.addLayout(row)
             if "C 类" in cat_name:
@@ -4027,8 +4028,8 @@ class ChartSettingsPage(QWidget):
         layout.addWidget(btns)
         dlg.exec()
 
-    def _show_cut_param_dialog(self):
-        """2D 切面图参数弹窗 — 图表列表 + 参数下拉 + 添加/删除。"""
+    def _show_cut_param_dialog(self, chart_key: str = "cut_2d_polar"):
+        """2D 切面图参数弹窗 — 每种图表类型独立配置。"""
         import copy
         from src.cut_param import CutChartEntry
 
@@ -4038,30 +4039,43 @@ class ChartSettingsPage(QWidget):
             except ValueError:
                 return [0.0]
 
+        # 根据 chart_key 确定方向和角度标签
+        is_azimuth = "azimuth" in chart_key
+        is_rect = "rect" in chart_key
+        direction = "theta" if is_azimuth else "phi"
+        angle_label = self.tr("Theta 角度 (°):") if is_azimuth else self.tr("Phi 角度 (°):")
+        default_angles = "30, 60" if is_azimuth else "0, 90"
+        # 对应的存储字段
+        entry_attr = f"_{chart_key}_entries"
+
         current = getattr(self._mw, '_chart_config_required', None) if self._mw else None
         # 加载已有条目
-        raw = getattr(current, 'cut_chart_entries', None) if current else None
+        raw = getattr(current, chart_key + '_entries', None) if current else None
         if raw:
             _entries: list = copy.deepcopy(raw)
         else:
-            _entries = [CutChartEntry(param="gain", direction="phi", angles=[0.0, 90.0])]
+            _entries = []
 
         dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("2D 切面图参数"))
-        dlg.setMinimumSize(500, 420)
+        fmt_name = "直角坐标" if is_rect else "极坐标"
+        dir_name = "方位面" if is_azimuth else "俯仰面"
+        dlg.setWindowTitle(self.tr(f"{fmt_name}{dir_name}切面图参数"))
+        dlg.setMinimumSize(480, 350)
         layout = QVBoxLayout(dlg)
 
         # ── 图表列表 ──
         chart_grp = QGroupBox(self.tr("图表列表"))
         chart_lo = QHBoxLayout(chart_grp)
         chart_list = QListWidget()
-        chart_list.setMaximumHeight(120)
+        chart_list.setMaximumHeight(100)
         _sel_idx = [0]
 
         def _rebuild_list():
             chart_list.clear()
-            for e in _entries:
-                chart_list.addItem(f"{chart_list.count() + 1}. {e.label}")
+            for i, e in enumerate(_entries):
+                pname = {"gain": "Gain", "ar": "AR", "rhcp": "RHCP", "lhcp": "LHCP"}.get(e[0], e[0])
+                ang = ", ".join(f"{a:.0f}°" for a in e[1])
+                chart_list.addItem(f"{i+1}. {pname}  {ang}")
             if _sel_idx[0] >= chart_list.count():
                 _sel_idx[0] = max(0, chart_list.count() - 1)
             if chart_list.count() > 0:
@@ -4070,49 +4084,33 @@ class ChartSettingsPage(QWidget):
         _rebuild_list()
         chart_lo.addWidget(chart_list, 1)
         btn_col = QVBoxLayout()
-        btn_del = QPushButton("✕")
-        btn_del.setFixedWidth(30)
+        btn_del = QPushButton("✕"); btn_del.setFixedWidth(30)
         btn_del.clicked.connect(lambda: (
-            _entries.pop(_sel_idx[0]) if len(_entries) > 1 and 0 <= _sel_idx[0] < len(_entries) else None,
+            _entries.pop(_sel_idx[0]) if _entries and 0 <= _sel_idx[0] < len(_entries) else None,
             _rebuild_list()))
-        btn_col.addWidget(btn_del)
-        btn_col.addStretch()
+        btn_col.addWidget(btn_del); btn_col.addStretch()
         chart_lo.addLayout(btn_col)
         layout.addWidget(chart_grp)
         chart_list.currentRowChanged.connect(lambda i: _sel_idx.__setitem__(0, i) if i >= 0 else None)
 
-        # ── 添加新图表 ──
+        # ── 添加 ──
         add_grp = QGroupBox(self.tr("添加图表"))
-        add_lo = QVBoxLayout(add_grp)
-        row1 = QHBoxLayout()
-        row1.addWidget(QLabel(self.tr("参数:")))
+        add_lo = QHBoxLayout(add_grp)
+        add_lo.addWidget(QLabel(self.tr("参数:")))
         cmb_param = QComboBox()
         for key, defn in [("gain", "Gain"), ("ar", "AR"), ("rhcp", "RHCP"), ("lhcp", "LHCP")]:
             cmb_param.addItem(defn, key)
-        row1.addWidget(cmb_param)
-        row1.addWidget(QLabel(self.tr("方向:")))
-        cmb_dir = QComboBox()
-        cmb_dir.addItem(self.tr("俯仰面 (Phi切)"), "phi")
-        cmb_dir.addItem(self.tr("方位面 (Theta切)"), "theta")
-        row1.addWidget(cmb_dir)
-        add_lo.addLayout(row1)
-
-        row2 = QHBoxLayout()
-        lbl_angle = QLabel(self.tr("角度 (°):"))
-        row2.addWidget(lbl_angle)
-        edit_angle = QLineEdit("0, 90")
-        edit_angle.setPlaceholderText("0, 90")
-        row2.addWidget(edit_angle)
-        btn_add = QPushButton(self.tr("+ 添加到列表"))
+        add_lo.addWidget(cmb_param)
+        add_lo.addWidget(QLabel(angle_label))
+        edit_angle = QLineEdit(default_angles)
+        edit_angle.setPlaceholderText(default_angles)
+        add_lo.addWidget(edit_angle)
+        btn_add = QPushButton(self.tr("+ 添加"))
         btn_add.clicked.connect(lambda: (
-            _entries.append(CutChartEntry(
-                param=cmb_param.currentData(), direction=cmb_dir.currentData(),
-                angles=_parse_angles(edit_angle.text()),
-            )),
+            _entries.append((cmb_param.currentData(), _parse_angles(edit_angle.text()))),
             _rebuild_list(),
         ))
-        row2.addWidget(btn_add)
-        add_lo.addLayout(row2)
+        add_lo.addWidget(btn_add)
         layout.addWidget(add_grp)
 
         # ── DPI ──
@@ -4126,7 +4124,7 @@ class ChartSettingsPage(QWidget):
         # ── 按钮 ──
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
-            setattr(self, '_cut_chart_entries', list(_entries)),
+            setattr(self, entry_attr, list(_entries)),
             setattr(self, '_dpi', spin_dpi.value()),
             self._sync_to_mw(),
             dlg.accept(),
