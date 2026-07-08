@@ -231,12 +231,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if saved_font_size:
             ScaleManager._font_scale = int(saved_font_size) / ScaleManager.BASE_FONT_SIZE
 
-        template_path = cfg.last_template_path
         output_dir = cfg.last_output_dir
 
-        # 始终恢复上次模板路径（即使文件暂时不存在，保留引用）
-        if template_path:
-            self.ui.editTemplatePath.setText(template_path)
+        # 不自动恢复模板 — 用户需手动选择
         # 恢复输出目录，无保存值时自动设为数据源目录（后续 _on_add_data_files 触发更新）
         if output_dir and Path(output_dir).exists():
             self.ui.editOutputDir.setText(output_dir)
@@ -245,14 +242,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         else:
             self.ui.editOutputDir.setText(str(Path.cwd() / "output"))
 
-        # 输出文件名: 默认用数据源名+日期，用户编辑后保留自定义
-        if not self._user_set_output_name and template_path:
+        # 输出文件名: 默认用数据源名
+        if not self._user_set_output_name:
             from src.template_manager import TemplateManager as TM
             out_dir = self.ui.editOutputDir.text() or str(Path.cwd() / "output")
             if self._data_file_paths:
                 src_name = Path(self._data_file_paths[0]).stem
             else:
-                src_name = Path(template_path).stem
+                src_name = "antenna_report"
             fname = TM.next_available_filename(out_dir, src_name)
             self.ui.editOutputName.setText(fname)
 
