@@ -1704,7 +1704,7 @@ class AntennaParamsPage(QWidget):
         splitter_widget = ThinSplitter(Qt.Horizontal)
         splitter_widget.setChildrenCollapsible(False)
 
-        left_grp = QGroupBox(self.tr("天线参数（模板识别 + full_report）"))
+        left_grp = QGroupBox(self.tr("天线参数"))
         left_layout = QVBoxLayout(left_grp)
         self._left_scroll = QScrollArea()
         self._left_scroll.setWidgetResizable(True)
@@ -2137,14 +2137,30 @@ class AntennaParamsPage(QWidget):
         self._left_checkboxes.clear()
         self._right_checkboxes.clear()
 
-        # 左右分栏: 报告需要 | 额外(full_report) — 与 ChartSettingsPage 对齐
+        # 左右分栏: 测试报告 | 额外报告
         content = QWidget()
-        hbox = QHBoxLayout(content)
-        hbox.setContentsMargins(0, 0, 0, 0)
+        vbox_outer = QVBoxLayout(content)
+        vbox_outer.setContentsMargins(0, 0, 0, 0)
+        vbox_outer.setSpacing(4)
+
+        # 共享标题行: 测试报告 + 额外报告 [启用]
+        hdr_row = QHBoxLayout()
+        hdr_row.addWidget(QLabel(self.tr("测试报告")))
+        hdr_row.addStretch()
+        hdr_row.addWidget(QLabel(self.tr("额外报告")))
+        self._check_full_report_enable = QCheckBox(self.tr("启用"))
+        self._check_full_report_enable.setChecked(
+            getattr(self._mw, '_full_report_enabled', False) if self._mw else False)
+        self._check_full_report_enable.toggled.connect(self._on_full_report_toggled)
+        hdr_row.addWidget(self._check_full_report_enable)
+        vbox_outer.addLayout(hdr_row)
+
+        # 左右列
+        hbox = QHBoxLayout()
         hbox.setSpacing(8)
 
-        # 左列: 报告需要 (模板识别自动勾选)
-        left_box = QGroupBox(self.tr("报告需要"))
+        # 左列: 测试报告内容
+        left_box = QGroupBox()
         left_layout = QVBoxLayout(left_box)
         left_layout.setSpacing(2)
         for grp_name, items in params:
@@ -2191,23 +2207,10 @@ class AntennaParamsPage(QWidget):
         left_layout.addStretch()
         hbox.addWidget(left_box, 1)
 
-        # 右列: 额外报告
+        # 右列: 额外报告内容
         right_box = QGroupBox()
         right_layout = QVBoxLayout(right_box)
         right_layout.setSpacing(2)
-        # 标题 + full_report 总开关 (同行)
-        hdr = QHBoxLayout()
-        hdr.addWidget(QLabel(self.tr("额外报告")))
-        self._check_full_report_enable = QCheckBox(self.tr("启用"))
-        self._check_full_report_enable.setChecked(
-            getattr(self._mw, '_full_report_enabled', False) if self._mw else False)
-        self._check_full_report_enable.toggled.connect(self._on_full_report_toggled)
-        hdr.addWidget(self._check_full_report_enable)
-        hdr.addStretch()
-        right_layout.addLayout(hdr)
-        # 分隔
-        sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
-        right_layout.addWidget(sep)
         for grp_name, items in params:
             grp = QGroupBox(grp_name)
             gl = QVBoxLayout(grp)
@@ -2249,6 +2252,7 @@ class AntennaParamsPage(QWidget):
             right_layout.addWidget(grp)
         right_layout.addStretch()
         hbox.addWidget(right_box, 1)
+        vbox_outer.addLayout(hbox)
 
         self._left_scroll.setWidget(content)
         self._sync_to_mw()
