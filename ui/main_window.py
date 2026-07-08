@@ -2274,7 +2274,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if file_page and hasattr(file_page, 'get_output_flags'):
             out_excel, out_word, out_data = file_page.get_output_flags()
         # 有图表配置 → 自动开启 Word 输出
-        if not out_word and getattr(self, '_chart_instances', None):
+        has_charts = bool(getattr(self, '_chart_instances', None))
+        ccfg = getattr(self, '_chart_config_required', None)
+        if not has_charts and ccfg and ccfg.has_any_c_class:
+            has_charts = True
+        if not out_word and has_charts:
             out_word = True
             if file_page and hasattr(file_page, '_check_out_word'):
                 file_page._check_out_word.setChecked(True)
