@@ -285,7 +285,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # ---- 图形展示 Tab: 启动时创建空 GraphViewer (工具栏立即可见) ----
         self._check_enable_chart_viewer = QCheckBox(self.tr("启用图表查看"))
-        self._check_enable_chart_viewer.setChecked(True)
+        self._check_enable_chart_viewer.setChecked(False)
         self._check_enable_chart_viewer.setToolTip(self.tr("关闭可跳过图表查看数据准备，加速出报告"))
         self.ui.vTabCharts.addWidget(self._check_enable_chart_viewer)
         from ui.graph_viewer import GraphViewer
