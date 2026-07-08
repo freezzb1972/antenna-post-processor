@@ -1174,14 +1174,7 @@ def _export_azimuth(
             "azimuth_polar_rhcp": "RC Azimuth Cut",
             "azimuth_polar_lhcp": "LHCP Azimuth Cut",
         }
-        # 新格式匹配: azimuth_polar_{param}_t{theta} / azimuth_polar_pk_{tmax}
-        if img_key.startswith("azimuth_polar_"):
-            rest = img_key[len("azimuth_polar_"):]
-            return f"Azimuth Cut ({rest})"
-        if img_key.startswith("azimuth_rect_"):
-            rest = img_key[len("azimuth_rect_"):]
-            return f"Azimuth Rect ({rest})"
-        # 尝试精确匹配
+        # 尝试精确匹配 (先于前缀匹配)
         if img_key in _AZ_BASE:
             return _AZ_BASE[img_key]
         # 尝试带索引后缀的 key: azimuth_polar_0, azimuth_polar_ar_1, ...
@@ -1189,6 +1182,13 @@ def _export_azimuth(
             if img_key.startswith(base + "_") and img_key[len(base)+1:].isdigit():
                 idx = int(img_key[len(base)+1:]) + 1
                 return f"{label} #{idx}"
+        # 新格式匹配: azimuth_polar_{param}_t{theta} / azimuth_polar_pk_{tmax}
+        if img_key.startswith("azimuth_polar_"):
+            rest = img_key[len("azimuth_polar_"):]
+            return f"Azimuth Cut ({rest})"
+        if img_key.startswith("azimuth_rect_"):
+            rest = img_key[len("azimuth_rect_"):]
+            return f"Azimuth Rect ({rest})"
         known = {
             "3d_gain": "3D Gain Pattern",
             "3d_eirp": "3D EIRP Pattern",
