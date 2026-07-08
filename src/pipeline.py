@@ -749,11 +749,13 @@ def _load_and_compute(
     if sheet_ar_configs is None:
         sheet_ar_configs = {}
 
-    # 统一进度条: 单次 progress_max 覆盖全部阶段 (读取→计算→Excel→Word)
+    # 统一进度条: 单次 progress_max 覆盖 5 阶段 (读取→计算→渲染→Excel→Word)
     _load_w = max(total, 1)            # 阶段1: 读取源文件
-    _compute_w = max(total * 6, 1)     # 阶段2: 计算 (6x 保证每任务多次更新)
-    _export_w = 10                      # 阶段3: Excel 导出
-    _word_w = 10                        # 阶段4: Word 输出
+    _calc_w = max(total * 4, 1)        # 阶段2: 计算参数
+    _render_w = max(total * 2, 1)      # 阶段3: 渲染图表
+    _compute_w = _calc_w + _render_w
+    _export_w = 10                      # 阶段4: Excel 导出
+    _word_w = 10                        # 阶段5: Word 输出
     progress_max = _load_w + _compute_w + _export_w + _word_w
 
     # ── 阶段 1: 读取源文件 ──
@@ -788,15 +790,19 @@ def _load_and_compute(
                 for sheet_name, row in fut.result():
                     sheet_results[sheet_name].append(row)
                     completed += 1
-                step = data_done + int(_compute_w * completed / len(compute_tasks))
+                step = data_done + int(_calc_w * completed / len(compute_tasks))
                 _report(progress_callback, step, progress_max,
                         f"[🧮] 计算参数 {completed}/{len(compute_tasks)}")
+                rstep = data_done + _calc_w + int(_render_w * completed / len(compute_tasks))
+                _report(progress_callback, rstep, progress_max,
+                        f"[🎨] 渲染图表 {completed}/{len(compute_tasks)}")
     else:
         _run_compute_serial(compute_tasks, sheet_results, data_done, progress_max,
                             cancel_callback, progress_callback, log_cb=log_callback,
                             azimuth_config=azimuth_config,
                             dir_extrap_method=dir_extrap_method,
-                            compute_weight=_compute_w, compute_total=len(compute_tasks))
+                            calc_w=_calc_w, render_w=_render_w,
+                            compute_total=len(compute_tasks))
 
     return sheet_results
 
@@ -805,11 +811,12 @@ def _run_compute_serial(
     compute_tasks, sheet_results, data_done, progress_max,
     cancel_callback, progress_callback, log_cb=None, azimuth_config=None,
     dir_extrap_method="none",
-    compute_weight=None, compute_total=None,
+    calc_w=None, render_w=None, compute_total=None,
 ):
     """串行逐频点计算（单进程或 parallel=1）。"""
     total_tasks = compute_total or len(compute_tasks)
-    cw = compute_weight or max(total_tasks * 3, 1)
+    cw = calc_w or max(total_tasks * 4, 1)
+    rw = render_w or max(total_tasks * 2, 1)
     for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co) in enumerate(compute_tasks):
         if cancel_callback and cancel_callback():
             break
@@ -823,6 +830,12 @@ def _run_compute_serial(
             step = int(cw * (i + 1) / total_tasks)
             _report(progress_callback, data_done + step, progress_max,
                     f"[🧮] 计算参数 {i+1}/{total_tasks}")
+            # 渲染进度 (calc 完成后进入 render)
+            has_imgs = bool(row.get("_images")) or bool(row.get("_graph_error"))
+            if has_imgs:
+                rstep = data_done + cw + int(rw * (i + 1) / total_tasks)
+                _report(progress_callback, rstep, progress_max,
+                        f"[🎨] 渲染图表 {i+1}/{total_tasks}")
 
 
 def _close_datasources(
@@ -1003,10 +1016,11 @@ def run_pipeline(
         _report(progress_callback, 1, 1, "✅ 预览就绪")
         return sheet_results
 
-    # ── 阶段 3: 输出 Excel 天线参数 (统一 progress_max) ──
+    # ── 阶段 4: 输出 Excel 天线参数 (统一 progress_max) ──
     total = len(tasks)
     _load_w = max(total, 1)
-    _compute_w = max(total * 6, 1)
+    _calc_w = max(total * 4, 1); _render_w = max(total * 2, 1)
+    _compute_w = _calc_w + _render_w
     _base = _load_w + _compute_w
     _export_w = 10  # Excel 导出权重
     _word_w = 10    # Word 导出权重

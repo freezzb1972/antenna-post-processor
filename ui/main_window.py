@@ -503,12 +503,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         progress_row.addWidget(self.ui.lblProgressMsg)
         exec_layout.addLayout(progress_row)
 
-        # 阶段指示器: 4 个阶段标签，当前阶段高亮
+        # 阶段指示器: 5 个阶段标签，右对齐
         stage_row = QHBoxLayout()
         stage_row.setSpacing(2)
+        stage_row.addStretch()
         self._stage_labels: list[QLabel] = []
         stage_names = [
-            self.tr("📂 读取数据"), self.tr("🧮 计算参数"),
+            self.tr("📂 读取数据"), self.tr("🧮 计算参数"), self.tr("🎨 渲染图表"),
             self.tr("📊 Excel输出"), self.tr("📄 Word输出"),
         ]
         for name in stage_names:
@@ -520,7 +521,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             )
             stage_row.addWidget(lbl)
             self._stage_labels.append(lbl)
-        stage_row.addStretch()
         exec_layout.addLayout(stage_row)
 
         h_splitter = ThinSplitter(Qt.Horizontal)
@@ -2581,7 +2581,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.progressBar.setMaximum(100)
         self.ui.progressBar.setValue(pct)
         # 阶段切换检测: 从消息前缀 [emoji] 提取阶段索引
-        stage_map = {"📂": 0, "🧮": 1, "📊": 2, "📄": 3, "✅": -1}
+        stage_map = {"📂": 0, "🧮": 1, "🎨": 2, "📊": 3, "📄": 4, "✅": -1}
         stage_idx = -1
         for emoji, idx in stage_map.items():
             if message.startswith(f"[{emoji}]"):
