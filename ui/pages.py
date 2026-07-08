@@ -2968,7 +2968,7 @@ class ChartSettingsPage(QWidget):
             # C 类: 俯仰面切面图标题 (在 checkbox 之前)
             if "C 类" in cat_name:
                 _phi_l = QLabel(self.tr("▸ 俯仰面切面图"))
-                _phi_l.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                _phi_l.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
                 cat_left_ly.addWidget(_phi_l)
             for key in keys:
                 row = QHBoxLayout()
@@ -3011,7 +3011,7 @@ class ChartSettingsPage(QWidget):
             self._add_select_all_row(self._chart_extra, keys, cat_right_ly)
             if "C 类" in cat_name:
                 _phi_r = QLabel(self.tr("▸ 俯仰面切面图"))
-                _phi_r.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                _phi_r.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
                 cat_right_ly.addWidget(_phi_r)
             for key in keys:
                 row = QHBoxLayout()
@@ -3036,7 +3036,7 @@ class ChartSettingsPage(QWidget):
             # C 类: 方位面切面图 + DPI
             if "C 类" in cat_name:
                 _az_lbl_r = QLabel(self.tr("▸ 方位面切面图"))
-                _az_lbl_r.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                _az_lbl_r.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
                 cat_right_ly.addWidget(_az_lbl_r)
                 _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
                             "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
@@ -3146,13 +3146,14 @@ class ChartSettingsPage(QWidget):
         scroll.setFrameShape(QScrollArea.NoFrame)
         scroll_content = QWidget()
         scroll_vbox = QVBoxLayout(scroll_content)
-        # 左右列水平并排放入 scroll
+        # 左右列用 QSplitter 水平并排 (中间可拖拽分隔线)
         self._chart_grp_list = grp_list
         self._chart_scroll_vbox = scroll_vbox
-        col_row = QHBoxLayout()
-        col_row.addWidget(left_box, 1)
-        col_row.addWidget(right_box, 1)
-        scroll_vbox.addLayout(col_row)
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.addWidget(left_box)
+        splitter.addWidget(right_box)
+        splitter.setSizes([400, 400])
+        scroll_vbox.addWidget(splitter)
         scroll_vbox.addWidget(out_grp)  # 输出设置 (Word 布局等)
         scroll_vbox.addStretch()
         scroll.setWidget(scroll_content)
@@ -3162,7 +3163,7 @@ class ChartSettingsPage(QWidget):
         """构建方位面极坐标切面控件 (可复用 — setup_ui + rebuild 共用)。"""
         # 标题
         _az_lbl = QLabel(self.tr("▸ 方位面切面图"))
-        _az_lbl.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+        _az_lbl.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
         left_layout.addWidget(_az_lbl)
         # 全选/取消全选
         _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
@@ -3604,12 +3605,12 @@ class ChartSettingsPage(QWidget):
 
         # 清除旧的类别 QGroupBox (保留 left_box/right_box 的 header)
         vbox = self._chart_scroll_vbox
-        # vbox 结构: col_row(HBox: left_box + right_box) + stretch
-        col_row = vbox.itemAt(0).layout()
-        if col_row is None:
+        # vbox 结构: splitter(left_box + right_box) + stretch
+        splitter = vbox.itemAt(0).widget()
+        if splitter is None:
             return
-        left_box = col_row.itemAt(0).widget()
-        right_box = col_row.itemAt(1).widget()
+        left_box = splitter.widget(0)
+        right_box = splitter.widget(1)
         left_outer = left_box.layout()
         right_outer = right_box.layout()
         # 清除内部旧类别 (保留 header: hdr_l + sep_l / hdr_r + sep_r)
@@ -3641,7 +3642,7 @@ class ChartSettingsPage(QWidget):
             self._add_select_all_row(self._chart_required, keys, cat_left_ly)
             if "C 类" in cat_name:
                 _phi_l = QLabel(self.tr("▸ 俯仰面切面图"))
-                _phi_l.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                _phi_l.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
                 cat_left_ly.addWidget(_phi_l)
             for key in keys:
                 row = QHBoxLayout()
@@ -3684,7 +3685,7 @@ class ChartSettingsPage(QWidget):
             self._add_select_all_row(self._chart_extra, keys, cat_right_ly)
             if "C 类" in cat_name:
                 _phi_r = QLabel(self.tr("▸ 俯仰面切面图"))
-                _phi_r.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                _phi_r.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
                 cat_right_ly.addWidget(_phi_r)
             for key in keys:
                 row = QHBoxLayout()
@@ -3707,7 +3708,7 @@ class ChartSettingsPage(QWidget):
                 row.addStretch(); cat_right_ly.addLayout(row)
             if "C 类" in cat_name:
                 _az_lbl_r = QLabel(self.tr("▸ 方位面切面图"))
-                _az_lbl_r.setStyleSheet("font-weight: bold; color: #555; margin-top: 4px;")
+                _az_lbl_r.setStyleSheet("font-weight: bold; color: #333; margin-top: 4px;")
                 cat_right_ly.addWidget(_az_lbl_r)
                 _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
                             "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
