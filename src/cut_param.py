@@ -120,7 +120,7 @@ def render_phi_cuts(
 ) -> dict[str, any]:
     """俯仰面切面: 固定 φ, 扫描 θ (Theta 轴) — 极坐标 + 直角坐标。
 
-    每个启用的参数 × 每个 Phi 角度 → 极坐标图和直角坐标图。
+    每个启用的参数 → 一张图 (多个 Phi 角度 = 多条曲线)。
     极坐标图自动包含 φ+180° mirror (标准做法)。
     """
     images = {}
@@ -138,27 +138,30 @@ def render_phi_cuts(
     for p in params:
         if not p.enabled or p.data is None:
             continue
+        # 收集所有角度的曲线
+        curves = []
         for phi_target in sorted(set(p.phi_angles)):
             idx = _nearest_index(phi_deg, phi_target)
             nearest_phi = float(phi_deg[idx])
             label = f"φ={nearest_phi:.0f}°"
-            d = p.data[idx, :]                            # φ 侧数据
-            mirror_idx = (idx + n_phi // 2) % n_phi
-            mirror = p.data[mirror_idx, :]                # φ+180° 镜像
+            curves.append((label, theta_deg, p.data[idx, :]))
 
-            if polar_enabled:
-                key = f"2d_polar_{p.key}_phi{nearest_phi:.0f}"
-                images[key] = renderer.render_2d_polar(
-                    theta_deg, d, freq_mhz,
-                    cut_label=f"{label} {p.ylabel}",
-                    mirror_angles_deg=theta_deg, mirror_gain_dbi=mirror,
-                    ylabel=p.ylabel, dpi=dpi, antenna_name="",
-                )
+        if not curves:
+            continue
 
-            if rect_enabled:
-                key = f"2d_rect_{p.key}_phi{nearest_phi:.0f}"
+        if polar_enabled:
+            key = f"2d_polar_{p.key}"
+            images[key] = renderer.render_2d_polar(
+                theta_deg, curves[0][2], freq_mhz,
+                ylabel=p.ylabel, dpi=dpi, antenna_name="",
+                curves=curves,
+            )
+
+        if rect_enabled:
+            for label, a_deg, vals in curves:
+                key = f"2d_rect_{p.key}_phi{label.replace('φ=', '').replace('°', '')}"
                 images[key] = renderer.render_2d_rect(
-                    theta_deg, d, freq_mhz,
+                    a_deg, vals, freq_mhz,
                     cut_label=f"{label} {p.ylabel}",
                     ylabel=p.ylabel, dpi=dpi, antenna_name="",
                 )

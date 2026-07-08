@@ -89,6 +89,13 @@ def write_chart_word_report(
         # side_by_side / default: 逐组排列
         _write_by_type(doc, ordered_groups, antenna_name, angles_str, img_width, layout_columns, show_caption)
 
+    # 避免覆盖: 同名文件自动加 _1, _2, ...
+    base, ext = os.path.splitext(output_path)
+    n = 1
+    while os.path.exists(output_path):
+        output_path = f"{base}_{n}{ext}"
+        n += 1
+
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     doc.save(output_path)
 
@@ -149,6 +156,13 @@ def write_chart_word_report_by_freq(
             _write_image_grid(doc, images, freqs_extra, antenna_name,
                               group_name, extra_angles, img_width, 1,
                               show_caption=show_caption)
+
+    # 避免覆盖: 同名文件自动加 _1, _2, ...
+    base, ext = os.path.splitext(output_path)
+    n = 1
+    while os.path.exists(output_path):
+        output_path = f"{base}_{n}{ext}"
+        n += 1
 
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     doc.save(output_path)

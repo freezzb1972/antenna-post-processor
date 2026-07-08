@@ -269,24 +269,34 @@ class MatplotlibRenderer(BaseRenderer):
         ylabel: str = "Gain (dBi)",
         mirror_angles_deg: np.ndarray | None = None,
         mirror_gain_dbi: np.ndarray | None = None,
+        curves: list[tuple[str, np.ndarray, np.ndarray]] | None = None,
     ) -> io.BytesIO:
         """2D 极坐标切面图。
 
-        若提供 mirror_angles_deg 和 mirror_gain_dbi，则绘制 Phi+180°
-        切面的镜像曲线，形成完整的 360° 极坐标图形。
+        支持单曲线模式 (angles_deg + gain_dbi) 或多曲线模式 (curves)。
+        若提供 mirror_*, 则绘制 φ+180° 镜像于左侧 (负 theta 半区)。
         """
         theta_rad = np.deg2rad(angles_deg)
         fig, ax = plt.subplots(subplot_kw={"projection": "polar"},
                                dpi=dpi, figsize=(7, 6))
 
-        ax.plot(theta_rad, gain_dbi, "b-", linewidth=1.2)
-        ax.fill(theta_rad, gain_dbi, alpha=0.1, color="blue")
-
-        # Phi+180° 镜像曲线: 绘于负 theta 半区 (左半平面)
-        if mirror_angles_deg is not None and mirror_gain_dbi is not None:
-            mirror_rad = np.deg2rad(mirror_angles_deg)
-            ax.plot(mirror_rad, mirror_gain_dbi, "b-", linewidth=1.2)
-            ax.fill(mirror_rad, mirror_gain_dbi, alpha=0.08, color="blue")
+        colors = ["#2196F3", "#F44336", "#4CAF50", "#FF9800"]
+        if curves:
+            for i, (label, c_angles, c_values) in enumerate(curves):
+                color = colors[i % len(colors)]
+                rad = np.deg2rad(c_angles)
+                ax.plot(rad, c_values, "-", linewidth=1.2, color=color, label=label)
+                # mirror (左侧)
+                mirror_rad = -rad  # 负角度 = 左半平面
+                ax.plot(mirror_rad, c_values, "--", linewidth=1.0, color=color, alpha=0.6)
+            if len(curves) > 1:
+                ax.legend(fontsize=8, loc="upper right")
+        else:
+            ax.plot(theta_rad, gain_dbi, "-", linewidth=1.2, color="#2196F3", label=cut_label)
+            if mirror_angles_deg is not None and mirror_gain_dbi is not None:
+                mirror_rad = -np.deg2rad(mirror_angles_deg)  # 负角度 = 左半平面
+                ax.plot(mirror_rad, mirror_gain_dbi, "--", linewidth=1.0,
+                        color="#2196F3", alpha=0.6)
 
         ax.set_theta_zero_location("N")
         ax.set_theta_direction(-1)
@@ -298,12 +308,10 @@ class MatplotlibRenderer(BaseRenderer):
         if antenna_name:
             title_parts.append(antenna_name)
         title_parts.append(f"{freq_mhz:.0f} MHz")
-        if cut_label:
-            title_parts.append(cut_label)
+        title_parts.append(ylabel)
         ax.set_title(" — ".join(title_parts), fontsize=12, pad=18)
 
         _setup_polar_radial_ticks(ax)
-
         ax.set_ylabel(ylabel, fontsize=10, labelpad=20)
         ax.grid(True, alpha=0.4)
 
@@ -325,9 +333,7 @@ class MatplotlibRenderer(BaseRenderer):
         """2D 直角坐标切面图。"""
         fig, ax = plt.subplots(dpi=dpi, figsize=(8, 5))
 
-        ax.plot(angles_deg, gain_dbi, "b-", linewidth=1.2)
-        ax.fill_between(angles_deg, gain_dbi, gain_dbi.min() - 5,
-                        alpha=0.08, color="blue")
+        ax.plot(angles_deg, gain_dbi, "-", linewidth=1.2, color="#2196F3")
 
         ax.set_xlabel(xlabel, fontsize=10)
         ax.set_ylabel(ylabel, fontsize=10)
@@ -358,9 +364,7 @@ class MatplotlibRenderer(BaseRenderer):
         """2D 直角坐标方位面切面图 (Theta 切 — 固定 θ, 扫描 φ)。"""
         fig, ax = plt.subplots(dpi=dpi, figsize=(8, 5))
 
-        ax.plot(phi_deg, values, "b-", linewidth=1.2)
-        ax.fill_between(phi_deg, values, values.min() - 5,
-                        alpha=0.08, color="blue")
+        ax.plot(phi_deg, values, "-", linewidth=1.2, color="#2196F3")
 
         ax.set_xlabel("Phi (deg)", fontsize=10)
         ax.set_ylabel(ylabel, fontsize=10)
