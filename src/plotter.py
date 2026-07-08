@@ -314,14 +314,15 @@ def generate_all_for_frequency(
             for ci, angles in enumerate(azimuth_config.angle_charts):
                 key = "azimuth_polar" if len(azimuth_config.angle_charts) == 1 else f"azimuth_polar_{ci}"
                 _render_azimuth(gain_dbi, sorted(set(angles)), key, "Gain (dBi)")
-        if azimuth_config.cut_azimuth_polar_pk070:
+        for t_max in (azimuth_config.pk_theta_ranges if azimuth_config else []):
             try:
-                mask = theta_deg <= 70.1
-                pk_070 = np.max(gain_dbi[:, mask], axis=1)
-                images["azimuth_polar_pk070"] = _renderer.render_azimuth_polar(
-                    phi_deg, [(70.0, pk_070)], freq_mhz,
-                    antenna_name=az_antenna, dpi=az_dpi, ylabel="Gain (dBi)",
-                    title=f"{freq_mhz:.0f}MHz - Gain (dBi) Theta 0°-70°",
+                mask = theta_deg <= t_max + 0.1
+                pk_vals = np.max(gain_dbi[:, mask], axis=1)
+                key = f"azimuth_polar_pk_{int(t_max)}"
+                t = f"{freq_mhz:.0f}MHz - Gain (dBi) θ=0°-{int(t_max)}°"
+                images[key] = _renderer.render_azimuth_polar(
+                    phi_deg, [(t_max, pk_vals)], freq_mhz,
+                    antenna_name=az_antenna, dpi=az_dpi, ylabel="Gain (dBi)", title=t,
                 )
             except Exception:
                 pass

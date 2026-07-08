@@ -493,11 +493,13 @@ def _process_one_frequency(
                 row["_azimuth_lhcp_db"] = lhcp_db
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
-            # Gain 0-70° Pk 中间数据
-            if azimuth_config and azimuth_config.cut_azimuth_polar_pk070:
-                mask = theta_deg <= 70.1
-                row["_gain_pk070_deg"] = theta_deg[mask].copy()
-                row["_gain_pk070_db"] = np.max(gain_dbi[:, mask], axis=1)
+            # Theta 范围峰值中间数据 (替代硬编码 70°)
+            if azimuth_config and azimuth_config.pk_theta_ranges:
+                for t_max in azimuth_config.pk_theta_ranges:
+                    mask = theta_deg <= t_max + 0.1
+                    key_suffix = str(int(t_max))
+                    row[f"_gain_pk_{key_suffix}_deg"] = theta_deg[mask].copy()
+                    row[f"_gain_pk_{key_suffix}_db"] = np.max(gain_dbi[:, mask], axis=1)
         except Exception as e:
             row["_graph_error"] = str(e)  # 图形生成失败不阻塞数据处理
 
@@ -1133,7 +1135,7 @@ def _export_azimuth(
     freq_ar_data: list[tuple[float, dict[float, np.ndarray]]] = []
     freq_rhcp_data: list[tuple[float, dict[float, np.ndarray]]] = []
     freq_lhcp_data: list[tuple[float, dict[float, np.ndarray]]] = []
-    freq_gain_vs_theta: list[tuple[float, np.ndarray]] = []  # [(freq, pk070_values_over_phi)]
+    freq_gain_vs_theta: dict[float, list[tuple[float, np.ndarray]]] = {}  # {t_max: [(freq, values)]}
 
 
     # 图片类型 → 用户可读组名
@@ -1153,7 +1155,6 @@ def _export_azimuth(
         # azimuth 多图表: azimuth_polar_0 → "Gain Azimuth Cut #1"
         _AZ_BASE = {
             "azimuth_polar": "Gain Azimuth Cut",
-            "azimuth_polar_pk070": "Gain Azimuth (θ=0°-70°)",
             "azimuth_polar_ar": "AR Azimuth Cut",
             "azimuth_polar_rhcp": "RC Azimuth Cut",
             "azimuth_polar_lhcp": "LHCP Azimuth Cut",
@@ -1309,10 +1310,12 @@ def _export_azimuth(
                     nearest = float(theta_deg_arr[idx])
                     ld[nearest] = lhcp_db_v[:, idx].copy()
                 freq_lhcp_data.append((freq, ld))
-            # Gain 0-70° Pk 中间数据 (每 phi 的 Theta 范围峰值)
-            pk070_db = row.get("_gain_pk070_db")
-            if pk070_db is not None and freq is not None:
-                freq_gain_vs_theta.append((freq, pk070_db.copy()))
+            # Theta 范围峰值中间数据 (每 phi 的 Theta 范围峰值)
+            if azimuth_config and azimuth_config.pk_theta_ranges:
+                for t_max in azimuth_config.pk_theta_ranges:
+                    pk_db = row.get(f"_gain_pk_{int(t_max)}_db")
+                    if pk_db is not None and freq is not None:
+                        freq_gain_vs_theta.setdefault(t_max, []).append((freq, pk_db.copy()))
 
 
     # ── Write Word: 统一输出所有图表到 Word ──
@@ -1363,8 +1366,8 @@ def _export_azimuth(
                 data_sheets["RHCP Azimuth"] = freq_rhcp_data
             if azimuth_config.cut_azimuth_polar_lhcp and freq_lhcp_data:
                 data_sheets["LHCP Azimuth"] = freq_lhcp_data
-            if azimuth_config.cut_azimuth_polar_pk070 and freq_gain_vs_theta:
-                data_sheets["Gain 0-70 Pk"] = [("phi_matrix", freq_gain_vs_theta)]
+            for t_max, pk_data in freq_gain_vs_theta.items():
+                data_sheets[f"Gain 0-{int(t_max)}° Pk"] = [("phi_matrix", pk_data)]
         if data_sheets:
             if not data_path:
                 gdir = getattr(azimuth_config, 'data_output_dir', '') if azimuth_config else ''
@@ -1401,7 +1404,7 @@ def _export_azimuth(
                     wb = _xl.Workbook(); wb.remove(wb.active)
                     for sheet_name, fd in data_sheets.items():
                         if not fd: continue
-                        if sheet_name == "Gain 0-70 Pk":
+                        if "Pk" in sheet_name and fd:
                             ws = wb.create_sheet(sheet_name)
                             _, pk_data = fd[0]
                             ws.cell(1, 1, "Phi (°)")
