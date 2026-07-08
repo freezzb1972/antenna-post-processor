@@ -1155,12 +1155,13 @@ def _export_azimuth(
     # 图片类型 → 用户可读组名
     def _label_for_image_key(img_key: str) -> str:
         """将 image key 映射为用户可读组名（支持多图表索引后缀）。"""
-        if img_key.startswith("2d_polar_phi"):
-            phi = img_key[len("2d_polar_phi"):]
-            return f"2D Polar Cut (φ={phi}°)"
-        if img_key.startswith("2d_rect_phi"):
-            phi = img_key[len("2d_rect_phi"):]
-            return f"2D Rectangular Cut (φ={phi}°)"
+        # 新格式: 2d_polar_{param}_phi{angle} / 2d_rect_{param}_phi{angle}
+        if img_key.startswith("2d_polar_"):
+            rest = img_key[len("2d_polar_"):]
+            return f"2D Polar Cut ({rest})"
+        if img_key.startswith("2d_rect_"):
+            rest = img_key[len("2d_rect_"):]
+            return f"2D Rect Cut ({rest})"
         # 3D multi-view keys: 3d_gain_v0, 3d_gain_v1, ...
         if "_v" in img_key and any(img_key.startswith(p) for p in ("3d_gain", "3d_eirp", "3d_ar")):
             base = img_key.rsplit("_v", 1)[0]
@@ -1173,6 +1174,13 @@ def _export_azimuth(
             "azimuth_polar_rhcp": "RC Azimuth Cut",
             "azimuth_polar_lhcp": "LHCP Azimuth Cut",
         }
+        # 新格式匹配: azimuth_polar_{param}_t{theta} / azimuth_polar_pk_{tmax}
+        if img_key.startswith("azimuth_polar_"):
+            rest = img_key[len("azimuth_polar_"):]
+            return f"Azimuth Cut ({rest})"
+        if img_key.startswith("azimuth_rect_"):
+            rest = img_key[len("azimuth_rect_"):]
+            return f"Azimuth Rect ({rest})"
         # 尝试精确匹配
         if img_key in _AZ_BASE:
             return _AZ_BASE[img_key]
