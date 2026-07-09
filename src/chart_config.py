@@ -417,7 +417,7 @@ class ChartConfig:
         return {
             "A 类: 3D 方向图": pattern_3d,
             "B 类: 频率曲线": vs_freq,
-            "2D 切面图": cuts,
+            "C 类: 2D 切面图": cuts,
         }
 
 
