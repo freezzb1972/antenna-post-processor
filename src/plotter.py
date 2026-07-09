@@ -289,7 +289,9 @@ def generate_all_for_frequency(
     phi_entries = (getattr(chart_config, 'cut_2d_polar_entries', None) or []) + \
                   (getattr(chart_config, 'cut_2d_rect_entries', None) or [])
     theta_entries = []  # 方位面 entries 由 azimuth_config 独立管理
-    if phi_entries or theta_entries:
+    if not phi_entries and not theta_entries:
+        params = []  # 没有配置条目 → 不生成 2D 切面图
+    else:
         from .cut_param import CutChartEntry as _CE
         all_entries = []
         for param, angles in phi_entries:
@@ -297,13 +299,6 @@ def generate_all_for_frequency(
         for param, angles in theta_entries:
             all_entries.append(_CE(param=param, direction="theta", angles=angles))
         params = build_cut_params_from_entries(all_entries, data_map)
-    else:
-        phi_angles = (list(chart_config.cut_2d_phi_angles) if chart_config.cut_2d_phi_angles
-                      else [0.0, 90.0])
-        theta_cut_angles = (list(chart_config.cut_2d_theta_angles) if chart_config.cut_2d_theta_angles
-                            else [30.0, 60.0])
-        params = build_cut_params(chart_config.cut_2d_params, data_map,
-                                  phi_angles=phi_angles, theta_angles=theta_cut_angles)
     images.update(render_phi_cuts(params, theta_deg, phi_deg, freq_mhz,
                                   chart_config, _renderer))
     images.update(render_theta_cuts(params, theta_deg, phi_deg, freq_mhz,
