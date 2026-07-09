@@ -1422,6 +1422,7 @@ def _export_azimuth(
         if not data_path:
             data_path = ""
         # 收集启用的图表类型 → 数据映射
+        data_sheets = {}
         if output_config:
             for t_max, pk_data in freq_gain_vs_theta.items():
                 data_sheets[f"Gain 0-{int(t_max)} Pk"] = [("phi_matrix", pk_data)]
