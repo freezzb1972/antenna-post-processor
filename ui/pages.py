@@ -3750,6 +3750,7 @@ class ChartSettingsPage(QWidget):
         edit_form.addRow(self.tr("方位角:"), spin_az)
         _refresh_edit()
         layout.addWidget(edit_grp)
+        self._add_frequency_picker(layout)
         layout.addStretch()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -3868,6 +3869,7 @@ class ChartSettingsPage(QWidget):
         check_dual.setToolTip(self.tr("Efficiency%+Gain 和 Directivity+TRP 共用双Y轴"))
         global_form.addRow("", check_dual)
         layout.addWidget(global_grp)
+        self._add_frequency_picker(layout)
         layout.addStretch()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -4091,6 +4093,7 @@ class ChartSettingsPage(QWidget):
         spin_dpi.setValue(getattr(current, 'dpi', 150) if current else 150)
         dpi_row.addWidget(spin_dpi); dpi_row.addStretch()
         layout.addLayout(dpi_row)
+        self._add_frequency_picker(layout)
 
         # ── 按钮 ──
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -4210,6 +4213,7 @@ class ChartSettingsPage(QWidget):
         step_layout.addWidget(btn_gen); step_layout.addStretch()
         edit_layout.addWidget(step_grp)
         layout.addWidget(edit_grp)
+        self._add_frequency_picker(layout)
         layout.addStretch()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -4289,74 +4293,8 @@ class ChartSettingsPage(QWidget):
                 return _charts[idx]
             return _charts[0] if _charts else []
 
-        # ── 频点选择 ──
-        from ui.widgets import FrequencyPickerWidget
-        freq_grp = QGroupBox(self.tr("频点选择"))
-        freq_layout = QVBoxLayout(freq_grp)
-        freq_picker = FrequencyPickerWidget()
-
-        # 从数据源加载频点 (替代旧 graph_viewer 方式)
-        all_freqs = set()
-        ds_map = getattr(self._mw, '_cached_datasource_map', None) if self._mw else None
-        if ds_map:
-            for ds in ds_map.values():
-                if hasattr(ds, 'frequencies'):
-                    all_freqs.update(ds.frequencies)
-        if not all_freqs and self._mw and getattr(self._mw, '_data_file_paths', None):
-            # 回退: 从文件直接解析
-            from src.datasource import DataSource
-            for fp in self._mw._data_file_paths[:3]:  # 只扫前3个, 避免慢
-                try:
-                    ds = DataSource.from_path(fp)
-                    if hasattr(ds, 'frequencies'):
-                        all_freqs.update(ds.frequencies)
-                except Exception:
-                    pass
-        if all_freqs:
-            freq_picker.set_frequencies(sorted(all_freqs))
-        else:
-            freq_picker.set_frequencies([])
-
-        cfg = getattr(self._mw, '_chart_config_required', None) if self._mw else None
-        if cfg and cfg.selected_frequencies:
-            freq_picker.set_selected(cfg.selected_frequencies)
-
-        freq_layout.addWidget(freq_picker)
-
-        # ── 手动输入 / Excel 粘贴 ──
-        paste_row = QHBoxLayout()
-        paste_row.addWidget(QLabel(self.tr("粘贴/手动输入:")))
-        edit_paste = QLineEdit()
-        edit_paste.setPlaceholderText(self.tr("逗号/空格/换行分隔, 支持 Excel 粘贴"))
-        edit_paste.setToolTip(self.tr("从 Excel 复制频点数据行或列, 粘贴到此自动解析"))
-        paste_row.addWidget(edit_paste)
-        btn_apply = QPushButton(self.tr("应用"))
-        def _apply_pasted():
-            text = edit_paste.text().strip()
-            if not text:
-                return
-            # 解析: 逗号/空格/换行/Tab 分隔
-            import re
-            parts = re.split(r'[\s,;\t\n\r]+', text)
-            parsed = []
-            for p in parts:
-                p = p.strip()
-                if not p:
-                    continue
-                try:
-                    parsed.append(float(p))
-                except ValueError:
-                    continue
-            if parsed:
-                current = set(freq_picker.get_selected())
-                current.update(parsed)
-                freq_picker.set_selected(sorted(current))
-                edit_paste.clear()
-        btn_apply.clicked.connect(_apply_pasted)
-        edit_paste.returnPressed.connect(_apply_pasted)
-        paste_row.addWidget(btn_apply)
-        freq_layout.addLayout(paste_row)
-        layout.addWidget(freq_grp)
+        freq_picker = self._add_frequency_picker(layout)
+        freq_picker_sel = lambda: self._sync_selected_frequencies(freq_picker.get_selected())
 
         # ── 角度编辑区 ──
         edit_grp = QGroupBox(self.tr("编辑选中图表的角度"))
@@ -4434,6 +4372,62 @@ class ChartSettingsPage(QWidget):
         layout.addWidget(btns)
         dlg.exec()
         self._sync_to_mw()
+
+    def _add_frequency_picker(self, layout: QVBoxLayout):
+        """构建频点选择组件 — 各参数弹窗复用。返回 picker 对象。"""
+        from ui.widgets import FrequencyPickerWidget
+        freq_grp = QGroupBox(self.tr("频点选择"))
+        freq_lo = QVBoxLayout(freq_grp)
+        picker = FrequencyPickerWidget()
+
+        all_freqs = set()
+        ds_map = getattr(self._mw, '_cached_datasource_map', None) if self._mw else None
+        if ds_map:
+            for ds in ds_map.values():
+                if hasattr(ds, 'frequencies'):
+                    all_freqs.update(ds.frequencies)
+        if not all_freqs and self._mw and getattr(self._mw, '_data_file_paths', None):
+            from src.datasource import DataSource
+            for fp in self._mw._data_file_paths[:3]:
+                try:
+                    ds = DataSource.from_path(fp)
+                    if hasattr(ds, 'frequencies'):
+                        all_freqs.update(ds.frequencies)
+                except Exception:
+                    pass
+        picker.set_frequencies(sorted(all_freqs) if all_freqs else [])
+
+        cfg = getattr(self._mw, '_chart_config_required', None) if self._mw else None
+        if cfg and cfg.selected_frequencies:
+            picker.set_selected(cfg.selected_frequencies)
+        freq_lo.addWidget(picker)
+
+        paste_row = QHBoxLayout()
+        paste_row.addWidget(QLabel(self.tr("粘贴/手动输入:")))
+        edit = QLineEdit()
+        edit.setPlaceholderText(self.tr("逗号/空格/换行分隔"))
+        edit.setToolTip(self.tr("从 Excel 复制频点数据, 粘贴到此自动解析"))
+        paste_row.addWidget(edit)
+        btn = QPushButton(self.tr("应用"))
+        def _apply():
+            import re
+            parts = re.split(r'[\s,;\t\n\r]+', edit.text().strip())
+            parsed = [float(p) for p in parts if p.strip()] if parts else []
+            try:
+                parsed = [float(p) for p in parts if p.strip()]
+            except ValueError:
+                parsed = []
+            if parsed:
+                current = set(picker.get_selected())
+                current.update(parsed)
+                picker.set_selected(sorted(current))
+                edit.clear()
+        btn.clicked.connect(_apply)
+        edit.returnPressed.connect(_apply)
+        paste_row.addWidget(btn)
+        freq_lo.addLayout(paste_row)
+        layout.addWidget(freq_grp)
+        return picker
 
     def _sync_selected_frequencies(self, freqs: list[float]):
         """将选中的频点同步到 ChartConfig。"""
