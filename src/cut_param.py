@@ -175,7 +175,7 @@ def render_theta_cuts(
     phi_deg: np.ndarray,
     freq_mhz: float,
     chart_config,
-    azimuth_config,
+    output_config,
     renderer,
 ) -> dict[str, any]:
     """方位面切面: 固定 θ, 扫描 φ (Phi 轴) — 极坐标 + 直角坐标。
@@ -193,7 +193,7 @@ def render_theta_cuts(
     if not polar_enabled and not rect_enabled:
         return images
 
-    az_dpi = azimuth_config.dpi if azimuth_config is not None and azimuth_config.dpi else 150
+    az_dpi = output_config.dpi if output_config is not None and output_config.dpi else 150
 
     for p in params:
         if not p.enabled or p.data is None:

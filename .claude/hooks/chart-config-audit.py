@@ -2,7 +2,7 @@
 """Pre-commit: 图表配置接口一致性检查
 
 检查项:
-  1. 字段名碰撞检测 — ChartConfig 和 AzimuthReportConfig 是否有重叠字段
+  1. 字段名碰撞检测 — ChartConfig 和 OutputConfig 是否有重叠字段
   2. merge/to_dict/from_dict 覆盖度 — 新增字段是否在所有序列化方法中覆盖
   3. 复选框重复检查 — 同一 key 是否被多次写入 _chart_required/_chart_extra
   4. 重复代码块近似度 — 相似 >80% 的连续代码段
@@ -44,19 +44,19 @@ def _find_dataclass_fields(filepath: str, class_name: str) -> set[str]:
 
 
 def check_field_collisions() -> list[str]:
-    """ChartConfig 和 AzimuthReportConfig 不应有重叠字段。"""
+    """ChartConfig 和 OutputConfig 不应有重叠字段。"""
     chart_fields = _find_dataclass_fields(
         str(PROJECT_ROOT / "src" / "chart_config.py"), "ChartConfig")
     az_fields = _find_dataclass_fields(
-        str(PROJECT_ROOT / "src" / "azimuth_config.py"), "AzimuthReportConfig")
+        str(PROJECT_ROOT / "src" / "output_config.py"), "OutputConfig")
 
-    # 白名单: dpi(各独立), cut_azimuth_polar/rect(UI→ChartConfig, pipeline→AzimuthReportConfig)
+    # 白名单: dpi(各独立), cut_azimuth_polar/rect(UI→ChartConfig, pipeline→OutputConfig)
     _WHITELIST = {"dpi", "cut_azimuth_polar", "cut_azimuth_rect"}
     overlap = chart_fields & az_fields - _WHITELIST
     errors = []
     for f in sorted(overlap):
         errors.append(
-            f"FIELD COLLISION: '{f}' exists in BOTH ChartConfig and AzimuthReportConfig "
+            f"FIELD COLLISION: '{f}' exists in BOTH ChartConfig and OutputConfig "
             f"— single source of truth required"
         )
     return errors
@@ -218,14 +218,14 @@ def main():
 
     pages_py = str(PROJECT_ROOT / "ui" / "pages.py")
     chart_cfg = str(PROJECT_ROOT / "src" / "chart_config.py")
-    az_cfg = str(PROJECT_ROOT / "src" / "azimuth_config.py")
+    az_cfg = str(PROJECT_ROOT / "src" / "output_config.py")
 
     # 检查 1: 字段碰撞
     all_errors.extend(check_field_collisions())
 
     # 检查 2: 序列化覆盖度
     all_errors.extend(check_serialization_coverage(chart_cfg, "ChartConfig"))
-    all_errors.extend(check_serialization_coverage(az_cfg, "AzimuthReportConfig"))
+    all_errors.extend(check_serialization_coverage(az_cfg, "OutputConfig"))
 
     if not quick:
         # 检查 3: 重复代码

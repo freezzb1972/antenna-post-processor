@@ -153,8 +153,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._ar_output_db: bool = True     # AR 默认输出 dB
         self._chart_config_required = None   # ChartConfig: 报告需要
         self._chart_config_extra = None      # ChartConfig: 额外(full_report)
-        from src.azimuth_config import AzimuthReportConfig
-        self._azimuth_config = AzimuthReportConfig()  # 方位面报告配置
+        from src.output_config import OutputConfig
+        self._output_config = OutputConfig()  # 方位面报告配置
         self._graph_viewer = None            # GraphViewer: 启动时创建，处理完后填充数据
         self._cached_template_path: Optional[str] = None  # 模板路径缓存
         self._cached_template_mtime: float = 0           # 模板文件 mtime 缓存
@@ -943,7 +943,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _on_save_task_package(self):
         """快速保存任务包（自动命名，覆盖已存在）。"""
         tpl_name = Path(self.ui.editTemplatePath.text().strip()).stem if self.ui.editTemplatePath.text().strip() else "task"
-        az = getattr(self, '_azimuth_config', None)
+        az = getattr(self, '_output_config', None)
         output_dir = (az.excel_output_dir if az else "") or self.ui.editOutputDir.text().strip() or "."
         from src.task_package import next_available_filename, save_task_package
         ant_path = next_available_filename(output_dir, tpl_name)
@@ -1055,7 +1055,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             out = t.get('output_dir', '')
             if out and Path(out).exists():
                 self.ui.editOutputDir.setText(out)
-                az = getattr(self, '_azimuth_config', None)
+                az = getattr(self, '_output_config', None)
                 if az:
                     az.excel_output_dir = out
             from src.config_manager import get_config_manager
@@ -1730,7 +1730,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """应用模板预设: 设置模板路径 + 输出目录 + 文件名。"""
         self.ui.editTemplatePath.setText(path)
         self._save_template_path(path)
-        az = getattr(self, '_azimuth_config', None)
+        az = getattr(self, '_output_config', None)
         if output_dir:
             self.ui.editOutputDir.setText(output_dir)
             if az:
@@ -1918,7 +1918,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             fp._check_out_excel.setChecked(has_template)
         # 图表 → Word + 数据
         ccfg = getattr(self, '_chart_config_required', None)
-        az = getattr(self, '_azimuth_config', None)
+        az = getattr(self, '_output_config', None)
         has_charts = bool(
             (ccfg and (ccfg.has_any_a_class or ccfg.has_any_b_class or ccfg.has_any_c_class))
             or (az and az.has_any_azimuth)
@@ -2291,7 +2291,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 有图表配置 → 自动开启 Word 输出
         has_charts = bool(getattr(self, '_chart_instances', None))
         ccfg = getattr(self, '_chart_config_required', None)
-        az = getattr(self, '_azimuth_config', None)
+        az = getattr(self, '_output_config', None)
         if not has_charts:
             if ccfg:
                 has_charts = ccfg.has_any_a_class or ccfg.has_any_b_class or ccfg.has_any_c_class
@@ -2301,7 +2301,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             out_word = True
             if file_page and hasattr(file_page, '_check_out_word'):
                 file_page._check_out_word.setChecked(True)
-        # 同步 Word 输出路径: _edit_word → azimuth_config
+        # 同步 Word 输出路径: _edit_word → output_config
         if out_word and file_page and hasattr(file_page, '_sync_azimuth_state'):
             file_page._sync_azimuth_state()
 
@@ -2312,8 +2312,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             return
 
         template_path = self.ui.editTemplatePath.text().strip()
-        # 从 azimuth_config 读取 Excel 报告路径
-        az = getattr(self, '_azimuth_config', None)
+        # 从 output_config 读取 Excel 报告路径
+        az = getattr(self, '_output_config', None)
         if az and az.excel_output_dir and az.excel_output_filename:
             output_dir = az.excel_output_dir
             output_name = az.excel_output_filename
@@ -2368,12 +2368,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             # 完整报告独立 Word 路径 + 独立布局参数
             if file_page and hasattr(file_page, '_edit_full_graph'):
                 fr_graph = file_page._edit_full_graph.text().strip()
-                if fr_graph and hasattr(self, '_azimuth_config') and self._azimuth_config:
-                    self._azimuth_config.chart_output_filename = Path(fr_graph).name
-                    self._azimuth_config.chart_output_dir = str(Path(fr_graph).parent)
+                if fr_graph and hasattr(self, '_output_config') and self._output_config:
+                    self._output_config.chart_output_filename = Path(fr_graph).name
+                    self._output_config.chart_output_dir = str(Path(fr_graph).parent)
             # 完整报告使用 fr_* 独立布局
-            if hasattr(self, '_azimuth_config') and self._azimuth_config:
-                az = self._azimuth_config
+            if hasattr(self, '_output_config') and self._output_config:
+                az = self._output_config
                 az.word_layout_mode = az.fr_word_layout_mode
                 az.word_columns = az.fr_word_columns
                 az.word_image_width_pct = az.fr_word_image_width_pct
@@ -2461,8 +2461,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         full_chart_config.save_png_folder = png_dir
 
         # ── 方位面配置：默认路径 + 角度自动加载 ──
-        if hasattr(self, '_azimuth_config') and self._azimuth_config is not None:
-            az = self._azimuth_config
+        if hasattr(self, '_output_config') and self._output_config is not None:
+            az = self._output_config
             # 默认路径：从第一个源文件推导（不管是否启用 azimuth, Word 输出需要路径）
             first_path = self._data_file_paths[0] if self._data_file_paths else ""
             if first_path:
@@ -2528,7 +2528,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             chart_config_obj=full_chart_config,
             ar_lag_config=self._ar_lag_config if hasattr(self, '_ar_lag_config') and not self._ar_lag_config.is_empty() else None,
             ar_output_db=self._ar_output_db,
-            azimuth_config=getattr(self, '_azimuth_config', None),  # 始终传递(含输出路径)
+            output_config=getattr(self, '_output_config', None),  # 始终传递(含输出路径)
             out_excel=out_excel,
             out_word=out_word,
             out_data=out_data,
@@ -2665,7 +2665,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 if task_widget and task_widget.text().strip():
                     ant_path = task_widget.text().strip()
                 else:
-                    az = getattr(self, '_azimuth_config', None)
+                    az = getattr(self, '_output_config', None)
                     output_dir = (az.excel_output_dir if az else "") or self.ui.editOutputDir.text().strip() or "."
                     tpl_name = Path(self.ui.editTemplatePath.text().strip()).stem if self.ui.editTemplatePath.text().strip() else "task"
                     ant_path = next_available_filename(output_dir, tpl_name)
@@ -2886,7 +2886,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     pass
 
         # ── 保存 ──
-        az = getattr(self, '_azimuth_config', None)
+        az = getattr(self, '_output_config', None)
         output_dir = (az.chart_output_dir if az else "") or self.ui.editOutputDir.text().strip() or "."
         src_stem = Path(self._data_file_paths[0]).stem if self._data_file_paths else "report"
         out_path = str(Path(output_dir) / f"{src_stem}_测试报告.docx")

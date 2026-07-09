@@ -573,7 +573,8 @@
         "30",
         "near horizon",
         "nhpis_30"
-      ]
+      ],
+      "negate": ["rc", "ar", "lag"]
     },
     "nhpis_225": {
       "label": "NHPIS ±22.5° (Pi/8)",
@@ -645,7 +646,8 @@
         "near horizon",
         "nhpis",
         "nhpis30_ratio"
-      ]
+      ],
+      "negate": ["rc", "ar", "lag"]
     },
     "nhpis225_ratio": {
       "label": "NHPIS22.5 / TIS",

@@ -10,7 +10,7 @@ import io
 
 import numpy as np
 
-from .azimuth_config import AzimuthReportConfig
+from .output_config import OutputConfig
 from .chart_config import ChartConfig
 from .renderer import BaseRenderer, MatplotlibRenderer
 
@@ -182,7 +182,7 @@ def generate_all_for_frequency(
     lhcp_db: np.ndarray | None = None,
     cpxpi_db: np.ndarray | None = None,
     antenna_name: str = "",
-    azimuth_config: AzimuthReportConfig | None = None,
+    output_config: OutputConfig | None = None,
     extra_patterns: dict[str, np.ndarray] = None,
 ) -> dict[str, io.BytesIO]:
     """根据 ChartConfig 为一个频点生成所有需要的图形。
@@ -197,7 +197,7 @@ def generate_all_for_frequency(
         lhcp_db:      LHCP 增益 (dB)，(n_phi, n_theta) [可选]
         ar_linear:    轴比线性值，(n_phi, n_theta)，3D AR 需要
         antenna_name: 天线名称
-        azimuth_config: 方位面报告配置
+        output_config: 方位面报告配置
         extra_patterns: 额外数据源映射，如 {"3d_etheta": theta_logmag_db, "3d_ephi": phi_logmag_db}
 
     Returns:
@@ -288,7 +288,7 @@ def generate_all_for_frequency(
     # 优先使用 4 组独立图表列表, 回退到旧字段
     phi_entries = (getattr(chart_config, 'cut_2d_polar_entries', None) or []) + \
                   (getattr(chart_config, 'cut_2d_rect_entries', None) or [])
-    theta_entries = []  # 方位面 entries 由 azimuth_config 独立管理
+    theta_entries = []  # 方位面 entries 由 output_config 独立管理
     if not phi_entries and not theta_entries:
         params = []  # 没有配置条目 → 不生成 2D 切面图
     else:
@@ -302,18 +302,18 @@ def generate_all_for_frequency(
     images.update(render_phi_cuts(params, theta_deg, phi_deg, freq_mhz,
                                   chart_config, _renderer))
     images.update(render_theta_cuts(params, theta_deg, phi_deg, freq_mhz,
-                                    chart_config, azimuth_config, _renderer))
+                                    chart_config, output_config, _renderer))
 
     # ── PK Theta 范围峰值 (旧方位面路径已移除, 统一走 cut_param) ──
-    if azimuth_config and azimuth_config.pk_theta_ranges:
-        for t_max in azimuth_config.pk_theta_ranges:
+    if output_config and output_config.pk_theta_ranges:
+        for t_max in output_config.pk_theta_ranges:
             try:
                 mask = theta_deg <= t_max + 0.1
                 pk_vals = np.max(gain_dbi[:, mask], axis=1)
                 key = f"azimuth_polar_pk_{int(t_max)}"
                 images[key] = _renderer.render_azimuth_polar(
                     phi_deg, [(t_max, pk_vals)], freq_mhz,
-                    ylabel="Gain (dBi)", dpi=azimuth_config.dpi,
+                    ylabel="Gain (dBi)", dpi=output_config.dpi,
                     title=f"{freq_mhz:.0f}MHz - Gain (dBi) θ=0°-{int(t_max)}°",
                 )
             except Exception:

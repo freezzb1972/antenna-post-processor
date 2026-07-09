@@ -11,7 +11,7 @@ import traceback
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .azimuth_config import AzimuthReportConfig
+    from .output_config import OutputConfig
 
 from openpyxl.chart import Reference, ScatterChart, Series
 from openpyxl.utils import get_column_letter
@@ -109,7 +109,7 @@ class ProcessingWorker(QObject):
         extra_params: set | None = None,
         chart_config_obj: ChartConfig | None = None,
         ar_lag_config: LagConfig | None = None,
-        azimuth_config: AzimuthReportConfig | None = None,
+        output_config: OutputConfig | None = None,
         out_excel: bool = True,
         out_word: bool = False,
         out_data: bool = False,
@@ -146,7 +146,7 @@ class ProcessingWorker(QObject):
         self.robust_peak = robust_peak
         self.extra_params = extra_params
         self.chart_config_obj = chart_config_obj
-        self.azimuth_config = azimuth_config
+        self.output_config = output_config
         self.out_excel = out_excel
         self.out_word = out_word
         self.out_data = out_data
@@ -188,7 +188,7 @@ class ProcessingWorker(QObject):
                 trim_start=self.trim_start,
                 trim_end=self.trim_end,
                 chart_config_obj=self.chart_config_obj,
-                azimuth_config=self.azimuth_config,
+                output_config=self.output_config,
                 out_excel=self.out_excel,
                 out_word=self.out_word,
                 out_data=self.out_data,

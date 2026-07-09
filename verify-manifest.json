@@ -235,7 +235,7 @@
     "modules": [
       "activation.py",
       "activation_server.py",
-      "azimuth_config.py",
+      "output_config.py",
       "azimuth_data_writer.py",
       "calculator.py",
       "chart_config.py",
@@ -877,8 +877,8 @@
       "_verified_note": "3 page classes directly read/write MainWindow properties, no parent mode shows defaults"
     },
     {
-      "id": "src-module-azimuth_config",
-      "description": "Auto-registered: azimuth_config.py",
+      "id": "src-module-output_config",
+      "description": "Auto-registered: output_config.py",
       "type": "computation",
       "widgets": [],
       "methods": [],
@@ -887,7 +887,10 @@
       ],
       "tests": [],
       "e2e_verified": false,
-      "status": "verified"
+      "status": "verified",
+      "files": [
+        "output_config.py"
+      ]
     },
     {
       "id": "src-module-azimuth_data_writer",

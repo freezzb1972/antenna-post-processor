@@ -1,7 +1,7 @@
 """
 方位面极坐标切面图 — 配置数据模型
 ===================================
-AzimuthReportConfig 管理方位面极坐标图的生成选项、
+OutputConfig 管理方位面极坐标图的生成选项、
 输出路径、中间数据路径等。独立于 ChartConfig，关注点分离。
 """
 
@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 @dataclass
-class AzimuthReportConfig:
+class OutputConfig:
     """方位面极坐标报告配置。
 
     所有字段均可通过 from_dict() / to_dict() 序列化。
@@ -137,7 +137,7 @@ class AzimuthReportConfig:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> AzimuthReportConfig:
+    def from_dict(cls, d: dict) -> OutputConfig:
         """从 dict 反序列化。"""
         return cls(
             pk_theta_ranges=list(d.get("pk_theta_ranges", [])),
@@ -168,9 +168,9 @@ class AzimuthReportConfig:
     # 合并
     # ═══════════════════════════════════════════════════════════
 
-    def merge(self, other: AzimuthReportConfig) -> AzimuthReportConfig:
+    def merge(self, other: OutputConfig) -> OutputConfig:
         """合并两个配置（OR 逻辑），角度取并集，路径取 self 优先。"""
-        return AzimuthReportConfig(
+        return OutputConfig(
             cut_azimuth_polar=self.cut_azimuth_polar or other.cut_azimuth_polar,
             pk_theta_ranges=sorted(set(self.pk_theta_ranges + other.pk_theta_ranges)),
             cut_azimuth_polar_ar=self.cut_azimuth_polar_ar or other.cut_azimuth_polar_ar,

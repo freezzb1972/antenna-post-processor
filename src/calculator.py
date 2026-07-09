@@ -63,12 +63,14 @@ def compute_directivity(
     gain_linear: np.ndarray,  # (n_phi, n_theta)
     theta_rad: np.ndarray,    # (n_theta,) 弧度
 ) -> float:
-    """球面积分计算方向性系数。
+    """球面梯形积分计算方向性系数。
 
     D = 4π · U_max / P_rad
 
     P_rad = ∫∫ U(θ,φ) sinθ dθ dφ
-           ≈ Σ Σ gain_linear[φ,θ] · sin(θ) · dθ · dφ
+           ≈ trapz_φ(trapz_θ(gain · sinθ))
+
+    θ 用梯形法 (O(h²)), φ 为均匀周期分布, 梯形=矩形。
 
     Args:
         gain_linear: 总增益线性值。
@@ -78,13 +80,14 @@ def compute_directivity(
         Directivity (dBi)。
     """
     n_phi, n_theta = gain_linear.shape
-    dtheta = theta_rad[1] - theta_rad[0] if n_theta > 1 else np.pi
     dphi = 2.0 * np.pi / n_phi
+    sin_theta = np.sin(theta_rad)
 
-    sin_theta = np.sin(theta_rad)  # (n_theta,)
-    # 球面积分: Σ_φ Σ_θ gain · sinθ · dθ · dφ
-    # gain_linear: (n_phi, n_theta), sin_theta: (n_theta,) → broadcast
-    p_rad = np.sum(gain_linear * sin_theta[np.newaxis, :]) * dtheta * dphi
+    integrand = gain_linear * sin_theta[np.newaxis, :]  # (n_phi, n_theta)
+    # 梯形法 over θ: ½ Σ (y_i + y_{i+1}) · dθ
+    int_theta = 0.5 * np.sum(integrand[:, :-1] + integrand[:, 1:], axis=1) * (theta_rad[1] - theta_rad[0])
+    # φ 均匀周期 → 矩形求和即精确
+    p_rad = np.sum(int_theta) * dphi
 
     u_max = float(np.max(gain_linear))
     if p_rad <= 0:
@@ -538,8 +541,8 @@ def compute_axial_ratio(
     # E_RHCP = (E_θ - j·E_φ) / √2
     # E_LHCP = (E_θ + j·E_φ) / √2
     # AR = (|E_RHCP| + |E_LHCP|) / ||E_RHCP| - |E_LHCP||
-    e_rhcp = (e_theta - 1j * e_phi) / np.sqrt(2.0)
-    e_lhcp = (e_theta + 1j * e_phi) / np.sqrt(2.0)
+    e_rhcp = (e_theta + 1j * e_phi) / np.sqrt(2.0)   # ETS convention
+    e_lhcp = (e_theta - 1j * e_phi) / np.sqrt(2.0)   # ETS convention
 
     abs_rhcp = np.abs(e_rhcp)
     abs_lhcp = np.abs(e_lhcp)
@@ -578,8 +581,8 @@ def compute_rhcp_lhcp_gain(
     e_theta = mag_theta * np.exp(1j * ph_theta)
     e_phi = mag_phi * np.exp(1j * ph_phi)
 
-    e_rhcp = (e_theta - 1j * e_phi) / np.sqrt(2.0)
-    e_lhcp = (e_theta + 1j * e_phi) / np.sqrt(2.0)
+    e_rhcp = (e_theta + 1j * e_phi) / np.sqrt(2.0)   # ETS convention
+    e_lhcp = (e_theta - 1j * e_phi) / np.sqrt(2.0)   # ETS convention
 
     abs_rhcp = np.maximum(np.abs(e_rhcp), 1e-15)
     abs_lhcp = np.maximum(np.abs(e_lhcp), 1e-15)

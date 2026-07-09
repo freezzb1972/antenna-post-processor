@@ -360,8 +360,8 @@ class DataSourceDialog(QDialog):
         mw.ui.editTemplatePath.setText(self._edit_template.text())
         mw.ui.editOutputDir.setText(self._edit_dir.text())
         mw.ui.editOutputName.setText(self._edit_name.text())
-        # 同步到 azimuth_config
-        az = getattr(mw, '_azimuth_config', None)
+        # 同步到 output_config
+        az = getattr(mw, '_output_config', None)
         if az:
             az.excel_output_dir = self._edit_dir.text().strip()
             az.excel_output_filename = self._edit_name.text().strip()

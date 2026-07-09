@@ -1,7 +1,7 @@
 """
 ChartInstance 图表实例模型 — 唯一数据源
 ========================================
-从 ChartConfig + AzimuthReportConfig 展开为扁平的图表实例列表。
+从 ChartConfig + OutputConfig 展开为扁平的图表实例列表。
 每个 ChartInstance = 一张输出图。驱动 Word 布局 + Pipeline 生成。
 
 设计原则:
@@ -53,7 +53,7 @@ class ChartInstance:
     """单张输出图 — 最小单位。"""
 
     instance_id: str          # "azimuth_polar_0", "3d_gain_v0", "2d_polar_phi90"
-    parent_type: str          # ChartConfig/AzimuthReportConfig 字段名
+    parent_type: str          # ChartConfig/OutputConfig 字段名
     category: ChartCategory   # A / B / C / Z
     label: str                # 唯一显示名: "Gain 极坐标方位面 (θ=0°,30°)"
     image_key: str            # 对应 plotter 的 image key: "azimuth_polar_0"
@@ -88,7 +88,7 @@ class ChartInstance:
 
 def expand_to_instances(
     chart_config,
-    azimuth_config,
+    output_config,
     mode: int = 0,
     existing_instances: list[ChartInstance] | None = None,
 ) -> list[ChartInstance]:
@@ -96,7 +96,7 @@ def expand_to_instances(
 
     Args:
         chart_config: ChartConfig 或 None
-        azimuth_config: AzimuthReportConfig 或 None
+        output_config: OutputConfig 或 None
         mode: 0=无源, 1=TRP, 2=TIS
         existing_instances: 已有的实例列表 (保留 enabled + sort_order)
 
@@ -178,15 +178,15 @@ def expand_to_instances(
                     ))
 
     # ── Z 类 azimuth ──
-    if azimuth_config:
+    if output_config:
         for flag, label_base, angle_charts_attr in [
             ("cut_azimuth_polar", "Gain 极坐标方位面", "angle_charts"),
             ("cut_azimuth_polar_ar", "AR 极坐标方位面", "angle_charts_ar"),
             ("cut_azimuth_polar_rhcp", "RHCP 极坐标方位面", "angle_charts_rhcp"),
             ("cut_azimuth_polar_lhcp", "LHCP 极坐标方位面", "angle_charts_lhcp"),
         ]:
-            if getattr(azimuth_config, flag, False):
-                charts = getattr(azimuth_config, angle_charts_attr, [[]])
+            if getattr(output_config, flag, False):
+                charts = getattr(output_config, angle_charts_attr, [[]])
                 for ci, angles in enumerate(charts):
                     if not angles:
                         continue

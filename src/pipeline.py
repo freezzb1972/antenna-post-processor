@@ -24,7 +24,7 @@ from typing import Any
 
 import numpy as np
 
-from .azimuth_config import AzimuthReportConfig
+from .output_config import OutputConfig
 from .calculator import (
     compute_ar_at_angles,
     compute_ar_range,
@@ -151,7 +151,7 @@ def _process_one_frequency(
     ar_lag_config: LagConfig = None,
     rhcp_lag_config: LagConfig = None,
     cpxpi_lag_config: LagConfig = None,
-    azimuth_config: AzimuthReportConfig = None,
+    output_config: OutputConfig = None,
     nh_custom_angles: list[float] | None = None,
     ar_output_db: bool = True,
     dir_extrap_method: str = "none",
@@ -290,9 +290,9 @@ def _process_one_frequency(
         for k, v in bw.items(): row[k] = v if v is not None else 0
 
     # Axial Ratio (仅当有 Phase 数据且需要 AR 列)
-    # 若 azimuth_config 要求 AR 方位面图，强制计算 AR
+    # 若 output_config 要求 AR 方位面图，强制计算 AR
     ar_need = compute_set & {"axial_ratio", "ar_single", "ar_range"}
-    az_force_ar = (azimuth_config is not None and False)
+    az_force_ar = (output_config is not None and False)
     if ar_need or az_force_ar or not need:
         tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
         if tp is not None and pp is not None:
@@ -433,7 +433,7 @@ def _process_one_frequency(
     gain_dbi = 10.0 * np.log10(np.maximum(gain_linear, 1e-15))
 
     # ── 图形生成 (A/C 类: 每频点 PNG + 方位面) ──
-    az_need = (azimuth_config is not None and azimuth_config.has_any_azimuth)
+    az_need = (output_config is not None and output_config.has_any_azimuth)
     if (chart_config is not None and chart_config.has_any_pattern_or_cut) or az_need:
         try:
             from .plotter import generate_all_for_frequency
@@ -445,7 +445,7 @@ def _process_one_frequency(
             ar_lin = None
             need_ar_for_graphics = (
                 ccfg.pattern_3d_ar or
-                (azimuth_config is not None and False)
+                (output_config is not None and False)
             )
             if need_ar_for_graphics and "axial_ratio" not in str(row.get("axial_ratio_error", "")):
                 tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
@@ -472,7 +472,7 @@ def _process_one_frequency(
                     rhcp_db=rhcp_db, lhcp_db=lhcp_db,
                     cpxpi_db=cpxpi_db,
                     antenna_name="",
-                    azimuth_config=azimuth_config,
+                    output_config=output_config,
                     extra_patterns=extra_patterns,
                 )
                 if images:
@@ -494,8 +494,8 @@ def _process_one_frequency(
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
             # Theta 范围峰值中间数据 (替代硬编码 70°)
-            if azimuth_config and azimuth_config.pk_theta_ranges:
-                for t_max in azimuth_config.pk_theta_ranges:
+            if output_config and output_config.pk_theta_ranges:
+                for t_max in output_config.pk_theta_ranges:
                     mask = theta_deg <= t_max + 0.1
                     key_suffix = str(int(t_max))
                     row[f"_gain_pk_{key_suffix}_deg"] = theta_deg[mask].copy()
@@ -731,7 +731,7 @@ def _load_and_compute(
     chart_config: ChartConfig = None,
     ar_lag_config: LagConfig = None,
     sheet_ar_configs: dict[str, LagConfig] = None,
-    azimuth_config: AzimuthReportConfig = None,
+    output_config: OutputConfig = None,
     nh_custom_angles: list[float] | None = None,
     ar_output_db: bool = True,
     dir_extrap_method: str = "none",
@@ -778,7 +778,7 @@ def _load_and_compute(
         raw = task_ds.read_sections(csv_idx)
         theta_list = list(task_ds.theta_angles)
         ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, theta_extrap_method, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, azimuth_config, compute_only))
+        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, theta_extrap_method, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, output_config, compute_only))
         _report(progress_callback, i + 1, progress_max, f"[📂] 读取源文件 {i+1}/{total}")
 
     data_done = _load_w
@@ -809,7 +809,7 @@ def _load_and_compute(
     else:
         _run_compute_serial(compute_tasks, sheet_results, data_done, progress_max,
                             cancel_callback, progress_callback, log_cb=log_callback,
-                            azimuth_config=azimuth_config,
+                            output_config=output_config,
                             dir_extrap_method=dir_extrap_method,
                             calc_w=_calc_w, render_w=_render_w,
                             compute_total=len(compute_tasks))
@@ -819,7 +819,7 @@ def _load_and_compute(
 
 def _run_compute_serial(
     compute_tasks, sheet_results, data_done, progress_max,
-    cancel_callback, progress_callback, log_cb=None, azimuth_config=None,
+    cancel_callback, progress_callback, log_cb=None, output_config=None,
     dir_extrap_method="none",
     calc_w=None, render_w=None, compute_total=None,
 ):
@@ -832,7 +832,7 @@ def _run_compute_serial(
             break
         try:
             theta_arr = np.array(theta_list)
-            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, dir_extrap_method=dir_extrap_method, compute_only=co, log_cb=log_cb)
+            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, dir_extrap_method=dir_extrap_method, compute_only=co, log_cb=log_cb)
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
@@ -903,7 +903,7 @@ def run_pipeline(
     trim_start: int = 0,
     trim_end: int = 0,
     chart_config_obj: ChartConfig | None = None,
-    azimuth_config: AzimuthReportConfig | None = None,
+    output_config: OutputConfig | None = None,
     out_excel: bool = True,
     out_word: bool = False,
     out_data: bool = False,
@@ -1029,7 +1029,7 @@ def run_pipeline(
                 extra_params=extra_params, chart_config=chart_config_obj,
                 ar_lag_config=ar_lag_config_override,
                 sheet_ar_configs=sheet_ar_configs,
-                azimuth_config=azimuth_config,
+                output_config=output_config,
                 nh_custom_angles=nh_custom_angles,
                 ar_output_db=ar_output_db,
                 dir_extrap_method=dir_extrap_method,
@@ -1093,7 +1093,7 @@ def run_pipeline(
     # ── 阶段 5: 输出 Word 图表报告 ──
     if out_word or out_data:
         _report(progress_callback, _base + _export_w, progress_max, "[📄] 输出 Word 图表报告...")
-        _export_azimuth(sheet_results, azimuth_config, log_callback,
+        _export_azimuth(sheet_results, output_config, log_callback,
                         out_word=out_word, out_data=out_data,
                         word_template_path=word_template_path,
                         chart_instances=chart_instances)
@@ -1158,7 +1158,7 @@ def _collect_report_images(
 
 def _export_azimuth(
     sheet_results: dict[str, list[dict[str, Any]]],
-    azimuth_config: AzimuthReportConfig,
+    output_config: OutputConfig,
     log_callback=None,
     out_word: bool = True,
     out_data: bool = True,
@@ -1303,7 +1303,7 @@ def _export_azimuth(
                     freqs.append(row["frequency"]); values.append(v)
             if len(freqs) > 1:
                 try:
-                    gap = getattr(azimuth_config, 'freq_gap_mhz', 10) if azimuth_config else 10
+                    gap = getattr(output_config, 'freq_gap_mhz', 10) if output_config else 10
                     png = _freq_renderer.render_freq_curve(
                         freqs, values, ylabel=param_label,
                         title=f"{ci.label}",
@@ -1316,14 +1316,14 @@ def _export_azimuth(
                     pass
 
     # ── 双Y轴配对 (B 类) ──
-    _dual_y = getattr(azimuth_config, 'dual_y_enabled', False) if azimuth_config else False
+    _dual_y = getattr(output_config, 'dual_y_enabled', False) if output_config else False
     if _dual_y and _flat:
         # 预定义配对: (%类, dB类) → 双Y轴
         _DUAL_PAIRS = [
             (("efficiency_pct", "Efficiency (%)"), ("gain", "Peak Gain (dBi)")),
             (("directivity", "Directivity (dBi)"), ("trp", "TRP (dBm)")),
         ]
-        gap = getattr(azimuth_config, 'freq_gap_mhz', 10) if azimuth_config else 10
+        gap = getattr(output_config, 'freq_gap_mhz', 10) if output_config else 10
         for (k1, l1), (k2, l2) in _DUAL_PAIRS:
             if k1 not in _flat[0] or k2 not in _flat[0]:
                 continue
@@ -1353,39 +1353,39 @@ def _export_azimuth(
             gain_dbi = row.get("_azimuth_gain_dbi")
             ar_db_v = row.get("_azimuth_ar_db")
             theta_deg_arr = row.get("_azimuth_theta_deg")
-            if gain_dbi is not None and theta_deg_arr is not None and azimuth_config and []:
+            if gain_dbi is not None and theta_deg_arr is not None and output_config and []:
                 gd = {}
-                for angle in azimuth_config.angles_sorted:
+                for angle in output_config.angles_sorted:
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
                     nearest = float(theta_deg_arr[idx])
                     gd[nearest] = gain_dbi[:, idx].copy()
                 freq_gain_data.append((freq, gd))
-            if ar_db_v is not None and theta_deg_arr is not None and azimuth_config and []:
+            if ar_db_v is not None and theta_deg_arr is not None and output_config and []:
                 ad = {}
-                for angle in azimuth_config.angles_ar_sorted:
+                for angle in output_config.angles_ar_sorted:
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
                     nearest = float(theta_deg_arr[idx])
                     ad[nearest] = ar_db_v[:, idx].copy()
                 freq_ar_data.append((freq, ad))
             rhcp_db_v = row.get("_azimuth_rhcp_db")
-            if rhcp_db_v is not None and theta_deg_arr is not None and azimuth_config and []:
+            if rhcp_db_v is not None and theta_deg_arr is not None and output_config and []:
                 rd = {}
-                for angle in azimuth_config.angles_rhcp_sorted:
+                for angle in output_config.angles_rhcp_sorted:
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
                     nearest = float(theta_deg_arr[idx])
                     rd[nearest] = rhcp_db_v[:, idx].copy()
                 freq_rhcp_data.append((freq, rd))
             lhcp_db_v = row.get("_azimuth_lhcp_db")
-            if lhcp_db_v is not None and theta_deg_arr is not None and azimuth_config and []:
+            if lhcp_db_v is not None and theta_deg_arr is not None and output_config and []:
                 ld = {}
-                for angle in azimuth_config.angles_lhcp_sorted:
+                for angle in output_config.angles_lhcp_sorted:
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
                     nearest = float(theta_deg_arr[idx])
                     ld[nearest] = lhcp_db_v[:, idx].copy()
                 freq_lhcp_data.append((freq, ld))
             # Theta 范围峰值中间数据 (每 phi 的 Theta 范围峰值)
-            if azimuth_config and azimuth_config.pk_theta_ranges:
-                for t_max in azimuth_config.pk_theta_ranges:
+            if output_config and output_config.pk_theta_ranges:
+                for t_max in output_config.pk_theta_ranges:
                     pk_db = row.get(f"_gain_pk_{int(t_max)}_db")
                     if pk_db is not None and freq is not None:
                         freq_gain_vs_theta.setdefault(t_max, []).append((freq, pk_db.copy()))
@@ -1399,7 +1399,7 @@ def _export_azimuth(
     elif not image_groups:
         _log(log_callback, "  ⚠ image_groups 为空 — 无图片可输出到 Word")
     else:
-        az = azimuth_config or None
+        az = output_config or None
         word_path = az.chart_output_path if az else ""
         if not word_path:
             _log(log_callback, "  ⚠ 未设置 Word 输出路径, 跳过图表报告")
@@ -1433,12 +1433,12 @@ def _export_azimuth(
 
     # ── 中间数据: 单文件多 sheet (按启用的图表类型) ──
     if out_data:
-        data_path = azimuth_config.data_output_path if azimuth_config else ""
+        data_path = output_config.data_output_path if output_config else ""
         if not data_path:
             data_path = ""
         # 收集启用的图表类型 → 数据映射
         data_sheets = {}
-        if azimuth_config:
+        if output_config:
             if False and freq_gain_data:
                 data_sheets["Gain Azimuth"] = freq_gain_data
             if False and freq_ar_data:
@@ -1451,8 +1451,8 @@ def _export_azimuth(
                 data_sheets[f"Gain 0-{int(t_max)}° Pk"] = [("phi_matrix", pk_data)]
         if data_sheets:
             if not data_path:
-                gdir = getattr(azimuth_config, 'data_output_dir', '') if azimuth_config else ''
-                gfn = getattr(azimuth_config, 'data_output_filename', '') if azimuth_config else ''
+                gdir = getattr(output_config, 'data_output_dir', '') if output_config else ''
+                gfn = getattr(output_config, 'data_output_filename', '') if output_config else ''
                 if gdir and gfn:
                     data_path = str(Path(gdir) / gfn)
             if data_path:
@@ -1568,7 +1568,7 @@ def _compute_chunk(
         try:
             theta_raw = np.array(theta_list)
             row = _process_one_frequency(raw, freq, theta_raw, lag_cfg,
-                                         theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, azimuth_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co,
+                                         theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co,
                                          log_cb=None)
             results.append((sheet_name, row))
         except Exception as e:

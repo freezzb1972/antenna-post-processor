@@ -55,7 +55,7 @@ from PySide6.QtWidgets import (
 
 from src.file_entry import FileEntry, mode_name, infer_mode_from_sheet
 from src.lag_config import LagConfig
-from src.azimuth_config import AzimuthReportConfig
+from src.output_config import OutputConfig
 from src.sheet_file_matcher import extract_key, sanitize_sheet_name
 from ui.layout_utils import FlowLayout, auto_size_dialog
 from ui.widgets import (AnglePickerWidget, DataFileSelector, OutputSettingsGroup,
@@ -425,13 +425,13 @@ class FileSettingsPage(QWidget):
         self._load_azimuth_state()
 
     def _load_azimuth_state(self):
-        """从 AzimuthReportConfig 恢复输出路径。"""
+        """从 OutputConfig 恢复输出路径。"""
         if not self._mw:
             return
-        az = getattr(self._mw, '_azimuth_config', None)
+        az = getattr(self._mw, '_output_config', None)
         if az is None:
             return
-        # Excel 报告: 从 azimuth_config 恢复
+        # Excel 报告: 从 output_config 恢复
         if hasattr(self, '_edit_xlsx') and az.excel_output_dir and az.excel_output_filename:
             self._edit_xlsx.setText(str(Path(az.excel_output_dir) / az.excel_output_filename))
         # Word 报告
@@ -442,13 +442,13 @@ class FileSettingsPage(QWidget):
             self._edit_data.setText(str(Path(az.data_output_dir) / az.data_output_filename))
 
     def _sync_azimuth_state(self):
-        """将输出路径写回 AzimuthReportConfig。"""
+        """将输出路径写回 OutputConfig。"""
         if not self._mw:
             return
-        az = getattr(self._mw, '_azimuth_config', None)
+        az = getattr(self._mw, '_output_config', None)
         if az is None:
             return
-        # Excel 报告 → azimuth_config
+        # Excel 报告 → output_config
         if hasattr(self, '_edit_xlsx'):
             txt = self._edit_xlsx.text().strip()
             if txt:
@@ -474,7 +474,7 @@ class FileSettingsPage(QWidget):
         """勾选 Word 或数据输出时自动开启/关闭方位面开关。"""
         if not self._mw:
             return
-        az = getattr(self._mw, '_azimuth_config', None)
+        az = getattr(self._mw, '_output_config', None)
         if az is None:
             return
         need_azimuth = (
@@ -1280,8 +1280,8 @@ class FileSettingsPage(QWidget):
             if w and not w.text().strip():
                 w.setText(str(Path(out_dir) / fname))
 
-        # 同步到 azimuth_config (确保 pipeline 消费端有默认值)
-        az = getattr(self._mw, '_azimuth_config', None) if self._mw else None
+        # 同步到 output_config (确保 pipeline 消费端有默认值)
+        az = getattr(self._mw, '_output_config', None) if self._mw else None
         if az:
             for attr, fname in defaults:
                 w = getattr(self, attr, None)
@@ -3120,8 +3120,8 @@ class ChartSettingsPage(QWidget):
             self._ar_ranges_x = list(xtr.ar_chart_ranges)
 
         # ── 方位面配置 ──
-        if hasattr(mw, '_azimuth_config') and mw._azimuth_config is not None:
-            az = mw._azimuth_config
+        if hasattr(mw, '_output_config') and mw._output_config is not None:
+            az = mw._output_config
 
             self._antenna_name = az.antenna_name
             self._word_layout_mode = az.word_layout_mode
@@ -3177,7 +3177,7 @@ class ChartSettingsPage(QWidget):
         Args:
             fr_mode: True=Full Report布局, False=普通Word布局
         """
-        az = getattr(self._mw, '_azimuth_config', None) if self._mw else None
+        az = getattr(self._mw, '_output_config', None) if self._mw else None
         prefix = "fr_" if fr_mode else ""
         title = self.tr("Full Report Word 布局设置") if fr_mode else self.tr("Word 输出布局设置")
         cur_mode = getattr(az, f"{prefix}word_layout_mode", "side_by_side") if az else "side_by_side"
@@ -3369,9 +3369,9 @@ class ChartSettingsPage(QWidget):
         extra.ar_chart_ranges = list(self._ar_ranges_x)
 
         # ── 方位面配置 ──
-        from src.azimuth_config import AzimuthReportConfig
-        existing = getattr(mw, '_azimuth_config', None)
-        azimuth = existing if existing is not None else AzimuthReportConfig()
+        from src.output_config import OutputConfig
+        existing = getattr(mw, '_output_config', None)
+        azimuth = existing if existing is not None else OutputConfig()
         azimuth.antenna_name = self._edit_antenna_name.text().strip() if hasattr(self, '_edit_antenna_name') else ""
         azimuth.word_layout_mode = self._word_layout_mode if hasattr(self, '_word_layout_mode') else "side_by_side"
         azimuth.dpi = self._spin_azimuth_dpi.value() if hasattr(self, '_spin_azimuth_dpi') else 100
@@ -3388,7 +3388,7 @@ class ChartSettingsPage(QWidget):
         # 标记角度已由用户配置, 防止 _start_processing 中自动用 LAG 角度覆盖
         azimuth._angles_initialized = True
 
-        mw._azimuth_config = azimuth
+        mw._output_config = azimuth
         mw._chart_config_required = required
         mw._chart_config_extra = extra
         if hasattr(mw, '_auto_check_output_flags'):
@@ -3662,8 +3662,8 @@ class ChartSettingsPage(QWidget):
         dlg.setMinimumSize(520, 480)
         layout = QVBoxLayout(dlg)
 
-        # 从 AzimuthReportConfig 读取当前值
-        az = getattr(self._mw, '_azimuth_config', None) if self._mw else None
+        # 从 OutputConfig 读取当前值
+        az = getattr(self._mw, '_output_config', None) if self._mw else None
         cur_gap = az.freq_gap_mhz if az else 10
         cur_dual = az.dual_y_enabled if az else False
 

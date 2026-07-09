@@ -302,8 +302,8 @@ def classify_header(raw_header: str) -> str:
     if is_pc_theta_column(raw_header):           return "pc_theta_mm"
     if is_pc_phi_column(raw_header):             return "pc_phi_mm"
 
-    # RHCP/LHCP/CP-XPI 检测 (在 LAG 之前, 避免 "RHCP Gain at Theta=" 被 LAG 误匹配)
-    _RE_RHCP = re.compile(r"RHCP\s*(?:Gain)?", re.IGNORECASE)
+    # RHCP/RC/LHCP/CP-XPI 检测 (在 LAG 之前, 避免 "RHCP Gain at Theta=" 被 LAG 误匹配)
+    _RE_RHCP = re.compile(r"R(?:H)?CP\s*(?:Gain)?", re.IGNORECASE)
     _RE_CP_XPI = re.compile(r"CP[\s-]*XPI", re.IGNORECASE)
     if _RE_RHCP.search(raw_header) or _RE_CP_XPI.search(raw_header):
         normalized = normalize_header(raw_header)

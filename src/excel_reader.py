@@ -386,9 +386,10 @@ _reg_fn("total_efficiency",
 
 _reg("efficiency_pct", must_contain="efficiency", cn="效率", must_not_contain="total db 总")
 
-# ── 圆极化 RHCP/LHCP (必须在 LAG 之前，避免被 lag_single 误匹配) ──
+# ── 圆极化 RC/RHCP/LHCP (必须在 LAG 之前，避免被 lag_single 误匹配) ──
 _reg_fn("rhcp_single",
-    lambda h: ("rhcp" in h.lower() or "右旋圆极化" in h or "右旋" in h))
+    lambda h: ("rhcp" in h.lower() or "右旋圆极化" in h or "右旋" in h or
+               (h.lower().startswith("rc ") or " rc " in h.lower())))
 _reg_fn("cp_xpi_single",
     lambda h: ("cp" in h.lower() and "xpi" in h.lower()) or ("cp-xpi" in h.lower()) or ("交叉极化" in h and ("theta" in h.lower() or "θ" in h or "@" in h)))
 
