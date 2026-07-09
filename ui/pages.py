@@ -3122,17 +3122,7 @@ class ChartSettingsPage(QWidget):
         # ── 方位面配置 ──
         if hasattr(mw, '_azimuth_config') and mw._azimuth_config is not None:
             az = mw._azimuth_config
-            if "cut_azimuth_polar" in self._chart_required:
-                self._chart_required["cut_azimuth_polar"].setChecked(az.cut_azimuth_polar)
-            if "cut_azimuth_rect" in self._chart_required:
-                self._chart_required["cut_azimuth_rect"].setChecked(az.cut_azimuth_rect)
-            if "cut_azimuth_polar_ar" in self._chart_required:
-                self._chart_required["cut_azimuth_polar_ar"].setChecked(az.cut_azimuth_polar_ar)
 
-            self._azimuth_angles = list(az.azimuth_cut_angles)
-            self._azimuth_angles_ar = list(az.azimuth_cut_angles_ar)
-            self._azimuth_angles_rhcp = list(az.azimuth_cut_angles_rhcp)
-            self._azimuth_angles_lhcp = list(az.azimuth_cut_angles_lhcp)
             self._antenna_name = az.antenna_name
             self._word_layout_mode = az.word_layout_mode
             self._chart_output_dir = az.chart_output_dir
@@ -3382,10 +3372,6 @@ class ChartSettingsPage(QWidget):
         from src.azimuth_config import AzimuthReportConfig
         existing = getattr(mw, '_azimuth_config', None)
         azimuth = existing if existing is not None else AzimuthReportConfig()
-        azimuth.azimuth_cut_angles = list(self._azimuth_angles)
-        azimuth.azimuth_cut_angles_ar = list(self._azimuth_angles_ar)
-        azimuth.azimuth_cut_angles_rhcp = list(self._azimuth_angles_rhcp)
-        azimuth.azimuth_cut_angles_lhcp = list(self._azimuth_angles_lhcp)
         azimuth.antenna_name = self._edit_antenna_name.text().strip() if hasattr(self, '_edit_antenna_name') else ""
         azimuth.word_layout_mode = self._word_layout_mode if hasattr(self, '_word_layout_mode') else "side_by_side"
         azimuth.dpi = self._spin_azimuth_dpi.value() if hasattr(self, '_spin_azimuth_dpi') else 100
