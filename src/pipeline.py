@@ -480,20 +480,6 @@ def _process_one_frequency(
                 )
                 if images:
                     row["_images"] = images
-            # 存储中间数据供方位面导出使用
-            if False and [[]]:
-                row["_azimuth_gain_dbi"] = gain_dbi
-                row["_azimuth_theta_deg"] = theta_deg.copy()
-            if False and ar_lin is not None and [[]]:
-                row["_azimuth_ar_db"] = 20.0 * np.log10(np.maximum(ar_lin, 1e-15))
-                if "_azimuth_theta_deg" not in row:
-                    row["_azimuth_theta_deg"] = theta_deg.copy()
-            if False and rhcp_db is not None and [[]]:
-                row["_azimuth_rhcp_db"] = rhcp_db
-                if "_azimuth_theta_deg" not in row:
-                    row["_azimuth_theta_deg"] = theta_deg.copy()
-            if False and lhcp_db is not None and [[]]:
-                row["_azimuth_lhcp_db"] = lhcp_db
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
             # Theta 范围峰值中间数据 (替代硬编码 70°)
@@ -1185,10 +1171,6 @@ def _export_azimuth(
 
     # ── 收集所有图片和中间数据 ──
     image_groups: dict[str, dict[float, io.BytesIO]] = {}
-    freq_gain_data: list[tuple[float, dict[float, np.ndarray]]] = []
-    freq_ar_data: list[tuple[float, dict[float, np.ndarray]]] = []
-    freq_rhcp_data: list[tuple[float, dict[float, np.ndarray]]] = []
-    freq_lhcp_data: list[tuple[float, dict[float, np.ndarray]]] = []
     freq_gain_vs_theta: dict[float, list[tuple[float, np.ndarray]]] = {}  # {t_max: [(freq, values)]}
 
 
@@ -1365,14 +1347,12 @@ def _export_azimuth(
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
                     nearest = float(theta_deg_arr[idx])
                     gd[nearest] = gain_dbi[:, idx].copy()
-                freq_gain_data.append((freq, gd))
             if ar_db_v is not None and theta_deg_arr is not None and output_config and []:
                 ad = {}
                 for angle in output_config.angles_ar_sorted:
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
                     nearest = float(theta_deg_arr[idx])
                     ad[nearest] = ar_db_v[:, idx].copy()
-                freq_ar_data.append((freq, ad))
             rhcp_db_v = row.get("_azimuth_rhcp_db")
             if rhcp_db_v is not None and theta_deg_arr is not None and output_config and []:
                 rd = {}
@@ -1380,7 +1360,6 @@ def _export_azimuth(
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
                     nearest = float(theta_deg_arr[idx])
                     rd[nearest] = rhcp_db_v[:, idx].copy()
-                freq_rhcp_data.append((freq, rd))
             lhcp_db_v = row.get("_azimuth_lhcp_db")
             if lhcp_db_v is not None and theta_deg_arr is not None and output_config and []:
                 ld = {}
@@ -1388,7 +1367,6 @@ def _export_azimuth(
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
                     nearest = float(theta_deg_arr[idx])
                     ld[nearest] = lhcp_db_v[:, idx].copy()
-                freq_lhcp_data.append((freq, ld))
             # Theta 范围峰值中间数据 (每 phi 的 Theta 范围峰值)
             if output_config and output_config.pk_theta_ranges:
                 for t_max in output_config.pk_theta_ranges:
@@ -1443,18 +1421,9 @@ def _export_azimuth(
         if not data_path:
             data_path = ""
         # 收集启用的图表类型 → 数据映射
-        data_sheets = {}
         if output_config:
-            if False and freq_gain_data:
-                data_sheets["Gain Azimuth"] = freq_gain_data
-            if False and freq_ar_data:
-                data_sheets["AR Azimuth"] = freq_ar_data
-            if False and freq_rhcp_data:
-                data_sheets["RHCP Azimuth"] = freq_rhcp_data
-            if False and freq_lhcp_data:
-                data_sheets["LHCP Azimuth"] = freq_lhcp_data
             for t_max, pk_data in freq_gain_vs_theta.items():
-                data_sheets[f"Gain 0-{int(t_max)}° Pk"] = [("phi_matrix", pk_data)]
+                data_sheets[f"Gain 0-{int(t_max)} Pk"] = [("phi_matrix", pk_data)]
         if data_sheets:
             if not data_path:
                 gdir = getattr(output_config, 'data_output_dir', '') if output_config else ''
