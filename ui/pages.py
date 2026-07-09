@@ -3230,7 +3230,7 @@ class ChartSettingsPage(QWidget):
                 if idx2 >= 0:
                     self._spin_az_columns.setCurrentIndex(idx2)
             if hasattr(self, '_spin_az_img_pct'):
-                self._spin_az_img_pct.setValue(az.word_image_width_pct if 10 <= az.word_image_width_pct <= 100 else 90)
+                self._spin_az_img_pct.setValue(az.word_image_width_pct if 10 <= az.word_image_width_pct <= 100 else 100)
             if hasattr(self, '_check_show_caption'):
                 self._check_show_caption.setChecked(getattr(az, 'show_caption', True))
             if hasattr(self, '_check_share_ticks'):
@@ -3271,7 +3271,7 @@ class ChartSettingsPage(QWidget):
         title = self.tr("Full Report Word 布局设置") if fr_mode else self.tr("Word 输出布局设置")
         cur_mode = getattr(az, f"{prefix}word_layout_mode", "side_by_side") if az else "side_by_side"
         cur_cols = getattr(az, f"{prefix}word_columns", 2) if az else 2
-        cur_pct = getattr(az, f"{prefix}word_image_width_pct", 90) if az else 90
+        cur_pct = getattr(az, f"{prefix}word_image_width_pct", 100) if az else 100
         cur_cap = getattr(az, f"{prefix}show_caption", False) if az else False
         cur_hd = getattr(az, f"{prefix}show_heading", True) if az else True
 
@@ -3476,7 +3476,7 @@ class ChartSettingsPage(QWidget):
         if hasattr(self, '_spin_azimuth_dpi_xtr'):
             azimuth.dpi = self._spin_azimuth_dpi_xtr.value()  # 右侧优先(最后设置)
         azimuth.word_columns = getattr(self, '_az_columns', 2)
-        azimuth.word_image_width_pct = getattr(self, '_az_img_pct', 90)
+        azimuth.word_image_width_pct = getattr(self, '_az_img_pct', 100)
         azimuth.show_caption = getattr(self, '_az_show_caption', False)
         azimuth.show_heading = getattr(self, '_az_show_heading', True)
         azimuth.share_radial_ticks = self._check_share_ticks.isChecked() if hasattr(self, '_check_share_ticks') else False
