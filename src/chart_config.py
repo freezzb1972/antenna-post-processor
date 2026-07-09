@@ -211,7 +211,10 @@ class ChartConfig:
         )
         for f in fields:
             setattr(merged, f, getattr(self, f) or getattr(other, f))
-        # 合并角度 + 参数选择
+        # 非 bool 字段合并
+        merged.render_charts = self.render_charts and other.render_charts
+        merged.view_angle_pairs = self.view_angle_pairs or other.view_angle_pairs
+        merged.selected_frequencies = self.selected_frequencies or other.selected_frequencies
         merged.cut_2d_phi_angles = list(set(self.cut_2d_phi_angles + other.cut_2d_phi_angles))
         merged.cut_2d_theta_angles = list(set(self.cut_2d_theta_angles + other.cut_2d_theta_angles))
         merged.cut_2d_params = self.cut_2d_params | other.cut_2d_params

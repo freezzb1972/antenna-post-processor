@@ -50,7 +50,7 @@ def check_field_collisions() -> list[str]:
     az_fields = _find_dataclass_fields(
         str(PROJECT_ROOT / "src" / "azimuth_config.py"), "AzimuthReportConfig")
 
-    overlap = chart_fields & az_fields
+    overlap = chart_fields & az_fields - {"dpi"}  # dpi 两个配置各独立
     errors = []
     for f in sorted(overlap):
         errors.append(
@@ -64,23 +64,26 @@ def check_field_collisions() -> list[str]:
 # 检查 2: merge/to_dict/from_dict 覆盖度
 # ═══════════════════════════════════════════════════════════════
 
-def _extract_method_body(tree: ast.AST, method_name: str) -> str | None:
-    """提取类方法体的源码文本。"""
+def _extract_method_body(filepath: str, method_name: str) -> str | None:
+    """提取类方法体的源码文本 (基于行号, 比 ast.unparse 准确)。"""
+    try:
+        with open(filepath) as f:
+            lines = f.readlines()
+            source = "".join(lines)
+            tree = ast.parse(source)
+    except Exception:
+        return None
+
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and node.name == method_name:
-            return ast.unparse(node)
+            start = node.lineno - 1  # 0-based
+            end = node.end_lineno if hasattr(node, 'end_lineno') else start + 50
+            return "".join(lines[start:end])
     return None
 
 
 def check_serialization_coverage(filepath: str, class_name: str) -> list[str]:
     """新增 dataclass 字段必须在 merge/to_dict/from_dict 中覆盖。"""
-    try:
-        with open(filepath) as f:
-            source = f.read()
-            tree = ast.parse(source)
-    except Exception:
-        return []
-
     fields = _find_dataclass_fields(filepath, class_name)
     if not fields:
         return []
@@ -88,24 +91,25 @@ def check_serialization_coverage(filepath: str, class_name: str) -> list[str]:
     errors = []
 
     # Check to_dict
-    to_dict_body = _extract_method_body(tree, "to_dict")
+    to_dict_body = _extract_method_body(filepath, "to_dict")
     if to_dict_body:
         for f in fields:
-            if f'"{f}"' not in to_dict_body:
+            if f'"{f}"' not in to_dict_body and f"'{f}'" not in to_dict_body:
                 errors.append(f"MISSING in {class_name}.to_dict(): '{f}'")
 
     # Check from_dict
-    from_dict_body = _extract_method_body(tree, "from_dict")
+    from_dict_body = _extract_method_body(filepath, "from_dict")
     if from_dict_body:
         for f in fields:
-            if f'"{f}"' not in from_dict_body:
+            if f'"{f}"' not in from_dict_body and f"'{f}'" not in from_dict_body:
                 errors.append(f"MISSING in {class_name}.from_dict(): '{f}'")
 
     # Check merge
-    merge_body = _extract_method_body(tree, "merge")
+    merge_body = _extract_method_body(filepath, "merge")
     if merge_body:
         for f in fields:
-            if f'"{f}"' not in merge_body and f"self.{f}" not in merge_body:
+            if (f'"{f}"' not in merge_body and f"'{f}'" not in merge_body
+                    and f"self.{f}" not in merge_body and f"other.{f}" not in merge_body):
                 errors.append(f"MISSING in {class_name}.merge(): '{f}'")
 
     return errors
