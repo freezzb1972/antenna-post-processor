@@ -3746,7 +3746,7 @@ class ChartSettingsPage(QWidget):
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
-            setattr(self, '_dpi', spin_dpi.value()),
+            setattr(self, '_dpi', spin_dpi.value()), self._sync_selected_frequencies(freq_picker.get_selected()),
             setattr(self, '_step_deg', float(spin_step.value())),
             self._view_angle_pairs.clear(),
             [self._view_angle_pairs.append((float(el), float(az))) for el, az in _pairs],
@@ -3867,7 +3867,7 @@ class ChartSettingsPage(QWidget):
         btns.accepted.connect(lambda: (
             setattr(az, 'freq_gap_mhz', spin_gap.value()) if az else None,
             setattr(az, 'dual_y_enabled', check_dual.isChecked()) if az else None,
-            self._sync_to_mw(),
+            self._sync_to_mw(), self._sync_selected_frequencies(freq_picker.get_selected()),
             dlg.accept()))
         btns.rejected.connect(dlg.reject)
         layout.addWidget(btns)
@@ -4091,7 +4091,7 @@ class ChartSettingsPage(QWidget):
         btns.accepted.connect(lambda: (
             setattr(self, entry_attr, list(_entries)),
             setattr(self, '_dpi', spin_dpi.value()),
-            self._sync_to_mw(),
+            self._sync_to_mw(), self._sync_selected_frequencies(freq_picker.get_selected()),
             dlg.accept(),
         ))
         btns.rejected.connect(dlg.reject)
@@ -4211,7 +4211,7 @@ class ChartSettingsPage(QWidget):
         btns.accepted.connect(lambda: (
             self._cut_2d_phi_angles.clear(),
             self._cut_2d_phi_angles.extend([ch[0] for ch in _charts if ch]),
-            self._sync_to_mw(),
+            self._sync_to_mw(), self._sync_selected_frequencies(freq_picker.get_selected()),
             dlg.accept()))
         btns.rejected.connect(dlg.reject)
         layout.addWidget(btns)
