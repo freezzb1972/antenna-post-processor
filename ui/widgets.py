@@ -640,8 +640,11 @@ class FrequencyPickerDialog(QDialog):
             p = p.strip()
             if not p:
                 continue
+            # 去除常见单位和格式字符
+            clean = p.lower().replace('mhz', '').replace('ghz', '').replace('hz', '')
+            clean = clean.replace('m', '').replace('g', '').replace(' ', '').replace('\t', '')
             try:
-                val = float(p)
+                val = float(clean)
                 if val in self._all_freqs:
                     if val not in self._selected:
                         self._selected.append(val)
