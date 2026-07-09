@@ -160,22 +160,7 @@ def expand_to_instances(
                     label=_CHART_LABELS.get(key, key), image_key=key, per_freq=False,
                 ))
 
-    # ── C 类 2D 切面 ──
-    if chart_config:
-        for flag, label_base, phi_angles, img_prefix in [
-            ("cut_2d_polar", "极坐标俯仰面切面图", chart_config.cut_2d_phi_angles, "2d_polar_phi"),
-            ("cut_2d_rect", "直角坐标俯仰面切面图", chart_config.cut_2d_phi_angles, "2d_rect_phi"),
-        ]:
-            if getattr(chart_config, flag, False):
-                angles = phi_angles if phi_angles else [0, 90]
-                for phi in sorted(set(angles)):
-                    cid = f"{flag}_phi{phi:.0f}"
-                    img_key = f"{img_prefix}{phi:.0f}"
-                    _add(ChartInstance(
-                        instance_id=cid, parent_type=flag, category=ChartCategory.C_2D,
-                        label=f"{label_base} (φ={phi:.0f}°)", image_key=img_key,
-                        per_freq=True, params={"phi_angle": float(phi)},
-                    ))
+    # ── C 类 2D 切面 (由 cut_param 统一渲染, 不再通过 ChartInstance) ──
 
     # ── Z 类 azimuth ──
     if output_config:
