@@ -261,8 +261,8 @@ def _write_by_freq(doc, ordered_groups, antenna_name, angles_str, img_width, col
     for freq in all_freqs:
         # 频点标题
         if show_heading:
-                heading = doc.add_heading(f"Frequency: {freq:.0f} MHz", level=1)
-        heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            heading = doc.add_heading(f"Frequency: {freq:.0f} MHz", level=1)
+            heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
         # 收集该频点的所有图片
         freq_images = {}
@@ -292,9 +292,8 @@ def _write_by_freq(doc, ordered_groups, antenna_name, angles_str, img_width, col
 def _write_by_type(doc, ordered_groups, antenna_name, angles_str, img_width, columns, show_heading, show_caption):
     """按图表类型布局: 每种图表类型展示其所有频点的图片。"""
     for group_name, images in ordered_groups:
-        if show_caption:
-            if show_heading:
-                heading = doc.add_heading(group_name, level=1); heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        if show_heading:
+            heading = doc.add_heading(group_name, level=1); heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
         freqs = sorted(images.keys())
         _write_image_grid(doc, images, freqs, antenna_name, group_name,
