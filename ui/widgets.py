@@ -567,8 +567,8 @@ class FrequencyPickerDialog(QDialog):
         lists_row.addLayout(btn_col)
 
         # 已选频点 (右)
-        right_grp = QGroupBox(f"已选频点 ({len(self._selected)})")
-        right_lo = QVBoxLayout(right_grp)
+        self._right_grp = QGroupBox(f"已选频点 ({len(self._selected)})")
+        right_lo = QVBoxLayout(self._right_grp)
         self._sel_list = QListWidget()
         self._sel_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self._sel_list.itemDoubleClicked.connect(self._move_to_all)
@@ -610,7 +610,7 @@ class FrequencyPickerDialog(QDialog):
             item = QListWidgetItem(f"{f:.1f} MHz")
             item.setData(Qt.UserRole, f)
             self._sel_list.addItem(item)
-        self._sel_list.parent().setTitle(f"已选频点 ({len(self._selected)})")
+        self._right_grp.setTitle(f"已选频点 ({len(self._selected)})")
 
     def _move_to_selected(self):
         moved = []
