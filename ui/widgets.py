@@ -521,7 +521,149 @@ class DataFileSelector(QGroupBox):
 
 
 # ═══════════════════════════════════════════════════════════════
-# FrequencyPickerWidget — 频点批量选择组件
+# FrequencyPickerDialog — 频点选择下级窗体
+# ═══════════════════════════════════════════════════════════════
+
+class FrequencyPickerDialog(QDialog):
+    """频点选择弹窗 — 全部频点 (左) ↔ 已选频点 (右) 双栏 + 粘贴验证。"""
+
+    def __init__(self, all_freqs: list[float], selected: list[float], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("频点选择")
+        self.setMinimumSize(600, 450)
+        self._all_freqs = sorted(set(all_freqs))
+        self._selected = sorted(set(selected))
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+
+        # ── 双列表 ──
+        lists_row = QHBoxLayout()
+
+        # 全部频点 (左)
+        left_grp = QGroupBox(f"全部频点 ({len(self._all_freqs)})")
+        left_lo = QVBoxLayout(left_grp)
+        self._all_list = QListWidget()
+        self._all_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self._all_list.itemDoubleClicked.connect(self._move_to_selected)
+        self._rebuild_all()
+        left_lo.addWidget(self._all_list)
+        lists_row.addWidget(left_grp, 1)
+
+        # 按钮列
+        btn_col = QVBoxLayout()
+        btn_col.addStretch()
+        btn_right = QPushButton("→")
+        btn_right.setFixedWidth(40)
+        btn_right.clicked.connect(self._move_to_selected)
+        btn_col.addWidget(btn_right)
+        btn_left = QPushButton("←")
+        btn_left.setFixedWidth(40)
+        btn_left.clicked.connect(self._move_to_all)
+        btn_col.addWidget(btn_left)
+        btn_col.addStretch()
+        lists_row.addLayout(btn_col)
+
+        # 已选频点 (右)
+        right_grp = QGroupBox(f"已选频点 ({len(self._selected)})")
+        right_lo = QVBoxLayout(right_grp)
+        self._sel_list = QListWidget()
+        self._sel_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self._sel_list.itemDoubleClicked.connect(self._move_to_all)
+        self._rebuild_sel()
+        right_lo.addWidget(self._sel_list)
+        lists_row.addWidget(right_grp, 1)
+
+        layout.addLayout(lists_row)
+
+        # ── 粘贴输入 ──
+        paste_row = QHBoxLayout()
+        paste_row.addWidget(QLabel("粘贴/输入:"))
+        self._edit_paste = QLineEdit()
+        self._edit_paste.setPlaceholderText("逗号/空格/换行分隔, 不在列表中的拒绝")
+        self._edit_paste.returnPressed.connect(self._apply_paste)
+        paste_row.addWidget(self._edit_paste)
+        btn_apply = QPushButton("应用")
+        btn_apply.clicked.connect(self._apply_paste)
+        paste_row.addWidget(btn_apply)
+        paste_row.addStretch()
+        layout.addLayout(paste_row)
+
+        # ── 按钮 ──
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _rebuild_all(self):
+        self._all_list.clear()
+        for f in self._all_freqs:
+            item = QListWidgetItem(f"{f:.1f} MHz")
+            item.setData(Qt.UserRole, f)
+            self._all_list.addItem(item)
+
+    def _rebuild_sel(self):
+        self._sel_list.clear()
+        for f in self._selected:
+            item = QListWidgetItem(f"{f:.1f} MHz")
+            item.setData(Qt.UserRole, f)
+            self._sel_list.addItem(item)
+        self._sel_list.parent().setTitle(f"已选频点 ({len(self._selected)})")
+
+    def _move_to_selected(self):
+        moved = []
+        for item in self._all_list.selectedItems():
+            f = item.data(Qt.UserRole)
+            if f not in self._selected:
+                self._selected.append(f)
+            moved.append(f)
+        self._selected.sort()
+        self._rebuild_sel()
+
+    def _move_to_all(self):
+        for item in self._sel_list.selectedItems():
+            f = item.data(Qt.UserRole)
+            if f in self._selected:
+                self._selected.remove(f)
+        self._rebuild_sel()
+
+    def _apply_paste(self):
+        text = self._edit_paste.text().strip()
+        if not text:
+            return
+        import re
+        parts = re.split(r'[\s,;\t\n\r]+', text)
+        accepted = []
+        rejected = []
+        for p in parts:
+            p = p.strip()
+            if not p:
+                continue
+            try:
+                val = float(p)
+                if val in self._all_freqs:
+                    if val not in self._selected:
+                        self._selected.append(val)
+                    accepted.append(val)
+                else:
+                    rejected.append(val)
+            except ValueError:
+                rejected.append(p)
+        self._selected.sort()
+        self._rebuild_sel()
+        self._edit_paste.clear()
+        if rejected:
+            QMessageBox.information(
+                self, "频点验证",
+                f"以下频点不在全部频点列表中，已拒绝:\n{', '.join(str(r) for r in rejected)}")
+
+    def get_selected(self) -> list[float]:
+        return list(self._selected)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FrequencyPickerWidget — 频点批量选择组件 (旧, 保留兼容)
 # ═══════════════════════════════════════════════════════════════
 
 class FrequencyPickerWidget(QWidget):
