@@ -171,17 +171,7 @@ class OutputConfig:
     def merge(self, other: OutputConfig) -> OutputConfig:
         """合并两个配置（OR 逻辑），角度取并集，路径取 self 优先。"""
         return OutputConfig(
-            cut_azimuth_polar=self.cut_azimuth_polar or other.cut_azimuth_polar,
             pk_theta_ranges=sorted(set(self.pk_theta_ranges + other.pk_theta_ranges)),
-            cut_azimuth_polar_ar=self.cut_azimuth_polar_ar or other.cut_azimuth_polar_ar,
-            cut_azimuth_polar_rhcp=self.cut_azimuth_polar_rhcp or other.cut_azimuth_polar_rhcp,
-            cut_azimuth_polar_lhcp=self.cut_azimuth_polar_lhcp or other.cut_azimuth_polar_lhcp,
-            cut_azimuth_polar_cpxpi=self.cut_azimuth_polar_cpxpi or other.cut_azimuth_polar_cpxpi,
-            cut_azimuth_rect=self.cut_azimuth_rect or other.cut_azimuth_rect,
-            azimuth_cut_angles=sorted(set(_flatten(self.azimuth_cut_angles) + _flatten(other.azimuth_cut_angles))),
-            azimuth_cut_angles_ar=sorted(set(_flatten(self.azimuth_cut_angles_ar) + _flatten(other.azimuth_cut_angles_ar))),
-            azimuth_cut_angles_rhcp=sorted(set(_flatten(self.azimuth_cut_angles_rhcp) + _flatten(other.azimuth_cut_angles_rhcp))),
-            azimuth_cut_angles_lhcp=sorted(set(_flatten(self.azimuth_cut_angles_lhcp) + _flatten(other.azimuth_cut_angles_lhcp))),
             antenna_name=self.antenna_name or other.antenna_name,
             word_layout_mode=self.word_layout_mode,
             word_columns=self.word_columns or other.word_columns,

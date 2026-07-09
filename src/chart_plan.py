@@ -162,33 +162,7 @@ def expand_to_instances(
 
     # ── C 类 2D 切面 (由 cut_param 统一渲染, 不再通过 ChartInstance) ──
 
-    # ── Z 类 azimuth ──
-    if output_config:
-        for flag, label_base, angle_charts_attr in [
-            ("cut_azimuth_polar", "Gain 极坐标方位面", "angle_charts"),
-            ("cut_azimuth_polar_ar", "AR 极坐标方位面", "angle_charts_ar"),
-            ("cut_azimuth_polar_rhcp", "RHCP 极坐标方位面", "angle_charts_rhcp"),
-            ("cut_azimuth_polar_lhcp", "LHCP 极坐标方位面", "angle_charts_lhcp"),
-        ]:
-            if getattr(output_config, flag, False):
-                charts = getattr(output_config, angle_charts_attr, [[]])
-                for ci, angles in enumerate(charts):
-                    if not angles:
-                        continue
-                    angles_str = ", ".join(f"{a:.0f}°" for a in sorted(set(angles)))
-                    if len(charts) == 1:
-                        cid = flag
-                        img_key = _AZ_IMG_KEYS.get(flag, flag)
-                        label = f"{label_base} (θ={angles_str})"
-                    else:
-                        cid = f"{flag}_{ci}"
-                        img_key = f"{_AZ_IMG_KEYS.get(flag, flag)}_{ci}"
-                        label = f"{label_base} #{ci+1} (θ={angles_str})"
-                    _add(ChartInstance(
-                        instance_id=cid, parent_type=flag, category=ChartCategory.Z_AZIMUTH,
-                        label=label, image_key=img_key, per_freq=True,
-                        params={"angles": [float(a) for a in sorted(set(angles))]},
-                    ))
+    # ── Z 类 azimuth (由 C 类 cut_param 统一渲染, 不再通过 ChartInstance) ──
 
 
 
