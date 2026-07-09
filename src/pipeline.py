@@ -1236,7 +1236,12 @@ def _export_azimuth(
                 label = _label_for_image_key(img_key)
                 if label not in image_groups:
                     image_groups[label] = {}
-                image_groups[label][freq] = buf
+                if freq in image_groups[label]:
+                    v = image_groups[label][freq]
+                    image_groups[label][freq] = v if isinstance(v, list) else [v]
+                    image_groups[label][freq].append(buf)
+                else:
+                    image_groups[label][freq] = buf
                 _total_imgs += 1
     if _total_imgs == 0:
         _log(log_callback, "  ⚠ 未收集到任何图片 — 检查 chart_config 和 _enabled_keys 过滤")
