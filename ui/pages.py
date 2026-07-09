@@ -3741,7 +3741,7 @@ class ChartSettingsPage(QWidget):
         edit_form.addRow(self.tr("方位角:"), spin_az)
         _refresh_edit()
         layout.addWidget(edit_grp)
-        self._add_frequency_picker(layout)
+        freq_picker = self._add_frequency_picker(layout)
         layout.addStretch()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -3860,7 +3860,7 @@ class ChartSettingsPage(QWidget):
         check_dual.setToolTip(self.tr("Efficiency%+Gain 和 Directivity+TRP 共用双Y轴"))
         global_form.addRow("", check_dual)
         layout.addWidget(global_grp)
-        self._add_frequency_picker(layout)
+        freq_picker = self._add_frequency_picker(layout)
         layout.addStretch()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -4084,7 +4084,7 @@ class ChartSettingsPage(QWidget):
         spin_dpi.setValue(getattr(current, 'dpi', 150) if current else 150)
         dpi_row.addWidget(spin_dpi); dpi_row.addStretch()
         layout.addLayout(dpi_row)
-        self._add_frequency_picker(layout)
+        freq_picker = self._add_frequency_picker(layout)
 
         # ── 按钮 ──
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -4204,7 +4204,7 @@ class ChartSettingsPage(QWidget):
         step_layout.addWidget(btn_gen); step_layout.addStretch()
         edit_layout.addWidget(step_grp)
         layout.addWidget(edit_grp)
-        self._add_frequency_picker(layout)
+        freq_picker = self._add_frequency_picker(layout)
         layout.addStretch()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
