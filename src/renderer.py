@@ -298,6 +298,8 @@ class MatplotlibRenderer(BaseRenderer):
                 ax.plot(mirror_rad, mirror_gain_dbi, "-", linewidth=1.2,
                         color="#2196F3")
 
+        if curves:
+            ax.legend(fontsize=8, loc="upper right")
         ax.set_theta_zero_location("N")
         ax.set_theta_direction(-1)
         ax.set_thetagrids(range(0, 360, 30),
@@ -419,6 +421,8 @@ class MatplotlibRenderer(BaseRenderer):
             ax.plot(phi_close, gain_close, color=color, linestyle=ls,
                     linewidth=1.2, label=label)
 
+        if curves:
+            ax.legend(fontsize=8, loc="upper right")
         ax.set_theta_zero_location("N")
         ax.set_theta_direction(-1)
         ax.set_thetagrids(range(0, 360, 30),

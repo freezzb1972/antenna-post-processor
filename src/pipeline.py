@@ -761,8 +761,8 @@ def _load_and_compute(
     # 重新计算权重 (total 可能因过滤减少)
     total = len(tasks)
     _load_w = max(total, 1)
-    _calc_w = max(total * 4, 1)
-    _render_w = max(total * 2, 1)
+    _calc_w = max(total, 1)            # 计算很快, 占1x
+    _render_w = max(total * 5, 1)      # 渲染慢, 占5x
     _compute_w = _calc_w + _render_w
     _export_w = 10
     _word_w = 10
@@ -1053,7 +1053,7 @@ def run_pipeline(
     # ── 阶段 4: 输出 Excel 天线参数 (统一 progress_max) ──
     total = len(tasks)
     _load_w = max(total, 1)
-    _calc_w = max(total * 4, 1); _render_w = max(total * 2, 1)
+    _calc_w = max(total, 1); _render_w = max(total * 5, 1)
     _compute_w = _calc_w + _render_w
     _base = _load_w + _compute_w
     _export_w = 10  # Excel 导出权重
