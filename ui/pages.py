@@ -3632,12 +3632,12 @@ class ChartSettingsPage(QWidget):
         edit_form.addRow(self.tr("方位角:"), spin_az)
         _refresh_edit()
         layout.addWidget(edit_grp)
-        freq_picker = self._add_frequency_picker(layout)
+        freq_picker = self._add_frequency_picker(layout, 'a')
         layout.addStretch()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
-            setattr(self, '_dpi', spin_dpi.value()), self._sync_selected_frequencies(freq_picker.get_selected()),
+            setattr(self, '_dpi', spin_dpi.value()), self._sync_selected_frequencies(freq_picker.get_selected(), 'a'),
             setattr(self, '_step_deg', float(spin_step.value())),
             self._view_angle_pairs.clear(),
             [self._view_angle_pairs.append((float(el), float(az))) for el, az in _pairs],
@@ -3751,14 +3751,14 @@ class ChartSettingsPage(QWidget):
         check_dual.setToolTip(self.tr("Efficiency%+Gain 和 Directivity+TRP 共用双Y轴"))
         global_form.addRow("", check_dual)
         layout.addWidget(global_grp)
-        freq_picker = self._add_frequency_picker(layout)
+        freq_picker = self._add_frequency_picker(layout, 'b')
         layout.addStretch()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
             setattr(az, 'freq_gap_mhz', spin_gap.value()) if az else None,
             setattr(az, 'dual_y_enabled', check_dual.isChecked()) if az else None,
-            self._sync_to_mw(), self._sync_selected_frequencies(freq_picker.get_selected()),
+            self._sync_to_mw(), self._sync_selected_frequencies(freq_picker.get_selected(), 'b'),
             dlg.accept()))
         btns.rejected.connect(dlg.reject)
         layout.addWidget(btns)
@@ -3975,14 +3975,14 @@ class ChartSettingsPage(QWidget):
         spin_dpi.setValue(getattr(current, 'dpi', 150) if current else 150)
         dpi_row.addWidget(spin_dpi); dpi_row.addStretch()
         layout.addLayout(dpi_row)
-        freq_picker = self._add_frequency_picker(layout)
+        freq_picker = self._add_frequency_picker(layout, 'c')
 
         # ── 按钮 ──
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
             setattr(self, entry_attr, list(_entries)),
             setattr(self, '_dpi', spin_dpi.value()),
-            self._sync_to_mw(), self._sync_selected_frequencies(freq_picker.get_selected()),
+            self._sync_to_mw(), self._sync_selected_frequencies(freq_picker.get_selected(), 'c'),
             dlg.accept(),
         ))
         btns.rejected.connect(dlg.reject)
@@ -4095,14 +4095,14 @@ class ChartSettingsPage(QWidget):
         step_layout.addWidget(btn_gen); step_layout.addStretch()
         edit_layout.addWidget(step_grp)
         layout.addWidget(edit_grp)
-        freq_picker = self._add_frequency_picker(layout)
+        freq_picker = self._add_frequency_picker(layout, 'c')
         layout.addStretch()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
             self._cut_2d_phi_angles.clear(),
             self._cut_2d_phi_angles.extend([ch[0] for ch in _charts if ch]),
-            self._sync_to_mw(), self._sync_selected_frequencies(freq_picker.get_selected()),
+            self._sync_to_mw(), self._sync_selected_frequencies(freq_picker.get_selected(), 'c'),
             dlg.accept()))
         btns.rejected.connect(dlg.reject)
         layout.addWidget(btns)
@@ -4111,7 +4111,7 @@ class ChartSettingsPage(QWidget):
         self._sync_to_mw()
 
 
-    def _add_frequency_picker(self, layout: QVBoxLayout):
+    def _add_frequency_picker(self, layout: QVBoxLayout, cat: str = "a"):
         """构建频点选择组件 — 下级弹窗模式。返回 picker adapter。"""
         freq_grp = QGroupBox(self.tr("频点选择"))
         freq_lo = QVBoxLayout(freq_grp)
@@ -4136,7 +4136,7 @@ class ChartSettingsPage(QWidget):
 
         # 已选频点
         cfg = getattr(self._mw, '_chart_config_required', None) if self._mw else None
-        _selected = list(cfg.selected_frequencies) if (cfg and cfg.selected_frequencies) else []
+        _selected = list(getattr(cfg, f"selected_frequencies_{cat}", [])) if cfg else []
 
         # 摘要显示
         row = QHBoxLayout()
@@ -4178,15 +4178,15 @@ class ChartSettingsPage(QWidget):
                 return list(_selected)
         return _Adapter()
 
-    def _sync_selected_frequencies(self, freqs: list[float]):
-        """将选中的频点同步到 ChartConfig。"""
+    def _sync_selected_frequencies(self, freqs: list[float], cat: str = "a"):
+        """同步频点到 ChartConfig。cat: 'a'=A类, 'b'=B类, 'c'=C类"""
+        attr = f"selected_frequencies_{cat}"
         if not self._mw:
             return
-        if not hasattr(self._mw, '_chart_config_required') or self._mw._chart_config_required is None:
-            return
-        self._mw._chart_config_required.selected_frequencies = list(freqs)
-        if hasattr(self._mw, '_chart_config_extra') and self._mw._chart_config_extra is not None:
-            self._mw._chart_config_extra.selected_frequencies = list(freqs)
+        if hasattr(self._mw, '_chart_config_required') and self._mw._chart_config_required:
+            setattr(self._mw._chart_config_required, attr, list(freqs))
+        if hasattr(self._mw, '_chart_config_extra') and self._mw._chart_config_extra:
+            setattr(self._mw._chart_config_extra, attr, list(freqs))
 
     # ── 公共接口 ──
 

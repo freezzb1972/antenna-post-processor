@@ -163,7 +163,9 @@ class ChartConfig:
     step_deg: float = 5.0          # 3D 图形采样精度 (°)
 
     # 频点过滤 (空列表 = 所有频点)
-    selected_frequencies: list[float] = field(default_factory=list)
+    selected_frequencies_a: list[float] = field(default_factory=list)  # A类
+    selected_frequencies_b: list[float] = field(default_factory=list)  # B类
+    selected_frequencies_c: list[float] = field(default_factory=list)  # C类
 
     # 输出方式
     embed_in_excel: bool = True
@@ -220,7 +222,9 @@ class ChartConfig:
         # 非 bool 字段合并
         merged.render_charts = self.render_charts and other.render_charts
         merged.view_angle_pairs = self.view_angle_pairs or other.view_angle_pairs
-        merged.selected_frequencies = self.selected_frequencies or other.selected_frequencies
+        merged.selected_frequencies_a = self.selected_frequencies_a or other.selected_frequencies_a
+        merged.selected_frequencies_b = self.selected_frequencies_b or other.selected_frequencies_b
+        merged.selected_frequencies_c = self.selected_frequencies_c or other.selected_frequencies_c
         merged.cut_2d_phi_angles = list(set(self.cut_2d_phi_angles + other.cut_2d_phi_angles))
         merged.cut_2d_theta_angles = list(set(self.cut_2d_theta_angles + other.cut_2d_theta_angles))
         merged.cut_2d_params = self.cut_2d_params | other.cut_2d_params

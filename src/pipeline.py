@@ -752,11 +752,14 @@ def _load_and_compute(
     # 统一进度条: 权重在频点过滤后重新计算
 
     # 频点过滤
-    if chart_config and chart_config.selected_frequencies:
-        sel = set(chart_config.selected_frequencies)
-        orig_total = len(tasks)
-        tasks = [t for t in tasks if t[1] in sel]
-        _log(log_callback, f"🎯 频点过滤: {len(tasks)}/{orig_total} 个频点")
+    if chart_config:
+        sel = (set(getattr(chart_config, 'selected_frequencies_a', []))
+               | set(getattr(chart_config, 'selected_frequencies_b', []))
+               | set(getattr(chart_config, 'selected_frequencies_c', [])))
+        if sel:
+            orig_total = len(tasks)
+            tasks = [t for t in tasks if t[1] in sel]
+            _log(log_callback, f"🎯 频点过滤: {len(tasks)}/{orig_total} 个频点")
 
     # 重新计算权重 (total 可能因过滤减少)
     total = len(tasks)
