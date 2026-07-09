@@ -152,6 +152,8 @@ class ChartConfig:
     # 4 组独立图表条目 (每组 = (param, [angles]) 的 list)
     cut_2d_polar_entries: list = field(default_factory=list)
     cut_2d_rect_entries: list = field(default_factory=list)
+    cut_azimuth_polar_entries: list = field(default_factory=list)
+    cut_azimuth_rect_entries: list = field(default_factory=list)
 
     # 视角参数
     elev: float = 30.0
@@ -223,7 +225,8 @@ class ChartConfig:
         merged.cut_2d_theta_angles = list(set(self.cut_2d_theta_angles + other.cut_2d_theta_angles))
         merged.cut_2d_params = self.cut_2d_params | other.cut_2d_params
         # 合并 4 组图表条目
-        for attr in ("cut_2d_polar_entries", "cut_2d_rect_entries"):
+        for attr in ("cut_2d_polar_entries", "cut_2d_rect_entries",
+                      "cut_azimuth_polar_entries", "cut_azimuth_rect_entries"):
             sl = list(getattr(self, attr, []))
             ol = list(getattr(other, attr, []))
             setattr(merged, attr, sl + ol)
