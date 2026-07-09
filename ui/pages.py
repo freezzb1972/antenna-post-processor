@@ -3108,11 +3108,11 @@ class ChartSettingsPage(QWidget):
         _az_lbl = QLabel(self.tr("▸ 方位面切面图"))
         _az_lbl.setStyleSheet("font-weight: bold; margin-top: 4px;")
         layout.addWidget(_az_lbl)
-        _az_keys = ["cut_azimuth_polar", "cut_azimuth_polar_ar",
-                    "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
+        _az_keys = ["cut_azimuth_polar", "cut_azimuth_rect",
+                    "cut_azimuth_polar_ar", "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"]
         self._add_select_all_row(target_dict, _az_keys, layout)
 
-        # Gain azimuth
+        # Gain azimuth — 极坐标
         row_az_g = QHBoxLayout()
         cb_az_g = QCheckBox(self.tr("Gain 极坐标方位面"))
         if saved and "cut_azimuth_polar" in saved:
@@ -3124,6 +3124,17 @@ class ChartSettingsPage(QWidget):
         btn_az_g.clicked.connect(lambda checked: self._show_azimuth_angle_popup("gain"))
         row_az_g.addWidget(btn_az_g); row_az_g.addStretch()
         layout.addLayout(row_az_g)
+
+        # Gain azimuth — 直角坐标
+        row_az_rect = QHBoxLayout()
+        cb_az_rect = QCheckBox(self.tr("Gain 直角坐标方位面"))
+        if saved and "cut_azimuth_rect" in saved:
+            cb_az_rect.setChecked(saved["cut_azimuth_rect"])
+        cb_az_rect.toggled.connect(lambda: self._sync_to_mw())
+        row_az_rect.addWidget(cb_az_rect)
+        target_dict["cut_azimuth_rect"] = cb_az_rect
+        row_az_rect.addStretch()
+        layout.addLayout(row_az_rect)
 
         for az_key, az_label, popup_target in [
             ("cut_azimuth_polar_ar", "AR 极坐标方位面", "ar"),
@@ -3200,6 +3211,8 @@ class ChartSettingsPage(QWidget):
             az = mw._azimuth_config
             if "cut_azimuth_polar" in self._chart_required:
                 self._chart_required["cut_azimuth_polar"].setChecked(az.cut_azimuth_polar)
+            if "cut_azimuth_rect" in self._chart_required:
+                self._chart_required["cut_azimuth_rect"].setChecked(az.cut_azimuth_rect)
             if "cut_azimuth_polar_ar" in self._chart_required:
                 self._chart_required["cut_azimuth_polar_ar"].setChecked(az.cut_azimuth_polar_ar)
 
@@ -3450,6 +3463,7 @@ class ChartSettingsPage(QWidget):
         existing = getattr(mw, '_azimuth_config', None)
         azimuth = existing if existing is not None else AzimuthReportConfig()
         azimuth.cut_azimuth_polar = self._chart_required.get("cut_azimuth_polar", QCheckBox()).isChecked()
+        azimuth.cut_azimuth_rect = self._chart_required.get("cut_azimuth_rect", QCheckBox()).isChecked()
         azimuth.cut_azimuth_polar_ar = self._chart_required.get("cut_azimuth_polar_ar", QCheckBox()).isChecked()
         azimuth.cut_azimuth_polar_rhcp = self._chart_required.get("cut_azimuth_polar_rhcp", QCheckBox()).isChecked()
         azimuth.cut_azimuth_polar_lhcp = self._chart_required.get("cut_azimuth_polar_lhcp", QCheckBox()).isChecked()
