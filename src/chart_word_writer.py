@@ -38,7 +38,7 @@ def write_chart_word_report(
     image_width_pct: int = 90,
     label_order: list[str] | None = None,
     layout_mode: str = "side_by_side",
-    show_heading: bool = True,
+    show_heading: bool = False,
     show_caption: bool = False,
 ) -> None:
     """将多组图表图片写入 Word 文档。

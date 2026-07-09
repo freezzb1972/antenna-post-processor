@@ -3184,7 +3184,7 @@ class ChartSettingsPage(QWidget):
         cur_cols = getattr(az, f"{prefix}word_columns", 2) if az else 2
         cur_pct = getattr(az, f"{prefix}word_image_width_pct", 100) if az else 100
         cur_cap = getattr(az, f"{prefix}show_caption", False) if az else False
-        cur_hd = getattr(az, f"{prefix}show_heading", True) if az else True
+        cur_hd = getattr(az, f"{prefix}show_heading", False) if az else False
 
         dlg = QDialog(self)
         dlg.setWindowTitle(title)
@@ -3380,7 +3380,7 @@ class ChartSettingsPage(QWidget):
         azimuth.word_columns = getattr(self, '_az_columns', 2)
         azimuth.word_image_width_pct = getattr(self, '_az_img_pct', 100)
         azimuth.show_caption = getattr(self, '_az_show_caption', False)
-        azimuth.show_heading = getattr(self, '_az_show_heading', True)
+        azimuth.show_heading = getattr(self, '_az_show_heading', False)
         azimuth.share_radial_ticks = self._check_share_ticks.isChecked() if hasattr(self, '_check_share_ticks') else False
 
         # 图表联动已移除 — 用户手动控制每个图表类型

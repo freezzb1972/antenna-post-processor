@@ -26,7 +26,7 @@ class OutputConfig:
     freq_gap_mhz: int = 10                  # B类频点曲线多段间隔阈值(MHz), 0=不打断
     dual_y_enabled: bool = False            # B类频点曲线启用双Y轴配对
     share_radial_ticks: bool = False         # 配对图共用径向刻度
-    show_heading: bool = True               # Word 是否生成章节标题
+    show_heading: bool = False              # Word 是否生成章节标题
     show_caption: bool = False              # Word 图片上方是否显示题注
 
     # ── Word 布局模式 ──
@@ -42,7 +42,7 @@ class OutputConfig:
     fr_word_layout_mode: str = "by_freq"
     fr_word_columns: int = 2
     fr_word_image_width_pct: int = 100
-    fr_show_heading: bool = True
+    fr_show_heading: bool = False
     fr_show_caption: bool = False
 
     # ── 输出路径 — 图表 (Word) ──
