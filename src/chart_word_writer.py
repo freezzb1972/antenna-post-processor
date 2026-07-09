@@ -38,7 +38,8 @@ def write_chart_word_report(
     image_width_pct: int = 90,
     label_order: list[str] | None = None,
     layout_mode: str = "side_by_side",
-    show_caption: bool = True,
+    show_heading: bool = True,
+    show_caption: bool = False,
 ) -> None:
     """将多组图表图片写入 Word 文档。
 
@@ -81,13 +82,13 @@ def write_chart_word_report(
 
     if layout_mode == "by_freq":
         # by_freq: 每频点一行, 展示所有图表类型
-        _write_by_freq(doc, ordered_groups, antenna_name, angles_str, img_width, layout_columns, show_caption)
+        _write_by_freq(doc, ordered_groups, antenna_name, angles_str, img_width, layout_columns, show_heading, show_caption)
     elif layout_mode == "by_type":
         # by_type: 每图表类型一节, 展示所有频点 (等同于默认逐组排列)
-        _write_by_type(doc, ordered_groups, antenna_name, angles_str, img_width, layout_columns, show_caption)
+        _write_by_type(doc, ordered_groups, antenna_name, angles_str, img_width, layout_columns, show_heading, show_caption)
     else:
         # side_by_side / default: 逐组排列
-        _write_by_type(doc, ordered_groups, antenna_name, angles_str, img_width, layout_columns, show_caption)
+        _write_by_type(doc, ordered_groups, antenna_name, angles_str, img_width, layout_columns, show_heading, show_caption)
 
     # 避免覆盖: 同名文件自动加 _1, _2, ...
     base, ext = os.path.splitext(output_path)
@@ -150,8 +151,8 @@ def write_chart_word_report_by_freq(
     if extra_groups:
         for group_name, images in extra_groups.items():
             if not images: continue
-            heading = doc.add_heading(group_name, level=1)
-            heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            if show_heading:
+                heading = doc.add_heading(group_name, level=1); heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
             freqs_extra = sorted(images.keys())
             _write_image_grid(doc, images, freqs_extra, antenna_name,
                               group_name, extra_angles, img_width, 1,
@@ -247,7 +248,7 @@ def _write_image_grid(
                 # 图片间不加空段 — 紧凑排列
 
 
-def _write_by_freq(doc, ordered_groups, antenna_name, angles_str, img_width, columns, show_caption):
+def _write_by_freq(doc, ordered_groups, antenna_name, angles_str, img_width, columns, show_heading, show_caption):
     """按频点布局: 每个频点展示该频点下的所有图表类型。"""
     # 收集所有频点 + 所有图表类型
     all_freqs = set()
@@ -259,7 +260,8 @@ def _write_by_freq(doc, ordered_groups, antenna_name, angles_str, img_width, col
 
     for freq in all_freqs:
         # 频点标题
-        heading = doc.add_heading(f"Frequency: {freq:.0f} MHz", level=1)
+        if show_heading:
+                heading = doc.add_heading(f"Frequency: {freq:.0f} MHz", level=1)
         heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
         # 收集该频点的所有图片
@@ -287,12 +289,12 @@ def _write_by_freq(doc, ordered_groups, antenna_name, angles_str, img_width, col
                     _add_cell_image(table.cell(0, j), imgs[freq], cap, width=img_width, show_caption=show_caption)
 
 
-def _write_by_type(doc, ordered_groups, antenna_name, angles_str, img_width, columns, show_caption):
+def _write_by_type(doc, ordered_groups, antenna_name, angles_str, img_width, columns, show_heading, show_caption):
     """按图表类型布局: 每种图表类型展示其所有频点的图片。"""
     for group_name, images in ordered_groups:
         if show_caption:
-            heading = doc.add_heading(group_name, level=1)
-            heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            if show_heading:
+                heading = doc.add_heading(group_name, level=1); heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
         freqs = sorted(images.keys())
         _write_image_grid(doc, images, freqs, antenna_name, group_name,

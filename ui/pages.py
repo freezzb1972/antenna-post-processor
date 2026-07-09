@@ -3272,7 +3272,8 @@ class ChartSettingsPage(QWidget):
         cur_mode = getattr(az, f"{prefix}word_layout_mode", "side_by_side") if az else "side_by_side"
         cur_cols = getattr(az, f"{prefix}word_columns", 2) if az else 2
         cur_pct = getattr(az, f"{prefix}word_image_width_pct", 90) if az else 90
-        cur_cap = getattr(az, f"{prefix}show_caption", True) if az else True
+        cur_cap = getattr(az, f"{prefix}show_caption", False) if az else False
+        cur_hd = getattr(az, f"{prefix}show_heading", True) if az else True
 
         dlg = QDialog(self)
         dlg.setWindowTitle(title)
@@ -3345,7 +3346,11 @@ class ChartSettingsPage(QWidget):
         spin_pct.setToolTip(self.tr("图片宽度占列宽的百分比"))
         fmt_layout.addRow(self.tr("图片宽(%):"), spin_pct)
 
-        check_cap = QCheckBox(self.tr("显示题注"))
+        check_hd = QCheckBox(self.tr("生成章节标题"))
+        check_hd.setChecked(cur_hd)
+        fmt_layout.addRow("", check_hd)
+
+        check_cap = QCheckBox(self.tr("显示图片题注"))
         check_cap.setChecked(cur_cap)
         fmt_layout.addRow("", check_cap)
         layout.addWidget(fmt_grp)
@@ -3364,6 +3369,7 @@ class ChartSettingsPage(QWidget):
                 self._az_columns = spin_cols.value()
                 self._az_img_pct = spin_pct.value()
                 self._az_show_caption = check_cap.isChecked()
+                self._az_show_heading = check_hd.isChecked()
             # 将列表顺序回写到 ChartInstance.sort_order
             instances = getattr(self._mw, '_chart_instances', None) or []
             if instances:
@@ -3471,7 +3477,8 @@ class ChartSettingsPage(QWidget):
             azimuth.dpi = self._spin_azimuth_dpi_xtr.value()  # 右侧优先(最后设置)
         azimuth.word_columns = getattr(self, '_az_columns', 2)
         azimuth.word_image_width_pct = getattr(self, '_az_img_pct', 90)
-        azimuth.show_caption = getattr(self, '_az_show_caption', True)
+        azimuth.show_caption = getattr(self, '_az_show_caption', False)
+        azimuth.show_heading = getattr(self, '_az_show_heading', True)
         azimuth.share_radial_ticks = self._check_share_ticks.isChecked() if hasattr(self, '_check_share_ticks') else False
 
         # 图表联动已移除 — 用户手动控制每个图表类型

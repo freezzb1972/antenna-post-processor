@@ -39,7 +39,8 @@ class AzimuthReportConfig:
     freq_gap_mhz: int = 10                  # B类频点曲线多段间隔阈值(MHz), 0=不打断
     dual_y_enabled: bool = False            # B类频点曲线启用双Y轴配对
     share_radial_ticks: bool = False         # 配对图共用径向刻度
-    show_caption: bool = True               # Word 图片上方是否显示题注
+    show_heading: bool = True               # Word 是否生成章节标题
+    show_caption: bool = False              # Word 图片上方是否显示题注
 
     # ── Word 布局模式 ──
     # "by_type": 每频点同行 2 列 (左 Gain 右 AR)
@@ -54,7 +55,8 @@ class AzimuthReportConfig:
     fr_word_layout_mode: str = "by_type"
     fr_word_columns: int = 2
     fr_word_image_width_pct: int = 90
-    fr_show_caption: bool = True
+    fr_show_heading: bool = True
+    fr_show_caption: bool = False
 
     # ── 输出路径 — 图表 (Word) ──
     chart_output_dir: str = ""               # 图表输出目录
@@ -187,6 +189,7 @@ class AzimuthReportConfig:
             "fr_word_layout_mode": self.fr_word_layout_mode,
             "fr_word_columns": self.fr_word_columns,
             "fr_word_image_width_pct": self.fr_word_image_width_pct,
+            "fr_show_heading": self.fr_show_heading,
             "fr_show_caption": self.fr_show_caption,
             "chart_output_dir": self.chart_output_dir,
             "chart_output_filename": self.chart_output_filename,
@@ -198,6 +201,7 @@ class AzimuthReportConfig:
             "freq_gap_mhz": self.freq_gap_mhz,
             "dual_y_enabled": self.dual_y_enabled,
             "share_radial_ticks": self.share_radial_ticks,
+            "show_heading": self.show_heading,
             "show_caption": self.show_caption,
         }
 
@@ -223,7 +227,8 @@ class AzimuthReportConfig:
             fr_word_layout_mode=str(d.get("fr_word_layout_mode", "by_type")),
             fr_word_columns=int(d.get("fr_word_columns", 2)),
             fr_word_image_width_pct=int(d.get("fr_word_image_width_pct", 90)),
-            fr_show_caption=bool(d.get("fr_show_caption", True)),
+            fr_show_heading=bool(d.get("fr_show_heading", True)),
+            fr_show_caption=bool(d.get("fr_show_caption", False)),
             chart_output_dir=str(d.get("chart_output_dir", "")),
             chart_output_filename=str(d.get("chart_output_filename", "")),
             excel_output_dir=str(d.get("excel_output_dir", "")),
@@ -234,7 +239,8 @@ class AzimuthReportConfig:
             freq_gap_mhz=int(d.get("freq_gap_mhz", 10)),
             dual_y_enabled=bool(d.get("dual_y_enabled", False)),
             share_radial_ticks=bool(d.get("share_radial_ticks", False)),
-            show_caption=bool(d.get("show_caption", True)),
+            show_heading=bool(d.get("show_heading", True)),
+            show_caption=bool(d.get("show_caption", False)),
         )
 
     # ═══════════════════════════════════════════════════════════
@@ -262,7 +268,8 @@ class AzimuthReportConfig:
             fr_word_layout_mode=self.fr_word_layout_mode,
             fr_word_columns=self.fr_word_columns or other.fr_word_columns,
             fr_word_image_width_pct=self.fr_word_image_width_pct or other.fr_word_image_width_pct,
-            fr_show_caption=self.fr_show_caption,
+            fr_show_heading=self.fr_show_heading and other.fr_show_heading,
+            fr_show_caption=self.fr_show_caption and other.fr_show_caption,
             chart_output_dir=self.chart_output_dir or other.chart_output_dir,
             chart_output_filename=self.chart_output_filename or other.chart_output_filename,
             excel_output_dir=self.excel_output_dir or other.excel_output_dir,
@@ -273,6 +280,7 @@ class AzimuthReportConfig:
             freq_gap_mhz=self.freq_gap_mhz if self.freq_gap_mhz >= 0 else other.freq_gap_mhz,
             dual_y_enabled=self.dual_y_enabled or other.dual_y_enabled,
             share_radial_ticks=self.share_radial_ticks or other.share_radial_ticks,
+            show_heading=self.show_heading and other.show_heading,
             show_caption=self.show_caption and other.show_caption,
         )
 

@@ -1423,7 +1423,8 @@ def _export_azimuth(
                     layout_mode=az.word_layout_mode if az else "side_by_side",
                     layout_columns=az.word_columns if az else 2,
                     image_width_pct=az.word_image_width_pct if az else 90,
-                    show_caption=getattr(az, 'show_caption', True) if az else True,
+                    show_heading=getattr(az, 'show_heading', True) if az else True,
+                    show_caption=getattr(az, 'show_caption', False) if az else False,
                 )
                 total_imgs = sum(len(v) for v in image_groups.values())
                 _log(log_callback, f"  ✓ Word 报告已保存 ({len(image_groups)} 组, {total_imgs} 张图)")
