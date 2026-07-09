@@ -1176,43 +1176,32 @@ def _export_azimuth(
 
     # 图片类型 → 用户可读组名
     def _label_for_image_key(img_key: str) -> str:
-        """将 image key 映射为用户可读组名（支持多图表索引后缀）。"""
-        # 新格式: 2d_polar_{param}_phi{angle} / 2d_rect_{param}_phi{angle}
-        if img_key.startswith("2d_polar_"):
-            return "极坐标俯仰面切面图"
-        if img_key.startswith("2d_rect_"):
-            return "直角坐标俯仰面切面图"
-        # 3D multi-view keys: 3d_gain_v0, 3d_gain_v1, ...
-        if "_v" in img_key and any(img_key.startswith(p) for p in ("3d_gain", "3d_eirp", "3d_ar")):
+        """将 image key 映射为 Word 标题 — 使用 ChartConfig.chart_labels() 作为唯一标签源。"""
+        from .chart_config import ChartConfig
+        _LABELS = ChartConfig.chart_labels()
+
+        # image key 前缀 → ChartConfig 字段 key
+        _PREFIX_MAP = {
+            "2d_polar_": "cut_2d_polar", "2d_rect_": "cut_2d_rect",
+            "azimuth_polar_": "cut_azimuth_polar", "azimuth_rect_": "cut_azimuth_rect",
+        }
+        for prefix, chart_key in _PREFIX_MAP.items():
+            if img_key.startswith(prefix):
+                return _LABELS.get(chart_key, img_key)
+
+        # 3D 多视角: 3d_gain_v0 → pattern_3d_gain
+        if "_v" in img_key:
             base = img_key.rsplit("_v", 1)[0]
-            known = {"3d_gain": "3D Gain Pattern", "3d_eirp": "3D EIRP Pattern", "3d_ar": "3D Axial Ratio Pattern"}
-            return known.get(base, img_key)
-        # azimuth 多图表: azimuth_polar_0 → "Gain Azimuth Cut #1"
-        _AZ_BASE = {
-            "azimuth_polar": "Gain Azimuth Cut",
-            "azimuth_polar_ar": "AR Azimuth Cut",
-            "azimuth_polar_rhcp": "RC Azimuth Cut",
-            "azimuth_polar_lhcp": "LHCP Azimuth Cut",
-        }
-        # 尝试精确匹配 (先于前缀匹配)
-        if img_key in _AZ_BASE:
-            return _AZ_BASE[img_key]
-        # 尝试带索引后缀的 key: azimuth_polar_0, azimuth_polar_ar_1, ...
-        for base, label in _AZ_BASE.items():
-            if img_key.startswith(base + "_") and img_key[len(base)+1:].isdigit():
-                idx = int(img_key[len(base)+1:]) + 1
-                return f"{label} #{idx}"
-        # 新格式匹配: azimuth_polar_{param}_t{theta} / azimuth_polar_pk_{tmax}
-        if img_key.startswith("azimuth_polar_"):
-            return "极坐标方位面切面图"
-        if img_key.startswith("azimuth_rect_"):
-            return "直角坐标方位面切面图"
-        known = {
-            "3d_gain": "3D Gain Pattern",
-            "3d_eirp": "3D EIRP Pattern",
-            "3d_ar": "3D Axial Ratio Pattern",
-        }
-        return known.get(img_key, img_key)
+            for ck in ("pattern_3d_gain", "pattern_3d_eirp", "pattern_3d_ar"):
+                if img_key.startswith(ck):
+                    return _LABELS.get(ck, img_key)
+
+        # 精确匹配
+        for ck in _LABELS:
+            if img_key == ck or img_key.startswith(ck):
+                return _LABELS[ck]
+
+        return img_key
 
     # 若提供实例列表，构建允许的 image_key 集合
     _enabled_keys: set | None = None
