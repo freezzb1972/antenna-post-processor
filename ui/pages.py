@@ -4293,16 +4293,68 @@ class ChartSettingsPage(QWidget):
         freq_grp = QGroupBox(self.tr("频点选择"))
         freq_layout = QVBoxLayout(freq_grp)
         freq_picker = FrequencyPickerWidget()
-        gv = getattr(self._mw, '_graph_viewer', None) if self._mw else None
-        if gv and gv._graph_data:
-            freq_picker.set_frequencies(list(gv._graph_data.keys()))
-            cfg = getattr(self._mw, '_chart_config_required', None) if self._mw else None
-            if cfg and cfg.selected_frequencies:
-                freq_picker.set_selected(cfg.selected_frequencies)
+
+        # 从数据源加载频点 (替代旧 graph_viewer 方式)
+        all_freqs = set()
+        ds_map = getattr(self._mw, '_cached_datasource_map', None) if self._mw else None
+        if ds_map:
+            for ds in ds_map.values():
+                if hasattr(ds, 'frequencies'):
+                    all_freqs.update(ds.frequencies)
+        if not all_freqs and self._mw and getattr(self._mw, '_data_file_paths', None):
+            # 回退: 从文件直接解析
+            from src.datasource import DataSource
+            for fp in self._mw._data_file_paths[:3]:  # 只扫前3个, 避免慢
+                try:
+                    ds = DataSource.from_path(fp)
+                    if hasattr(ds, 'frequencies'):
+                        all_freqs.update(ds.frequencies)
+                except Exception:
+                    pass
+        if all_freqs:
+            freq_picker.set_frequencies(sorted(all_freqs))
         else:
             freq_picker.set_frequencies([])
-            freq_layout.addWidget(QLabel(self.tr("  (运行预览后可选频点)")))
+
+        cfg = getattr(self._mw, '_chart_config_required', None) if self._mw else None
+        if cfg and cfg.selected_frequencies:
+            freq_picker.set_selected(cfg.selected_frequencies)
+
         freq_layout.addWidget(freq_picker)
+
+        # ── 手动输入 / Excel 粘贴 ──
+        paste_row = QHBoxLayout()
+        paste_row.addWidget(QLabel(self.tr("粘贴/手动输入:")))
+        edit_paste = QLineEdit()
+        edit_paste.setPlaceholderText(self.tr("逗号/空格/换行分隔, 支持 Excel 粘贴"))
+        edit_paste.setToolTip(self.tr("从 Excel 复制频点数据行或列, 粘贴到此自动解析"))
+        paste_row.addWidget(edit_paste)
+        btn_apply = QPushButton(self.tr("应用"))
+        def _apply_pasted():
+            text = edit_paste.text().strip()
+            if not text:
+                return
+            # 解析: 逗号/空格/换行/Tab 分隔
+            import re
+            parts = re.split(r'[\s,;\t\n\r]+', text)
+            parsed = []
+            for p in parts:
+                p = p.strip()
+                if not p:
+                    continue
+                try:
+                    parsed.append(float(p))
+                except ValueError:
+                    continue
+            if parsed:
+                current = set(freq_picker.get_selected())
+                current.update(parsed)
+                freq_picker.set_selected(sorted(current))
+                edit_paste.clear()
+        btn_apply.clicked.connect(_apply_pasted)
+        edit_paste.returnPressed.connect(_apply_pasted)
+        paste_row.addWidget(btn_apply)
+        freq_layout.addLayout(paste_row)
         layout.addWidget(freq_grp)
 
         # ── 角度编辑区 ──
