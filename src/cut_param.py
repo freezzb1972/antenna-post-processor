@@ -198,20 +198,25 @@ def render_theta_cuts(
     for p in params:
         if not p.enabled or p.data is None:
             continue
+        # 收集所有角度的曲线 (与 Phi 切面一致: 一张图含多条曲线)
+        curves = []
         for theta_target in sorted(set(p.theta_angles)):
             idx = _nearest_index(theta_deg, theta_target)
             nearest_t = float(theta_deg[idx])
-            d = p.data[:, idx]                             # 全 φ 方向的数据
+            curves.append((nearest_t, p.data[:, idx]))
 
-            if polar_enabled:
-                curves = [(nearest_t, d)]
-                key = f"azimuth_polar_{p.key}_t{nearest_t:.0f}"
-                images[key] = renderer.render_azimuth_polar(
-                    phi_deg, curves, freq_mhz,
-                    ylabel=p.ylabel, dpi=az_dpi, antenna_name="",
-                )
+        if not curves:
+            continue
 
-            if rect_enabled:
+        if polar_enabled:
+            key = f"azimuth_polar_{p.key}"
+            images[key] = renderer.render_azimuth_polar(
+                phi_deg, curves, freq_mhz,
+                ylabel=p.ylabel, dpi=az_dpi, antenna_name="",
+            )
+
+        if rect_enabled:
+            for nearest_t, d in curves:
                 key = f"azimuth_rect_{p.key}_t{nearest_t:.0f}"
                 images[key] = renderer.render_azimuth_rect(
                     phi_deg, d, freq_mhz,
