@@ -292,7 +292,7 @@ def _process_one_frequency(
     # Axial Ratio (仅当有 Phase 数据且需要 AR 列)
     # 若 azimuth_config 要求 AR 方位面图，强制计算 AR
     ar_need = compute_set & {"axial_ratio", "ar_single", "ar_range"}
-    az_force_ar = (azimuth_config is not None and getattr(azimuth_config, 'cut_azimuth_polar_ar', False))
+    az_force_ar = (azimuth_config is not None and azimuth_config.cut_azimuth_polar_ar)
     if ar_need or az_force_ar or not need:
         tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
         if tp is not None and pp is not None:
@@ -445,7 +445,7 @@ def _process_one_frequency(
             ar_lin = None
             need_ar_for_graphics = (
                 ccfg.pattern_3d_ar or
-                (azimuth_config is not None and getattr(azimuth_config, 'cut_azimuth_polar_ar', False))
+                (azimuth_config is not None and azimuth_config.cut_azimuth_polar_ar)
             )
             if need_ar_for_graphics and "axial_ratio" not in str(row.get("axial_ratio_error", "")):
                 tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
@@ -478,18 +478,18 @@ def _process_one_frequency(
                 if images:
                     row["_images"] = images
             # 存储中间数据供方位面导出使用
-            if getattr(azimuth_config, 'cut_azimuth_polar', False) and getattr(azimuth_config, 'angle_charts', [[]]):
+            if azimuth_config.cut_azimuth_polar and azimuth_config.angle_charts:
                 row["_azimuth_gain_dbi"] = gain_dbi
                 row["_azimuth_theta_deg"] = theta_deg.copy()
-            if getattr(azimuth_config, 'cut_azimuth_polar_ar', False) and ar_lin is not None and getattr(azimuth_config, 'angle_charts_ar', [[]]):
+            if azimuth_config.cut_azimuth_polar_ar and ar_lin is not None and azimuth_config.angle_charts_ar:
                 row["_azimuth_ar_db"] = 20.0 * np.log10(np.maximum(ar_lin, 1e-15))
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
-            if getattr(azimuth_config, 'cut_azimuth_polar_rhcp', False) and rhcp_db is not None and getattr(azimuth_config, 'angle_charts_rhcp', [[]]):
+            if azimuth_config.cut_azimuth_polar_rhcp and rhcp_db is not None and azimuth_config.angle_charts_rhcp:
                 row["_azimuth_rhcp_db"] = rhcp_db
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
-            if getattr(azimuth_config, 'cut_azimuth_polar_lhcp', False) and lhcp_db is not None and getattr(azimuth_config, 'angle_charts_lhcp', [[]]):
+            if azimuth_config.cut_azimuth_polar_lhcp and lhcp_db is not None and azimuth_config.angle_charts_lhcp:
                 row["_azimuth_lhcp_db"] = lhcp_db
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
@@ -1354,14 +1354,14 @@ def _export_azimuth(
             gain_dbi = row.get("_azimuth_gain_dbi")
             ar_db_v = row.get("_azimuth_ar_db")
             theta_deg_arr = row.get("_azimuth_theta_deg")
-            if gain_dbi is not None and theta_deg_arr is not None and azimuth_config and getattr(azimuth_config, 'azimuth_cut_angles', []):
+            if gain_dbi is not None and theta_deg_arr is not None and azimuth_config and azimuth_config.azimuth_cut_angles:
                 gd = {}
                 for angle in azimuth_config.angles_sorted:
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
                     nearest = float(theta_deg_arr[idx])
                     gd[nearest] = gain_dbi[:, idx].copy()
                 freq_gain_data.append((freq, gd))
-            if ar_db_v is not None and theta_deg_arr is not None and azimuth_config and getattr(azimuth_config, 'azimuth_cut_angles_ar', []):
+            if ar_db_v is not None and theta_deg_arr is not None and azimuth_config and azimuth_config.azimuth_cut_angles_ar:
                 ad = {}
                 for angle in azimuth_config.angles_ar_sorted:
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
@@ -1369,7 +1369,7 @@ def _export_azimuth(
                     ad[nearest] = ar_db_v[:, idx].copy()
                 freq_ar_data.append((freq, ad))
             rhcp_db_v = row.get("_azimuth_rhcp_db")
-            if rhcp_db_v is not None and theta_deg_arr is not None and azimuth_config and getattr(azimuth_config, 'azimuth_cut_angles_rhcp', []):
+            if rhcp_db_v is not None and theta_deg_arr is not None and azimuth_config and azimuth_config.azimuth_cut_angles_rhcp:
                 rd = {}
                 for angle in azimuth_config.angles_rhcp_sorted:
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
@@ -1377,7 +1377,7 @@ def _export_azimuth(
                     rd[nearest] = rhcp_db_v[:, idx].copy()
                 freq_rhcp_data.append((freq, rd))
             lhcp_db_v = row.get("_azimuth_lhcp_db")
-            if lhcp_db_v is not None and theta_deg_arr is not None and azimuth_config and getattr(azimuth_config, 'azimuth_cut_angles_lhcp', []):
+            if lhcp_db_v is not None and theta_deg_arr is not None and azimuth_config and azimuth_config.azimuth_cut_angles_lhcp:
                 ld = {}
                 for angle in azimuth_config.angles_lhcp_sorted:
                     idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
@@ -1440,13 +1440,13 @@ def _export_azimuth(
         # 收集启用的图表类型 → 数据映射
         data_sheets = {}
         if azimuth_config:
-            if getattr(azimuth_config, 'cut_azimuth_polar', False) and freq_gain_data:
+            if azimuth_config.cut_azimuth_polar and freq_gain_data:
                 data_sheets["Gain Azimuth"] = freq_gain_data
-            if getattr(azimuth_config, 'cut_azimuth_polar_ar', False) and freq_ar_data:
+            if azimuth_config.cut_azimuth_polar_ar and freq_ar_data:
                 data_sheets["AR Azimuth"] = freq_ar_data
-            if getattr(azimuth_config, 'cut_azimuth_polar_rhcp', False) and freq_rhcp_data:
+            if azimuth_config.cut_azimuth_polar_rhcp and freq_rhcp_data:
                 data_sheets["RHCP Azimuth"] = freq_rhcp_data
-            if getattr(azimuth_config, 'cut_azimuth_polar_lhcp', False) and freq_lhcp_data:
+            if azimuth_config.cut_azimuth_polar_lhcp and freq_lhcp_data:
                 data_sheets["LHCP Azimuth"] = freq_lhcp_data
             for t_max, pk_data in freq_gain_vs_theta.items():
                 data_sheets[f"Gain 0-{int(t_max)}° Pk"] = [("phi_matrix", pk_data)]
