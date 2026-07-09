@@ -1179,11 +1179,9 @@ def _export_azimuth(
         """将 image key 映射为用户可读组名（支持多图表索引后缀）。"""
         # 新格式: 2d_polar_{param}_phi{angle} / 2d_rect_{param}_phi{angle}
         if img_key.startswith("2d_polar_"):
-            rest = img_key[len("2d_polar_"):]
-            return f"2D Polar Cut ({rest})"
+            return "极坐标俯仰面切面图"
         if img_key.startswith("2d_rect_"):
-            rest = img_key[len("2d_rect_"):]
-            return f"2D Rect Cut ({rest})"
+            return "直角坐标俯仰面切面图"
         # 3D multi-view keys: 3d_gain_v0, 3d_gain_v1, ...
         if "_v" in img_key and any(img_key.startswith(p) for p in ("3d_gain", "3d_eirp", "3d_ar")):
             base = img_key.rsplit("_v", 1)[0]
@@ -1206,11 +1204,9 @@ def _export_azimuth(
                 return f"{label} #{idx}"
         # 新格式匹配: azimuth_polar_{param}_t{theta} / azimuth_polar_pk_{tmax}
         if img_key.startswith("azimuth_polar_"):
-            rest = img_key[len("azimuth_polar_"):]
-            return f"Azimuth Cut ({rest})"
+            return "极坐标方位面切面图"
         if img_key.startswith("azimuth_rect_"):
-            rest = img_key[len("azimuth_rect_"):]
-            return f"Azimuth Rect ({rest})"
+            return "直角坐标方位面切面图"
         known = {
             "3d_gain": "3D Gain Pattern",
             "3d_eirp": "3D EIRP Pattern",
