@@ -259,11 +259,6 @@ def _write_by_freq(doc, ordered_groups, antenna_name, angles_str, img_width, col
     group_names = [name for name, _ in ordered_groups]
 
     for freq in all_freqs:
-        # 频点标题
-        if show_heading:
-            heading = doc.add_heading(f"Frequency: {freq:.0f} MHz", level=1)
-            heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
         # 收集该频点的所有图片
         freq_images = {}
         for group_name, images in ordered_groups:
