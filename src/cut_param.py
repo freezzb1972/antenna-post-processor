@@ -158,13 +158,12 @@ def render_phi_cuts(
             )
 
         if rect_enabled:
-            for label, a_deg, vals in curves:
-                key = f"2d_rect_{p.key}_phi{label.replace('φ=', '').replace('°', '')}"
-                images[key] = renderer.render_2d_rect(
-                    a_deg, vals, freq_mhz,
-                    cut_label=f"{label} {p.ylabel}",
-                    ylabel=p.ylabel, dpi=dpi, antenna_name="",
-                )
+            key = f"2d_rect_{p.key}"
+            images[key] = renderer.render_2d_rect(
+                theta_deg, curves[0][2], freq_mhz,
+                ylabel=p.ylabel, dpi=dpi, antenna_name="",
+                curves=curves,
+            )
 
     return images
 
@@ -216,11 +215,11 @@ def render_theta_cuts(
             )
 
         if rect_enabled:
-            for nearest_t, d in curves:
-                key = f"azimuth_rect_{p.key}_t{nearest_t:.0f}"
-                images[key] = renderer.render_azimuth_rect(
-                    phi_deg, d, freq_mhz,
-                    ylabel=p.ylabel, dpi=az_dpi, antenna_name="",
-                )
+            key = f"azimuth_rect_{p.key}"
+            images[key] = renderer.render_azimuth_rect(
+                phi_deg, curves[0][1], freq_mhz,
+                ylabel=p.ylabel, dpi=az_dpi, antenna_name="",
+                curves=curves,
+            )
 
     return images

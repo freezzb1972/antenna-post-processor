@@ -331,11 +331,19 @@ class MatplotlibRenderer(BaseRenderer):
         dpi: int = 150,
         antenna_name: str = "",
         ylabel: str = "Gain (dBi)",
+        curves: list[tuple[str, np.ndarray, np.ndarray]] | None = None,
     ) -> io.BytesIO:
-        """2D 直角坐标切面图。"""
+        """2D 直角坐标切面图。支持多曲线叠加。"""
         fig, ax = plt.subplots(dpi=dpi, figsize=(8, 5))
+        colors = ["#2196F3", "#F44336", "#4CAF50", "#FF9800"]
 
-        ax.plot(angles_deg, gain_dbi, "-", linewidth=1.2, color="#2196F3")
+        if curves:
+            for i, (label, c_angles, c_values) in enumerate(curves):
+                ax.plot(c_angles, c_values, "-", linewidth=1.2, color=colors[i % len(colors)], label=label)
+            if curves:
+                ax.legend(fontsize=8)
+        else:
+            ax.plot(angles_deg, gain_dbi, "-", linewidth=1.2, color="#2196F3")
 
         ax.set_xlabel(xlabel, fontsize=10)
         ax.set_ylabel(ylabel, fontsize=10)
@@ -362,11 +370,20 @@ class MatplotlibRenderer(BaseRenderer):
         dpi: int = 150,
         antenna_name: str = "",
         cut_label: str = "",
+        curves: list[tuple[float, np.ndarray]] | None = None,
     ) -> io.BytesIO:
-        """2D 直角坐标方位面切面图 (Theta 切 — 固定 θ, 扫描 φ)。"""
+        """2D 直角坐标方位面切面图。支持多曲线叠加。"""
         fig, ax = plt.subplots(dpi=dpi, figsize=(8, 5))
+        colors = ["#2196F3", "#F44336", "#4CAF50", "#FF9800"]
 
-        ax.plot(phi_deg, values, "-", linewidth=1.2, color="#2196F3")
+        if curves:
+            for i, (theta_angle, c_values) in enumerate(curves):
+                ax.plot(phi_deg, c_values, "-", linewidth=1.2,
+                        color=colors[i % len(colors)], label=f"={theta_angle:.0f}")
+            if curves:
+                ax.legend(fontsize=8)
+        else:
+            ax.plot(phi_deg, values, "-", linewidth=1.2, color="#2196F3")
 
         ax.set_xlabel("Phi (deg)", fontsize=10)
         ax.set_ylabel(ylabel, fontsize=10)
