@@ -288,7 +288,8 @@ def generate_all_for_frequency(
     # 优先使用 4 组独立图表列表, 回退到旧字段
     phi_entries = (getattr(chart_config, 'cut_2d_polar_entries', None) or []) + \
                   (getattr(chart_config, 'cut_2d_rect_entries', None) or [])
-    theta_entries = []  # 方位面 entries 由 output_config 独立管理
+    theta_entries = (getattr(chart_config, 'cut_azimuth_polar_entries', None) or []) + \
+                    (getattr(chart_config, 'cut_azimuth_rect_entries', None) or [])
     if not phi_entries and not theta_entries:
         params = []  # 没有配置条目 → 不生成 2D 切面图
     else:
