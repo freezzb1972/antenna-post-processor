@@ -445,7 +445,10 @@ def _process_one_frequency(
             ar_lin = None
             need_ar_for_graphics = (
                 ccfg.pattern_3d_ar or
-                (output_config is not None and False)
+                any("ar" in str(e[0]) for e in getattr(ccfg, 'cut_2d_polar_entries', []))
+                or any("ar" in str(e[0]) for e in getattr(ccfg, 'cut_2d_rect_entries', []))
+                or any("ar" in str(e[0]) for e in getattr(ccfg, 'cut_azimuth_polar_entries', []))
+                or any("ar" in str(e[0]) for e in getattr(ccfg, 'cut_azimuth_rect_entries', []))
             )
             if need_ar_for_graphics and "axial_ratio" not in str(row.get("axial_ratio_error", "")):
                 tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
