@@ -411,8 +411,8 @@ class ChartConfig:
         elif mode == 1:
             vs_freq.append("chart_trp_freq")
 
-        # 2D 切面图: 俯仰面 + 方位面
-        cuts = ["cut_2d_polar", "cut_azimuth_polar", "cut_2d_rect", "cut_azimuth_rect"]
+        # 2D 切面图: 俯仰面 (方位面见 AzimuthReportConfig 独立 section)
+        cuts = ["cut_2d_polar", "cut_2d_rect"]
 
         return {
             "A 类: 3D 方向图": pattern_3d,
