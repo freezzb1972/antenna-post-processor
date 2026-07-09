@@ -288,15 +288,15 @@ class MatplotlibRenderer(BaseRenderer):
                 ax.plot(rad, c_values, "-", linewidth=1.2, color=color, label=label)
                 # mirror (左侧)
                 mirror_rad = -rad  # 负角度 = 左半平面
-                ax.plot(mirror_rad, c_values, "--", linewidth=1.0, color=color, alpha=0.6)
+                ax.plot(mirror_rad, c_values, "-", linewidth=1.2, color=color)
             if len(curves) > 1:
                 ax.legend(fontsize=8, loc="upper right")
         else:
             ax.plot(theta_rad, gain_dbi, "-", linewidth=1.2, color="#2196F3", label=cut_label)
             if mirror_angles_deg is not None and mirror_gain_dbi is not None:
                 mirror_rad = -np.deg2rad(mirror_angles_deg)  # 负角度 = 左半平面
-                ax.plot(mirror_rad, mirror_gain_dbi, "--", linewidth=1.0,
-                        color="#2196F3", alpha=0.6)
+                ax.plot(mirror_rad, mirror_gain_dbi, "-", linewidth=1.2,
+                        color="#2196F3")
 
         ax.set_theta_zero_location("N")
         ax.set_theta_direction(-1)
@@ -717,9 +717,6 @@ def _setup_polar_radial_ticks(ax):
     ax.yaxis.set_minor_locator(_ticker.NullLocator())
     ax.set_yticks(ticks)
     ax.set_yticklabels([_tick_label(v) for v in ticks], fontsize=10)
-    # 极坐标中心 0 刻度被默认隐藏 → 显式标注
-    ax.annotate(_tick_label(ticks[0]), xy=(np.deg2rad(15), ticks[0]),
-                fontsize=10, ha='center', va='center', color='#555555')
     ax.set_rlabel_position(15)
 
 
