@@ -160,7 +160,24 @@ def expand_to_instances(
                     label=_CHART_LABELS.get(key, key), image_key=key, per_freq=False,
                 ))
 
-    # ── C 类 2D 切面 (由 cut_param 统一渲染, 不再通过 ChartInstance) ──
+    # ── C 类 2D 切面 (条目驱动, 与 A 类一致: per_freq=True) ──
+    _C_ENTRY_MAP = [
+        ("cut_2d_polar_entries", ChartCategory.C_2D, "2d_polar"),
+        ("cut_2d_rect_entries", ChartCategory.C_2D, "2d_rect"),
+        ("cut_azimuth_polar_entries", ChartCategory.Z_AZIMUTH, "azimuth_polar"),
+        ("cut_azimuth_rect_entries", ChartCategory.Z_AZIMUTH, "azimuth_rect"),
+    ]
+    if chart_config:
+        for attr, cat, prefix in _C_ENTRY_MAP:
+            entries = getattr(chart_config, attr, [])
+            for param, angles in entries:
+                img_key = f"{prefix}_{param}"
+                _add(ChartInstance(
+                    instance_id=img_key, parent_type=attr,
+                    category=cat, per_freq=True,
+                    label=f"{_CHART_LABELS.get(prefix, prefix)} ({param})",
+                    image_key=img_key,
+                ))
 
     # ── Z 类 azimuth (由 C 类 cut_param 统一渲染, 不再通过 ChartInstance) ──
 
