@@ -24,7 +24,7 @@ from typing import Any
 
 import numpy as np
 
-from .azimuth_config import AzimuthReportConfig, _flatten
+from .azimuth_config import AzimuthReportConfig
 from .calculator import (
     compute_ar_at_angles,
     compute_ar_range,
