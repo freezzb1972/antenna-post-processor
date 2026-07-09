@@ -50,7 +50,9 @@ def check_field_collisions() -> list[str]:
     az_fields = _find_dataclass_fields(
         str(PROJECT_ROOT / "src" / "azimuth_config.py"), "AzimuthReportConfig")
 
-    overlap = chart_fields & az_fields - {"dpi"}  # dpi 两个配置各独立
+    # 白名单: dpi(各独立), cut_azimuth_polar/rect(UI→ChartConfig, pipeline→AzimuthReportConfig)
+    _WHITELIST = {"dpi", "cut_azimuth_polar", "cut_azimuth_rect"}
+    overlap = chart_fields & az_fields - _WHITELIST
     errors = []
     for f in sorted(overlap):
         errors.append(

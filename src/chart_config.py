@@ -141,9 +141,11 @@ class ChartConfig:
     # ── 图表渲染总开关 ──
     render_charts: bool = True  # False=跳过所有图表渲染, 仅计算参数
 
-    # C 类: 2D 切面 (俯仰面 Phi cut — 方位面见 AzimuthReportConfig)
+    # C 类: 2D 切面 (俯仰面 + 方位面)
     cut_2d_polar: bool = False
     cut_2d_rect: bool = False
+    cut_azimuth_polar: bool = False      # 方位面极坐标
+    cut_azimuth_rect: bool = False       # 方位面直角坐标
     cut_2d_phi_angles: list[float] = field(default_factory=list)    # 向后兼容
     cut_2d_theta_angles: list[float] = field(default_factory=list)  # 向后兼容
     cut_2d_params: set = field(default_factory=lambda: {"gain"})    # 向后兼容
@@ -180,7 +182,8 @@ class ChartConfig:
 
     @property
     def has_any_c_class(self) -> bool:
-        return self.cut_2d_polar or self.cut_2d_rect
+        return (self.cut_2d_polar or self.cut_2d_rect or
+                self.cut_azimuth_polar or self.cut_azimuth_rect)
 
     @property
     def has_any_pattern_or_cut(self) -> bool:
@@ -197,6 +200,7 @@ class ChartConfig:
             "chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
             "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp",
             "chart_ar_freq", "cut_2d_polar", "cut_2d_rect",
+            "cut_azimuth_polar", "cut_azimuth_rect",
         ]
         merged = ChartConfig(
             elev=self.elev, azim=self.azim, dpi=self.dpi,
@@ -327,6 +331,7 @@ class ChartConfig:
             "chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
             "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp",
             "chart_ar_freq", "cut_2d_polar", "cut_2d_rect",
+            "cut_azimuth_polar", "cut_azimuth_rect",
         ]
 
     @classmethod
@@ -378,6 +383,8 @@ class ChartConfig:
             "chart_ar_freq": "AR vs 频率",
             "cut_2d_polar": "极坐标俯仰面切面图",
             "cut_2d_rect": "直角坐标俯仰面切面图",
+            "cut_azimuth_polar": "极坐标方位面切面图",
+            "cut_azimuth_rect": "直角坐标方位面切面图",
         }
 
     @classmethod
@@ -401,13 +408,13 @@ class ChartConfig:
         elif mode == 1:
             vs_freq.append("chart_trp_freq")
 
-        # 2D 切面图: 俯仰面 Phi cut (方位面见 AzimuthReportConfig)
-        cuts = ["cut_2d_polar", "cut_2d_rect"]
+        # 2D 切面图: 俯仰面 + 方位面
+        cuts = ["cut_2d_polar", "cut_azimuth_polar", "cut_2d_rect", "cut_azimuth_rect"]
 
         return {
             "A 类: 3D 方向图": pattern_3d,
             "B 类: 频率曲线": vs_freq,
-            "C 类: 2D 切面图": cuts,
+            "2D 切面图": cuts,
         }
 
 

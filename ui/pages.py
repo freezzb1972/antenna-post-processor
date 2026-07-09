@@ -2966,14 +2966,14 @@ class ChartSettingsPage(QWidget):
 
             self._add_select_all_row(self._chart_required, keys, cat_left_ly)
             # C 类: 俯仰面切面图标题 (在 checkbox 之前)
-            if "C 类" in cat_name:
+            if "2D 切面图" in cat_name:
                 _phi_l = QLabel(self.tr("▸ 俯仰面切面图"))
                 _phi_l.setStyleSheet("font-weight: bold; margin-top: 4px;")
                 cat_left_ly.addWidget(_phi_l)
             for key in keys:
                 self._add_chart_checkbox_row(key, labels, self._chart_required, cat_left_ly)
             # C 类: 方位面切面图
-            if "C 类" in cat_name:
+            if "2D 切面图" in cat_name:
                 self._build_azimuth_section(cat_left_ly)
             cat_left_ly.addStretch()
             left_outer.addWidget(cat_left)
@@ -2991,14 +2991,14 @@ class ChartSettingsPage(QWidget):
             cat_right_ly.setSpacing(3)
 
             self._add_select_all_row(self._chart_extra, keys, cat_right_ly)
-            if "C 类" in cat_name:
+            if "2D 切面图" in cat_name:
                 _phi_r = QLabel(self.tr("▸ 俯仰面切面图"))
                 _phi_r.setStyleSheet("font-weight: bold; margin-top: 4px;")
                 cat_right_ly.addWidget(_phi_r)
             for key in keys:
                 self._add_chart_checkbox_row(key, labels, self._chart_extra, cat_right_ly)
             # C 类: 方位面切面图 + DPI
-            if "C 类" in cat_name:
+            if "2D 切面图" in cat_name:
                 self._build_azimuth_section(cat_right_ly, self._chart_extra,
                                              dpi_attr="_spin_azimuth_dpi_xtr")
             cat_right_ly.addStretch()
@@ -3573,14 +3573,14 @@ class ChartSettingsPage(QWidget):
             self._collapse_map[cat_name] = {"grp": cat_left, "hidden": False}
 
             self._add_select_all_row(self._chart_required, keys, cat_left_ly)
-            if "C 类" in cat_name:
+            if "2D 切面图" in cat_name:
                 _phi_l = QLabel(self.tr("▸ 俯仰面切面图"))
                 _phi_l.setStyleSheet("font-weight: bold; margin-top: 4px;")
                 cat_left_ly.addWidget(_phi_l)
             for key in keys:
                 self._add_chart_checkbox_row(key, labels, self._chart_required, cat_left_ly,
                                               checked=saved.get(key, False))
-            if "C 类" in cat_name:
+            if "2D 切面图" in cat_name:
                 self._build_azimuth_section(cat_left_ly)
                 for az_key in ("cut_azimuth_polar_ar",
                                "cut_azimuth_polar_rhcp", "cut_azimuth_polar_lhcp"):
@@ -3600,14 +3600,14 @@ class ChartSettingsPage(QWidget):
             cat_right_ly = QVBoxLayout(cat_right); cat_right_ly.setSpacing(3)
 
             self._add_select_all_row(self._chart_extra, keys, cat_right_ly)
-            if "C 类" in cat_name:
+            if "2D 切面图" in cat_name:
                 _phi_r = QLabel(self.tr("▸ 俯仰面切面图"))
                 _phi_r.setStyleSheet("font-weight: bold; margin-top: 4px;")
                 cat_right_ly.addWidget(_phi_r)
             for key in keys:
                 self._add_chart_checkbox_row(key, labels, self._chart_extra, cat_right_ly,
                                               checked=saved.get(key, False))
-            if "C 类" in cat_name:
+            if "2D 切面图" in cat_name:
                 self._build_azimuth_section(cat_right_ly, self._chart_extra, saved=saved,
                                              dpi_attr="_spin_azimuth_dpi_xtr")
             cat_right_ly.addStretch()
@@ -3651,7 +3651,7 @@ class ChartSettingsPage(QWidget):
             btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
             btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
             row.addWidget(btn)
-        elif key in ("cut_2d_polar", "cut_2d_rect"):
+        elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
             btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
             btn.clicked.connect(lambda checked, k=key: self._show_cut_param_dialog(k))
             row.addWidget(btn)
