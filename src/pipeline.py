@@ -1300,8 +1300,9 @@ def _export_azimuth(
                     if ci.label not in image_groups:
                         image_groups[ci.label] = {}
                     image_groups[ci.label][0.0] = png
-                except Exception:
-                    pass
+                    _log(log_callback, f"  B类 {ci.label}: {len(freqs)} 频点")
+                except Exception as e:
+                    _log(log_callback, f"  B类 {ci.label} 渲染失败: {e}")
 
     # ── 双Y轴配对 (B 类) ──
     _dual_y = getattr(output_config, 'dual_y_enabled', False) if output_config else False
