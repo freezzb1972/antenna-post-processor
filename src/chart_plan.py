@@ -149,37 +149,38 @@ def expand_to_instances(
                     params={"elev": float(el), "azim": float(az), "view_index": vi},
                 ))
 
-    # ── B 类 频点曲线 ──
-    _B_KEYS = ["chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
-               "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp", "chart_ar_freq"]
-    if chart_config:
-        for key in _B_KEYS:
-            if getattr(chart_config, key, False):
-                _add(ChartInstance(
-                    instance_id=key, parent_type=key, category=ChartCategory.B_FREQ,
-                    label=_CHART_LABELS.get(key, key), image_key=key, per_freq=False,
-                ))
+    # ── 公共: 从 bool key 列表创建 ChartInstance ──
+    def _add_bool_keys(keys, cat, per_freq):
+        if chart_config:
+            for key in keys:
+                if getattr(chart_config, key, False):
+                    _add(ChartInstance(
+                        instance_id=key, parent_type=key, category=cat,
+                        label=_CHART_LABELS.get(key, key), image_key=key,
+                        per_freq=per_freq,
+                    ))
 
-    # ── C 类 2D 切面 (条目驱动, 与 A 类一致: per_freq=True) ──
-    _C_ENTRY_MAP = [
-        ("cut_2d_polar_entries", ChartCategory.C_2D, "2d_polar"),
-        ("cut_2d_rect_entries", ChartCategory.C_2D, "2d_rect"),
-        ("cut_azimuth_polar_entries", ChartCategory.Z_AZIMUTH, "azimuth_polar"),
-        ("cut_azimuth_rect_entries", ChartCategory.Z_AZIMUTH, "azimuth_rect"),
-    ]
+    _add_bool_keys(
+        ["chart_eff_freq", "chart_gain_freq", "chart_dir_freq",
+         "chart_lag_freq", "chart_trp_freq", "chart_trp_nhprp", "chart_ar_freq"],
+        ChartCategory.B_FREQ, per_freq=False,
+    )
+
+    # ── C 类: 从 entries 创建 ChartInstance ──
     if chart_config:
-        for attr, cat, prefix in _C_ENTRY_MAP:
-            entries = getattr(chart_config, attr, [])
-            for param, angles in entries:
+        for attr, cat, prefix in [
+            ("cut_2d_polar_entries", ChartCategory.C_2D, "2d_polar"),
+            ("cut_2d_rect_entries", ChartCategory.C_2D, "2d_rect"),
+            ("cut_azimuth_polar_entries", ChartCategory.Z_AZIMUTH, "azimuth_polar"),
+            ("cut_azimuth_rect_entries", ChartCategory.Z_AZIMUTH, "azimuth_rect"),
+        ]:
+            for param, _angles in getattr(chart_config, attr, []):
                 img_key = f"{prefix}_{param}"
                 _add(ChartInstance(
-                    instance_id=img_key, parent_type=attr,
-                    category=cat, per_freq=True,
+                    instance_id=img_key, parent_type=attr, category=cat,
+                    per_freq=True, image_key=img_key,
                     label=f"{_CHART_LABELS.get(prefix, prefix)} ({param})",
-                    image_key=img_key,
                 ))
-
-    # ── Z 类 azimuth (由 C 类 cut_param 统一渲染, 不再通过 ChartInstance) ──
 
 
 
