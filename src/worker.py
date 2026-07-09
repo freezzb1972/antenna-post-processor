@@ -7,6 +7,7 @@ QThread 封装的异步处理任务，通过 Signal 与 GUI 通信。
 
 from __future__ import annotations
 
+import os
 import traceback
 from typing import TYPE_CHECKING
 
@@ -118,7 +119,7 @@ class ProcessingWorker(QObject):
         ar_output_db: bool = True,
         worksheet_naming_mode: int = 0,
         compute_only: bool = False,  # 预览模式: True→只计算不导出
-        dir_extrap_method: str = "linear",  # Directivity外推方法: linear|constant|mirror
+        dir_extrap_method: str = "none",  # Directivity外推方法: none|linear|constant|mirror
         # 多步进参数
         step_values: list[float] | None = None,
         skip_original: bool = False,
@@ -200,7 +201,7 @@ class ProcessingWorker(QObject):
                 ar_output_db=self.ar_output_db,
                 worksheet_naming_mode=self.worksheet_naming_mode,
                 chart_instances=getattr(self, 'chart_instances', None),
-                parallel=max(1, (os.cpu_count() or 4) - 1),  # 预留1核给UI
+                parallel=1 if os.name == 'nt' else max(1, (os.cpu_count() or 4) - 1),
                 compute_only=self.compute_only,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
