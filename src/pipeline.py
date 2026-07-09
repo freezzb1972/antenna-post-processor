@@ -1409,6 +1409,7 @@ def _export_azimuth(
         else:
             from .chart_word_writer import write_chart_word_report
             _log(log_callback, f"生成图表报告: {word_path}")
+            _log(log_callback, f"  布局模式: {az.word_layout_mode if az else 'default'}, 标题: {getattr(az, 'show_caption', True) if az else True}")
             try:
                 # 按 ChartInstance.sort_order 排序 image_groups 的 key 顺序
                 if chart_instances:
