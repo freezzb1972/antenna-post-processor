@@ -7,6 +7,7 @@ QThread 封装的异步处理任务，通过 Signal 与 GUI 通信。
 
 from __future__ import annotations
 
+import os
 import traceback
 from typing import TYPE_CHECKING
 
