@@ -159,7 +159,7 @@ class ChartConfig:
     elev: float = 30.0
     azim: float = -60.0
     view_angle_pairs: list[tuple[float, float]] = field(default_factory=list)  # [(elev, azim), ...]
-    dpi: int = 150
+    dpi: int = 100
     step_deg: float = 5.0          # 3D 图形采样精度 (°)
 
     # 频点过滤 (空列表 = 所有频点)
