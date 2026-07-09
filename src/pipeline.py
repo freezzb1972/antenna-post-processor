@@ -1239,13 +1239,12 @@ def _export_azimuth(
     # 新 key: 2d_polar_gain_phi0, azimuth_polar_gain_t30
     def _is_new_cut_key(k: str) -> bool:
         if k.startswith("2d_polar_") or k.startswith("2d_rect_"):
-            return True  # 所有 2d_* 都是新格式
+            return True
         if k.startswith("azimuth_polar_"):
-            # azimuth_polar_{param}_*  = 新格式, azimuth_polar (无后缀) = 旧
             rest = k[len("azimuth_polar_"):]
-            return "_" in rest
+            return bool(rest)  # 有后缀 → 新格式 (azimuth_polar 无后缀=旧)
         if k.startswith("azimuth_rect_"):
-            return True  # 所有 azimuth_rect 都是新格式
+            return True
         return False
 
     _total_imgs = 0
