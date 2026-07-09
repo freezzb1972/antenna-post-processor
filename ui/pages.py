@@ -3977,17 +3977,16 @@ class ChartSettingsPage(QWidget):
         layout.addLayout(dpi_row)
         freq_picker = self._add_frequency_picker(layout, 'c')
 
-        # ── 按钮 ──
+        # ── 按钮: OK/Cancel 后保存 (避免 lambda 闭包) ──
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        btns.accepted.connect(lambda: (
-            setattr(self, entry_attr, list(_entries)),
-            setattr(self, '_dpi', spin_dpi.value()),
-            self._sync_to_mw(), self._sync_selected_frequencies(freq_picker.get_selected(), 'c'),
-            dlg.accept(),
-        ))
+        btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
         layout.addWidget(btns)
-        dlg.exec()
+        if dlg.exec() == QDialog.Accepted:
+            setattr(self, entry_attr, list(_entries))
+            setattr(self, '_dpi', spin_dpi.value())
+            self._sync_to_mw()
+            self._sync_selected_frequencies(freq_picker.get_selected(), 'c')
 
     def _show_2d_phi_angle_popup(self):
         """弹出 2D 俯仰面切面 Phi 角度选择窗口 — 图表列表模式（每 phi = 一个图表）。"""
