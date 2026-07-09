@@ -574,7 +574,7 @@ class FrequencyPickerDialog(QDialog):
         self._sel_list.itemDoubleClicked.connect(self._move_to_all)
         self._rebuild_sel()
         right_lo.addWidget(self._sel_list)
-        lists_row.addWidget(right_grp, 1)
+        lists_row.addWidget(self._right_grp, 1)
 
         layout.addLayout(lists_row)
 
