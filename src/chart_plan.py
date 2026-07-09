@@ -45,10 +45,6 @@ _CHART_LABELS: dict[str, str] = {
     "cut_2d_polar": "极坐标俯仰面切面图",
     "cut_2d_rect": "直角坐标俯仰面切面图",
     # C 类 azimuth
-    "cut_azimuth_polar": "Gain 极坐标方位面",
-    "cut_azimuth_polar_ar": "AR 极坐标方位面",
-    "cut_azimuth_polar_rhcp": "RC 极坐标方位面",
-    "cut_azimuth_polar_lhcp": "LHCP 极坐标方位面",
 }
 
 
@@ -209,14 +205,7 @@ def expand_to_instances(
                         params={"angles": [float(a) for a in sorted(set(angles))]},
                     ))
 
-        # Theta 范围峰值 (替代硬编码 70°)
-        for t_max in (azimuth_config.pk_theta_ranges if azimuth_config else []):
-            _add(ChartInstance(
-                instance_id=f"pk_{int(t_max)}", parent_type="pk_theta_range",
-                category=ChartCategory.Z_AZIMUTH,
-                label=f"Gain 极坐标方位面 PK (θ=0-{int(t_max)}°)",
-                image_key=f"azimuth_polar_pk_{int(t_max)}", per_freq=True,
-            ))
+
 
     instances.sort(key=lambda x: x.sort_order)
     return instances
@@ -232,8 +221,4 @@ _3D_IMAGE_KEYS = {
 }
 
 _AZ_IMG_KEYS = {
-    "cut_azimuth_polar": "azimuth_polar",
-    "cut_azimuth_polar_ar": "azimuth_polar_ar",
-    "cut_azimuth_polar_rhcp": "azimuth_polar_rhcp",
-    "cut_azimuth_polar_lhcp": "azimuth_polar_lhcp",
 }

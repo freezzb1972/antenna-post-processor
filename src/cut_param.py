@@ -187,9 +187,9 @@ def render_theta_cuts(
     if n_theta < 1:
         return images
 
-    # 方位面开关只在 AzimuthReportConfig
-    polar_enabled = getattr(azimuth_config, 'cut_azimuth_polar', False) if azimuth_config else False
-    rect_enabled = getattr(azimuth_config, 'cut_azimuth_rect', False) if azimuth_config else False
+    # 方位面开关从 ChartConfig 读取
+    polar_enabled = getattr(chart_config, 'cut_azimuth_polar', False)
+    rect_enabled = getattr(chart_config, 'cut_azimuth_rect', False)
     if not polar_enabled and not rect_enabled:
         return images
 
