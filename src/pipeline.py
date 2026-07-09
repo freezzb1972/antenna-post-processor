@@ -749,18 +749,28 @@ def _load_and_compute(
     if sheet_ar_configs is None:
         sheet_ar_configs = {}
 
-    # 统一进度条: 单次 progress_max 覆盖 5 阶段 (读取→计算→渲染→Excel→Word)
-    _load_w = max(total, 1)            # 阶段1: 读取源文件
-    _calc_w = max(total * 4, 1)        # 阶段2: 计算参数
-    _render_w = max(total * 2, 1)      # 阶段3: 渲染图表
+    # 统一进度条: 权重在频点过滤后重新计算
+
+    # 频点过滤
+    if chart_config and chart_config.selected_frequencies:
+        sel = set(chart_config.selected_frequencies)
+        orig_total = len(tasks)
+        tasks = [t for t in tasks if t[1] in sel]
+        _log(log_callback, f"🎯 频点过滤: {len(tasks)}/{orig_total} 个频点")
+
+    # 重新计算权重 (total 可能因过滤减少)
+    total = len(tasks)
+    _load_w = max(total, 1)
+    _calc_w = max(total * 4, 1)
+    _render_w = max(total * 2, 1)
     _compute_w = _calc_w + _render_w
-    _export_w = 10                      # 阶段4: Excel 导出
-    _word_w = 10                        # 阶段5: Word 输出
+    _export_w = 10
+    _word_w = 10
     progress_max = _load_w + _compute_w + _export_w + _word_w
 
     # ── 阶段 1: 读取源文件 ──
     _log(log_callback, f"📂 读取 {total} 个频点数据...")
-    _report(progress_callback, 0, progress_max, f"[📂] 读取源文件 0/{total}")
+    _report(progress_callback, 0, progress_max, f"[📂] 读取源文件 0/{len(tasks)}")
     compute_tasks = []
     for i, (sheet_name, freq, csv_idx, lag_cfg, task_ds, needed_params) in enumerate(tasks):
         if cancel_callback and cancel_callback():

@@ -2966,10 +2966,6 @@ class ChartSettingsPage(QWidget):
 
             self._add_select_all_row(self._chart_required, keys, cat_left_ly)
             # C 类: 俯仰面切面图标题 (在 checkbox 之前)
-            if "2D 切面图" in cat_name:
-                _phi_l = QLabel(self.tr("▸ 俯仰面切面图"))
-                _phi_l.setStyleSheet("font-weight: bold; margin-top: 4px;")
-                cat_left_ly.addWidget(_phi_l)
             for key in keys:
                 self._add_chart_checkbox_row(key, labels, self._chart_required, cat_left_ly)
             # C 类: 方位面切面图
@@ -2991,10 +2987,6 @@ class ChartSettingsPage(QWidget):
             cat_right_ly.setSpacing(3)
 
             self._add_select_all_row(self._chart_extra, keys, cat_right_ly)
-            if "2D 切面图" in cat_name:
-                _phi_r = QLabel(self.tr("▸ 俯仰面切面图"))
-                _phi_r.setStyleSheet("font-weight: bold; margin-top: 4px;")
-                cat_right_ly.addWidget(_phi_r)
             for key in keys:
                 self._add_chart_checkbox_row(key, labels, self._chart_extra, cat_right_ly)
             # C 类: 方位面切面图 + DPI
@@ -3574,10 +3566,6 @@ class ChartSettingsPage(QWidget):
             self._collapse_map[cat_name] = {"grp": cat_left, "hidden": False}
 
             self._add_select_all_row(self._chart_required, keys, cat_left_ly)
-            if "2D 切面图" in cat_name:
-                _phi_l = QLabel(self.tr("▸ 俯仰面切面图"))
-                _phi_l.setStyleSheet("font-weight: bold; margin-top: 4px;")
-                cat_left_ly.addWidget(_phi_l)
             for key in keys:
                 self._add_chart_checkbox_row(key, labels, self._chart_required, cat_left_ly,
                                               checked=saved.get(key, False))
@@ -3601,10 +3589,6 @@ class ChartSettingsPage(QWidget):
             cat_right_ly = QVBoxLayout(cat_right); cat_right_ly.setSpacing(3)
 
             self._add_select_all_row(self._chart_extra, keys, cat_right_ly)
-            if "2D 切面图" in cat_name:
-                _phi_r = QLabel(self.tr("▸ 俯仰面切面图"))
-                _phi_r.setStyleSheet("font-weight: bold; margin-top: 4px;")
-                cat_right_ly.addWidget(_phi_r)
             for key in keys:
                 self._add_chart_checkbox_row(key, labels, self._chart_extra, cat_right_ly,
                                               checked=saved.get(key, False))

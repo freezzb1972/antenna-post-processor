@@ -289,7 +289,7 @@ class MatplotlibRenderer(BaseRenderer):
                 # mirror (左侧)
                 mirror_rad = -rad  # 负角度 = 左半平面
                 ax.plot(mirror_rad, c_values, "-", linewidth=1.2, color=color)
-            if len(curves) > 1:
+            if curves:
                 ax.legend(fontsize=8, loc="upper right")
         else:
             ax.plot(theta_rad, gain_dbi, "-", linewidth=1.2, color="#2196F3", label=cut_label)
