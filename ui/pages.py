@@ -3653,8 +3653,14 @@ class ChartSettingsPage(QWidget):
         label_map = ChartConfig.chart_labels()
         chart_label = label_map.get(chart_key, chart_key)
 
-        # 图表列表: 每图表 = 一条频率曲线（可指定频段范围）
-        _charts: list = [{"label": chart_label, "freq_start": 0, "freq_end": 0}]  # 0=全频段
+        # 图表列表: 从持久存储恢复
+        if not hasattr(self, '_b_class_charts'):
+            self._b_class_charts = {}
+        _charts: list = self._b_class_charts.get(chart_key)
+        if not _charts:
+            _charts = [{"label": chart_label, "freq_start": 0, "freq_end": 0}]
+        else:
+            _charts = [dict(c) for c in _charts]  # deep copy
         _selected_idx = [0]
 
         dlg = QDialog(self)
@@ -3756,6 +3762,7 @@ class ChartSettingsPage(QWidget):
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
+            self._b_class_charts.__setitem__(chart_key, _charts),
             setattr(az, 'freq_gap_mhz', spin_gap.value()) if az else None,
             setattr(az, 'dual_y_enabled', check_dual.isChecked()) if az else None,
             self._sync_to_mw(), self._sync_selected_frequencies(freq_picker.get_selected(), 'b'),
