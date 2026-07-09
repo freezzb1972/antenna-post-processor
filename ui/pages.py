@@ -3534,7 +3534,7 @@ class ChartSettingsPage(QWidget):
             btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(80)
             btn.clicked.connect(lambda checked, k=key: self._show_bclass_param_dialog(k))
             row.addWidget(btn)
-        elif key in ("cut_2d_polar", "cut_2d_rect"):
+        elif key in ("cut_2d_polar", "cut_2d_rect", "cut_azimuth_polar", "cut_azimuth_rect"):
             btn = QPushButton("⚙ " + self.tr("参数")); btn.setFixedWidth(85)
             btn.clicked.connect(lambda checked, k=key: self._show_cut_param_dialog(k))
             row.addWidget(btn)
