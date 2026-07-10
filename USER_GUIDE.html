@@ -812,21 +812,28 @@ antenna-post-processor/
 <!-- ============================================================ -->
 <h2 id="chart-config">19. 图表配置</h2>
 
-<p>图形配置对话框通过 <strong>设置 → 图形配置...</strong> 打开。默认所有 B 类频点曲线图表不选中（效率/增益/LAG vs 频率），用户按需手动勾选。</p>
+<p>图形配置对话框通过 <strong>设置 → 图形配置...</strong> 打开。左右两列分别对应 <strong>测试报告</strong>（主 Word 报告）与 <strong>额外报告</strong>（完整 full_report）。默认所有 B 类频点曲线图表不选中（效率/增益/LAG vs 频率），用户按需手动勾选。<strong>所有图表统一输出到 Word</strong>（不再嵌入 Excel）。</p>
 
-<p><strong>全选/取消全选：</strong></p>
+<h3>19.1 「启用」总开关 — 控制是否渲染图表</h3>
+<p>左右两列标题旁各有一个 <strong>[启用]</strong> 复选框，作为该列图表的<strong>总开关</strong>：</p>
 <ul>
-  <li>每个图表分类顶部有「全选」和「取消全选」按钮</li>
-  <li>控制当前分类左右两列（报告需要 + 额外 full_report）所有 checkbox</li>
-  <li>左列「报告需要」= 嵌入主输出 Excel</li>
-  <li>右列「额外 (full_report)」= 仅完整报告使用</li>
+  <li><strong>测试报告 [启用]</strong>：控制左列（required）图表是否参与渲染，并联动「测试报告 (.docx)」输出开关。</li>
+  <li><strong>额外报告 [启用]</strong>：控制右列（full_report）图表是否参与渲染。默认<strong>关闭</strong>。</li>
+  <li><strong>关键：</strong>「启用」关闭时，该列所有图表（<em>包括模板自动识别勾选的</em>）都<strong>不会渲染</strong>，无需逐个取消勾选。</li>
 </ul>
 
-<p><strong>图表子选择：</strong></p>
+<div class="note">
+⚠ <strong>只想出天线参数、不出图表？</strong> 直接把两个「启用」开关都关掉即可 —— 比逐个取消图表勾选更快。<br>
+打开模板时的<strong>自动识别会同时勾选左右两列</strong>的对应图表，所以只关一个不够，必须两个都关。<br>
+实测：两列都关（仅计算参数）139 频点约 <strong>28 秒</strong>；开启图表渲染约 <strong>5 分钟</strong>。
+</div>
+
+<h3>19.2 全选 / 图表子选择</h3>
 <ul>
-  <li>Gain/AR/LAG 曲线支持 ⚙ 角度... 弹窗选择具体 θ 角度或范围</li>
-  <li>视角参数：仰角/方位角/DPI/采样精度</li>
-  <li>输出方式：嵌入 Excel + 可选 PNG 文件夹</li>
+  <li>每个图表分类顶部有「全选」「取消全选」按钮，控制当前分类左右两列所有 checkbox。</li>
+  <li>Gain/AR/LAG 曲线支持 ⚙ 角度... 弹窗选择具体 θ 角度或范围。</li>
+  <li>视角参数：仰角 / 方位角 / DPI / 采样精度。</li>
+  <li>Word 布局：默认按频点（by_freq）排列，可在「Word 输出布局设置」中切换为按类型（by_type）。</li>
 </ul>
 
 <!-- ============================================================ -->
@@ -932,6 +939,16 @@ antenna-post-processor/
   <li>天线参数页：LAG 角度 / 算法选项 / 参数勾选变更 → READY 自动回到 IDLE，强制重新预览</li>
   <li>图表配置页：输出路径 / 图表类型 / 视角参数变更 → 不影响预览状态（仅影响导出）</li>
 </ul>
+
+<p><strong>输出路径自动推导：</strong></p>
+<ul>
+  <li>添加/切换数据文件时，输出路径<strong>自动从数据文件所在目录推导</strong>：目录 = <code>数据文件夹/output/</code>，文件名 = <code>&lt;数据文件名&gt;_AntennaReport.xlsx</code>（图表报告 <code>_图表报告.docx</code>、中间数据 <code>_中间数据.xlsx</code> 同理）。</li>
+  <li>文件名<strong>始终</strong>随数据文件更新；目录仅在用户<strong>未手动改过</strong>时自动更新（一旦手动选择/编辑输出目录，即固定不再自动覆盖）。</li>
+  <li>因此实际输出位置可能与最初手填的不同 —— 以日志中「📊 写入 Excel: ...」显示的路径为准。</li>
+  <li>若同名文件已存在，自动追加 <code>_YYYYMMDD_NN</code> 后缀避免覆盖。</li>
+</ul>
+
+<p><strong>并行计算：</strong>逐频点计算使用多进程（<code>ProcessPoolExecutor</code>，默认 CPU 核数−1），大批量频点显著加速。进度条分「计算参数 / 渲染图表」两阶段显示；未启用任何图表时不显示「渲染图表」步骤。</p>
 
 <!-- ============================================================ -->
 <h2 id="word-template">25. Word 模板报告</h2>
