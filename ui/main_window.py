@@ -2527,19 +2527,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             if first_path:
                 if file_page and hasattr(file_page, '_sync_output_paths'):
                     file_page._sync_output_paths(Path(first_path))
-            # 角度自动加载 (仅首次且用户未手动配置时)
-                if not az._angles_initialized:
-                    if not az.azimuth_cut_angles:
-                        gain_singles = self._lag_config.singles_sorted
-                        az.azimuth_cut_angles = [list(gain_singles)] if gain_singles else [[]]
-                    if not az.azimuth_cut_angles_ar:
-                        ar_singles = (self._ar_lag_config.singles_sorted
-                                      if hasattr(self, '_ar_lag_config') else [])
-                        az.azimuth_cut_angles_ar = [list(ar_singles)] if ar_singles else [[]]
-                        if not az.azimuth_cut_angles_ar:
-                            az.azimuth_cut_angles_ar = [list(self._lag_config.singles_sorted)] if self._lag_config.singles_sorted else [[]]
-                    # RHCP/LHCP 通常为空, 只在用户显式配置后才保留(不自动填充)
-                    az._angles_initialized = True
+            # 注: 已删除对 az.azimuth_cut_angles/_ar 的自动初始化 —— 这些字段已在
+            # OutputConfig 重构中移除(方位面改用 pk_theta_ranges), 全项目无人消费。
+            # 旧代码读取不存在的字段导致 AttributeError(此前被 _sync_to_mw 设 _angles_initialized 掩盖)。
 
         # 从 MainWindow widget 读取（天线参数 dialog 通过 _sync_to_mw 写入此处）
         extrapolate_theta = self._cmb_extrapolate.currentData()
