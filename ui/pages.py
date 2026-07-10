@@ -663,8 +663,7 @@ class FileSettingsPage(QWidget):
             self._cfg.config.last_template_path = path
             self._cfg._dirty = True
         if self._mw:
-            self._mw._chart_config_required = None
-            self._mw._cached_template_params = set()
+            self._mw._reset_template_derived_state()  # 完整清除旧模板派生状态(防陈旧)
             self._mw._auto_apply_template_params()
             # 立即从模板更新角度配置（不等自动匹配）
             try:
@@ -673,6 +672,7 @@ class FileSettingsPage(QWidget):
                 self._mw._auto_update_angle_config_from_template(sheets)
             except Exception:
                 pass
+            self._mw._auto_check_output_flags()  # 加载模板 → 自动勾选天线参数报告(.xlsx)
         self._lbl_match_status.setText("")
         if self._data_file_paths:
             self._on_auto_match()
@@ -773,8 +773,7 @@ class FileSettingsPage(QWidget):
             self._cfg.config.last_template_path = path
             self._cfg._dirty = True
         if self._mw:
-            self._mw._chart_config_required = None
-            self._mw._cached_template_params = set()
+            self._mw._reset_template_derived_state()  # 完整清除旧模板派生状态(防陈旧)
             self._mw._auto_apply_template_params()
             # 立即从模板更新角度配置（不等自动匹配）
             try:
@@ -783,6 +782,7 @@ class FileSettingsPage(QWidget):
                 self._mw._auto_update_angle_config_from_template(sheets)
             except Exception:
                 pass
+            self._mw._auto_check_output_flags()  # 加载模板 → 自动勾选天线参数报告(.xlsx)
         self._lbl_match_status.setText("")
         if self._data_file_paths:
             self._on_auto_match()
@@ -3446,8 +3446,8 @@ class ChartSettingsPage(QWidget):
         mw._output_config = azimuth
         mw._chart_config_required = required
         mw._chart_config_extra = extra
-        if hasattr(mw, '_auto_check_output_flags'):
-            mw._auto_check_output_flags()
+        # 注: 不在此调 _auto_check_output_flags —— 勾图表不应勾"天线参数报告(.xlsx)"。
+        # Excel 仅由模板加载驱动; 图表只经"测试报告[启用]"联动勾"测试报告(.docx)"(见本方法开头)。
 
         # 展开为 ChartInstance 列表（单一数据源供 Word 布局 + Pipeline）
         from src.chart_plan import expand_to_instances
