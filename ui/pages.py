@@ -424,6 +424,30 @@ class FileSettingsPage(QWidget):
         self._cfg = get_config_manager()
         self._load_azimuth_state()
 
+    def _sync_output_paths(self, source_path: Path):
+        """根据源文件路径更新输出文件名，目录仅在用户未自定义时自动更新。"""
+        if not self._mw:
+            return
+        az = getattr(self._mw, '_output_config', None)
+        if az is None:
+            return
+        src_dir = str(source_path.parent)
+        src_stem = source_path.stem
+        auto_dir = str(Path(src_dir) / "output")
+        if getattr(self._mw, '_output_dir_is_auto', True):
+            az.excel_output_dir = auto_dir
+            az.chart_output_dir = auto_dir
+            az.data_output_dir = auto_dir
+            self._mw.ui.editOutputDir.setText(auto_dir)
+        # 文件名始终更新
+        az.excel_output_filename = f"{src_stem}_AntennaReport.xlsx"
+        az.chart_output_filename = f"{src_stem}图表报告.docx"
+        az.data_output_filename = f"{src_stem}_中间数据.xlsx"
+        # 同步主窗口 GUI
+        self._mw.ui.editOutputName.setText(az.excel_output_filename)
+        # 同步 FileSettingsPage GUI
+        self._load_azimuth_state()
+
     def _load_azimuth_state(self):
         """从 OutputConfig 恢复输出路径。"""
         if not self._mw:
@@ -1152,6 +1176,7 @@ class FileSettingsPage(QWidget):
             self._file_entries.clear()
             self._file_list_widget.setRowCount(0)
             self._lbl_match_status.setText("")
+            self._mw._cached_datasource_map = None  # 文件变更, 清除数据源缓存
         existing = set(self._data_file_paths)
         new_paths = [p for p in paths if p not in existing]
         if not new_paths:
@@ -1169,6 +1194,8 @@ class FileSettingsPage(QWidget):
         # 无预设模板时，输出目录自动设为数据源目录
         if not self._output_dir or self._output_dir == str(Path.cwd() / "output"):
             self._output_dir = str(Path(new_paths[0]).parent)
+        # 换源文件时立即更新所有输出路径和 GUI 显示
+        self._sync_output_paths(Path(new_paths[0]))
         if self._template_path:
             self._on_auto_match()
 
@@ -1190,6 +1217,8 @@ class FileSettingsPage(QWidget):
             self._data_stale = False
             if self._template_path:
                 self._on_auto_match()
+        if self._mw:
+            self._mw._cached_datasource_map = None  # 文件变更, 清除数据源缓存
         self._log(f"🗑 已清除 {len(rows)} 行, 剩余 {len(self._data_file_paths)} 个文件")
 
     def _on_clear_all_files(self):
@@ -1198,6 +1227,8 @@ class FileSettingsPage(QWidget):
         self._file_list_widget.setRowCount(0)
         self._lbl_match_status.setText("")
         self._data_stale = True
+        if self._mw:
+            self._mw._cached_datasource_map = None  # 文件变更, 清除数据源缓存
 
     def _on_browse_full_report(self):
         start_dir = self._output_dir or str(Path.cwd() / "output")
@@ -3305,8 +3336,9 @@ class ChartSettingsPage(QWidget):
         dlg.exec()
 
     def _on_test_report_toggled(self, checked: bool):
-        """测试报告总开关: 控制 Word 输出自动选中/取消。"""
+        """测试报告总开关: 控制 Word 输出自动选中/取消 + 图表渲染总闸门。"""
         if self._mw:
+            self._mw._test_report_enabled = checked
             fp = getattr(self._mw, '_file_settings_page', None)
             if fp and hasattr(fp, '_check_out_word'):
                 fp._check_out_word.setChecked(checked)

@@ -131,6 +131,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._last_matches: list = []        # 工作表-文件匹配结果
         self._chart_instances: list = []     # 图表实例列表 (ChartInstance)
         self._full_report_enabled: bool = False  # full_report 计算/输出开关
+        self._test_report_enabled: bool = True   # 测试报告(required)图表总开关
         self._required_params: set = set()   # 用户确认的报告必需参数
         self._extra_params: set = set()      # 用户额外选择的计算参数
         self._dir_extrap_method: str = "linear"  # Directivity 外推算法
@@ -147,6 +148,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._antenna_images: dict[str, dict] = {}    # antenna_name → images
         self._ant_queue: list[str] = []               # 多天线处理队列
         self._ant_idx: int = 0                        # 当前处理索引
+        self._multi_antenna_active: bool = False      # 是否处于多天线串行处理中(仅此为真才续跑下一个)
         self._ant_all_results: dict = {}              # 累积结果
         self._ant_all_images: dict = {}               # 累积图片
         self._nh_custom_angles: List[float] = []  # NHPRP/NHPIS 自定义角度列表
@@ -155,6 +157,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._chart_config_extra = None      # ChartConfig: 额外(full_report)
         from src.output_config import OutputConfig
         self._output_config = OutputConfig()  # 方位面报告配置
+        self._output_dir_is_auto = True       # 输出目录是否自动生成（用户手动改过后为 False）
         self._graph_viewer = None            # GraphViewer: 启动时创建，处理完后填充数据
         self._cached_template_path: Optional[str] = None  # 模板路径缓存
         self._cached_template_mtime: float = 0           # 模板文件 mtime 缓存
@@ -1644,6 +1647,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 文件浏览
         self.ui.btnBrowseTemplate.clicked.connect(self._on_browse_template)
         self.ui.btnBrowseOutput.clicked.connect(self._on_browse_output)
+        self.ui.editOutputDir.textEdited.connect(self._on_output_dir_edited)
         self.ui.btnBrowseFullReport.clicked.connect(self._on_browse_full_report)
 
         self.ui.btnStop.clicked.connect(self._on_stop)
@@ -1711,6 +1715,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self.ui.editOutputDir.setText(path)
             self._cfg.config.last_output_dir = path
             self._cfg._dirty = True
+            self._output_dir_is_auto = False  # 用户手动选择目录
+
+    def _on_output_dir_edited(self):
+        """用户手动编辑输出目录文本时标记为非自动。"""
+        self._output_dir_is_auto = False
 
     def _on_browse_full_report(self):
         start_dir = self.ui.editFullReportPath.text() or str(Path.cwd() / "output")
@@ -2210,6 +2219,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         ant_names = list(self._antenna_configs.keys())
         self._ant_queue = ant_names[:]
         self._ant_idx = 0
+        self._multi_antenna_active = True   # 仅真正的多天线串行处理才置真
         self._ant_all_results = {}
         self._ant_all_images = {}
         self._process_next_antenna()
@@ -2288,15 +2298,27 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         out_data = False
         if file_page and hasattr(file_page, 'get_output_flags'):
             out_excel, out_word, out_data = file_page.get_output_flags()
-        # 有图表配置 → 自动开启 Word 输出
-        has_charts = bool(getattr(self, '_chart_instances', None))
+        # 报告启用开关 (总闸门): 未启用的报告, 其图表不参与渲染/输出。
+        # 模板自动识别会同时勾选测试报告列和额外报告列, 故必须按启用开关门控,
+        # 否则用户即使关闭"启用"开关, 自动识别的图表仍会被渲染 (耗时且非预期)。
+        test_enabled = bool(getattr(self, '_test_report_enabled', True))
+        extra_enabled = (bool(getattr(self, '_full_report_enabled', False))
+                         or bool(file_page and hasattr(file_page, '_check_full_report')
+                                 and file_page._check_full_report.isChecked()))
         ccfg = getattr(self, '_chart_config_required', None)
+        xcfg = getattr(self, '_chart_config_extra', None)
         az = getattr(self, '_output_config', None)
-        if not has_charts:
-            if ccfg:
-                has_charts = ccfg.has_any_a_class or ccfg.has_any_b_class or ccfg.has_any_c_class
-            if az and not has_charts:
-                has_charts = az.has_any_azimuth
+        # 有效图表 = 已启用的报告里确有图表
+        has_charts = False
+        if test_enabled:
+            if bool(getattr(self, '_chart_instances', None)):
+                has_charts = True
+            elif ccfg and (ccfg.has_any_a_class or ccfg.has_any_b_class or ccfg.has_any_c_class):
+                has_charts = True
+            elif az and az.has_any_azimuth:
+                has_charts = True
+        if not has_charts and extra_enabled and xcfg:
+            has_charts = xcfg.has_any_a_class or xcfg.has_any_b_class or xcfg.has_any_c_class
         if not out_word and has_charts:
             out_word = True
             if file_page and hasattr(file_page, '_check_out_word'):
@@ -2456,7 +2478,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if self._chart_config_required is not None or self._chart_config_extra is not None:
             req = self._chart_config_required or ChartConfig()
             xtr = self._chart_config_extra or ChartConfig()
-            full_chart_config = req.merge(xtr)
+            # 报告启用开关作为渲染总闸门: 未启用的报告其图表配置不并入 → pipeline 不渲染。
+            # 模板自动识别 (_auto_apply_chart_config) 会同时勾选测试/额外两列,
+            # 若无条件合并, 用户即使关闭"启用"开关, 自动识别的图表仍会被渲染。
+            full_chart_config = (req if test_enabled else ChartConfig()).merge(
+                xtr if extra_enabled else ChartConfig())
         png_dir = plot_config.save_png_folder
         full_chart_config.save_png_folder = png_dir
 
@@ -2466,21 +2492,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             # 默认路径：从第一个源文件推导（不管是否启用 azimuth, Word 输出需要路径）
             first_path = self._data_file_paths[0] if self._data_file_paths else ""
             if first_path:
-                p = Path(first_path)
-                src_dir = str(p.parent)
-                src_stem = p.stem
-                if not az.excel_output_dir:
-                    az.excel_output_dir = str(Path(src_dir) / "output")
-                if not az.excel_output_filename:
-                    az.excel_output_filename = f"{src_stem}_AntennaReport.xlsx"
-                if not az.chart_output_dir:
-                    az.chart_output_dir = src_dir
-                if not az.chart_output_filename:
-                    az.chart_output_filename = f"{src_stem}图表报告.docx"
-                if not az.data_output_dir:
-                    az.data_output_dir = src_dir
-                if not az.data_output_filename:
-                    az.data_output_filename = f"{src_stem}_中间数据.xlsx"
+                if file_page and hasattr(file_page, '_sync_output_paths'):
+                    file_page._sync_output_paths(Path(first_path))
             # 角度自动加载 (仅首次且用户未手动配置时)
                 if not az._angles_initialized:
                     if not az.azimuth_cut_angles:
@@ -2540,7 +2553,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             gen_diff=gen_diff,
             gen_diff_chart=gen_diff_chart,
             antenna_configs=self._antenna_configs if self._antenna_configs else None,
-            chart_instances=getattr(self, '_chart_instances', None),
+            chart_instances=(self._chart_instances if test_enabled else []),
         )
         self._worker.moveToThread(self._thread)
 
@@ -2567,6 +2580,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._running = False
         self._data_stale = True  # 中断的计算，数据标记为陈旧
         self._worker = None
+        self._multi_antenna_active = False  # 中断后清除多天线续跑状态，防止下次误触发
         # 安全退出线程：quit() 退出事件循环，wait(3000) 等待线程结束
         if self._thread is not None:
             self._thread.quit()
@@ -2734,18 +2748,21 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 自动切到结果Tab
         self.ui.tabConfig.setCurrentIndex(0)
 
-        # 多天线模式: 继续处理下一个
-        if hasattr(self, '_ant_queue') and self._ant_idx < len(self._ant_queue):
+        # 多天线模式: 继续处理下一个 (仅在真正的多天线串行处理中续跑;
+        # 单天线出报告/预览不得因残留队列状态被误触发再跑一次)
+        if self._multi_antenna_active and self._ant_idx < len(self._ant_queue):
             self._ant_all_results[ant_name] = results
             self._ant_all_images[ant_name] = images
             QTimer.singleShot(500, self._process_next_antenna)
             return
 
         # 全部完成，恢复状态
+        self._multi_antenna_active = False
         if hasattr(self, '_ant_all_results') and self._ant_all_results:
             self._antenna_results = self._ant_all_results
             self._antenna_images = self._ant_all_images
             self._ant_queue = []
+            self._ant_idx = 0
 
     def _process_antennas_parallel(self, antennas):
         """并行处理多个天线 (自动检测 CPU 核数)。"""
@@ -3039,6 +3056,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._running = False
         self._worker = None
         self._data_stale = True  # 错误后数据陈旧，下次处理前自动清除
+        self._multi_antenna_active = False  # 出错后清除多天线续跑状态，防止下次误触发
         # 安全退出线程：quit() 退出事件循环，wait(3000) 等待线程结束
         if self._thread is not None:
             self._thread.quit()
