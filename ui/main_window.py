@@ -104,10 +104,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             lambda: setattr(self, '_user_set_output_name', True))
 
         # ---- 状态 ----
-        self._lag_config = LagConfig(
-            single_angles=[0, 10, 20, 90],
-            ranges=[(0, 90), (60, 90)],
-        )
+        # LAG 默认空(与 AR/RHCP/CPXPI 一致): 空 = "未手动指定" → run 时 pipeline 从模板 auto-detect。
+        # 消除旧的 [0,10,20,90] 非对称默认(它会无条件覆盖模板角度, 导致 LAG/RC 只出 0/10/20)。
+        self._lag_config = LagConfig()
         self._thread: Optional[QThread] = None
         self._worker: Optional[ProcessingWorker] = None
         self._running = False
@@ -1685,8 +1684,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self.ui.editTemplatePath.setText(path)
             self._cfg.config.last_template_path = path
             self._cfg._dirty = True
-            self._chart_config_required = None  # 模板已变，下次使用时重新检测
-            self._cached_template_params = set()  # 强制刷新模板参数缓存
+            self._reset_template_derived_state()  # 换模板: 清除旧模板派生的所有缓存(防陈旧数据)
             # 自动应用模板检测到的计算参数
             self._auto_apply_template_params()
             self._auto_check_output_flags()
@@ -1755,7 +1753,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             if az:
                 az.excel_output_filename = fname
         # 模板变更后自动识别并应用计算参数
-        self._cached_template_params = set()
+        self._reset_template_derived_state()
         self._auto_apply_template_params()
         self._auto_check_output_flags()
 
@@ -1913,6 +1911,19 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._cpxpi_lag_config = cpxpi_cfg
             self._log(f"从模板自动更新 CP-XPI 角度: 单角度={cpxpi_cfg.singles_sorted}")
 
+        # 把检测到的角度写进 AntennaParamsPage 控件(唯一真源)。
+        # 否则控件仍是旧值, _sync_to_mw 会用陈旧控件把 mw._*_config 打回, 导致模板角度丢失。
+        ap = getattr(self, '_antenna_params_page', None)
+        if ap:
+            if getattr(ap, '_gain_angle_widget', None) and not lag_cfg.is_empty():
+                ap._gain_angle_widget.set_config(lag_cfg)
+            if getattr(ap, '_ar_angle_widget', None) and not ar_cfg.is_empty():
+                ap._ar_angle_widget.set_config(ar_cfg)
+            if getattr(ap, '_rhcp_angle_widget', None) and not rhcp_cfg.is_empty():
+                ap._rhcp_angle_widget.set_config(rhcp_cfg)
+            if getattr(ap, '_cpxpi_angle_widget', None) and not cpxpi_cfg.is_empty():
+                ap._cpxpi_angle_widget.set_config(cpxpi_cfg)
+
         self._update_params_display()
 
     def _auto_check_output_flags(self):
@@ -1935,6 +1946,39 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             fp._check_out_word.setChecked(has_charts)
         if hasattr(fp, '_check_out_data'):
             fp._check_out_data.setChecked(has_charts)
+
+    def _reset_template_derived_state(self):
+        """换模板时清除所有从旧模板派生的状态, 防止旧数据残留(陈旧数据防护)。
+
+        清空后由 _auto_apply_template_params + _auto_update_angle_config_from_template
+        从新模板重新检测并重填。
+        """
+        # 图表配置(旧模板残留)
+        self._chart_config_required = None
+        self._chart_config_extra = None
+        self._chart_instances = []
+        self._cached_template_params = set()
+        # 全局角度配置 → 空(检测重填)
+        self._lag_config = LagConfig()
+        self._ar_lag_config = LagConfig()
+        self._rhcp_lag_config = LagConfig()
+        self._cpxpi_lag_config = LagConfig()
+        # 每天线配置(参数 + 角度) → 空(检测重填; required_params 空后 _auto_apply 会用新模板填充)
+        for ant in self._antenna_configs.values():
+            ant.required_params = set()
+            ant.extra_params = set()
+            ant.lag_config = LagConfig()
+            ant.ar_lag_config = LagConfig()
+            ant.rhcp_lag_config = LagConfig()
+            ant.cpxpi_lag_config = LagConfig()
+        # AntennaParamsPage 角度控件 → 空(检测只重填新模板有的类型, 旧模板独有的类型不残留)
+        ap = getattr(self, '_antenna_params_page', None)
+        if ap:
+            for wname in ('_gain_angle_widget', '_ar_angle_widget',
+                          '_rhcp_angle_widget', '_cpxpi_angle_widget'):
+                wid = getattr(ap, wname, None)
+                if wid:
+                    wid.set_config(LagConfig())
 
     def _auto_apply_template_params(self):
         """从模板自动识别并应用计算参数到主窗口 + AntennaParamsPage。
