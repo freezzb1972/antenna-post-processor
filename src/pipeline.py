@@ -157,6 +157,7 @@ def _process_one_frequency(
     dir_extrap_method: str = "none",
     compute_only: bool = False,
     store_matrices: bool = False,
+    chart_instances: list | None = None,
     log_cb=None,
 ) -> dict[str, Any]:
     """处理单个频点。按 needed_params（模板列）+ extra_params（用户额外）计算。"""
@@ -491,14 +492,22 @@ def _process_one_frequency(
                 rhcp_db = row.get("_rhcp_gain")
                 lhcp_db = row.get("_lhcp_gain")
                 cpxpi_db = row.get("_cp_xpi")
+                # 每图标题: 类别默认模板 (用户可逐实例覆盖 inst.title)
+                _antenna = output_config.antenna_name if output_config is not None else ""
+                _titles = None
+                if chart_instances:
+                    from .chart_titles import build_title
+                    _titles = {ci.image_key: build_title(ci, freq, _antenna)
+                               for ci in chart_instances if ci.enabled}
                 images = generate_all_for_frequency(
                     theta_deg, phi_angles, gain_dbi,
                     freq, ccfg, ar_linear=ar_lin,
                     rhcp_db=rhcp_db, lhcp_db=lhcp_db,
                     cpxpi_db=cpxpi_db,
-                    antenna_name="",
+                    antenna_name=_antenna,
                     output_config=output_config,
                     extra_patterns=extra_patterns,
+                    titles=_titles,
                 )
                 if images:
                     row["_images"] = images
@@ -766,6 +775,7 @@ def _load_and_compute(
     dir_extrap_method: str = "none",
     compute_only: bool = False,
     store_matrices: bool = False,
+    chart_instances: list | None = None,
     cancel_callback=None,
     progress_callback=None,
     log_callback=None,
@@ -831,7 +841,7 @@ def _load_and_compute(
                          f"最后角={_valid[-1]:.1f}° + 步进={_dphi:.1f}° = {_expect:.1f}° "
                          f"(应≈360°), Directivity/AR/LAG 可能偏小")
         ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, theta_extrap_method, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, output_config, compute_only, store_matrices))
+        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, theta_extrap_method, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, output_config, compute_only, store_matrices, chart_instances))
         _report(progress_callback, i + 1, progress_max, f"[📂] 读取源文件 {i+1}/{total}")
 
     data_done = _load_w
@@ -889,12 +899,12 @@ def _run_compute_serial(
     total_tasks = compute_total or len(compute_tasks)
     cw = calc_w or max(total_tasks * 4, 1)
     rw = render_w or max(total_tasks * 2, 1)
-    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co, sm) in enumerate(compute_tasks):
+    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co, sm, cinst) in enumerate(compute_tasks):
         if cancel_callback and cancel_callback():
             break
         try:
             theta_arr = np.array(theta_list)
-            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, dir_extrap_method=dir_extrap_method, compute_only=co, store_matrices=sm, log_cb=log_cb)
+            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, dir_extrap_method=dir_extrap_method, compute_only=co, store_matrices=sm, chart_instances=cinst, log_cb=log_cb)
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
@@ -1097,6 +1107,7 @@ def run_pipeline(
                 dir_extrap_method=dir_extrap_method,
                 compute_only=compute_only,
                 store_matrices=out_data,
+                chart_instances=chart_instances,
                 cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,
             )
         finally:
@@ -1557,11 +1568,11 @@ def _compute_chunk(
     """
     import numpy as np
     results = []
-    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co, sm in compute_tasks:
+    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co, sm, cinst in compute_tasks:
         try:
             theta_raw = np.array(theta_list)
             row = _process_one_frequency(raw, freq, theta_raw, lag_cfg,
-                                         theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co, store_matrices=sm,
+                                         theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co, store_matrices=sm, chart_instances=cinst,
                                          log_cb=None)
             results.append((sheet_name, row))
         except Exception as e:

@@ -184,6 +184,7 @@ def generate_all_for_frequency(
     antenna_name: str = "",
     output_config: OutputConfig | None = None,
     extra_patterns: dict[str, np.ndarray] = None,
+    titles: dict[str, str] | None = None,
 ) -> dict[str, io.BytesIO]:
     """根据 ChartConfig 为一个频点生成所有需要的图形。
 
@@ -205,6 +206,11 @@ def generate_all_for_frequency(
     """
     images: dict[str, io.BytesIO] = {}
     extra = extra_patterns or {}
+    _t = titles or {}
+
+    def _title_for(key: str, default: str) -> str:
+        """取实例标题(类别默认/用户覆盖), 缺失回退到旧硬编码默认。"""
+        return _t.get(key) or default
 
     # ── A 类: 3D 方向图 ──
     # 多视角支持: 若有 view_angle_pairs 则循环，否则用单个 elev/azim
@@ -220,7 +226,8 @@ def generate_all_for_frequency(
                 theta_deg, phi_deg, gain_dbi, freq_mhz,
                 elev=el, azim=az,
                 dpi=chart_config.dpi,
-                title="3D Gain Pattern", antenna_name=antenna_name,
+                title=_title_for(f"3d_gain{suffix}", "3D Gain Pattern"),
+                antenna_name=antenna_name,
                 colormap="emquest",
             )
 
@@ -231,7 +238,8 @@ def generate_all_for_frequency(
                 theta_deg, phi_deg, gain_dbi, freq_mhz,
                 elev=el, azim=az,
                 dpi=chart_config.dpi,
-                title="3D EIRP Pattern", antenna_name=antenna_name,
+                title=_title_for(f"3d_eirp{suffix}", "3D EIRP Pattern"),
+                antenna_name=antenna_name,
                 colormap="emquest",
             )
 
@@ -243,7 +251,8 @@ def generate_all_for_frequency(
                 theta_deg, phi_deg, ar_db, freq_mhz,
                 elev=el, azim=az,
                 dpi=chart_config.dpi,
-                title="3D Axial Ratio", antenna_name=antenna_name,
+                title=_title_for(f"3d_ar{suffix}", "3D Axial Ratio"),
+                antenna_name=antenna_name,
                 colormap="emquest",
             )
 
@@ -255,7 +264,8 @@ def generate_all_for_frequency(
                 theta_deg, phi_deg, extra["3d_etheta"], freq_mhz,
                 elev=el, azim=az,
                 dpi=chart_config.dpi,
-                title="3D E_θ Pattern", antenna_name=antenna_name,
+                title=_title_for(f"3d_etheta{suffix}", "3D E_θ Pattern"),
+                antenna_name=antenna_name,
                 colormap="emquest",
             )
 
@@ -266,7 +276,8 @@ def generate_all_for_frequency(
                 theta_deg, phi_deg, extra["3d_ephi"], freq_mhz,
                 elev=el, azim=az,
                 dpi=chart_config.dpi,
-                title="3D E_φ Pattern", antenna_name=antenna_name,
+                title=_title_for(f"3d_ephi{suffix}", "3D E_φ Pattern"),
+                antenna_name=antenna_name,
                 colormap="emquest",
             )
 
@@ -301,9 +312,9 @@ def generate_all_for_frequency(
             all_entries.append(_CE(param=param, direction="theta", angles=angles))
         params = build_cut_params_from_entries(all_entries, data_map)
     images.update(render_phi_cuts(params, theta_deg, phi_deg, freq_mhz,
-                                  chart_config, _renderer))
+                                  chart_config, _renderer, titles=_t))
     images.update(render_theta_cuts(params, theta_deg, phi_deg, freq_mhz,
-                                    chart_config, output_config, _renderer))
+                                    chart_config, output_config, _renderer, titles=_t))
 
     # ── PK Theta 范围峰值 (旧方位面路径已移除, 统一走 cut_param) ──
     if output_config and output_config.pk_theta_ranges:
@@ -315,7 +326,7 @@ def generate_all_for_frequency(
                 images[key] = _renderer.render_azimuth_polar(
                     phi_deg, [(t_max, pk_vals)], freq_mhz,
                     ylabel="Gain (dBi)", dpi=output_config.dpi,
-                    title=f"{freq_mhz:.0f}MHz - Gain (dBi) θ=0°-{int(t_max)}°",
+                    title=_t.get(key) or f"{freq_mhz:.0f}MHz - Gain (dBi) θ=0°-{int(t_max)}°",
                 )
             except Exception:
                 pass

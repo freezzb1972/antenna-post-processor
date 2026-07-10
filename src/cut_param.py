@@ -117,6 +117,7 @@ def render_phi_cuts(
     freq_mhz: float,
     chart_config,
     renderer,
+    titles: dict | None = None,
 ) -> dict[str, any]:
     """俯仰面切面: 固定 φ, 扫描 θ (Theta 轴) — 极坐标 + 直角坐标。
 
@@ -134,6 +135,7 @@ def render_phi_cuts(
         return images
 
     dpi = getattr(chart_config, 'dpi', 150)
+    _t = titles or {}
 
     for p in params:
         if not p.enabled or p.data is None:
@@ -154,7 +156,7 @@ def render_phi_cuts(
             images[key] = renderer.render_2d_polar(
                 theta_deg, curves[0][2], freq_mhz,
                 ylabel=p.ylabel, dpi=dpi, antenna_name="",
-                curves=curves,
+                curves=curves, title=_t.get(key, ""),
             )
 
         if rect_enabled:
@@ -162,7 +164,7 @@ def render_phi_cuts(
             images[key] = renderer.render_2d_rect(
                 theta_deg, curves[0][2], freq_mhz,
                 ylabel=p.ylabel, dpi=dpi, antenna_name="",
-                curves=curves,
+                curves=curves, title=_t.get(key, ""),
             )
 
     return images
@@ -176,6 +178,7 @@ def render_theta_cuts(
     chart_config,
     output_config,
     renderer,
+    titles: dict | None = None,
 ) -> dict[str, any]:
     """方位面切面: 固定 θ, 扫描 φ (Phi 轴) — 极坐标 + 直角坐标。
 
@@ -193,6 +196,7 @@ def render_theta_cuts(
         return images
 
     az_dpi = output_config.dpi if output_config is not None and output_config.dpi else 150
+    _t = titles or {}
 
     for p in params:
         if not p.enabled or p.data is None:
@@ -212,6 +216,7 @@ def render_theta_cuts(
             images[key] = renderer.render_azimuth_polar(
                 phi_deg, curves, freq_mhz,
                 ylabel=p.ylabel, dpi=az_dpi, antenna_name="",
+                title=_t.get(key, ""),
             )
 
         if rect_enabled:
@@ -219,7 +224,7 @@ def render_theta_cuts(
             images[key] = renderer.render_azimuth_rect(
                 phi_deg, curves[0][1], freq_mhz,
                 ylabel=p.ylabel, dpi=az_dpi, antenna_name="",
-                curves=curves,
+                curves=curves, title=_t.get(key, ""),
             )
 
     return images
