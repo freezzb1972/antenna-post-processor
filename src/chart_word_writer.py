@@ -40,7 +40,7 @@ def write_chart_word_report(
     layout_mode: str = "side_by_side",
     show_heading: bool = False,
     show_caption: bool = False,
-) -> None:
+) -> str:
     """将多组图表图片写入 Word 文档。
 
     Args:
@@ -53,6 +53,9 @@ def write_chart_word_report(
         label_order: 图表组输出顺序列表（如按 ChartInstance.sort_order）。
         layout_mode: "side_by_side", "by_freq", "by_type"。
         show_caption: 是否显示图片上方题注。
+
+    Returns:
+        实际保存的文件路径（可能与 output_path 不同，因为会自动加 _1, _2 防覆盖）。
     """
     doc = Document()
 
@@ -99,6 +102,7 @@ def write_chart_word_report(
 
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     doc.save(output_path)
+    return output_path
 
 
 def write_chart_word_report_by_freq(
@@ -153,10 +157,14 @@ def write_chart_word_report_by_freq(
             if not images: continue
             if show_heading:
                 heading = doc.add_heading(group_name, level=1); heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            freqs_extra = sorted(images.keys())
-            _write_image_grid(doc, images, freqs_extra, antenna_name,
-                              group_name, extra_angles, img_width, 1,
-                              show_caption=show_caption)
+            flat = []
+            for freq in sorted(images.keys()):
+                v = images[freq]
+                bufs = v if isinstance(v, list) else [v]
+                for buf in bufs:
+                    cap = _make_caption(antenna_name, freq, group_name, extra_angles) if show_caption else ""
+                    flat.append((cap, buf))
+            _write_flat_grid(doc, flat, img_width, 1, show_caption=show_caption)
 
     # 避免覆盖: 同名文件自动加 _1, _2, ...
     base, ext = os.path.splitext(output_path)
@@ -217,87 +225,65 @@ def _add_cell_image(cell, img_buf: io.BytesIO, caption: str,
     run_img.add_picture(img_buf, width=width)
 
 
-def _write_image_grid(
+def _write_flat_grid(
     doc: Document,
-    images: dict[float, io.BytesIO],
-    freqs: list[float],
-    antenna_name: str,
-    group_name: str,
-    angles_str: str,
+    items: list[tuple[str, io.BytesIO]],
     img_width: object,
-    columns: int = 2,
+    columns: int,
     show_caption: bool = True,
 ) -> None:
-    """按频点排列图片，每行 N 列。"""
-    def _bufs(freq):
-        v = images.get(freq)
-        if v is None: return []
-        return v if isinstance(v, list) else [v]
+    """将扁平 (caption, buf) 列表按 columns 列排列 — 所有布局模式的公共底层。
 
-    if columns == 1:
-        for freq in freqs:
-            for buf in _bufs(freq):
-                cap = _make_caption(antenna_name, freq, group_name, angles_str) if show_caption else ""
-                _add_single_image(doc, buf, cap, width=img_width, show_caption=show_caption)
-    else:
-        for i in range(0, len(freqs), columns):
-            row_freqs = freqs[i:i + columns]
-            if len(row_freqs) == 1:
-                for buf in _bufs(row_freqs[0]):
-                    cap = _make_caption(antenna_name, row_freqs[0], group_name, angles_str) if show_caption else ""
-                    _add_single_image(doc, buf, cap, width=img_width, show_caption=show_caption)
-            else:
-                table = doc.add_table(rows=1, cols=len(row_freqs))
-                table.alignment = WD_TABLE_ALIGNMENT.CENTER
-                for j, freq in enumerate(row_freqs):
-                    for buf in _bufs(freq):
-                        cap = _make_caption(antenna_name, freq, group_name, angles_str) if show_caption else ""
-                        _add_cell_image(table.cell(0, j), buf, cap, width=img_width, show_caption=show_caption)
-                # 图片间不加空段 — 紧凑排列
+    columns 是独立参数，控制每行图片数量，与数据如何排序无关:
+      - columns=1 → 单列, 图片占整页宽
+      - columns=2 → 双列, 图片占半页宽
+    img_width 已由上层根据 col_width * image_width_pct% 算好。
+    """
+    for i in range(0, len(items), columns):
+        row_items = items[i:i + columns]
+        if len(row_items) == 1:
+            cap, buf = row_items[0]
+            _add_single_image(doc, buf, cap, width=img_width, show_caption=show_caption)
+        else:
+            table = doc.add_table(rows=1, cols=len(row_items))
+            table.alignment = WD_TABLE_ALIGNMENT.CENTER
+            for j, (cap, buf) in enumerate(row_items):
+                _add_cell_image(table.cell(0, j), buf, cap, width=img_width, show_caption=show_caption)
 
 
 def _write_by_freq(doc, ordered_groups, antenna_name, angles_str, img_width, columns, show_heading, show_caption):
-    """按频点布局: 每个频点展示该频点下的所有图表类型。"""
-    # 收集所有频点 + 所有图表类型
-    all_freqs = set()
-    for _, images in ordered_groups:
-        all_freqs.update(images.keys())
-    all_freqs = sorted(all_freqs)
+    """按频点布局: 先按频点 → 再按 group 排序, 每行 columns 张图。"""
+    # 收集所有图片, 附带排序键: (freq, group_index)
+    all_items: list[tuple[float, int, str, io.BytesIO]] = []
+    for gi, (group_name, images) in enumerate(ordered_groups):
+        for freq in sorted(images.keys()):
+            v = images[freq]
+            bufs = v if isinstance(v, list) else [v]
+            for buf in bufs:
+                all_items.append((freq, gi, group_name, buf))
+    all_items.sort(key=lambda x: (x[0], x[1]))  # freq asc, group order
 
-    group_names = [name for name, _ in ordered_groups]
+    flat: list[tuple[str, io.BytesIO]] = []
+    for freq, gi, group_name, buf in all_items:
+        cap = _make_caption(antenna_name, freq, group_name, angles_str) if show_caption else ""
+        flat.append((cap, buf))
 
-    for freq in all_freqs:
-        # 收集该频点的所有图片
-        freq_images = {}
-        for group_name, images in ordered_groups:
-            if freq in images:
-                freq_images[group_name] = {freq: images[freq]}
-
-        if not freq_images:
-            continue
-
-        # 用表格排列 (每行最多 columns 列)
-        entries = list(freq_images.items())
-        for i in range(0, len(entries), columns):
-            row_entries = entries[i:i + columns]
-            if len(row_entries) == 1:
-                gn, imgs = row_entries[0]
-                cap = _make_caption(antenna_name, freq, gn, angles_str) if show_caption else ""
-                _add_single_image(doc, imgs[freq], cap, width=img_width, show_caption=show_caption)
-            else:
-                table = doc.add_table(rows=1, cols=len(row_entries))
-                table.alignment = WD_TABLE_ALIGNMENT.CENTER
-                for j, (gn, imgs) in enumerate(row_entries):
-                    cap = _make_caption(antenna_name, freq, gn, angles_str) if show_caption else ""
-                    _add_cell_image(table.cell(0, j), imgs[freq], cap, width=img_width, show_caption=show_caption)
+    _write_flat_grid(doc, flat, img_width, columns, show_caption)
 
 
 def _write_by_type(doc, ordered_groups, antenna_name, angles_str, img_width, columns, show_heading, show_caption):
-    """按图表类型布局: 每种图表类型展示其所有频点的图片。"""
+    """按图表类型布局: 每种类型里按频点排序, 每行 columns 张图。"""
     for group_name, images in ordered_groups:
         if show_heading:
-            heading = doc.add_heading(group_name, level=1); heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            heading = doc.add_heading(group_name, level=1)
+            heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
-        freqs = sorted(images.keys())
-        _write_image_grid(doc, images, freqs, antenna_name, group_name,
-                          angles_str, img_width, columns, show_caption=show_caption)
+        flat: list[tuple[str, io.BytesIO]] = []
+        for freq in sorted(images.keys()):
+            v = images[freq]
+            bufs = v if isinstance(v, list) else [v]
+            for buf in bufs:
+                cap = _make_caption(antenna_name, freq, group_name, angles_str) if show_caption else ""
+                flat.append((cap, buf))
+
+        _write_flat_grid(doc, flat, img_width, columns, show_caption)

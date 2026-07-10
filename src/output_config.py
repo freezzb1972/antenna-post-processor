@@ -32,7 +32,7 @@ class OutputConfig:
     # ── Word 布局模式 ──
     # "by_type": 每频点同行 2 列 (左 Gain 右 AR)
     # "sequential":   先全部 Gain（前加 Heading1），再全部 AR（前加 Heading1）
-    word_layout_mode: str = "by_type"
+    word_layout_mode: str = "by_freq"
 
     # ── Word 图片尺寸 ──
     word_columns: int = 2                       # 列数: 1=单列, 2=双列
@@ -142,7 +142,7 @@ class OutputConfig:
         return cls(
             pk_theta_ranges=list(d.get("pk_theta_ranges", [])),
             antenna_name=str(d.get("antenna_name", "")),
-            word_layout_mode=str(d.get("word_layout_mode", "by_type")),
+            word_layout_mode=str(d.get("word_layout_mode", "by_freq")),
             word_columns=int(d.get("word_columns", 2)),
             word_image_width_pct=int(d.get("word_image_width_pct", 100)),
             fr_word_layout_mode=str(d.get("fr_word_layout_mode", "by_type")),
