@@ -142,6 +142,20 @@ class FileSettingsPage(QWidget):
             self._mw.ui.editOutputName.setText(v)
         self._local["output_name"] = v
 
+    @property
+    def _worksheet_naming_mode(self) -> int:
+        """工作表命名模式: 0=保留原模板工作表名, 1=用数据源名命名。
+        始终从 MainWindow 读取, 消除双重缓存。"""
+        if self._mw:
+            return getattr(self._mw, '_worksheet_naming_mode', 0)
+        return self._local.setdefault("worksheet_naming_mode", 0)
+
+    @_worksheet_naming_mode.setter
+    def _worksheet_naming_mode(self, value: int):
+        if self._mw:
+            self._mw._worksheet_naming_mode = value
+        self._local["worksheet_naming_mode"] = value
+
     # ── UI 构建 ──
 
     def _setup_ui(self):
@@ -419,7 +433,6 @@ class FileSettingsPage(QWidget):
         """初始化本地状态（无 MainWindow 时使用）。"""
         self._local: dict = {}
         self._file_entries: List[FileEntry] = []
-        self._worksheet_naming_mode: int = 0
         from src.config_manager import get_config_manager
         self._cfg = get_config_manager()
         self._load_azimuth_state()
@@ -615,7 +628,6 @@ class FileSettingsPage(QWidget):
         if not self._mw:
             return
         self._file_entries = list(getattr(self._mw, '_file_entries', []))
-        self._worksheet_naming_mode = getattr(self._mw, '_worksheet_naming_mode', 0)
         # 刷新 UI
         self._refresh_data_file_ui()
 
@@ -1345,10 +1357,7 @@ class FileSettingsPage(QWidget):
             self._file_entries[row].test_mode = combo.currentData()
 
     def _on_naming_mode_changed(self, index: int):
-        data = self._cmb_naming_mode.currentData() or 0
-        self._worksheet_naming_mode = data
-        if self._mw:
-            self._mw._worksheet_naming_mode = data
+        self._worksheet_naming_mode = self._cmb_naming_mode.currentData() or 0
         self._on_auto_match()
 
     def _on_auto_match(self):

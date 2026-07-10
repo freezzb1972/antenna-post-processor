@@ -165,6 +165,28 @@ def _process_one_frequency(
     extra = extra_params or set()
     compute_set = need | extra  # 实际计算: 模板需求 + 用户额外
 
+    # 角度域标准化: phi∈[0,360), theta∈[0,180]
+    _pa = raw.get("_phi_angles")
+    if _pa is not None:
+        _pa = np.asarray(_pa, dtype=np.float64)
+        phi_mask = _pa < 360.0
+        if not np.all(phi_mask):
+            theta_lm = theta_lm[phi_mask, :]
+            phi_lm = phi_lm[phi_mask, :]
+            for _k in ("theta_phase", "phi_phase"):
+                if _k in raw and raw[_k] is not None:
+                    raw[_k] = raw[_k][phi_mask, :]
+            _pa = _pa[phi_mask]
+            raw["_phi_angles"] = _pa
+    theta_mask = theta_deg <= 180.0
+    if not np.all(theta_mask):
+        theta_lm = theta_lm[:, theta_mask]
+        phi_lm = phi_lm[:, theta_mask]
+        for _k in ("theta_phase", "phi_phase"):
+            if _k in raw and raw[_k] is not None:
+                raw[_k] = raw[_k][:, theta_mask]
+        theta_deg = theta_deg[theta_mask]
+
     need_extrap = theta_extrap_method is not None and theta_deg[-1] < 175
     if need_extrap:
         theta_orig = theta_deg.copy()
@@ -440,7 +462,8 @@ def _process_one_frequency(
             # 确保 chart_config 不为 None（纯 azimuth 模式时 ChartConfig 可能为 None）
             ccfg = chart_config if chart_config is not None else ChartConfig()
             n_phi = phi_lm.shape[0]
-            phi_angles = np.linspace(0, 360, n_phi, endpoint=False)
+            _pa = raw.get("_phi_angles")
+            phi_angles = np.array(_pa, dtype=np.float64) if _pa else np.arange(n_phi, dtype=np.float64)
             # AR 线性值（如果需要 3D AR 或 方位面 AR）
             ar_lin = None
             need_ar_for_graphics = (
@@ -770,11 +793,31 @@ def _load_and_compute(
     _log(log_callback, f"📂 读取 {total} 个频点数据...")
     _report(progress_callback, 0, progress_max, f"[📂] 读取源文件 0/{len(tasks)}")
     compute_tasks = []
+    _phi_warned = False
     for i, (sheet_name, freq, csv_idx, lag_cfg, task_ds, needed_params) in enumerate(tasks):
         if cancel_callback and cancel_callback():
             break
         raw = task_ds.read_sections(csv_idx)
         theta_list = list(task_ds.theta_angles)
+        phi_list = list(task_ds.phi_angles) if hasattr(task_ds, 'phi_angles') else []
+        raw["_phi_angles"] = phi_list if phi_list else None
+        # 检测 phi 轴完整性 (仅警告一次)
+        if not _phi_warned and len(phi_list) >= 2:
+            _phi_warned = True
+            _over = [p for p in phi_list if p >= 360.0]
+            _valid = [p for p in phi_list if p < 360.0]
+            _dphi = phi_list[1] - phi_list[0]
+            if _over:
+                _log(log_callback,
+                     f"⚠ phi 轴超出 360°: {len(_over)} 个冗余点 ({_over[0]:.1f}~{_over[-1]:.1f}°), "
+                     f"已自动裁剪, 保留 {len(_valid)} 点")
+            if _valid:
+                _expect = _valid[-1] + _dphi  # 最后角 + 步进 应≈360
+                if abs(_expect - 360.0) > _dphi * 0.5:
+                    _log(log_callback,
+                         f"⚠ phi 轴不完整: {len(_valid)} 点, "
+                         f"最后角={_valid[-1]:.1f}° + 步进={_dphi:.1f}° = {_expect:.1f}° "
+                         f"(应≈360°), Directivity/AR/LAG 可能偏小")
         ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
         compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, theta_extrap_method, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, output_config, compute_only))
         _report(progress_callback, i + 1, progress_max, f"[📂] 读取源文件 {i+1}/{total}")
@@ -792,6 +835,7 @@ def _load_and_compute(
     )
     if parallel > 1 and len(compute_tasks) > 1:
         _log(log_callback, f"并行计算: {parallel} 进程 × {len(compute_tasks)} 频点")
+        _report(progress_callback, data_done, progress_max, "[🧮] 启动并行引擎...")
         # chunk_size=1 → 每任务独立 future, 逐任务报告进度
         chunks = [compute_tasks[i:i + 1] for i in range(0, len(compute_tasks), 1)]
         with ProcessPoolExecutor(max_workers=parallel) as executor:
@@ -1103,7 +1147,8 @@ def run_pipeline(
         _export_ok = _export_azimuth(sheet_results, output_config, log_callback,
                         out_word=out_word, out_data=out_data,
                         word_template_path=word_template_path,
-                        chart_instances=chart_instances)
+                        chart_instances=chart_instances,
+                        chart_config_obj=chart_config_obj)
         _report(progress_callback, progress_max, progress_max, "[✅] 完成")
     else:
         _report(progress_callback, progress_max, progress_max, "[✅] 完成")
@@ -1175,6 +1220,7 @@ def _export_azimuth(
     out_data: bool = True,
     word_template_path: str | None = None,
     chart_instances: list | None = None,
+    chart_config_obj: ChartConfig | None = None,
 ):
     """从处理结果中收集方位面图片和中间数据，写入 Word 和 Excel。
 

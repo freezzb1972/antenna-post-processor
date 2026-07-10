@@ -178,6 +178,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._update_lag_display()
         self._init_menu()
         self._hide_settings_tabs()
+        # 默认页面设为「处理设置」
+        self.ui.tabConfig.setCurrentIndex(0)
         # 基础 QSS = 主题(已去字号) + 自定义样式; ScaleManager 动态叠加
         self._theme_qss = self.app.styleSheet()
         self.set_base_qss(self._theme_qss + self._custom_qss)
@@ -1519,18 +1521,15 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         valid_paths = set(self._data_file_paths)
         for m in getattr(self, '_last_matches', []):
             fp = m.file_path or ""
-            if combo:
-                fp = combo.currentData() or ""
-                if fp and fp != "—" and fp not in valid_paths:
-                    # 此匹配表行引用了不存在于 _data_file_paths 的旧文件 → 重置
-                    combo.setCurrentIndex(0)
+            if fp and fp != "—" and fp not in valid_paths:
+                # 此匹配表行引用了不存在于 _data_file_paths 的旧文件 → 重置
+                m.file_path = ""
 
         # 已匹配的行
         matched_files = set()
         for m in getattr(self, '_last_matches', []):
             template_sheet_name = m.sheet_name
             fp = m.file_path or ""
-            fp = combo.currentData() or "" if combo else ""
             if fp and Path(fp).exists():
                 if progress_callback:
                     file_idx += 1
@@ -2447,7 +2446,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 self.tr("没有有效的工作表↔文件匹配，请先执行自动匹配。"))
             self._restore_start_button()
             return
-        self._log(f"多源模式: {len(datasource_map)} 个工作表")
+        self._log(f"多源模式: {len(datasource_map)} 个工作表 (命名模式={self._worksheet_naming_mode}, 0=模板原名, 1=数据源名)")
         for sn, ds in datasource_map.items():
             self._log(f"  {sn} ← {type(ds).__name__}")
 
@@ -2566,7 +2565,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._thread.finished.connect(self._thread.deleteLater)
 
         self._thread.start()
-        self._log(self.tr(f"▶ 开始处理"))
+        self._log(self.tr(f"▶ 开始处理 (命名模式={self._worksheet_naming_mode}, 0=模板原名, 1=数据源名)"))
         self._log(self.tr(f"  模板: {template_path}"))
         self._log(self.tr(f"  输出: {output_path}"))
         if full_report_path:
