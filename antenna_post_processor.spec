@@ -60,6 +60,9 @@ a = Analysis(
         # ---- requests (CloudRenderer) ----
         'requests',
 
+        # ---- multiprocessing (ProcessPoolExecutor 并行计算) ----
+        'multiprocessing',
+
         # ---- openpyxl ----
         'openpyxl.cell._writer',
 

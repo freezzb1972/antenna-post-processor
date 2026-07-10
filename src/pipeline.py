@@ -482,6 +482,12 @@ def _process_one_frequency(
                     row["_images"] = images
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
+            # 存储图表原始数据矩阵供中间数据审查用（始终存储，不受 compute_only 限制）
+            row["_chart_gain_dbi"] = gain_dbi.copy()
+            row["_chart_theta_deg"] = theta_deg.copy()
+            row["_chart_phi_deg"] = phi_angles.copy()
+            if ar_lin is not None:
+                row["_chart_ar_db"] = 20.0 * np.log10(np.maximum(ar_lin, 1e-15))
             # Theta 范围峰值中间数据 (替代硬编码 70°)
             if output_config and output_config.pk_theta_ranges:
                 for t_max in output_config.pk_theta_ranges:
@@ -777,6 +783,13 @@ def _load_and_compute(
     _report(progress_callback, data_done, progress_max, f"[🧮] 计算参数 0/{len(compute_tasks)}")
 
     # ── 阶段 2: 计算天线参数 ──
+    # 是否真的会渲染图表 (与 _process_one_frequency 的渲染门保持一致)。
+    # 无图表配置且无方位面时不渲染，进度也不应显示"渲染图表"步骤。
+    _will_render = (
+        ((chart_config is not None and chart_config.has_any_pattern_or_cut)
+         or (output_config is not None and output_config.has_any_azimuth))
+        and not compute_only
+    )
     if parallel > 1 and len(compute_tasks) > 1:
         _log(log_callback, f"并行计算: {parallel} 进程 × {len(compute_tasks)} 频点")
         # chunk_size=1 → 每任务独立 future, 逐任务报告进度
@@ -795,9 +808,10 @@ def _load_and_compute(
                 step = data_done + int(_calc_w * completed / len(compute_tasks))
                 _report(progress_callback, step, progress_max,
                         f"[🧮] 计算参数 {completed}/{len(compute_tasks)}")
-                rstep = data_done + _calc_w + int(_render_w * completed / len(compute_tasks))
-                _report(progress_callback, rstep, progress_max,
-                        f"[🎨] 渲染图表 {completed}/{len(compute_tasks)}")
+                if _will_render:
+                    rstep = data_done + _calc_w + int(_render_w * completed / len(compute_tasks))
+                    _report(progress_callback, rstep, progress_max,
+                            f"[🎨] 渲染图表 {completed}/{len(compute_tasks)}")
     else:
         _run_compute_serial(compute_tasks, sheet_results, data_done, progress_max,
                             cancel_callback, progress_callback, log_cb=log_callback,
@@ -999,8 +1013,8 @@ def run_pipeline(
             _log(log_callback, f"自动检测到 {total_angles} 个 AR 角度 (来自 {len(sheet_ar_configs)} 个 sheet)")
 
     # ---- 2. 预览缓存: 非 compute_only 时尝试加载缓存跳过计算 ----
-    if not compute_only and output_path:
-        cached = _load_preview_cache(output_path, template_path)
+    if not compute_only:
+        cached = _load_preview_cache(output_config, output_path, template_path)
         if cached is not None:
             _log(log_callback, "📦 复用预览缓存数据, 跳过计算")
             sheet_results = cached
@@ -1034,7 +1048,7 @@ def run_pipeline(
     # ── compute_only 模式下跳过所有导出步骤 ──
     if compute_only:
         # 保存预览缓存（不含图片 bytes，供下次导出复用）
-        _save_preview_cache(sheet_results, output_path, template_path)
+        _save_preview_cache(sheet_results, output_config, output_path, template_path)
         _log(log_callback, "⏭ 预览模式 — 跳过 Excel/Word/报告导出")
         elapsed = time.time() - t0
         total_rows = sum(len(v) for v in sheet_results.values())
@@ -1083,9 +1097,10 @@ def run_pipeline(
         )
 
     # ── 阶段 5: 输出 Word 图表报告 ──
+    _export_ok = True  # 跟踪导出是否全部成功
     if out_word or out_data:
         _report(progress_callback, _base + _export_w, progress_max, "[📄] 输出 Word 图表报告...")
-        _export_azimuth(sheet_results, output_config, log_callback,
+        _export_ok = _export_azimuth(sheet_results, output_config, log_callback,
                         out_word=out_word, out_data=out_data,
                         word_template_path=word_template_path,
                         chart_instances=chart_instances)
@@ -1096,6 +1111,10 @@ def run_pipeline(
     elapsed = time.time() - t0
     total_rows = sum(len(v) for v in sheet_results.values())
     _log(log_callback, f"✓ 完成: {total_rows} 行, {elapsed:.1f}s")
+
+    # 导出成功后清除预览缓存（失败时保留供重试）
+    if _export_ok:
+        _delete_preview_cache(output_config, output_path)
 
     return sheet_results
 
@@ -1170,33 +1189,50 @@ def _export_azimuth(
     from .chart_word_writer import write_chart_word_report
 
     # ── 收集所有图片和中间数据 ──
+    _word_ok = True   # Word 导出是否成功（供调用方决定是否清理缓存）
+    _data_ok = True   # 中间数据导出是否成功
     image_groups: dict[str, dict[float, io.BytesIO]] = {}
-    freq_gain_vs_theta: dict[float, list[tuple[float, np.ndarray]]] = {}  # {t_max: [(freq, values)]}
 
 
-    # 图片类型 → 用户可读组名
+    # ── 从 chart_instances 构建 image_key → label 映射 (主数据源) ──
+    # chart_plan.py 已为每个 ChartInstance 生成了正确的 label 和 image_key,
+    # 此处直接使用, 避免在 pipeline 中重复硬编码标签逻辑.
+    _image_key_to_label: dict[str, str] = {}
+    if chart_instances:
+        for ci in chart_instances:
+            if ci.enabled and ci.image_key:
+                _image_key_to_label[ci.image_key] = ci.label
+
+    # 图片类型 → 用户可读组名 (仅作回退, 主数据源是 _image_key_to_label)
     def _label_for_image_key(img_key: str) -> str:
-        """将 image key 映射为 Word 标题 — 使用 ChartConfig.chart_labels() 作为唯一标签源。"""
+        """将 image key 映射为 Word 标题。
+
+        优先使用 chart_instances 中的 label (由 chart_plan 生成, 非硬编码),
+        回退逻辑仅处理无 instance 的图片 (如 PK theta 范围峰值).
+        """
+        # 主数据源: chart_instances
+        if img_key in _image_key_to_label:
+            return _image_key_to_label[img_key]
+
+        # ── 回退: 无 instance 的图片 ──
+        import re
+
+        # PK theta 范围峰值: azimuth_polar_pk_70 → "PK Gain (θ=0°-70°)"
+        m = re.match(r'azimuth_polar_pk_(\d+)', img_key)
+        if m:
+            t_max = m.group(1)
+            return f"PK Gain (θ=0°-{t_max}°)"
+
+        # 3D 多视角: 3d_gain_v0, 3d_eirp_v1 等
         from .chart_config import ChartConfig
         _LABELS = ChartConfig.chart_labels()
-
-        # image key 前缀 → ChartConfig 字段 key
-        _PREFIX_MAP = {
-            "2d_polar_": "cut_2d_polar", "2d_rect_": "cut_2d_rect",
-            "azimuth_polar_": "cut_azimuth_polar", "azimuth_rect_": "cut_azimuth_rect",
-        }
-        for prefix, chart_key in _PREFIX_MAP.items():
-            if img_key.startswith(prefix):
-                return _LABELS.get(chart_key, img_key)
-
-        # 3D 多视角: 3d_gain_v0 → pattern_3d_gain
         if "_v" in img_key:
             base = img_key.rsplit("_v", 1)[0]
             for ck in ("pattern_3d_gain", "pattern_3d_eirp", "pattern_3d_ar"):
                 if img_key.startswith(ck):
                     return _LABELS.get(ck, img_key)
 
-        # 精确匹配
+        # 精确匹配 chart_labels
         for ck in _LABELS:
             if img_key == ck or img_key.startswith(ck):
                 return _LABELS[ck]
@@ -1244,7 +1280,19 @@ def _export_azimuth(
                     image_groups[label][freq] = buf
                 _total_imgs += 1
     if _total_imgs == 0:
-        _log(log_callback, "  ⚠ 未收集到任何图片 — 检查 chart_config 和 _enabled_keys 过滤")
+        # 诊断: 检查第一行看 _images 是否存在
+        _sample_row = None
+        for _sn, _rows in sheet_results.items():
+            if _rows:
+                _sample_row = _rows[0]; break
+        _has_images_key = "_images" in (_sample_row or {})
+        _imgs_val = _sample_row.get("_images", "N/A") if _sample_row else "N/A"
+        _has_error = _sample_row.get("_error", "") if _sample_row else ""
+        _log(log_callback,
+             f"  ⚠ 未收集到图片 — _images_key={_has_images_key}, "
+             f"imgs_count={len(_imgs_val) if isinstance(_imgs_val, dict) else _imgs_val}, "
+             f"chart_has_c={getattr(chart_config_obj, 'has_any_c_class', '?') if chart_config_obj else '?'}, "
+             f"error={_has_error}")
 
     # ── B 类: 频点曲线 PNG (Word 报告), 按 ChartInstance 驱动 ──
     _B_CHART_TO_PARAM = {
@@ -1324,51 +1372,30 @@ def _export_azimuth(
                 except Exception:
                     pass
 
-    # ── 中间数据收集 ──
+    # ── 中间数据收集: 保存图表原始数据矩阵供审查验证 ──
+    _chart_data: list[dict[str, Any]] = []  # [{freq, sheet, theta, phi, gain_dbi, ar_db}]
     for sheet_name, rows in sheet_results.items():
         for row in rows:
             freq = row.get("frequency")
             if freq is None: continue
-            gain_dbi = row.get("_azimuth_gain_dbi")
-            ar_db_v = row.get("_azimuth_ar_db")
-            theta_deg_arr = row.get("_azimuth_theta_deg")
-            if gain_dbi is not None and theta_deg_arr is not None and output_config and []:
-                gd = {}
-                for angle in output_config.angles_sorted:
-                    idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
-                    nearest = float(theta_deg_arr[idx])
-                    gd[nearest] = gain_dbi[:, idx].copy()
-            if ar_db_v is not None and theta_deg_arr is not None and output_config and []:
-                ad = {}
-                for angle in output_config.angles_ar_sorted:
-                    idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
-                    nearest = float(theta_deg_arr[idx])
-                    ad[nearest] = ar_db_v[:, idx].copy()
-            rhcp_db_v = row.get("_azimuth_rhcp_db")
-            if rhcp_db_v is not None and theta_deg_arr is not None and output_config and []:
-                rd = {}
-                for angle in output_config.angles_rhcp_sorted:
-                    idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
-                    nearest = float(theta_deg_arr[idx])
-                    rd[nearest] = rhcp_db_v[:, idx].copy()
-            lhcp_db_v = row.get("_azimuth_lhcp_db")
-            if lhcp_db_v is not None and theta_deg_arr is not None and output_config and []:
-                ld = {}
-                for angle in output_config.angles_lhcp_sorted:
-                    idx = int(np.argmin(np.abs(theta_deg_arr - angle)))
-                    nearest = float(theta_deg_arr[idx])
-                    ld[nearest] = lhcp_db_v[:, idx].copy()
-            # Theta 范围峰值中间数据 (每 phi 的 Theta 范围峰值)
-            if output_config and output_config.pk_theta_ranges:
-                for t_max in output_config.pk_theta_ranges:
-                    pk_db = row.get(f"_gain_pk_{int(t_max)}_db")
-                    if pk_db is not None and freq is not None:
-                        freq_gain_vs_theta.setdefault(t_max, []).append((freq, pk_db.copy()))
+            entry = {"sheet": sheet_name, "freq": freq}
+            for key in ("_chart_gain_dbi", "_chart_ar_db", "_chart_theta_deg", "_chart_phi_deg"):
+                v = row.get(key)
+                if v is not None:
+                    entry[key] = v
+            if len(entry) > 2:  # 至少有一项数据
+                _chart_data.append(entry)
 
 
     # ── Write Word: 统一输出所有图表到 Word ──
+    def _count_images(v: dict) -> int:
+        """统计一组图片的实际张数（值可能是 BytesIO 或 list[BytesIO]）."""
+        n = 0
+        for buf in v.values():
+            n += len(buf) if isinstance(buf, list) else 1
+        return n
     _log(log_callback, f"  📊 收集到 {len(image_groups)} 组图片"
-         + (f" ({sum(len(v) for v in image_groups.values())} 张)" if image_groups else ""))
+         + (f" ({sum(_count_images(v) for v in image_groups.values())} 张)" if image_groups else ""))
     if not out_word:
         pass  # 用户未请求 Word 输出
     elif not image_groups:
@@ -1390,7 +1417,7 @@ def _export_azimuth(
                     _label_order = [ci.label for ci in sorted(chart_instances, key=lambda x: x.sort_order) if ci.enabled]
                 else:
                     _label_order = list(image_groups.keys())
-                write_chart_word_report(
+                saved_path = write_chart_word_report(
                     image_groups, word_path,
                     antenna_name=az.antenna_name if az else "",
                     label_order=_label_order,
@@ -1400,75 +1427,49 @@ def _export_azimuth(
                     show_heading=getattr(az, 'show_heading', False) if az else False,
                     show_caption=getattr(az, 'show_caption', False) if az else False,
                 )
-                total_imgs = sum(len(v) for v in image_groups.values())
-                _log(log_callback, f"  ✓ Word 报告已保存 ({len(image_groups)} 组, {total_imgs} 张图)")
+                total_imgs = sum(_count_images(v) for v in image_groups.values())
+                _log(log_callback, f"  ✓ Word 报告已保存: {saved_path} ({len(image_groups)} 组, {total_imgs} 张图)")
             except Exception as e:
                 _log(log_callback, f"  ✗ Word 报告生成失败: {e}")
+                _word_ok = False
 
 
-    # ── 中间数据: 单文件多 sheet (按启用的图表类型) ──
-    if out_data:
+    # ── 中间数据: 保存图表原始数据矩阵供审查验证 ──
+    if out_data and _chart_data:
         data_path = output_config.data_output_path if output_config else ""
         if not data_path:
-            data_path = ""
-        # 收集启用的图表类型 → 数据映射
-        data_sheets = {}
-        if output_config:
-            for t_max, pk_data in freq_gain_vs_theta.items():
-                data_sheets[f"Gain 0-{int(t_max)} Pk"] = [("phi_matrix", pk_data)]
-        if data_sheets:
-            if not data_path:
-                gdir = getattr(output_config, 'data_output_dir', '') if output_config else ''
-                gfn = getattr(output_config, 'data_output_filename', '') if output_config else ''
-                if gdir and gfn:
-                    data_path = str(Path(gdir) / gfn)
-            if data_path:
-                _log(log_callback, f"中间数据: {data_path}")
+            gdir = getattr(output_config, 'data_output_dir', '') if output_config else ''
+            gfn = getattr(output_config, 'data_output_filename', '') if output_config else ''
+            if gdir and gfn:
+                data_path = str(Path(gdir) / gfn)
+        if data_path:
+            _log(log_callback, f"中间数据: {data_path}")
+            try:
+                import openpyxl as _xl
+                wb = _xl.Workbook(); wb.remove(wb.active)
+                for entry in _chart_data:
+                    sn = str(entry.get("sheet", "data"))[:31]
+                    freq_str = f"{entry['freq']:.0f}MHz"
+                    theta = entry.get("_chart_theta_deg")
+                    phi = entry.get("_chart_phi_deg")
+                    if theta is None or phi is None:
+                        continue
+                    # Gain sheet: 每个频点一个 data block (phi × theta)
+                    if "_chart_gain_dbi" in entry:
+                        _write_matrix_block(wb, f"Gain_{sn}", freq_str, entry["_chart_gain_dbi"], phi, theta)
+                    # AR sheet
+                    if "_chart_ar_db" in entry:
+                        _write_matrix_block(wb, f"AR_{sn}", freq_str, entry["_chart_ar_db"], phi, theta)
+                wb.save(data_path); wb.close()
+                _log(log_callback, f"  ✓ 中间数据已保存 ({len(_chart_data)} 个频点)")
+            except Exception as e:
+                _log(log_callback, f"  ✗ 中间数据导出失败: {e}")
+                _data_ok = False
+    elif out_data and not _chart_data:
+        _log(log_callback, "  ⚠ 中间数据为空 — 未生成图表或数据缺失")
 
-                def _write_data_sheet(wb, sheet_name, freq_data):
-                    """在 workbook 中添加一个数据 sheet (每频点一个 block)。"""
-                    ws = wb.create_sheet(sheet_name[:31])
-                    next_row = 1
-                    for freq_mhz, theta_data in freq_data:
-                        sorted_thetas = sorted(theta_data.keys())
-                        n_phi = len(next(iter(theta_data.values())))
-                        ws.cell(row=next_row, column=1,
-                                value=f"Frequency: {freq_mhz:.1f} MHz")
-                        next_row += 1
-                        r0 = next_row
-                        ws.cell(row=r0, column=1, value="Theta (°) \\ Phi (°)")
-                        for pi in range(n_phi):
-                            ws.cell(row=r0, column=pi + 2, value=pi)
-                        for ti, theta_val in enumerate(sorted_thetas):
-                            crow = r0 + 1 + ti
-                            ws.cell(row=crow, column=1, value=f"{theta_val:.1f}")
-                            for pi in range(n_phi):
-                                ws.cell(row=crow, column=pi + 2,
-                                        value=round(float(theta_data[theta_val][pi]), 6))
-                        next_row = r0 + len(sorted_thetas) + 1
-
-                try:
-                    import openpyxl as _xl
-                    wb = _xl.Workbook(); wb.remove(wb.active)
-                    for sheet_name, fd in data_sheets.items():
-                        if not fd: continue
-                        if "Pk" in sheet_name and fd:
-                            ws = wb.create_sheet(sheet_name)
-                            _, pk_data = fd[0]
-                            ws.cell(1, 1, "Phi (°)")
-                            for ci, (f, _) in enumerate(pk_data):
-                                ws.cell(1, ci + 2, f"{f:.1f} MHz")
-                            n_phi = len(pk_data[0][1])
-                            for pi in range(n_phi):
-                                ws.cell(pi + 2, 1, pi)
-                                for ci, (_, vals) in enumerate(pk_data):
-                                    ws.cell(pi + 2, ci + 2, round(float(vals[pi]), 6))
-                        else:
-                            _write_data_sheet(wb, sheet_name, fd)  # noqa: F821
-                    wb.save(data_path); wb.close()
-                    _log(log_callback, f"  ✓ 中间数据已保存 ({len(data_sheets)} sheets)")
-                except Exception as e:
-                    _log(log_callback, f"  ✗ 中间数据导出失败: {e}")
+    # 返回导出是否全部成功（供调用方决定是否清理缓存）
+    return _word_ok and _data_ok
 
 
 # ---------------------------------------------------------------------------
@@ -1546,19 +1547,25 @@ def _compute_chunk(
 # ═══════════════════════════════════════════════════════════════
 # 预览缓存: compute_only 时保存 → 导出时复用
 # ═══════════════════════════════════════════════════════════════
+# 预览缓存 (预览时保存 → 导出时复用 → 导出后自动删除)
+# ═══════════════════════════════════════════════════════════════
 
-def _cache_path(output_path: str) -> str:
-    """预览缓存文件路径。"""
-    return output_path.replace(".xlsx", "") + ".preview_cache.pkl"
+def _cache_path(output_config, output_path: str) -> str | None:
+    """预览缓存文件路径。优先用 Excel 输出路径, 其次 Word 输出路径。"""
+    if output_path:
+        return output_path.replace(".xlsx", "") + ".preview_cache.pkl"
+    if output_config and output_config.chart_output_path:
+        return output_config.chart_output_path + ".preview_cache.pkl"
+    return None
 
 
-def _save_preview_cache(sheet_results, output_path, template_path):
+def _save_preview_cache(sheet_results, output_config, output_path, template_path):
     """保存预览缓存 (不含图片 bytes, 不含渲染结果)。"""
     import pickle
-    if not output_path:
+    cache_file = _cache_path(output_config, output_path)
+    if not cache_file:
         return
     try:
-        cache_file = _cache_path(output_path)
         # 只保存数值数据, 去掉 _images (bytes 无法 pickle 或太大)
         clean = {}
         for name, rows in sheet_results.items():
@@ -1578,20 +1585,75 @@ def _save_preview_cache(sheet_results, output_path, template_path):
         pass  # 缓存保存失败不阻塞
 
 
-def _load_preview_cache(output_path, template_path):
-    """加载预览缓存, 如果模板匹配则返回 sheet_results, 否则返回 None。"""
+def _load_preview_cache(output_config, output_path, template_path):
+    """加载预览缓存, 验证模板未变, 返回 sheet_results 或 None。"""
     import pickle
-    if not output_path:
-        return None
-    cache_file = _cache_path(output_path)
-    if not os.path.exists(cache_file):
+    cache_file = _cache_path(output_config, output_path)
+    if not cache_file or not os.path.exists(cache_file):
         return None
     try:
         with open(cache_file, 'rb') as f:
             data = pickle.load(f)
-        # 模板路径必须匹配
         if data.get("template_path") != template_path:
             return None
         return data.get("sheet_results", {})
     except Exception:
         return None
+
+
+def _delete_preview_cache(output_config, output_path):
+    """导出完成后删除预览缓存。"""
+    cache_file = _cache_path(output_config, output_path)
+    if cache_file and os.path.exists(cache_file):
+        try:
+            os.remove(cache_file)
+        except Exception:
+            pass
+
+
+def _write_matrix_block(wb, sheet_name: str, freq_label: str,
+                        matrix: np.ndarray, phi_deg: np.ndarray,
+                        theta_deg: np.ndarray) -> None:
+    """向 workbook 写入一个频点的数据矩阵 (phi × theta)。
+
+    格式:
+      Frequency: 1154 MHz
+              Theta:  -180.0  -178.0  ...  179.0
+      Phi   0:         val     val   ...   val
+      Phi   1:         val     val   ...   val
+    """
+    truncated = sheet_name[:31]
+    if truncated in wb.sheetnames:
+        ws = wb[truncated]
+        # 检测截断碰撞: 若已有 sheet 来自不同的完整名称, 追加序号避免数据混淆
+        _existing_full = getattr(ws, '_full_sheet_name', '')
+        if _existing_full and _existing_full != sheet_name:
+            n = 2
+            while f"{truncated}_{n}" in wb.sheetnames:
+                n += 1
+            truncated = f"{truncated}_{n}"
+            ws = wb.create_sheet(truncated)
+    else:
+        ws = wb.create_sheet(truncated)
+    ws._full_sheet_name = sheet_name  # 标记完整名称供碰撞检测
+    # 找到下一个可用行: 在已有数据后面追加
+    next_row = ws.max_row + 1
+    if ws.max_row == 1 and ws.cell(1, 1).value is None:
+        next_row = 1
+    # 空行分隔
+    if next_row > 1:
+        next_row += 1
+    ws.cell(row=next_row, column=1, value=f"Frequency: {freq_label}")
+    next_row += 1
+    # 表头行: Theta 角度
+    ws.cell(row=next_row, column=1, value="Phi \\ Theta (°)")
+    for ci, tv in enumerate(theta_deg):
+        ws.cell(row=next_row, column=ci + 2, value=round(float(tv), 1))
+    next_row += 1
+    # 数据行: 每行一个 phi
+    n_phi, n_theta = matrix.shape
+    for pi in range(min(n_phi, len(phi_deg))):
+        ws.cell(row=next_row + pi, column=1, value=round(float(phi_deg[pi]), 1))
+        for ti in range(min(n_theta, len(theta_deg))):
+            ws.cell(row=next_row + pi, column=ti + 2,
+                    value=round(float(matrix[pi, ti]), 6))
