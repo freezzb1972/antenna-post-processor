@@ -242,6 +242,9 @@ class FileSettingsPage(QWidget):
         ds.btn_clear_all.clicked.connect(self._on_clear_all_files)
         ds.btn_auto_match.clicked.connect(self._on_auto_match)
         ds.cmb_naming_mode.currentIndexChanged.connect(self._on_naming_mode_changed)
+        # 信号在 addItem 之后才连接, 遗失构造期间的 currentIndexChanged, 手动同步
+        if self._mw:
+            self._mw._worksheet_naming_mode = ds.cmb_naming_mode.currentData() or 0
 
         # 多天线确认按钮
         ds.btn_multi_antenna = QPushButton(self.tr("📡 多天线确认..."))
@@ -2962,7 +2965,7 @@ class ChartSettingsPage(QWidget):
         hdr_l = QHBoxLayout()
         hdr_l.addWidget(QLabel(self.tr("测试报告")))
         self._check_test_report_enable = QCheckBox(self.tr("启用"))
-        self._check_test_report_enable.setChecked(True)
+        self._check_test_report_enable.setChecked(False)  # 默认空: 只加载模板不出图; 勾图表后自动启用
         self._check_test_report_enable.toggled.connect(self._on_test_report_toggled)
         hdr_l.addWidget(self._check_test_report_enable)
         hdr_l.addStretch()
@@ -3358,6 +3361,17 @@ class ChartSettingsPage(QWidget):
             return
         from src.chart_config import ChartConfig
         mw = self._mw
+
+        # 勾选任何图表 → 自动启用对应报告(测试/额外), 联动输出勾选(via toggled handler)。
+        # 未勾任何图表则不动"启用", 由用户自行控制取消。
+        if hasattr(self, '_check_test_report_enable') \
+                and any(cb.isChecked() for cb in self._chart_required.values()) \
+                and not self._check_test_report_enable.isChecked():
+            self._check_test_report_enable.setChecked(True)  # → _on_test_report_toggled 勾 测试报告(.docx)
+        if hasattr(self, '_check_full_report_enable') \
+                and any(cb.isChecked() for cb in self._chart_extra.values()) \
+                and not self._check_full_report_enable.isChecked():
+            self._check_full_report_enable.setChecked(True)
 
         # 模式变更 → 自动刷新图表分类 (跳过首次初始化)
         new_mode = getattr(mw, '_test_mode', 0)

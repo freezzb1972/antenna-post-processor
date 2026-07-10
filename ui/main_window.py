@@ -130,7 +130,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._last_matches: list = []        # 工作表-文件匹配结果
         self._chart_instances: list = []     # 图表实例列表 (ChartInstance)
         self._full_report_enabled: bool = False  # full_report 计算/输出开关
-        self._test_report_enabled: bool = True   # 测试报告(required)图表总开关
+        self._test_report_enabled: bool = False  # 测试报告(required)图表总开关; 默认空, 勾图表后自动启用
         self._required_params: set = set()   # 用户确认的报告必需参数
         self._extra_params: set = set()      # 用户额外选择的计算参数
         self._dir_extrap_method: str = "linear"  # Directivity 外推算法
@@ -2335,7 +2335,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 报告启用开关 (总闸门): 未启用的报告, 其图表不参与渲染/输出。
         # 模板自动识别会同时勾选测试报告列和额外报告列, 故必须按启用开关门控,
         # 否则用户即使关闭"启用"开关, 自动识别的图表仍会被渲染 (耗时且非预期)。
-        test_enabled = bool(getattr(self, '_test_report_enabled', True))
+        test_enabled = bool(getattr(self, '_test_report_enabled', False))
         extra_enabled = (bool(getattr(self, '_full_report_enabled', False))
                          or bool(file_page and hasattr(file_page, '_check_full_report')
                                  and file_page._check_full_report.isChecked()))
