@@ -631,6 +631,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                         ant = self._antenna_configs[name]
                         if fe.path not in ant.data_files:
                             ant.data_files.append(fe.path)
+        # 剪除不在当前文件列表中的残留天线配置。
+        # 防陈旧数据: _antenna_configs 只增不删会残留旧文件的天线, 使 len>1 → 一键出报告
+        # 误走多天线模式, 把旧天线也跑一遍("又跑一次")。
+        for stale in [n for n in self._antenna_configs if n not in seen]:
+            del self._antenna_configs[stale]
+        if self._current_antenna_name and self._current_antenna_name not in self._antenna_configs:
+            self._current_antenna_name = next(iter(self._antenna_configs), None)
         # 恢复选择
         if current and current in seen:
             idx = self._antenna_selector.findData(current)
