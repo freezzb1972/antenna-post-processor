@@ -289,8 +289,6 @@ class MatplotlibRenderer(BaseRenderer):
                 # mirror (左侧)
                 mirror_rad = -rad  # 负角度 = 左半平面
                 ax.plot(mirror_rad, c_values, "-", linewidth=1.2, color=color)
-            if curves:
-                ax.legend(fontsize=8, loc="upper right")
         else:
             ax.plot(theta_rad, gain_dbi, "-", linewidth=1.2, color="#2196F3", label=cut_label)
             if mirror_angles_deg is not None and mirror_gain_dbi is not None:
@@ -298,8 +296,6 @@ class MatplotlibRenderer(BaseRenderer):
                 ax.plot(mirror_rad, mirror_gain_dbi, "-", linewidth=1.2,
                         color="#2196F3")
 
-        if curves:
-            ax.legend(fontsize=8, loc="upper right")
         ax.set_theta_zero_location("N")
         ax.set_theta_direction(-1)
         ax.set_thetagrids(range(0, 360, 30),
@@ -314,10 +310,16 @@ class MatplotlibRenderer(BaseRenderer):
         ax.set_title(" — ".join(title_parts), fontsize=12, pad=18)
 
         _setup_polar_radial_ticks(ax)
-        ax.set_ylabel(ylabel, fontsize=10, labelpad=20)
+        # 注: 不再设 ax.set_ylabel —— ylabel 已在标题中; 左侧竖排标题会遮挡 0°/1° 角度刻度。
         ax.grid(True, alpha=0.4)
 
-        fig.tight_layout(pad=1.5)
+        # 图例放到图外右上 (与方位面 render_azimuth_polar 一致)
+        if curves and len(curves) > 1:
+            angle = np.deg2rad(45)
+            ax.legend(loc="lower left", fontsize=9, framealpha=0.6,
+                      bbox_to_anchor=(.5 + np.cos(angle) / 2, .5 + np.sin(angle) / 2))
+
+        fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_2d_rect(
