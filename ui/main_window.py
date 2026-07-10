@@ -1962,26 +1962,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if ant and not ant.required_params:
             ant.required_params = set(tp)
 
-        # 自动推断图表配置
-        from src.chart_config import auto_detect_charts
-        auto_charts = auto_detect_charts(tp)
-        if auto_charts:
-            self._auto_apply_chart_config(auto_charts)
+        # 注: 已移除"从模板参数自动推断图表配置"链路。
+        # 天线参数推不出用户想要的图表, 自动勾选反而误渲染; 图表由用户在图表配置中手动决定。
 
         self._update_params_display()
-
-    def _auto_apply_chart_config(self, auto_charts: dict[str, bool]):
-        """根据模板参数自动启用对应的图表 checkbox。"""
-        if not hasattr(self, '_chart_settings_page') or not self._chart_settings_page:
-            return
-        cp = self._chart_settings_page
-        for chart_key, enabled in auto_charts.items():
-            if chart_key in cp._chart_required:
-                cp._chart_required[chart_key].setChecked(enabled)
-            if chart_key in cp._chart_extra:
-                cp._chart_extra[chart_key].setChecked(enabled)
-        cp._sync_to_mw()
-        self._log(f"📊 从模板自动推断图表: {', '.join(auto_charts.keys())}")
 
     def _on_load_from_template(self):
         template_path = self.ui.editTemplatePath.text()
@@ -2478,8 +2462,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             req = self._chart_config_required or ChartConfig()
             xtr = self._chart_config_extra or ChartConfig()
             # 报告启用开关作为渲染总闸门: 未启用的报告其图表配置不并入 → pipeline 不渲染。
-            # 模板自动识别 (_auto_apply_chart_config) 会同时勾选测试/额外两列,
-            # 若无条件合并, 用户即使关闭"启用"开关, 自动识别的图表仍会被渲染。
+            # 图表完全由用户在图表配置中手动勾选 (已移除模板自动推断图表链路)。
             full_chart_config = (req if test_enabled else ChartConfig()).merge(
                 xtr if extra_enabled else ChartConfig())
         png_dir = plot_config.save_png_folder

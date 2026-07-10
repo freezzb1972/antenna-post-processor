@@ -92,19 +92,7 @@ _COLTYPE_TO_CHART = {
 }
 
 # 图表自动检测: 从模板参数推断哪些图表应启用
-def auto_detect_charts(template_params: set) -> dict[str, bool]:
-    """根据模板检测到的参数, 返回应启用的图表 key → True。"""
-    result: dict[str, bool] = {}
-    for col_type, chart_keys in _COLTYPE_TO_CHART.items():
-        if col_type in template_params:
-            for ck in chart_keys.split("|"):
-                result[ck.strip()] = True
-    # C 类切面图: 只要有 Gain 或 AR 就启用 (默认只 Gain 参数)
-    if "gain" in template_params or "ar_single" in template_params or "ar_range" in template_params:
-        result["cut_2d_polar"] = True
-        result["cut_2d_rect"] = True
-    return result
-
+# 注: 已移除 auto_detect_charts (模板参数→图表配置自动推断, 帮倒忙)
 
 @dataclass
 class ChartConfig:
@@ -238,96 +226,7 @@ class ChartConfig:
 
     # ── 工厂方法 ──
 
-    @classmethod
-    def from_template(cls, template_path: str) -> ChartConfig:
-        """扫描模板文件：元数据行 + 列头 → 自动检测图形需求。
-
-        扫描策略:
-          1. 在数据列头行之前的所有行中搜索匹配标题正则
-          2. 从模板列类型推导 B 类图表
-          3. 合并为默认启用的 ChartConfig
-        """
-        import openpyxl
-        wb = openpyxl.load_workbook(template_path, data_only=True)
-        config = ChartConfig()
-        col_types: set[str] = set()
-
-        try:
-            for ws in wb.worksheets:
-                max_row = ws.max_row or 100
-                max_col = ws.max_column or 20
-
-                # 扫描元数据行（在 Frequency 列头之前）
-                header_row = None
-                for row_idx in range(1, min(max_row + 1, 200)):
-                    row_texts = []
-                    for c_idx in range(1, max_col + 1):
-                        v = ws.cell(row_idx, c_idx).value
-                        if v is not None:
-                            row_texts.append(str(v).strip())
-
-                    # 检查是否到了 Frequency 列头行
-                    for t in row_texts:
-                        if _match_text(t, [r"(?i)freq", r"(?i)频率"]):
-                            header_row = row_idx
-                            break
-
-                    if header_row is not None:
-                        # 此行为列头行 —— 解析列类型
-                        for c_idx in range(1, max_col + 1):
-                            v = ws.cell(header_row, c_idx).value
-                            if v is not None:
-                                # 简化: 直接通过文本判断
-                                col_type = _classify_column_text(str(v).strip())
-                                if col_type:
-                                    col_types.add(col_type)
-                        break
-
-                    # 元数据行：搜索图表标题
-                    for t in row_texts:
-                        for chart_key, patterns in _CHART_PATTERNS.items():
-                            if _match_text(t, patterns):
-                                setattr(config, chart_key, True)
-                                break
-        finally:
-            wb.close()
-
-        # 从列类型推导 B 类图表
-        for ct in col_types:
-            chart_key = _COLTYPE_TO_CHART.get(ct)
-            if chart_key:
-                setattr(config, chart_key, True)
-
-        # NHPRP 存在 → 多线图
-        if any(c in col_types for c in ("nhprp_45", "nhprp_30", "nhprp_225")):
-            config.chart_trp_nhprp = True
-
-        return config
-
-    @classmethod
-    def from_template_headers(cls, headers: list[str], col_types: set[str]) -> ChartConfig:
-        """从列头文本列表和 col_type 集合推导图形需求。
-
-        用于 UI 对话框在已有 SheetInfo 的情况下快速推导。
-        """
-        config = ChartConfig()
-
-        # 扫描列头文本
-        for h in headers:
-            for chart_key, patterns in _CHART_PATTERNS.items():
-                if _match_text(h, patterns):
-                    setattr(config, chart_key, True)
-
-        # 从 col_type 推导
-        for ct in col_types:
-            chart_key = _COLTYPE_TO_CHART.get(ct)
-            if chart_key:
-                setattr(config, chart_key, True)
-
-        if any(c in col_types for c in ("nhprp_45", "nhprp_30", "nhprp_225")):
-            config.chart_trp_nhprp = True
-
-        return config
+    # 注: 已移除 from_template / from_template_headers (从模板自动推导图表配置, 无调用者)
 
     @classmethod
     def all_chart_keys(cls) -> list[str]:
