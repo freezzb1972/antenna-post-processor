@@ -5,7 +5,7 @@
   "last_template_path": "D:/CC/Ralab Test Data/GNSS_report_template.xlsx",
   "last_output_dir": "D:/CC/Ralab Test Data/安费诺L1andL5/ETS/AFN_withAMP",
   "last_csv_paths": [
-    "D:/CC/Ralab Test Data/安费诺L1andL5/ETS/AFN_withoutAMP/NO1_withoutAMP.csv"
+    "/tmp/file1.csv"
   ],
   "last_rsp_preset_name": "",
   "llm": {
@@ -25,7 +25,7 @@
     "local_endpoint": "http://localhost:11434",
     "_api_key": ""
   },
-  "window_geometry": "AdnQywADAAAAAAAHAAAAAAAABCAAAALZAAAABwAAAB4AAAQgAAAC2QAAAAAAAAAABQAAAAAHAAAAHgAABCAAAALZ",
+  "window_geometry": "AdnQywADAAAAAAABAAAAFwAAA1YAAALWAAAAAwAAABkAAANUAAAC1AAAAAAAAAAAAyAAAAADAAAAGQAAA1QAAALU",
   "default_dirs": {},
   "metadata": {},
   "license": {

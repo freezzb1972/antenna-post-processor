@@ -20,3 +20,12 @@ license.json
 .claude/.compact_counter
 .claude/auto-save-before-compact.md
 CURRENT_STATE.md
+
+# 工作树杂物 (repo cleanup 2026-07-10)
+backup version/
+CTIA Test plan/
+.playwright-mcp/
+*.zip
+ui_comparison.png
+AR_Formula_Comparison.html
+data_repair_guide.html
