@@ -94,11 +94,18 @@ def extract_angles_from_headers(headers: list[str], param_prefix: str = "") -> t
     singles: list[float] = []
     ranges: list[tuple[float, float]] = []
 
+    # 前缀别名: 模板列头前缀写法多样, RHCP 常写作 "RC"。用词边界匹配避免 "rc" 误匹配
+    # "source" 之类子串。其余前缀保持原样(别名=自身)。
+    import re as _re
+    _alias = {"rhcp": ["rhcp", "rc"]}.get(param_prefix.lower(), [param_prefix.lower()])
+    _prefix_re = (_re.compile(r"\b(?:" + "|".join(_re.escape(a) for a in _alias) + r")\b")
+                  if param_prefix else None)
+
     for raw in headers:
         h = normalize_header(raw)
         if not h:
             continue
-        if param_prefix and param_prefix not in h.lower():
+        if _prefix_re and not _prefix_re.search(h.lower()):
             continue
 
         # 先检测范围（避免 "0-90" 中的 0/90 被单角度误匹配）
