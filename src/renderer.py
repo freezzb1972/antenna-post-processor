@@ -267,6 +267,7 @@ class MatplotlibRenderer(BaseRenderer):
         dpi: int = 150,
         antenna_name: str = "",
         ylabel: str = "Gain (dBi)",
+        title: str = "",
         mirror_angles_deg: np.ndarray | None = None,
         mirror_gain_dbi: np.ndarray | None = None,
         curves: list[tuple[str, np.ndarray, np.ndarray]] | None = None,
@@ -307,7 +308,7 @@ class MatplotlibRenderer(BaseRenderer):
             title_parts.append(antenna_name)
         title_parts.append(f"{freq_mhz:.0f} MHz")
         title_parts.append(ylabel)
-        ax.set_title(" — ".join(title_parts), fontsize=12, pad=18)
+        ax.set_title((title or " — ".join(title_parts)), fontsize=12, pad=18)
 
         _setup_polar_radial_ticks(ax)
         # 注: 不再设 ax.set_ylabel —— ylabel 已在标题中; 左侧竖排标题会遮挡 0°/1° 角度刻度。
@@ -333,6 +334,7 @@ class MatplotlibRenderer(BaseRenderer):
         dpi: int = 150,
         antenna_name: str = "",
         ylabel: str = "Gain (dBi)",
+        title: str = "",
         curves: list[tuple[str, np.ndarray, np.ndarray]] | None = None,
     ) -> io.BytesIO:
         """2D 直角坐标切面图。支持多曲线叠加。"""
@@ -357,7 +359,7 @@ class MatplotlibRenderer(BaseRenderer):
         title_parts.append(f"{freq_mhz:.0f} MHz")
         if cut_label:
             title_parts.append(cut_label)
-        ax.set_title(" — ".join(title_parts), fontsize=12)
+        ax.set_title((title or " — ".join(title_parts)), fontsize=12)
 
         fig.tight_layout(pad=1.2)
         return _fig_to_png_buffer(fig, dpi)
@@ -369,6 +371,7 @@ class MatplotlibRenderer(BaseRenderer):
         freq_mhz: float,
         *,
         ylabel: str = "Gain (dBi)",
+        title: str = "",
         dpi: int = 150,
         antenna_name: str = "",
         cut_label: str = "",
@@ -397,7 +400,7 @@ class MatplotlibRenderer(BaseRenderer):
         title_parts.append(f"{freq_mhz:.0f} MHz")
         if cut_label:
             title_parts.append(cut_label)
-        ax.set_title(" — ".join(title_parts), fontsize=12)
+        ax.set_title((title or " — ".join(title_parts)), fontsize=12)
 
         fig.tight_layout(pad=1.2)
         return _fig_to_png_buffer(fig, dpi)
@@ -488,6 +491,7 @@ class MatplotlibRenderer(BaseRenderer):
         antenna_name: str = "",
         dpi: int = 150,
         ylabel: str = "Gain (dBi)",
+        title: str = "",
     ) -> io.BytesIO:
         """渲染 Gain vs Theta 2D Cartesian 线图 (θ=0-70° 峰值增益)。"""
         fig, ax = plt.subplots(figsize=(6, 4), dpi=dpi)
@@ -500,7 +504,7 @@ class MatplotlibRenderer(BaseRenderer):
         lo, hi = np.min(values), np.max(values)
         margin = max((hi - lo) * 0.1, 0.5)
         ax.set_ylim(lo - margin, hi + margin)
-        ax.set_title(f"{freq_mhz:.0f} MHz" + (f" — {antenna_name}" if antenna_name else ""),
+        ax.set_title(title or (f"{freq_mhz:.0f} MHz" + (f" — {antenna_name}" if antenna_name else "")),
                      fontsize=10)
 
         fig.tight_layout()
