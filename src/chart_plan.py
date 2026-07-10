@@ -61,6 +61,7 @@ class ChartInstance:
     params: dict[str, Any] = field(default_factory=dict)
     enabled: bool = True
     sort_order: int = 0
+    title: str = ""          # 用户覆盖标题(空=用类别默认模板)
 
     def to_dict(self) -> dict:
         return {
@@ -68,7 +69,7 @@ class ChartInstance:
             "cat": self.category.value, "label": self.label,
             "key": self.image_key, "per_freq": self.per_freq,
             "params": self.params, "enabled": self.enabled,
-            "order": self.sort_order,
+            "order": self.sort_order, "title": self.title,
         }
 
     @classmethod
@@ -78,7 +79,7 @@ class ChartInstance:
             category=ChartCategory(d["cat"]), label=d["label"],
             image_key=d["key"], per_freq=d.get("per_freq", True),
             params=d.get("params", {}), enabled=d.get("enabled", True),
-            sort_order=d.get("order", 0),
+            sort_order=d.get("order", 0), title=d.get("title", ""),
         )
 
 
@@ -116,6 +117,7 @@ def expand_to_instances(
         if old:
             ci.enabled = old.enabled
             ci.sort_order = old.sort_order
+            ci.title = old.title
         else:
             ci.sort_order = order_counter[0]
             order_counter[0] += 1
@@ -146,7 +148,7 @@ def expand_to_instances(
                 _add(ChartInstance(
                     instance_id=cid, parent_type=key, category=ChartCategory.A_3D,
                     label=label, image_key=img_key, per_freq=True,
-                    params={"elev": float(el), "azim": float(az), "view_index": vi},
+                    params={"elev": float(el), "azim": float(az), "view_index": vi, "param": key.replace("pattern_3d_", "")},
                 ))
 
     # ── 公共: 从 bool key 列表创建 ChartInstance ──
@@ -158,6 +160,7 @@ def expand_to_instances(
                         instance_id=key, parent_type=key, category=cat,
                         label=_CHART_LABELS.get(key, key), image_key=key,
                         per_freq=per_freq,
+                        params={"param": key.replace("chart_", "").replace("_freq", "")},
                     ))
 
     _add_bool_keys(
@@ -180,6 +183,7 @@ def expand_to_instances(
                     instance_id=img_key, parent_type=attr, category=cat,
                     per_freq=True, image_key=img_key,
                     label=f"{_CHART_LABELS.get(prefix, prefix)} ({param})",
+                    params={"param": param, "angles": list(_angles or [])},
                 ))
 
 
