@@ -156,6 +156,7 @@ def _process_one_frequency(
     ar_output_db: bool = True,
     dir_extrap_method: str = "none",
     compute_only: bool = False,
+    store_matrices: bool = False,
     log_cb=None,
 ) -> dict[str, Any]:
     """处理单个频点。按 needed_params（模板列）+ extra_params（用户额外）计算。"""
@@ -454,18 +455,19 @@ def _process_one_frequency(
     # 计算总增益 dB 矩阵 (供图形和 2D Cuts 使用)
     gain_dbi = 10.0 * np.log10(np.maximum(gain_linear, 1e-15))
 
-    # ── 图形生成 (A/C 类: 每频点 PNG + 方位面) ──
     az_need = (output_config is not None and output_config.has_any_azimuth)
-    if (chart_config is not None and chart_config.has_any_pattern_or_cut) or az_need:
+    want_render = (chart_config is not None and chart_config.has_any_pattern_or_cut) or az_need
+
+    n_phi = phi_lm.shape[0]
+    _pa = raw.get("_phi_angles")
+    phi_angles = np.array(_pa, dtype=np.float64) if _pa else np.arange(n_phi, dtype=np.float64)
+    ar_lin = None
+
+    # ── 图形生成 (仅图表/方位面驱动; matplotlib 仅非 compute_only) ──
+    if want_render:
         try:
             from .plotter import generate_all_for_frequency
-            # 确保 chart_config 不为 None（纯 azimuth 模式时 ChartConfig 可能为 None）
             ccfg = chart_config if chart_config is not None else ChartConfig()
-            n_phi = phi_lm.shape[0]
-            _pa = raw.get("_phi_angles")
-            phi_angles = np.array(_pa, dtype=np.float64) if _pa else np.arange(n_phi, dtype=np.float64)
-            # AR 线性值（如果需要 3D AR 或 方位面 AR）
-            ar_lin = None
             need_ar_for_graphics = (
                 ccfg.pattern_3d_ar or
                 any("ar" in str(e[0]) for e in getattr(ccfg, 'cut_2d_polar_entries', []))
@@ -479,16 +481,13 @@ def _process_one_frequency(
                     ar_result = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
                     if ar_result is not None:
                         ar_lin = ar_result[0]
-            # compute_only 模式跳过 Matplotlib 渲染
             if not compute_only:
-                # 构建 E_θ/E_φ 分量额外数据
                 extra_patterns = {}
                 if ccfg.pattern_3d_etheta:
                     extra_patterns["3d_etheta"] = theta_lm
                 if ccfg.pattern_3d_ephi:
                     extra_patterns["3d_ephi"] = phi_lm
                 extra_patterns = extra_patterns if extra_patterns else None
-                # RHCP/LHCP/CP-XPI 矩阵 (供切面图)
                 rhcp_db = row.get("_rhcp_gain")
                 lhcp_db = row.get("_lhcp_gain")
                 cpxpi_db = row.get("_cp_xpi")
@@ -505,13 +504,25 @@ def _process_one_frequency(
                     row["_images"] = images
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
-            # 存储图表原始数据矩阵供中间数据审查用（始终存储，不受 compute_only 限制）
+        except Exception as e:
+            row["_graph_error"] = str(e)  # 图形生成失败不阻塞数据处理
+
+    # ── 中间数据矩阵存储 (out_data 或 有图表时都存; 不触发 matplotlib 渲染) ──
+    if store_matrices or want_render:
+        try:
             row["_chart_gain_dbi"] = gain_dbi.copy()
             row["_chart_theta_deg"] = theta_deg.copy()
             row["_chart_phi_deg"] = phi_angles.copy()
-            if ar_lin is not None:
+            # AR 矩阵: 复用渲染算的 ar_lin, 否则从相位数据补算
+            if ar_lin is None:
+                _tp = raw.get("theta_phase"); _pp = raw.get("phi_phase")
+                if _tp is not None and _pp is not None:
+                    _arr = compute_axial_ratio(theta_lm, _tp, phi_lm, _pp)
+                    if _arr is not None:
+                        ar_lin = _arr[0]
+            if ar_lin is not None and "_chart_ar_db" not in row:
                 row["_chart_ar_db"] = 20.0 * np.log10(np.maximum(ar_lin, 1e-15))
-            # Theta 范围峰值中间数据 (替代硬编码 70°)
+            # Theta 范围峰值 (θ≤N 的 φ 向峰值)
             if output_config and output_config.pk_theta_ranges:
                 for t_max in output_config.pk_theta_ranges:
                     mask = theta_deg <= t_max + 0.1
@@ -519,7 +530,7 @@ def _process_one_frequency(
                     row[f"_gain_pk_{key_suffix}_deg"] = theta_deg[mask].copy()
                     row[f"_gain_pk_{key_suffix}_db"] = np.max(gain_dbi[:, mask], axis=1)
         except Exception as e:
-            row["_graph_error"] = str(e)  # 图形生成失败不阻塞数据处理
+            row["_data_matrix_error"] = str(e)
 
     # 存储原始数据供图形展示使用
     # NOTE: 每频点存储 _raw_data 会大幅增加内存开销。
@@ -754,6 +765,7 @@ def _load_and_compute(
     ar_output_db: bool = True,
     dir_extrap_method: str = "none",
     compute_only: bool = False,
+    store_matrices: bool = False,
     cancel_callback=None,
     progress_callback=None,
     log_callback=None,
@@ -819,7 +831,7 @@ def _load_and_compute(
                          f"最后角={_valid[-1]:.1f}° + 步进={_dphi:.1f}° = {_expect:.1f}° "
                          f"(应≈360°), Directivity/AR/LAG 可能偏小")
         ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, theta_extrap_method, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, output_config, compute_only))
+        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, theta_extrap_method, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, output_config, compute_only, store_matrices))
         _report(progress_callback, i + 1, progress_max, f"[📂] 读取源文件 {i+1}/{total}")
 
     data_done = _load_w
@@ -877,12 +889,12 @@ def _run_compute_serial(
     total_tasks = compute_total or len(compute_tasks)
     cw = calc_w or max(total_tasks * 4, 1)
     rw = render_w or max(total_tasks * 2, 1)
-    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co) in enumerate(compute_tasks):
+    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co, sm) in enumerate(compute_tasks):
         if cancel_callback and cancel_callback():
             break
         try:
             theta_arr = np.array(theta_list)
-            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, dir_extrap_method=dir_extrap_method, compute_only=co, log_cb=log_cb)
+            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, dir_extrap_method=dir_extrap_method, compute_only=co, store_matrices=sm, log_cb=log_cb)
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
@@ -1084,6 +1096,7 @@ def run_pipeline(
                 ar_output_db=ar_output_db,
                 dir_extrap_method=dir_extrap_method,
                 compute_only=compute_only,
+                store_matrices=out_data,
                 cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,
             )
         finally:
@@ -1418,21 +1431,6 @@ def _export_azimuth(
                 except Exception:
                     pass
 
-    # ── 中间数据收集: 保存图表原始数据矩阵供审查验证 ──
-    _chart_data: list[dict[str, Any]] = []  # [{freq, sheet, theta, phi, gain_dbi, ar_db}]
-    for sheet_name, rows in sheet_results.items():
-        for row in rows:
-            freq = row.get("frequency")
-            if freq is None: continue
-            entry = {"sheet": sheet_name, "freq": freq}
-            for key in ("_chart_gain_dbi", "_chart_ar_db", "_chart_theta_deg", "_chart_phi_deg"):
-                v = row.get(key)
-                if v is not None:
-                    entry[key] = v
-            if len(entry) > 2:  # 至少有一项数据
-                _chart_data.append(entry)
-
-
     # ── Write Word: 统一输出所有图表到 Word ──
     def _count_images(v: dict) -> int:
         """统计一组图片的实际张数（值可能是 BytesIO 或 list[BytesIO]）."""
@@ -1480,8 +1478,9 @@ def _export_azimuth(
                 _word_ok = False
 
 
-    # ── 中间数据: 保存图表原始数据矩阵供审查验证 ──
-    if out_data and _chart_data:
+    # ── 中间数据: 泛化导出 (注册表驱动, 见 src/intermediate_data.py) ──
+    #   Gain/AR/RHCP/LHCP/CP-XPI 矩阵 + PkGain + LAG/AR/RHCP/CP-XPI@θ 切片, 自动按 row 字段裁剪。
+    if out_data:
         data_path = output_config.data_output_path if output_config else ""
         if not data_path:
             gdir = getattr(output_config, 'data_output_dir', '') if output_config else ''
@@ -1490,29 +1489,9 @@ def _export_azimuth(
                 data_path = str(Path(gdir) / gfn)
         if data_path:
             _log(log_callback, f"中间数据: {data_path}")
-            try:
-                import openpyxl as _xl
-                wb = _xl.Workbook(); wb.remove(wb.active)
-                for entry in _chart_data:
-                    sn = str(entry.get("sheet", "data"))[:31]
-                    freq_str = f"{entry['freq']:.0f}MHz"
-                    theta = entry.get("_chart_theta_deg")
-                    phi = entry.get("_chart_phi_deg")
-                    if theta is None or phi is None:
-                        continue
-                    # Gain sheet: 每个频点一个 data block (phi × theta)
-                    if "_chart_gain_dbi" in entry:
-                        _write_matrix_block(wb, f"Gain_{sn}", freq_str, entry["_chart_gain_dbi"], phi, theta)
-                    # AR sheet
-                    if "_chart_ar_db" in entry:
-                        _write_matrix_block(wb, f"AR_{sn}", freq_str, entry["_chart_ar_db"], phi, theta)
-                wb.save(data_path); wb.close()
-                _log(log_callback, f"  ✓ 中间数据已保存 ({len(_chart_data)} 个频点)")
-            except Exception as e:
-                _log(log_callback, f"  ✗ 中间数据导出失败: {e}")
+            from .intermediate_data import write_intermediate_data
+            if not write_intermediate_data(sheet_results, data_path, log_callback):
                 _data_ok = False
-    elif out_data and not _chart_data:
-        _log(log_callback, "  ⚠ 中间数据为空 — 未生成图表或数据缺失")
 
     # 返回导出是否全部成功（供调用方决定是否清理缓存）
     return _word_ok and _data_ok
@@ -1578,11 +1557,11 @@ def _compute_chunk(
     """
     import numpy as np
     results = []
-    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co in compute_tasks:
+    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co, sm in compute_tasks:
         try:
             theta_raw = np.array(theta_list)
             row = _process_one_frequency(raw, freq, theta_raw, lag_cfg,
-                                         theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co,
+                                         theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co, store_matrices=sm,
                                          log_cb=None)
             results.append((sheet_name, row))
         except Exception as e:
