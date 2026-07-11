@@ -850,7 +850,7 @@ def _load_and_compute(
                          f"最后角={_valid[-1]:.1f}° + 步进={_dphi:.1f}° = {_expect:.1f}° "
                          f"(应≈360°), Directivity/AR/LAG 可能偏小")
         ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
-        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, theta_extrap_method, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, output_config, compute_only, store_matrices, chart_instances))
+        compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, theta_extrap_method, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, output_config, compute_only, store_matrices, chart_instances, dir_extrap_method))
         _report(progress_callback, i + 1, progress_max, f"[📂] 读取源文件 {i+1}/{total}")
 
     data_done = _load_w
@@ -908,12 +908,12 @@ def _run_compute_serial(
     total_tasks = compute_total or len(compute_tasks)
     cw = calc_w or max(total_tasks * 4, 1)
     rw = render_w or max(total_tasks * 2, 1)
-    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co, sm, cinst) in enumerate(compute_tasks):
+    for i, (sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co, sm, cinst, de) in enumerate(compute_tasks):
         if cancel_callback and cancel_callback():
             break
         try:
             theta_arr = np.array(theta_list)
-            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, dir_extrap_method=dir_extrap_method, compute_only=co, store_matrices=sm, chart_instances=cinst, log_cb=log_cb)
+            row = _process_one_frequency(raw, freq, theta_arr, lag_cfg, theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, dir_extrap_method=de, compute_only=co, store_matrices=sm, chart_instances=cinst, log_cb=log_cb)
             sheet_results[sheet_name].append(row)
         except Exception as e:
             sheet_results[sheet_name].append({"frequency": freq, "_error": str(e)})
@@ -1579,15 +1579,15 @@ def _compute_chunk(
 ) -> list[tuple[str, dict[str, Any]]]:
     """子进程中处理一批频点的纯计算任务。不读文件。
 
-    每个任务: (sheet_name, freq, raw_data, lag_cfg, theta_list, extrapolate_theta)
+    每个任务 18 元组: (..., chart_instances, dir_extrap_method)。
     """
     import numpy as np
     results = []
-    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co, sm, cinst in compute_tasks:
+    for sheet_name, freq, raw, lag_cfg, theta_list, do_extrap, rpk, nparams, xparams, ccfg, ar_cfg, nh_angles, ar_out_db, az_cfg, co, sm, cinst, de in compute_tasks:
         try:
             theta_raw = np.array(theta_list)
             row = _process_one_frequency(raw, freq, theta_raw, lag_cfg,
-                                         theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, compute_only=co, store_matrices=sm, chart_instances=cinst,
+                                         theta_extrap_method=do_extrap, robust_peak=rpk, needed_params=nparams, extra_params=xparams, chart_config=ccfg, ar_lag_config=ar_cfg, rhcp_lag_config=None, cpxpi_lag_config=None, output_config=az_cfg, nh_custom_angles=nh_angles, ar_output_db=ar_out_db, dir_extrap_method=de, compute_only=co, store_matrices=sm, chart_instances=cinst,
                                          log_cb=None)
             results.append((sheet_name, row))
         except Exception as e:
