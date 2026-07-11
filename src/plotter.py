@@ -312,7 +312,8 @@ def generate_all_for_frequency(
             all_entries.append(_CE(param=param, direction="theta", angles=angles))
         params = build_cut_params_from_entries(all_entries, data_map)
     images.update(render_phi_cuts(params, theta_deg, phi_deg, freq_mhz,
-                                  chart_config, _renderer, titles=_t))
+                                  chart_config, _renderer, titles=_t,
+                                  output_config=output_config))
     images.update(render_theta_cuts(params, theta_deg, phi_deg, freq_mhz,
                                     chart_config, output_config, _renderer, titles=_t))
 

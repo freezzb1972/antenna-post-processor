@@ -118,6 +118,7 @@ def render_phi_cuts(
     chart_config,
     renderer,
     titles: dict | None = None,
+    output_config=None,
 ) -> dict[str, any]:
     """俯仰面切面: 固定 φ, 扫描 θ (Theta 轴) — 极坐标 + 直角坐标。
 
@@ -134,7 +135,8 @@ def render_phi_cuts(
     if not polar_enabled and not rect_enabled:
         return images
 
-    dpi = getattr(chart_config, 'dpi', 150)
+    # 俯仰面切面 DPI 并入方位面 (output_config.dpi, 默认100), 与 3D 的 spinDpi 解耦
+    dpi = output_config.dpi if (output_config is not None and output_config.dpi) else 100
     _t = titles or {}
 
     for p in params:
