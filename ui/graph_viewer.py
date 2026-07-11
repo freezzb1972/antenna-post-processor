@@ -43,6 +43,17 @@ DEFAULT_PATTERN_KEYS = list(PATTERN_DATA_MAP.keys())
 GRID_OPTIONS = ["1×1", "1×2", "2×2", "3×3", "2×2+1"]
 PLOT_TYPES = ["Spherical 3D", "Polar 2D", "Cartesian 3D"]
 
+# 7 视角预设 (elev, azim, roll) — 与报告 A 类弹窗 7 预设一致 (Iso + 上下左右前后)
+VIEW_PRESETS = {
+    "Iso":    (30, -60, 0),
+    "Top":    (90, -90, 0),
+    "Bottom": (-90, -90, 0),
+    "Front":  (0, -90, 0),
+    "Back":   (0, 90, 0),
+    "Left":   (0, 180, 0),
+    "Right":  (0, 0, 0),
+}
+
 # Frequency curve definitions: (display_label, result_key_prefix, match_mode)
 # match_mode "exact" requires exact key match, "prefix" matches key.startswith(prefix)
 # 查看器频点曲线定义 — 对应 ChartConfig 的 B 类图表
@@ -88,7 +99,8 @@ class SubPlotPanel:
     def __init__(self, fig, position, title="", data_key="gain_db"):
         self.title = title
         self.data_key = data_key   # 直接存储数据 key, e.g. "gain_db", "ar_linear"
-        self._elev, self._azim = 30, -60
+        self._elev, self._azim, self._roll = 30, -60, 0
+        self.selected = False       # 点选高亮 (联动关闭时控件作用于选中子图)
         self._plot_type = "Spherical 3D"
         self._theta_idx = 0          # Polar 2D 截面索引
         self._cuts = {"X-Z": False, "Y-Z": False, "X-Y": False}
@@ -119,10 +131,12 @@ class SubPlotPanel:
     def set_cut(self, cut: str, enabled: bool):
         self._cuts[cut] = enabled
 
-    def set_view(self, elev, azim):
+    def set_view(self, elev, azim, roll=None):
         self._elev, self._azim = elev, azim
+        if roll is not None:
+            self._roll = roll
         if hasattr(self.ax, "view_init"):
-            self.ax.view_init(elev=elev, azim=azim)
+            self.ax.view_init(elev=self._elev, azim=self._azim, roll=self._roll)
 
     # ── 主绘制入口 ──
 
@@ -135,7 +149,12 @@ class SubPlotPanel:
         else:
             self._draw_spherical_3d(theta_deg, phi_deg, data, cmap)
         self._apply_cuts()
-        self.ax.set_title(self.title, fontsize=8)
+        # 标题着色: 选中=黄, Polar 2D 背景白→黑字, 其余黑底→白字
+        if self.selected:
+            tcolor = "#ffd700"
+        else:
+            tcolor = "black" if self._plot_type == "Polar 2D" else "white"
+        self.ax.set_title(self.title, fontsize=8, color=tcolor)
 
     # ── 绘图模式 ──
 
@@ -166,7 +185,7 @@ class SubPlotPanel:
                              rstride=1, cstride=1, alpha=0.85,
                              linewidth=0, antialiased=True)
         self.ax.set_box_aspect([1, 1, 1])
-        self.ax.view_init(elev=self._elev, azim=self._azim)
+        self.ax.view_init(elev=self._elev, azim=self._azim, roll=self._roll)
         self.ax.set_axis_off()                       # 天线图无笛卡尔轴意义
 
     def _draw_polar(self, theta_deg, phi_deg, data, cmap):
@@ -222,6 +241,9 @@ class GraphViewer(QWidget):
         self._linked = True
         self._elev, self._azim = 30, -60
         self._step_deg = 5.0
+        self._selected_idx = 0                       # 点选的子图 (分别控制时的目标)
+        self._suppress_view = False                  # 抑制数值框信号 (预设/回填时)
+        self._ov_combos: List[QComboBox] = []        # per-子图数据类型叠加下拉
         # 可配置状态: 方向图数据类型 (data key 列表)
         self._active_pattern_keys: List[str] = list(DEFAULT_PATTERN_KEYS)
         # 可配置状态: 频率曲线选择 (索引列表, None=全部)
@@ -232,6 +254,8 @@ class GraphViewer(QWidget):
         self._anim_playing = False
         self._setup_ui()
         self._canvas.mpl_connect("button_release_event", self._on_mouse_release)
+        self._canvas.mpl_connect("button_press_event", self._on_canvas_click)
+        self._canvas.mpl_connect("draw_event", self._reposition_overlays)
 
     def update_mode_display(self):
         """根据当前测试模式更新模式标签和可选曲线。"""
@@ -473,20 +497,53 @@ class GraphViewer(QWidget):
         lay.setContentsMargins(4, 2, 4, 2)
         lay.setSpacing(6)
 
-        # ── 视角预设 ──
+        # ── 视角预设 (下拉) + el/az/roll 数值框 ──
         lay.addWidget(QLabel("视角:"))
-        presets = [
-            ("Iso", 30, -60), ("Top", 90, 0), ("Front", 0, 0),
-            ("Side", 0, 90), ("Back", 0, 180), ("Bottom", -90, 0),
-        ]
-        for label, elev, azim in presets:
-            btn = QPushButton(label)
-            btn.setFixedWidth(60)
-            btn.setToolTip(f"预设视角: {label} (el={elev}°, az={azim}°)")
-            btn.clicked.connect(lambda checked, e=elev, a=azim: self._set_view_preset(e, a))
-            lay.addWidget(btn)
+        self._cmb_preset = QComboBox()
+        self._cmb_preset.addItems(list(VIEW_PRESETS.keys()))
+        self._cmb_preset.setFixedWidth(72)
+        self._cmb_preset.setToolTip("7 视角预设 (Iso/上下左右前后)")
+        self._cmb_preset.currentIndexChanged.connect(self._on_view_preset_changed)
+        lay.addWidget(self._cmb_preset)
+
+        self._spin_elev = QDoubleSpinBox()
+        self._spin_elev.setRange(-90, 90); self._spin_elev.setValue(30)
+        self._spin_elev.setPrefix("el "); self._spin_elev.setSuffix("°")
+        self._spin_elev.setFixedWidth(80)
+        self._spin_elev.valueChanged.connect(self._apply_view_spins)
+        lay.addWidget(self._spin_elev)
+        self._spin_azim = QDoubleSpinBox()
+        self._spin_azim.setRange(-180, 360); self._spin_azim.setValue(-60)
+        self._spin_azim.setPrefix("az "); self._spin_azim.setSuffix("°")
+        self._spin_azim.setFixedWidth(84)
+        self._spin_azim.valueChanged.connect(self._apply_view_spins)
+        lay.addWidget(self._spin_azim)
+        self._spin_roll = QDoubleSpinBox()
+        self._spin_roll.setRange(-180, 360); self._spin_roll.setValue(0)
+        self._spin_roll.setPrefix("roll "); self._spin_roll.setSuffix("°")
+        self._spin_roll.setFixedWidth(92)
+        self._spin_roll.valueChanged.connect(self._apply_view_spins)
+        lay.addWidget(self._spin_roll)
 
         sep = QFrame(); sep.setFrameShape(QFrame.VLine); lay.addWidget(sep)
+
+        # ── 图型 (作用于选中子图, 联动时作用全部) ──
+        lay.addWidget(QLabel("图型:"))
+        self._cmb_plot_type = QComboBox()
+        self._cmb_plot_type.addItems(PLOT_TYPES)
+        self._cmb_plot_type.setFixedWidth(112)
+        self._cmb_plot_type.setToolTip("3D曲面 / 极坐标2D切面 / 直角3D — 作用于点选的子图")
+        self._cmb_plot_type.currentIndexChanged.connect(self._on_toolbar_plot_type)
+        lay.addWidget(self._cmb_plot_type)
+
+        # ── 联动 / 分别控制 ──
+        self._chk_view_link = QCheckBox("联动")
+        self._chk_view_link.setChecked(True)
+        self._chk_view_link.setToolTip("联动: 视角/图型作用所有子图; 取消: 仅作用点选的子图")
+        self._chk_view_link.toggled.connect(self._on_view_link_toggled)
+        lay.addWidget(self._chk_view_link)
+
+        sep_v = QFrame(); sep_v.setFrameShape(QFrame.VLine); lay.addWidget(sep_v)
 
         # ── 视图模式 ──
         lay.addWidget(QLabel("视图:"))
@@ -584,9 +641,7 @@ class GraphViewer(QWidget):
         self._chk_link.toggled.connect(self._on_link_toggled)
         self._chk_link.hide()
 
-        # 子图类型控件
-        self._plot_type_combos: List[QComboBox] = []
-        self._plot_type_layout = QHBoxLayout()  # 确保属性存在(后续 _rebuild 使用)
+        # 子图类型 / 信息标签 (per-子图下拉已取代旧的 _plot_type_layout)
         if not hasattr(self, '_lbl_info') or self._lbl_info is None:
             self._lbl_info = QLabel("")
 
@@ -627,13 +682,137 @@ class GraphViewer(QWidget):
         self._lbl_anim_progress = QLabel("0 / 0")
         self._lbl_anim_progress.hide()
 
-    def _set_view_preset(self, elev: float, azim: float):
-        self._elev, self._azim = elev, azim
-        for sp in self._subplots:
-            sp.set_view(elev, azim)
+    # ==================================================================
+    # 视角控制 (工具栏: 预设下拉 + el/az/roll 数值 + 图型 + 联动)
+    # ==================================================================
+
+    def _view_targets(self):
+        """联动 → 所有子图; 分别控制 → 仅点选的子图。"""
+        if self._linked or not self._subplots:
+            return self._subplots
+        idx = min(getattr(self, '_selected_idx', 0), len(self._subplots) - 1)
+        return [self._subplots[idx]]
+
+    def _on_view_preset_changed(self):
+        name = self._cmb_preset.currentText()
+        if name not in VIEW_PRESETS:
+            return
+        el, az, rl = VIEW_PRESETS[name]
+        self._suppress_view = True
+        self._spin_elev.setValue(el); self._spin_azim.setValue(az); self._spin_roll.setValue(rl)
+        self._suppress_view = False
+        self._apply_view_spins()
+
+    def _apply_view_spins(self):
+        """数值框变化 → 作用于目标子图 (联动全部 / 分别选中)。"""
+        if getattr(self, '_suppress_view', False):
+            return
+        el = self._spin_elev.value(); az = self._spin_azim.value(); rl = self._spin_roll.value()
+        for sp in self._view_targets():
+            sp.set_view(el, az, rl)
+        self._elev, self._azim = el, az
         if hasattr(self, '_lbl_zoom'):
-            self._lbl_zoom.setText(f" el={elev:.0f}° az={azim:.0f}°")
+            self._lbl_zoom.setText(f" el={el:.0f}° az={az:.0f}° roll={rl:.0f}°")
         self._canvas.draw_idle()
+
+    def _on_view_link_toggled(self, checked):
+        self._linked = checked
+        if hasattr(self, '_chk_link'):
+            self._chk_link.setChecked(checked)   # 保持隐藏控件同步
+
+    def _on_toolbar_plot_type(self):
+        pt = self._cmb_plot_type.currentText()
+        for sp in self._view_targets():
+            sp.set_plot_type(pt)
+        self._on_update()
+
+    def _sync_spins_to_selected(self):
+        """点选子图后, 工具栏数值框回填该子图当前视角。"""
+        if not self._subplots:
+            return
+        sp = self._subplots[min(getattr(self, '_selected_idx', 0), len(self._subplots) - 1)]
+        self._suppress_view = True
+        self._spin_elev.setValue(sp._elev)
+        self._spin_azim.setValue(sp._azim)
+        self._spin_roll.setValue(sp._roll)
+        self._suppress_view = False
+
+    # ==================================================================
+    # per-子图数据类型叠加下拉 (Q1) + 点选子图 (Q2)
+    # ==================================================================
+
+    def _available_data_keys(self) -> List[str]:
+        """当前数据实际可用的方向图类型 key (按注册顺序)。无数据 → 全部默认。"""
+        if not self._graph_data:
+            return list(DEFAULT_PATTERN_KEYS)
+        fd0 = next(iter(self._graph_data.values()))
+        avail = [k for k in DEFAULT_PATTERN_KEYS if fd0.get(k) is not None]
+        return avail or list(DEFAULT_PATTERN_KEYS)
+
+    def _rebuild_subplot_overlays(self):
+        """重建每个子图左上角的数据类型下拉 (parented to canvas, draw_event 定位)。"""
+        for c in self._ov_combos:
+            c.setParent(None); c.deleteLater()
+        self._ov_combos = []
+        avail = self._available_data_keys()
+        for i, sp in enumerate(self._subplots):
+            c = QComboBox(self._canvas)
+            for k in avail:
+                c.addItem(PATTERN_DATA_MAP.get(k, k), k)
+            j = c.findData(sp.data_key)
+            c.setCurrentIndex(j if j >= 0 else 0)
+            c.setFixedWidth(118)
+            c.setToolTip("选择此子图显示的数据类型")
+            c.currentIndexChanged.connect(lambda _=0, idx=i: self._on_overlay_type_changed(idx))
+            c.show()
+            self._ov_combos.append(c)
+        self._reposition_overlays()
+
+    def _on_overlay_type_changed(self, idx: int):
+        if idx >= len(self._subplots) or idx >= len(self._ov_combos):
+            return
+        dk = self._ov_combos[idx].currentData()
+        if dk is None:
+            return
+        sp = self._subplots[idx]
+        sp.data_key = dk
+        sp.title = PATTERN_DATA_MAP.get(dk, dk)
+        self._on_update()
+
+    def _reposition_overlays(self, event=None):
+        """draw_event 后按各子图 axes 位置摆放叠加下拉 (自动适配缩放/分隔条)。"""
+        if not self._ov_combos:
+            return
+        w = self._canvas.width(); h = self._canvas.height()
+        for sp, c in zip(self._subplots, self._ov_combos):
+            try:
+                bb = sp.ax.get_position()
+            except Exception:
+                continue
+            x = int(bb.x0 * w)
+            y = int((1.0 - bb.y1) * h)
+            c.move(max(0, x), max(0, y))
+            c.raise_()
+
+    def _set_overlays_visible(self, vis: bool):
+        for c in self._ov_combos:
+            c.setVisible(vis)
+
+    def _on_canvas_click(self, event):
+        """点选子图 → 高亮 + 回填工具栏数值 (分别控制时的目标)。"""
+        if event.inaxes is None or not self._subplots:
+            return
+        for i, sp in enumerate(self._subplots):
+            if sp.ax is event.inaxes:
+                self._selected_idx = i
+                for j, s in enumerate(self._subplots):
+                    s.selected = (j == i)
+                    if s.ax is not None and hasattr(s.ax, "title"):
+                        s.ax.title.set_color("#ffd700" if s.selected else
+                                             ("black" if s._plot_type == "Polar 2D" else "white"))
+                self._sync_spins_to_selected()
+                self._canvas.draw_idle()
+                break
 
     def _on_cmap_changed(self, cmap_name: str):
         for sp in self._subplots:
@@ -653,75 +832,6 @@ class GraphViewer(QWidget):
             if hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), '_log'):
                 self.parent().parent()._log(f"✓ 图形已导出: {path}")
 
-    def _build_ctrl_bar(self) -> QHBoxLayout:
-        ctrl = QHBoxLayout()
-        ctrl.addWidget(QLabel("视图:"))
-        self._cmb_view_mode = QComboBox()
-        self._cmb_view_mode.setEditable(True)
-        self._cmb_view_mode.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_view_mode.lineEdit().setPlaceholderText("搜索...")
-        self._cmb_view_mode.addItems(["3D Pattern", "Freq Curves"])
-        self._cmb_view_mode.currentIndexChanged.connect(self._on_view_mode_changed)
-        ctrl.addWidget(self._cmb_view_mode)
-        ctrl.addSpacing(16)
-
-        self._pattern_ctrl_panel = QWidget()
-        pc = QHBoxLayout(self._pattern_ctrl_panel)
-        pc.setContentsMargins(0, 0, 0, 0)
-        pc.addWidget(QLabel("频点:"))
-        self._cmb_freq = QComboBox()
-        self._cmb_freq.currentIndexChanged.connect(self._on_update)
-        pc.addWidget(self._cmb_freq)
-        pc.addWidget(QLabel("  布局:"))
-        self._cmb_grid = QComboBox()
-        self._cmb_grid.addItems(GRID_OPTIONS)
-        self._cmb_grid.setCurrentIndex(2)
-        self._cmb_grid.currentIndexChanged.connect(self._on_grid_changed)
-        pc.addWidget(self._cmb_grid)
-        pc.addWidget(QLabel("  精度:"))
-        self._spin_step = QSpinBox()
-        self._spin_step.setRange(1, 30)
-        self._spin_step.setValue(5)
-        self._spin_step.setSuffix("°")
-        self._spin_step.setFixedWidth(70)
-        self._spin_step.setToolTip("3D 采样步进: 1°=最精细(~40K点), 30°=最快(~150点)")
-        self._spin_step.valueChanged.connect(self._on_step_changed)
-        pc.addWidget(self._spin_step)
-        self._chk_link = QCheckBox("联动视角")
-        self._chk_link.setChecked(True)
-        self._chk_link.toggled.connect(self._on_link_toggled)
-        pc.addWidget(self._chk_link)
-        ctrl.addWidget(self._pattern_ctrl_panel)
-        self._lbl_info = QLabel("")
-        ctrl.addWidget(self._lbl_info)
-        return ctrl
-
-    def _build_phase2_bar(self) -> QWidget:
-        self._pattern_phase2_panel = QWidget()
-        phase2 = QHBoxLayout(self._pattern_phase2_panel)
-        self._plot_type_combos: List[QComboBox] = []
-        self._plot_type_layout = QHBoxLayout()
-        phase2.addLayout(self._plot_type_layout)
-        phase2.addSpacing(16)
-        phase2.addWidget(QLabel("剖切:"))
-        self._cut_checks: Dict[str, QCheckBox] = {}
-        for label in ["X-Z", "Y-Z", "X-Y"]:
-            cb = QCheckBox(label)
-            cb.toggled.connect(self._on_cut_changed)
-            self._cut_checks[label] = cb
-            phase2.addWidget(cb)
-        phase2.addSpacing(8)
-        phase2.addWidget(QLabel("  θ截面:"))
-        self._slider_theta = QSlider(Qt.Horizontal)
-        self._slider_theta.setMinimum(0); self._slider_theta.setMaximum(0)
-        self._slider_theta.setFixedWidth(120)
-        self._slider_theta.valueChanged.connect(self._on_theta_slider_changed)
-        phase2.addWidget(self._slider_theta)
-        self._lbl_theta_val = QLabel("--°")
-        self._lbl_theta_val.setFixedWidth(40)
-        phase2.addWidget(self._lbl_theta_val)
-        phase2.addStretch()
-        return self._pattern_phase2_panel
 
     @staticmethod
     def _build_graph_area():
@@ -736,53 +846,6 @@ class GraphViewer(QWidget):
         splitter.addWidget(table)
         splitter.setSizes([650, 250])
         return splitter, fig, canvas, table
-
-    def _build_anim_bar(self) -> QWidget:
-        self._pattern_anim_panel = QWidget()
-        anim_bar = QHBoxLayout(self._pattern_anim_panel)
-        self._btn_play = QPushButton("▶ 播放")
-        self._btn_play.setFixedWidth(80)
-        self._btn_play.clicked.connect(self._on_play_pause)
-        anim_bar.addWidget(self._btn_play)
-        anim_bar.addWidget(QLabel("  速度:"))
-        self._slider_speed = QSlider(Qt.Horizontal)
-        self._slider_speed.setMinimum(1); self._slider_speed.setMaximum(10)
-        self._slider_speed.setValue(5); self._slider_speed.setFixedWidth(100)
-        self._slider_speed.valueChanged.connect(self._on_speed_changed)
-        anim_bar.addWidget(self._slider_speed)
-        self._lbl_speed_val = QLabel("600ms"); self._lbl_speed_val.setFixedWidth(50)
-        anim_bar.addWidget(self._lbl_speed_val)
-        anim_bar.addSpacing(12)
-        self._lbl_anim_progress = QLabel("0 / 0")
-        anim_bar.addWidget(self._lbl_anim_progress)
-        anim_bar.addStretch()
-        return self._pattern_anim_panel
-
-    # ==================================================================
-    # 图类型控件 (per-subplot)
-    # ==================================================================
-
-    def _rebuild_plot_type_controls(self):
-        """根据当前子图数量重建图类型下拉列表。"""
-        for combo in self._plot_type_combos:
-            self._plot_type_layout.removeWidget(combo)
-            combo.deleteLater()
-        self._plot_type_combos.clear()
-
-        for sp in self._subplots:
-            combo = QComboBox()
-            combo.addItems(PLOT_TYPES)
-            combo.currentIndexChanged.connect(self._on_plot_type_changed)
-            self._plot_type_combos.append(combo)
-            # 短标签: 取标题括号前的内容
-            short = sp.title.split("(")[0].strip()
-            self._plot_type_layout.addWidget(QLabel(short + ":"))
-            self._plot_type_layout.addWidget(combo)
-
-    def _on_plot_type_changed(self):
-        for sp, combo in zip(self._subplots, self._plot_type_combos):
-            sp.set_plot_type(combo.currentText())
-        self._on_update()
 
     # ==================================================================
     # 球面剖切
@@ -818,8 +881,8 @@ class GraphViewer(QWidget):
     # ==================================================================
 
     def _rebuild_subplots(self):
-        # 保存旧子图的视角 (按 data_key 索引)
-        old_views = {sp.data_key: (sp._elev, sp._azim) for sp in self._subplots}
+        # 保存旧子图的视角 (按 data_key 索引, 含 roll)
+        old_views = {sp.data_key: (sp._elev, sp._azim, sp._roll) for sp in self._subplots}
         self._figure.clear()
         self._subplots = []
         grid = self._cmb_grid.currentText()
@@ -830,15 +893,19 @@ class GraphViewer(QWidget):
             keys = self._active_pattern_keys[:rows * cols]
             for i, dk in enumerate(keys):
                 self._add_subplot((rows, cols, i + 1), dk, old_views)
-        self._rebuild_plot_type_controls()
+        # 恢复选中高亮 (索引可能越界 → 收敛到 0)
+        if self._subplots:
+            self._selected_idx = min(self._selected_idx, len(self._subplots) - 1)
+            self._subplots[self._selected_idx].selected = True
+        self._rebuild_subplot_overlays()
         self._canvas.draw()
 
     def _add_subplot(self, pos, dk, old_views):
         """在指定位置(rows,cols,idx 元组 或 GridSpec spec 单元组)加一个子图。"""
         title = PATTERN_DATA_MAP.get(dk, dk)
         sp = SubPlotPanel(self._figure, pos, title=title, data_key=dk)
-        ev, az = old_views.get(dk, (self._elev, self._azim))
-        sp.set_view(ev, az)
+        ev, az, rl = old_views.get(dk, (self._elev, self._azim, 0))
+        sp.set_view(ev, az, rl)
         self._subplots.append(sp)
 
     def _rebuild_2x2plus1(self, old_views):
@@ -1225,6 +1292,8 @@ class GraphViewer(QWidget):
         # 显示/隐藏 2D Cuts 控制栏
         if hasattr(self, '_cuts2d_bar'):
             self._cuts2d_bar.setVisible(is_2d)
+        # per-子图叠加下拉仅在 3D Pattern 模式显示
+        self._set_overlays_visible(is_pattern)
         if is_pattern:
             self._rebuild_subplots()
             self._on_update()
