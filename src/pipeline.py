@@ -461,7 +461,7 @@ def _process_one_frequency(
 
     n_phi = phi_lm.shape[0]
     _pa = raw.get("_phi_angles")
-    phi_angles = np.array(_pa, dtype=np.float64) if _pa else np.arange(n_phi, dtype=np.float64)
+    phi_angles = np.array(_pa, dtype=np.float64) if _pa is not None and len(_pa) else np.arange(n_phi, dtype=np.float64)
     ar_lin = None
 
     # ── 图形生成 (仅图表/方位面驱动; matplotlib 仅非 compute_only) ──
@@ -915,7 +915,9 @@ def _run_compute_serial(
             _report(progress_callback, data_done + step, progress_max,
                     f"[🧮] 计算参数 {i+1}/{total_tasks}")
             # 渲染进度 (calc 完成后进入 render)
-            has_imgs = bool(row.get("_images")) or bool(row.get("_graph_error"))
+            # 用最后追加的结果 (含异常 stub), 避免所有频点异常时 row 未绑定 → UnboundLocalError 掩盖真错
+            _last = sheet_results[sheet_name][-1] if sheet_results.get(sheet_name) else {}
+            has_imgs = bool(_last.get("_images")) or bool(_last.get("_graph_error"))
             if has_imgs:
                 rstep = data_done + cw + int(rw * (i + 1) / total_tasks)
                 _report(progress_callback, rstep, progress_max,
