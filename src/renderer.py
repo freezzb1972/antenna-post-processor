@@ -18,6 +18,51 @@ import numpy as np
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
 
+
+def _setup_cjk_font() -> None:
+    """配置 CJK 字体, 使中文标题不渲染为豆腐块。
+
+    DejaVu Sans 无中文字形, 且本版 matplotlib 不跨 sans-serif 列表逐字形回退。
+    故显式注册系统 CJK 字体文件, 校验其含中文字形后设为首选 (该类字体同时含完整
+    拉丁/希腊/标点, 英文标题与 θ/φ/° 一并正常)。全无 CJK 字体时静默降级 (维持现状)。
+    优先非可变字体 (SimHei/YaHei/WQY), 避免可变字体的 thin 权重问题。
+    """
+    import os as _os
+    from matplotlib import font_manager as _fm
+    from matplotlib.ft2font import FT2Font
+
+    # 候选文件, 非 VF 优先 (Windows 部署机 / Linux / 用户字体目录)
+    _home = _os.path.expanduser("~")
+    _candidates = [
+        "/mnt/c/Windows/Fonts/msyh.ttc", "C:/Windows/Fonts/msyh.ttc",
+        "/mnt/c/Windows/Fonts/simhei.ttf", "C:/Windows/Fonts/simhei.ttf",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        _os.path.join(_home, ".local/share/fonts/msyh.ttc"),
+        _os.path.join(_home, ".local/share/fonts/NotoSansSC-VF.ttf"),  # VF, 兜底
+    ]
+    _picked = None
+    for _p in _candidates:
+        try:
+            if not _os.path.exists(_p):
+                continue
+            if FT2Font(_p).get_char_index(ord("方")) == 0:  # 校验含中文字形
+                continue
+            _fm.fontManager.addfont(_p)
+            _picked = _fm.FontProperties(fname=_p).get_name()
+            break
+        except Exception:
+            continue
+
+    if _picked:
+        _base = [n for n in plt.rcParams.get("font.sans-serif", [])
+                 if n != _picked]
+        plt.rcParams["font.sans-serif"] = [_picked] + _base
+    plt.rcParams["axes.unicode_minus"] = False
+
+
+_setup_cjk_font()
+
 # ═══════════════════════════════════════════════════════════════
 # EMQuest 风格色彩映射
 # ═══════════════════════════════════════════════════════════════
