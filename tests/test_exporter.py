@@ -8,10 +8,6 @@ import pytest
 from src.excel_reader import ColumnInfo, SheetInfo
 from src.exporter import (
     _build_col_map,
-    _find_ar_range_column,
-    _find_ar_single_column,
-    _find_lag_range_column,
-    _find_lag_single_column,
     _name_delta,
     _replace_cell_text,
     _write_ar_range,
@@ -123,43 +119,72 @@ class TestBuildColMap:
         assert len(col_map.get("lag_single", [])) == 2
 
 
-# ── Column Finder Functions ────────────────────────────────────────
+# ── 列类型+角度/范围 匹配 (旧 _find_*_column 已重构为 _build_col_map + writer 内联匹配) ──
+# 原 _find_lag_single_column(info, 30) 返回列索引的语义, 现由 writer 的匹配逻辑承载。
+# 这里通过 writer 行为验证「类型+角度/范围 → 正确列」及「无匹配不写入」两类语义。
 
-class TestFindLagSingleColumn:
-    def test_find_theta_30(self, sample_info):
-        col = _find_lag_single_column(sample_info, 30.0)
-        assert col == 5  # column E
+class TestLagSingleMatch:
+    def test_theta_30_writes_col_E(self, sample_info):
+        wb = openpyxl.Workbook(); ws = wb.active
+        _write_lag_single(ws, 2, _build_col_map(sample_info), 30.0, 5.0)
+        assert ws.cell(2, 5).value == round(5.0, 6)  # column E
+        assert ws.cell(2, 6).value is None            # 未误写 F
+        wb.close()
 
-    def test_find_theta_60(self, sample_info):
-        col = _find_lag_single_column(sample_info, 60.0)
-        assert col == 6  # column F
+    def test_theta_60_writes_col_F(self, sample_info):
+        wb = openpyxl.Workbook(); ws = wb.active
+        _write_lag_single(ws, 2, _build_col_map(sample_info), 60.0, 6.0)
+        assert ws.cell(2, 6).value == round(6.0, 6)  # column F
+        assert ws.cell(2, 5).value is None            # 未误写 E
+        wb.close()
 
-    def test_not_found(self, sample_info):
-        assert _find_lag_single_column(sample_info, 99.0) is None
-
-
-class TestFindLagRangeColumn:
-    def test_find_0_to_70(self, sample_info):
-        col = _find_lag_range_column(sample_info, 0, 70)
-        assert col == 7  # column G
-
-    def test_not_found(self, sample_info):
-        assert _find_lag_range_column(sample_info, 10, 30) is None
-
-
-class TestFindArSingleColumn:
-    def test_find_theta_30(self, sample_info):
-        col = _find_ar_single_column(sample_info, 30.0)
-        assert col == 8
-
-    def test_not_found(self, sample_info):
-        assert _find_ar_single_column(sample_info, 99.0) is None
+    def test_no_match_writes_nothing(self, sample_info):
+        wb = openpyxl.Workbook(); ws = wb.active
+        _write_lag_single(ws, 2, _build_col_map(sample_info), 99.0, 1.0)
+        assert ws.cell(2, 5).value is None and ws.cell(2, 6).value is None
+        wb.close()
 
 
-class TestFindArRangeColumn:
-    def test_find_0_to_70(self, sample_info):
-        col = _find_ar_range_column(sample_info, 0, 70)
-        assert col == 9
+class TestLagRangeMatch:
+    def test_0_to_70_writes_col_G(self, sample_info):
+        wb = openpyxl.Workbook(); ws = wb.active
+        _write_lag_range(ws, 2, _build_col_map(sample_info), 0, 70, 4.5)
+        assert ws.cell(2, 7).value == round(4.5, 6)  # column G
+        wb.close()
+
+    def test_no_match_writes_nothing(self, sample_info):
+        wb = openpyxl.Workbook(); ws = wb.active
+        _write_lag_range(ws, 2, _build_col_map(sample_info), 10, 30, 4.5)
+        assert ws.cell(2, 7).value is None
+        wb.close()
+
+
+class TestArSingleMatch:
+    def test_theta_30_writes_col_H(self, sample_info):
+        wb = openpyxl.Workbook(); ws = wb.active
+        _write_ar_single(ws, 2, _build_col_map(sample_info), 30.0, 2.5)
+        assert ws.cell(2, 8).value == round(2.5, 6)  # column H
+        wb.close()
+
+    def test_no_match_writes_nothing(self, sample_info):
+        wb = openpyxl.Workbook(); ws = wb.active
+        _write_ar_single(ws, 2, _build_col_map(sample_info), 99.0, 2.5)
+        assert ws.cell(2, 8).value is None
+        wb.close()
+
+
+class TestArRangeMatch:
+    def test_0_to_70_writes_col_I(self, sample_info):
+        wb = openpyxl.Workbook(); ws = wb.active
+        _write_ar_range(ws, 2, _build_col_map(sample_info), 0, 70, 3.0)
+        assert ws.cell(2, 9).value == round(3.0, 6)  # column I
+        wb.close()
+
+    def test_no_match_writes_nothing(self, sample_info):
+        wb = openpyxl.Workbook(); ws = wb.active
+        _write_ar_range(ws, 2, _build_col_map(sample_info), 10, 30, 3.0)
+        assert ws.cell(2, 9).value is None
+        wb.close()
 
 
 # ── Write Functions ────────────────────────────────────────────────
