@@ -3783,7 +3783,7 @@ class ChartSettingsPage(QWidget):
         btn_col = QVBoxLayout()
         btn_add = QPushButton("+")
         btn_add.setFixedWidth(30)
-        btn_add.clicked.connect(lambda: (_pairs.append([30.0, -60.0]), _rebuild_chart_list()))
+        btn_add.clicked.connect(lambda: (_pairs.append([30.0, -60.0]), _selected_idx.__setitem__(0, len(_pairs) - 1), _rebuild_chart_list()))
         btn_col.addWidget(btn_add)
         btn_del = QPushButton("✕")
         btn_del.setFixedWidth(30)
@@ -3893,6 +3893,7 @@ class ChartSettingsPage(QWidget):
         btn_add.setFixedWidth(30)
         btn_add.clicked.connect(lambda: (
             _charts.append({"label": f"{chart_label} #{len(_charts)+1}", "freq_start": 0, "freq_end": 0}),
+            _selected_idx.__setitem__(0, len(_charts) - 1),
             _rebuild_chart_list()))
         btn_col.addWidget(btn_add)
         btn_del = QPushButton("✕")
@@ -4059,7 +4060,7 @@ class ChartSettingsPage(QWidget):
         btn_col = QVBoxLayout()
         btn_add_chart = QPushButton("+"); btn_add_chart.setFixedWidth(30)
         btn_add_chart.clicked.connect(lambda: (
-            _entries.append((cmb_param.currentData(), [])), _rebuild_list()))
+            _entries.append((cmb_param.currentData(), [])), _sel_idx.__setitem__(0, len(_entries) - 1), _rebuild_list()))
         btn_col.addWidget(btn_add_chart)
         btn_del_chart = QPushButton("✕"); btn_del_chart.setFixedWidth(30)
         btn_del_chart.clicked.connect(lambda: (
@@ -4228,7 +4229,7 @@ class ChartSettingsPage(QWidget):
         btn_col = QVBoxLayout()
         btn_add = QPushButton("+")
         btn_add.setFixedWidth(30)
-        btn_add.clicked.connect(lambda: (_charts.append([0.0]), _rebuild_chart_list()))
+        btn_add.clicked.connect(lambda: (_charts.append([0.0]), _selected_idx.__setitem__(0, len(_charts) - 1), _rebuild_chart_list()))
         btn_col.addWidget(btn_add)
         btn_del = QPushButton("✕")
         btn_del.setFixedWidth(30)
