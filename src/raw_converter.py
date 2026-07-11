@@ -489,13 +489,13 @@ def _write_normal_csv(path, metadata, freqs, theta, phi,
             w.writerow([sname, "Frequency  (MHz)"] + [""] * (n_cols - 2))
 
             for fi in range(n_freqs):
-                w.writerow(["", f"{freqs[fi]:.6f}", "Theta Angle  (deg)"] + theta)
+                w.writerow(["", f"{freqs[fi]:.16g}", "Theta Angle  (deg)"] + theta)
                 w.writerow(["", "", "Phi Angle  (deg)"] + ["Response  (dB)"] * n_theta)
                 for pi in range(n_phi):
-                    row = ["", "", f"{phi[pi]:.6f}"]
+                    row = ["", "", f"{phi[pi]:.16g}"]
                     for ti in range(n_theta):
                         v = sdata[fi, pi, ti]
-                        row.append(f"{v:.6f}" if np.isfinite(v) else "")
+                        row.append(f"{v:.16g}" if np.isfinite(v) else "")
                     w.writerow(row)
                 if fi < n_freqs - 1:
                     w.writerow([""] * n_cols)
