@@ -63,14 +63,13 @@ def compute_directivity(
     gain_linear: np.ndarray,  # (n_phi, n_theta)
     theta_rad: np.ndarray,    # (n_theta,) 弧度
 ) -> float:
-    """球面梯形积分计算方向性系数。
+    """球面数值积分计算方向性系数 (与 ETS 对齐)。
 
     D = 4π · U_max / P_rad
 
     P_rad = ∫∫ U(θ,φ) sinθ dθ dφ
-           ≈ trapz_φ(trapz_θ(gain · sinθ))
 
-    θ 用梯形法 (O(h²)), φ 为均匀周期分布, 梯形=矩形。
+    θ 用左黎曼矩形和 (末点不计入, 与 ETS 一致), φ 为均匀周期分布 (矩形=精确)。
 
     Args:
         gain_linear: 总增益线性值。
@@ -84,8 +83,9 @@ def compute_directivity(
     sin_theta = np.sin(theta_rad)
 
     integrand = gain_linear * sin_theta[np.newaxis, :]  # (n_phi, n_theta)
-    # 梯形法 over θ: ½ Σ (y_i + y_{i+1}) · dθ
-    int_theta = 0.5 * np.sum(integrand[:, :-1] + integrand[:, 1:], axis=1) * (theta_rad[1] - theta_rad[0])
+    # θ 用左黎曼矩形和 (每个 θ 样本代表角带 [θ_i, θ_i+Δθ] 左端点; 末点 θmax 不作带起点 → 不计入)。
+    # 与 ETS 一致 (验证: SuZhong withAMP 两组 278 频点, |Δ| 均值 0.001 dB; 原梯形法偏 +0.01)。
+    int_theta = np.sum(integrand[:, :-1], axis=1) * (theta_rad[1] - theta_rad[0])
     # φ 均匀周期 → 矩形求和即精确
     p_rad = np.sum(int_theta) * dphi
 
