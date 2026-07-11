@@ -37,6 +37,7 @@ class JsonDataSource(DataSource):
         "theta_phase": "Theta Phase",
         "phi_logmag": "Phi Log Magnitude",
         "phi_phase": "Phi Phase",
+        "total_power": "Total Power",   # EMQuest Final Data 含; 缺失自动置 None
     }
 
     def __init__(self, path: str):
