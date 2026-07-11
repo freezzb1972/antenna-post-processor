@@ -189,6 +189,11 @@ def _process_one_frequency(
                 raw[_k] = raw[_k][:, theta_mask]
         theta_deg = theta_deg[theta_mask]
 
+    # 保存原始数据 (Directivity 独立外推用; 通用 Theta 外推不影响 Directivity, 见 tooltip"除Directivity外")
+    orig_theta_deg = theta_deg.copy()
+    orig_theta_lm = theta_lm
+    orig_phi_lm = phi_lm
+
     need_extrap = theta_extrap_method is not None and theta_deg[-1] < 175
     if need_extrap:
         theta_orig = theta_deg.copy()
@@ -204,21 +209,23 @@ def _process_one_frequency(
     if "gain" in need or "peak_eirp" in compute_set or not need:
         row["gain"] = round(peak_dbi, 6)
 
-    # Directivity (需全球面积分; theta < 175° 时临时外推补全)
+    # Directivity (需全球面积分)。独立用 dir_extrap_method 外推**原始**数据,
+    # 不受通用 theta_extrap_method 影响 (dir_extrap="none" 即用原始截断数据积分)。
     directivity_dbi = None
     need_dir_or_eff = ("directivity" in compute_set or "efficiency_pct" in need
                        or "efficiency_db" in compute_set or not need)
     if need_dir_or_eff:
-        if theta_deg[-1] < 175 and theta_extrap_method is None and dir_extrap_method != "none":
-            # 外推 LogMag 数据到 180° 仅用于 Directivity, 不覆盖原始数据
-            ext_th, ext_tl = extrapolate_theta(theta_deg, theta_lm, dir_extrap_method)
-            _, ext_pl = extrapolate_theta(theta_deg, phi_lm, dir_extrap_method)
+        if orig_theta_deg[-1] < 175 and dir_extrap_method != "none":
+            # 外推原始 LogMag 到 180° 仅用于 Directivity, 不覆盖其它参数
+            ext_th, ext_tl = extrapolate_theta(orig_theta_deg, orig_theta_lm, dir_extrap_method)
+            _, ext_pl = extrapolate_theta(orig_theta_deg, orig_phi_lm, dir_extrap_method)
             ext_gl, _ = compute_total_gain_linear(ext_tl, ext_pl)
             dir_gl = ext_gl
             dir_theta = np.deg2rad(ext_th)
         else:
-            dir_gl = gain_linear
-            dir_theta = theta_rad
+            # 不外推: 用原始截断数据 (θ 仅到 80/110° 等) 直接积分
+            dir_gl, _ = compute_total_gain_linear(orig_theta_lm, orig_phi_lm)
+            dir_theta = np.deg2rad(orig_theta_deg)
         directivity_dbi = compute_directivity(dir_gl, dir_theta)
         if "directivity" in compute_set or not need:
             row["directivity"] = round(directivity_dbi, 6)

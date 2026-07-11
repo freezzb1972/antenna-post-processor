@@ -133,7 +133,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._test_report_enabled: bool = False  # 测试报告(required)图表总开关; 默认空, 勾图表后自动启用
         self._required_params: set = set()   # 用户确认的报告必需参数
         self._extra_params: set = set()      # 用户额外选择的计算参数
-        self._dir_extrap_method: str = "linear"  # Directivity 外推算法
+        self._dir_extrap_method: str = "none"  # Directivity 外推算法 (默认不外推)
         self._test_mode: int = 0             # 0=passive, 1=TRP, 2=TIS
         self._worksheet_naming_mode: int = 0  # 0=保留原模板工作表名, 1=用数据源名命名
         self._mode_states = [{}, {}, {}]     # 三种测试模式独立参数状态
@@ -2565,7 +2565,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         # 从 MainWindow widget 读取（天线参数 dialog 通过 _sync_to_mw 写入此处）
         extrapolate_theta = self._cmb_extrapolate.currentData()
-        dir_extrap = getattr(self, '_dir_extrap_method', 'linear')
+        dir_extrap = getattr(self, '_dir_extrap_method', 'none')
         freq_source = self._cmb_freq_source.currentData() or "datasource"
         trim_start = self._spin_trim_start.value()
         trim_end = self._spin_trim_end.value()

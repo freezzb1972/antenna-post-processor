@@ -119,7 +119,7 @@ class ProcessingWorker(QObject):
         ar_output_db: bool = True,
         worksheet_naming_mode: int = 0,
         compute_only: bool = False,  # 预览模式: True→只计算不导出
-        dir_extrap_method: str = "linear",  # Directivity外推方法: linear|constant|mirror
+        dir_extrap_method: str = "none",  # Directivity外推方法: none|linear|constant|mirror (默认不外推)
         # 多步进参数
         step_values: list[float] | None = None,
         skip_original: bool = False,
