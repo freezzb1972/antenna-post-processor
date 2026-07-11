@@ -32,20 +32,15 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 
-# 方向图数据 key → 显示名称
-PATTERN_DATA_MAP = {
-    "gain_db": "Gain (dBi)",
-    "theta_db": "E_θ (dB)",
-    "phi_db": "E_φ (dB)",
-    "ar_linear": "AR (线性)",
-    "rhcp_db": "RHCP (dBi)",
-    "lhcp_db": "LHCP (dBi)",
-    "cpxpi_db": "CP-XPI (dB)",
-}
-# 默认显示的数据类型 (按序)
-DEFAULT_PATTERN_KEYS = ["gain_db", "theta_db", "phi_db", "ar_linear", "rhcp_db", "lhcp_db", "cpxpi_db"]
+# 方向图数据 key → 显示名称 (从统一注册表 pattern_types 派生; 含相位/Total Power)
+from src.pattern_types import PATTERN_TYPES as _PT
+PATTERN_DATA_MAP = {}
+for _p in _PT:
+    PATTERN_DATA_MAP.setdefault(_p.viewer_key, _p.display)   # eirp≡gain 去重
+# 默认显示的数据类型 (按注册顺序)
+DEFAULT_PATTERN_KEYS = list(PATTERN_DATA_MAP.keys())
 
-GRID_OPTIONS = ["1×1", "1×2", "2×2"]
+GRID_OPTIONS = ["1×1", "1×2", "2×2", "3×3", "2×2+1"]
 PLOT_TYPES = ["Spherical 3D", "Polar 2D", "Cartesian 3D"]
 
 # Frequency curve definitions: (display_label, result_key_prefix, match_mode)
@@ -826,22 +821,39 @@ class GraphViewer(QWidget):
         # 保存旧子图的视角 (按 data_key 索引)
         old_views = {sp.data_key: (sp._elev, sp._azim) for sp in self._subplots}
         self._figure.clear()
-        rows, cols = self._grid_dims()
         self._subplots = []
-        # 使用可配置的数据类型列表
-        keys = self._active_pattern_keys[:rows * cols]
-        for i, dk in enumerate(keys):
-            pos = (rows, cols, i + 1)
-            title = PATTERN_DATA_MAP.get(dk, dk)
-            sp = SubPlotPanel(self._figure, pos, title=title, data_key=dk)
-            ev, az = old_views.get(dk, (self._elev, self._azim))
-            sp.set_view(ev, az)
-            self._subplots.append(sp)
+        grid = self._cmb_grid.currentText()
+        if grid == "2×2+1":
+            self._rebuild_2x2plus1(old_views)
+        else:
+            rows, cols = self._grid_dims()
+            keys = self._active_pattern_keys[:rows * cols]
+            for i, dk in enumerate(keys):
+                self._add_subplot((rows, cols, i + 1), dk, old_views)
         self._rebuild_plot_type_controls()
         self._canvas.draw()
 
+    def _add_subplot(self, pos, dk, old_views):
+        """在指定位置(rows,cols,idx 元组 或 GridSpec spec 单元组)加一个子图。"""
+        title = PATTERN_DATA_MAP.get(dk, dk)
+        sp = SubPlotPanel(self._figure, pos, title=title, data_key=dk)
+        ev, az = old_views.get(dk, (self._elev, self._azim))
+        sp.set_view(ev, az)
+        self._subplots.append(sp)
+
+    def _rebuild_2x2plus1(self, old_views):
+        """特殊布局: 2×2 (θLog/θPhase/φLog/φPhase) + Total Power 右列跨两格 (EMQuest 风格)。"""
+        from matplotlib.gridspec import GridSpec
+        gs = GridSpec(2, 3, figure=self._figure)
+        layout = [(gs[0, 0], "theta_db"), (gs[0, 1], "theta_phase"),
+                  (gs[1, 0], "phi_db"), (gs[1, 1], "phi_phase"),
+                  (gs[0:2, 2], "total_power")]
+        for spec, dk in layout:
+            self._add_subplot((spec,), dk, old_views)
+
     def _grid_dims(self):
-        mapping = {"1×1": (1, 1), "1×2": (1, 2), "2×2": (2, 2), "3×3": (3, 3)}
+        mapping = {"1×1": (1, 1), "1×2": (1, 2), "2×2": (2, 2),
+                   "3×3": (3, 3), "2×2+1": (2, 3)}
         return mapping.get(self._cmb_grid.currentText(), (2, 2))
 
     def _on_grid_changed(self):
