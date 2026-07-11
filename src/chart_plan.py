@@ -125,12 +125,12 @@ def expand_to_instances(
 
     # ── A 类 3D 方向图 ──
     if chart_config:
-        _a_keys = ["pattern_3d_gain", "pattern_3d_eirp", "pattern_3d_ar",
-                   "pattern_3d_etheta", "pattern_3d_ephi"]
+        # gain/Eθ/Eφ 所有模式; 无源+AR, 发射+EIRP, 接收(TIS)暂无第4个(EIS待数据)
+        _a_keys = ["pattern_3d_gain", "pattern_3d_etheta", "pattern_3d_ephi"]
         if mode == 0:
-            _a_keys.remove("pattern_3d_eirp")
+            _a_keys.append("pattern_3d_ar")
         elif mode == 1:
-            _a_keys.remove("pattern_3d_ar")
+            _a_keys.append("pattern_3d_eirp")
 
         for key in _a_keys:
             if not getattr(chart_config, key, False):

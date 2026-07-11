@@ -302,28 +302,25 @@ class ChartConfig:
         Args:
             mode: 0=无源天线, 1=有源发射(TRP), 2=有源接收(TIS)
         """
-        # 共用: 3D 方向图 (所有模式都有 Gain)
+        # A 类 3D 方向图: gain/Eθ/Eφ 所有模式; 第4个按模式:
+        #   无源→AR(圆极化)  发射→EIRP  接收(TIS)→暂无(EIS/TIS 待灵敏度数据, 见记忆 tis-metrics-todo)
         pattern_3d = ["pattern_3d_gain", "pattern_3d_etheta", "pattern_3d_ephi"]
-        if mode == 1:
-            pattern_3d.append("pattern_3d_eirp")
-        else:
-            pattern_3d.append("pattern_3d_ar")
-
-        # vs 频率曲线: 按模式分组
-        vs_freq = ["chart_gain_freq", "chart_eff_freq", "chart_dir_freq"]
         if mode == 0:
-            vs_freq.append("chart_ar_freq")
+            pattern_3d.append("pattern_3d_ar")
         elif mode == 1:
-            vs_freq.append("chart_trp_freq")
+            pattern_3d.append("pattern_3d_eirp")
 
-        # 2D 切面图: 俯仰面 + 方位面
-        cuts = ["cut_2d_polar", "cut_azimuth_polar", "cut_2d_rect", "cut_azimuth_rect"]
+        result = {"A 类: 3D 方向图": pattern_3d}
 
-        return {
-            "A 类: 3D 方向图": pattern_3d,
-            "B 类: 频率曲线": vs_freq,
-            "C 类: 2D 切面图": cuts,
-        }
+        # B 类 频率曲线: 仅无源 (有源只测高/中/低 3 band, 不需频率曲线)
+        if mode == 0:
+            result["B 类: 频率曲线"] = ["chart_gain_freq", "chart_eff_freq",
+                                        "chart_dir_freq", "chart_ar_freq"]
+
+        # C 类 2D 切面图: 所有模式
+        result["C 类: 2D 切面图"] = ["cut_2d_polar", "cut_azimuth_polar",
+                                     "cut_2d_rect", "cut_azimuth_rect"]
+        return result
 
 
 # ═══════════════════════════════════════════════════════════════
