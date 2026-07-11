@@ -9,7 +9,7 @@
 服务器 URL 优先级:
   1. FEEDBACK_SERVER_URL 环境变量
   2. QSettings "feedback/server_url"
-  3. 默认: http://138.2.77.171  (ARM, nginx 代理 /feedback → 127.0.0.1:8898)
+  3. 默认: https://antennapp.freezzb.dpdns.org  (Cloudflare 隧道 → /feedback 路由到 127.0.0.1:8898)
 
 安全: HMAC-SHA256 签名请求体 (完整性 + 防伪造刷屏), 密钥客户端/服务端共享。
       密钥内嵌于分发客户端, 属完整性校验非强鉴权 (可提取), 配合服务端限流+去重。
@@ -25,8 +25,12 @@ import uuid
 from pathlib import Path
 
 from .activation import get_machine_id
+from . import __version__ as _APP_VERSION
 
-_DEFAULT_SERVER_URL = "http://138.2.77.171"
+_DEFAULT_SERVER_URL = "https://antennapp.freezzb.dpdns.org"
+
+# 正常 UA — Cloudflare Bot 防护会挡 urllib 默认 UA (Python-urllib/*) 返回 403
+_USER_AGENT = f"AntennaPostProcessor/{_APP_VERSION}"
 
 # HMAC 共享密钥 (与服务端 feedback_server 一致)。
 _FEEDBACK_HMAC_KEY = bytes.fromhex(
@@ -104,7 +108,8 @@ def submit_feedback(payload: dict, server_url: str | None = None,
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
         url, data=body,
-        headers={"Content-Type": "application/json", "X-Signature": _sign(body)},
+        headers={"Content-Type": "application/json", "X-Signature": _sign(body),
+                 "User-Agent": _USER_AGENT},
         method="POST",
     )
     try:
