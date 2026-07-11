@@ -817,12 +817,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # ── 帮助 ──
         hm = menubar.addMenu(self.tr("&帮助"))
         hm.addAction(self.tr("使用说明"), self._on_help, QKeySequence("F1"))
+        hm.addAction(self.tr("发送反馈..."), self._on_send_feedback)
         hm.addAction(self.tr("许可管理..."), self._on_license)
         hm.addAction(self.tr("关于..."), self._on_about)
 
         # 注册到 WindowManager
         from ui.window_manager import WindowManager
         WindowManager.instance().register(self)
+
+        # 启动后台重发本地反馈队列 (离线时攒的反馈)
+        QTimer.singleShot(3000, self._resend_feedback_queue)
 
     def _hide_settings_tabs(self):
         """重组标签页：移除废弃标签，重命名保留标签。
@@ -1019,6 +1023,34 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         from ui.dialogs import HelpDialog
         dlg = HelpDialog(self)
         dlg.exec()
+
+    def _on_send_feedback(self):
+        """打开反馈对话框, 附带日志/配置快照供用户可选勾选。"""
+        from ui.feedback_dialog import FeedbackDialog
+        log_text = ""
+        try:
+            log_text = self.ui.logOutput.toPlainText()
+        except Exception:
+            pass
+        config_dict = {}
+        try:
+            import dataclasses
+            from src.config_manager import get_config_manager
+            config_dict = dataclasses.asdict(get_config_manager().config)
+        except Exception:
+            pass
+        FeedbackDialog(self, log_text=log_text, config_dict=config_dict).exec()
+
+    def _resend_feedback_queue(self):
+        """后台重发本地反馈队列 (feedback_client 纯逻辑, 用守护线程避免卡 UI)。"""
+        import threading
+        try:
+            from src import feedback_client
+            threading.Thread(
+                target=lambda: feedback_client.resend_queue(), daemon=True
+            ).start()
+        except Exception:
+            pass
 
     # ── 项目管理 ──
 
