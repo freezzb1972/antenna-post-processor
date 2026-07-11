@@ -2954,6 +2954,7 @@ class ChartSettingsPage(QWidget):
         # 视角参数默认值（每个3D图表参数对话框中可单独调整）
         self._elev = 30.0; self._azim = -60.0
         self._dpi = 150; self._step_deg = 5.0
+        self._dyn_db = 40.0   # 3D 半径动态范围 (dB), 可配
 
         grp_list: list = []
 
@@ -3164,6 +3165,7 @@ class ChartSettingsPage(QWidget):
             self._ar_ranges = list(req.ar_chart_ranges)
             self._cut_2d_phi_angles = list(req.cut_2d_phi_angles)
             self._view_angle_pairs = list(req.view_angle_pairs)
+            self._dyn_db = float(getattr(req, 'dyn_db', 40.0))
         if hasattr(mw, '_chart_config_extra') and mw._chart_config_extra is not None:
             xtr = mw._chart_config_extra
             for key, cb in self._chart_extra.items():
@@ -3539,6 +3541,7 @@ class ChartSettingsPage(QWidget):
         required.azim = getattr(self, '_azim', -60.0)
         required.dpi = getattr(self, '_dpi', 150)
         required.step_deg = getattr(self, '_step_deg', 5.0)
+        required.dyn_db = getattr(self, '_dyn_db', 40.0)
         required.embed_in_excel = False  # 图表统一到 Word
         extra.elev = required.elev
         extra.azim = required.azim
@@ -3736,42 +3739,41 @@ class ChartSettingsPage(QWidget):
         layout.addLayout(row)
 
     def _show_a3d_param_dialog(self, chart_key: str):
-        """A 类 3D 方向图参数设置 — DPI + 采样精度 + 图表列表(每视角=一个图表)。"""
+        """A 类 3D 方向图参数设置 — DPI + 采样精度 + 动态范围 + 图表列表(每视角 elev/azim/roll)。"""
         from src.chart_config import ChartConfig
-        label_map = ChartConfig.chart_labels()
-        label = label_map.get(chart_key, chart_key)
+        label = ChartConfig.chart_labels().get(chart_key, chart_key)
 
-        # 视角对 → 图表列表格式: [(el, az), ...]
-        _pairs: list = [[el, az] for el, az in self._view_angle_pairs] if self._view_angle_pairs else [[30.0, -60.0]]
+        def _as3(p):
+            return [float(p[0]), float(p[1]), float(p[2]) if len(p) > 2 else 0.0]
+        _pairs = [_as3(p) for p in self._view_angle_pairs] if self._view_angle_pairs else [[30.0, -60.0, 0.0]]
         _selected_idx = [0]
+        _PRESETS = [("Iso", 30, -60, 0), ("Top", 90, -90, 0), ("Bottom", -90, -90, 0),
+                    ("Front", 0, -90, 0), ("Back", 0, 90, 0), ("Left", 0, 180, 0), ("Right", 0, 0, 0)]
 
         dlg = QDialog(self)
         dlg.setWindowTitle(label + " " + self.tr("参数设置"))
-        dlg.setMinimumSize(520, 480)
+        dlg.setMinimumSize(540, 540)
         layout = QVBoxLayout(dlg)
 
         form = QFormLayout()
-        spin_dpi = QSpinBox()
-        spin_dpi.setRange(72, 600); spin_dpi.setValue(getattr(self, '_dpi', 150))
+        spin_dpi = QSpinBox(); spin_dpi.setRange(72, 600); spin_dpi.setValue(getattr(self, '_dpi', 150))
         form.addRow(self.tr("DPI:"), spin_dpi)
-
-        spin_step = QSpinBox()
-        spin_step.setRange(1, 30); spin_step.setValue(int(getattr(self, '_step_deg', 5)))
-        spin_step.setSuffix("°")
-        spin_step.setToolTip(self.tr("3D 采样精度: 1°=最细, 30°=最快"))
+        spin_step = QSpinBox(); spin_step.setRange(1, 30); spin_step.setValue(int(getattr(self, '_step_deg', 5)))
+        spin_step.setSuffix("°"); spin_step.setToolTip(self.tr("3D 采样精度: 1°=最细, 30°=最快"))
         form.addRow(self.tr("采样精度:"), spin_step)
+        spin_dyn = QSpinBox(); spin_dyn.setRange(10, 80); spin_dyn.setValue(int(getattr(self, '_dyn_db', 40)))
+        spin_dyn.setSuffix(" dB"); spin_dyn.setToolTip(self.tr("3D 半径动态范围: 峰值往下多少 dB 收缩到中心 (默认 40)"))
+        form.addRow(self.tr("动态范围:"), spin_dyn)
         layout.addLayout(form)
 
-        # ── 图表列表 ──
         chart_grp = QGroupBox(self.tr("图表列表（每视角 = 一张 3D 图）"))
         chart_layout = QHBoxLayout(chart_grp)
-        chart_list = QListWidget()
-        chart_list.setMaximumHeight(100)
+        chart_list = QListWidget(); chart_list.setMaximumHeight(110)
 
         def _rebuild_chart_list():
             chart_list.clear()
-            for i, (el, az) in enumerate(_pairs):
-                chart_list.addItem(f"图表 {i+1}: el={el:.0f}°, az={az:.0f}°")
+            for i, p in enumerate(_pairs):
+                chart_list.addItem(f"图表 {i+1}: el={p[0]:.0f}° az={p[1]:.0f}° roll={p[2]:.0f}°")
             if _selected_idx[0] >= chart_list.count():
                 _selected_idx[0] = chart_list.count() - 1
             if _selected_idx[0] >= 0 and chart_list.count() > 0:
@@ -3779,64 +3781,73 @@ class ChartSettingsPage(QWidget):
 
         _rebuild_chart_list()
         chart_layout.addWidget(chart_list, 1)
-
         btn_col = QVBoxLayout()
-        btn_add = QPushButton("+")
-        btn_add.setFixedWidth(30)
-        btn_add.clicked.connect(lambda: (_pairs.append([30.0, -60.0]), _selected_idx.__setitem__(0, len(_pairs) - 1), _rebuild_chart_list()))
+        btn_add = QPushButton("+"); btn_add.setFixedWidth(30)
+        btn_add.clicked.connect(lambda: (_pairs.append([30.0, -60.0, 0.0]), _selected_idx.__setitem__(0, len(_pairs) - 1), _rebuild_chart_list()))
         btn_col.addWidget(btn_add)
-        btn_del = QPushButton("✕")
-        btn_del.setFixedWidth(30)
+        btn_del = QPushButton("✕"); btn_del.setFixedWidth(30)
         btn_del.clicked.connect(lambda: (
             _pairs.pop(_selected_idx[0]) if len(_pairs) > 1 and 0 <= _selected_idx[0] < len(_pairs) else None,
             _rebuild_chart_list()))
-        btn_col.addWidget(btn_del)
-        btn_col.addStretch()
+        btn_col.addWidget(btn_del); btn_col.addStretch()
         chart_layout.addLayout(btn_col)
         layout.addWidget(chart_grp)
-
         chart_list.currentRowChanged.connect(lambda i: _selected_idx.__setitem__(0, i) if i >= 0 else None)
 
-        # ── 编辑选中图表 ──
         edit_grp = QGroupBox(self.tr("编辑选中图表的视角"))
         edit_form = QFormLayout(edit_grp)
 
-        def _get_current():
+        def _cur():
             idx = _selected_idx[0]
-            if 0 <= idx < len(_pairs):
-                return _pairs[idx]
-            return _pairs[0] if _pairs else [30.0, -60.0]
+            return _pairs[idx] if 0 <= idx < len(_pairs) else (_pairs[0] if _pairs else [30.0, -60.0, 0.0])
 
-        spin_el = QDoubleSpinBox()
-        spin_el.setRange(-90, 90); spin_el.setDecimals(0); spin_el.setSuffix("°")
-        spin_az = QDoubleSpinBox()
-        spin_az.setRange(-180, 180); spin_az.setDecimals(0); spin_az.setSuffix("°")
+        cmb_preset = QComboBox(); cmb_preset.addItem(self.tr("(预设视角)"), None)
+        for nm, e, a, r in _PRESETS:
+            cmb_preset.addItem(nm, (e, a, r))
+        spin_el = QDoubleSpinBox(); spin_el.setRange(-90, 90); spin_el.setDecimals(0); spin_el.setSuffix("°")
+        spin_az = QDoubleSpinBox(); spin_az.setRange(-180, 360); spin_az.setDecimals(0); spin_az.setSuffix("°")
+        spin_roll = QDoubleSpinBox(); spin_roll.setRange(-180, 360); spin_roll.setDecimals(0); spin_roll.setSuffix("°")
 
         def _refresh_edit():
-            cur = _get_current()
-            spin_el.blockSignals(True); spin_az.blockSignals(True)
-            spin_el.setValue(cur[0]); spin_az.setValue(cur[1])
-            spin_el.blockSignals(False); spin_az.blockSignals(False)
+            c = _cur()
+            for s, v in ((spin_el, c[0]), (spin_az, c[1]), (spin_roll, c[2])):
+                s.blockSignals(True); s.setValue(v); s.blockSignals(False)
 
-        spin_el.valueChanged.connect(lambda v: (_get_current().__setitem__(0, v), _rebuild_chart_list()))
-        spin_az.valueChanged.connect(lambda v: (_get_current().__setitem__(1, v), _rebuild_chart_list()))
+        spin_el.valueChanged.connect(lambda v: (_cur().__setitem__(0, v), _rebuild_chart_list()))
+        spin_az.valueChanged.connect(lambda v: (_cur().__setitem__(1, v), _rebuild_chart_list()))
+        spin_roll.valueChanged.connect(lambda v: (_cur().__setitem__(2, v), _rebuild_chart_list()))
+
+        def _apply_preset(_idx):
+            d = cmb_preset.currentData()
+            if d is None:
+                return
+            c = _cur(); c[0], c[1], c[2] = float(d[0]), float(d[1]), float(d[2])
+            _refresh_edit(); _rebuild_chart_list()
+        cmb_preset.currentIndexChanged.connect(_apply_preset)
         chart_list.currentRowChanged.connect(lambda i: _refresh_edit())
 
+        edit_form.addRow(self.tr("预设:"), cmb_preset)
         edit_form.addRow(self.tr("仰角:"), spin_el)
         edit_form.addRow(self.tr("方位角:"), spin_az)
+        edit_form.addRow(self.tr("滚转:"), spin_roll)
         _refresh_edit()
         layout.addWidget(edit_grp)
         freq_picker = self._add_frequency_picker(layout, 'a')
         layout.addStretch()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        btns.accepted.connect(lambda: (
-            setattr(self, '_dpi', spin_dpi.value()), self._sync_selected_frequencies(freq_picker.get_selected(), 'a'),
-            setattr(self, '_step_deg', float(spin_step.value())),
-            self._view_angle_pairs.clear(),
-            [self._view_angle_pairs.append((float(el), float(az))) for el, az in _pairs],
-            self._sync_to_mw(),
-            dlg.accept()))
+
+        def _accept():
+            self._dpi = spin_dpi.value()
+            self._step_deg = float(spin_step.value())
+            self._dyn_db = float(spin_dyn.value())
+            self._sync_selected_frequencies(freq_picker.get_selected(), 'a')
+            self._view_angle_pairs.clear()
+            for p in _pairs:
+                self._view_angle_pairs.append((float(p[0]), float(p[1]), float(p[2])))
+            self._sync_to_mw()
+            dlg.accept()
+        btns.accepted.connect(_accept)
         btns.rejected.connect(dlg.reject)
         layout.addWidget(btns)
         dlg.exec()

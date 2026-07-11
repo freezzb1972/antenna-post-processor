@@ -648,22 +648,22 @@ Continue with boundary-value extrapolation?</translation>
 <context>
     <name>ChartSettingsPage</name>
     <message>
-        <location filename="../ui/pages.py" line="3213" />
+        <location filename="../ui/pages.py" line="3215" />
         <source>全选</source>
         <translation>Select all</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3214" />
+        <location filename="../ui/pages.py" line="3216" />
         <source>取消全选</source>
         <translation>Deselect all</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3434" />
+        <location filename="../ui/pages.py" line="3436" />
         <source>当前标题语言 = {0}  (在输出设置的「标题语言」切换)</source>
         <translation>Current title language = {0}  (switch via 'Title language' in Output settings)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3439" />
+        <location filename="../ui/pages.py" line="3441" />
         <source>编辑各类图表的默认标题模板。可用占位符:
 {0}
 缺失占位符自动省略。逐张图可在「Word 输出布局设置」的标题列单独覆盖。</source>
@@ -672,483 +672,508 @@ Continue with boundary-value extrapolation?</translation>
 Missing placeholders are omitted. Override per chart in the Title column of Word output layout settings.</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3825" />
+        <location filename="../ui/pages.py" line="3830" />
         <source>仰角:</source>
         <translation>Elevation:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3826" />
+        <location filename="../ui/pages.py" line="3831" />
         <source>方位角:</source>
         <translation>Azimuth:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3762" />
+        <location filename="../ui/pages.py" line="3763" />
         <source>采样精度:</source>
         <translation>Sampling resolution:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4132" />
+        <location filename="../ui/pages.py" line="4143" />
         <source>添加</source>
         <translation>Add</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4278" />
+        <location filename="../ui/pages.py" line="4289" />
         <source>步进批量生成</source>
         <translation>Batch generate by step</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4152" />
-        <location filename="../ui/pages.py" line="4289" />
+        <location filename="../ui/pages.py" line="4163" />
+        <location filename="../ui/pages.py" line="4300" />
         <source>生成</source>
         <translation>Generate</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="2966" />
+        <location filename="../ui/pages.py" line="2967" />
         <source>测试报告</source>
         <translation>Test report</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="2967" />
-        <location filename="../ui/pages.py" line="2982" />
+        <location filename="../ui/pages.py" line="2968" />
+        <location filename="../ui/pages.py" line="2983" />
         <source>启用</source>
         <translation>Enable</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="2981" />
+        <location filename="../ui/pages.py" line="2982" />
         <source>额外报告</source>
         <translation>Extra report</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3055" />
+        <location filename="../ui/pages.py" line="3056" />
         <source>输出设置</source>
         <translation>Output settings</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3060" />
+        <location filename="../ui/pages.py" line="3061" />
         <source>Word 输出布局设置...</source>
         <translation>Word output layout settings...</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3063" />
+        <location filename="../ui/pages.py" line="3064" />
         <source>Full Report Word 布局设置...</source>
         <translation>Full Report Word layout settings...</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3066" />
+        <location filename="../ui/pages.py" line="3067" />
         <source>默认标题模板...</source>
         <translation>Default title templates...</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3067" />
+        <location filename="../ui/pages.py" line="3068" />
         <source>编辑各类图表的默认标题模板 (英文, 支持占位符)</source>
         <translation>Edit default title templates per chart type (English, placeholders supported)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3075" />
+        <location filename="../ui/pages.py" line="3076" />
         <source>图表标题天线名:</source>
         <translation>Chart title antenna name:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3077" />
+        <location filename="../ui/pages.py" line="3078" />
         <source>天线名，用于图表标题</source>
         <translation>Antenna name for chart titles</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3082" />
+        <location filename="../ui/pages.py" line="3083" />
         <source>标题语言:</source>
         <translation>Title language:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3084" />
-        <location filename="../ui/pages.py" line="3419" />
+        <location filename="../ui/pages.py" line="3085" />
+        <location filename="../ui/pages.py" line="3421" />
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3085" />
-        <location filename="../ui/pages.py" line="3419" />
+        <location filename="../ui/pages.py" line="3086" />
+        <location filename="../ui/pages.py" line="3421" />
         <source>中文</source>
         <translation>Chinese</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3086" />
+        <location filename="../ui/pages.py" line="3087" />
         <source>图表图片内标题的语言 (独立于界面语言)</source>
         <translation>Language of titles inside chart images (independent of UI language)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3099" />
+        <location filename="../ui/pages.py" line="3100" />
         <source>测试模式:</source>
         <translation>Test mode:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3101" />
+        <location filename="../ui/pages.py" line="3102" />
         <source>无源天线</source>
         <translation>Passive antenna</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3102" />
+        <location filename="../ui/pages.py" line="3103" />
         <source>有源发射 TRP</source>
         <translation>Active TX (TRP)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3103" />
+        <location filename="../ui/pages.py" line="3104" />
         <source>有源接收 TIS</source>
         <translation>Active RX (TIS)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3241" />
+        <location filename="../ui/pages.py" line="3243" />
         <source>Full Report Word 布局设置</source>
         <translation>Full Report Word layout settings</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3241" />
+        <location filename="../ui/pages.py" line="3243" />
         <source>Word 输出布局设置</source>
         <translation>Word output layout settings</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3252" />
+        <location filename="../ui/pages.py" line="3254" />
         <source>批量输出模式</source>
         <translation>Batch output mode</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3254" />
+        <location filename="../ui/pages.py" line="3256" />
         <source>按频点: 每频点全部图 → 下一频点</source>
         <translation>By frequency: all charts per freq → next freq</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3255" />
+        <location filename="../ui/pages.py" line="3257" />
         <source>按图表类型: 每类图全频点 → 下一类</source>
         <translation>By chart type: all freqs per type → next type</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3261" />
+        <location filename="../ui/pages.py" line="3263" />
         <source>图表顺序与标题 (上移/下移调顺序; 双击标题单元格编辑)</source>
         <translation>Chart order &amp; titles (up/down to reorder; double-click title cell to edit)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3263" />
+        <location filename="../ui/pages.py" line="3265" />
         <source>标题留空 = 用类别默认模板 (随频率/天线名自动生成)。悬停查看默认。</source>
         <translation>Empty title = use category default template (auto-generated with freq/antenna). Hover to see default.</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3283" />
+        <location filename="../ui/pages.py" line="3285" />
         <source>图表</source>
         <translation>Chart</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3283" />
+        <location filename="../ui/pages.py" line="3285" />
         <source>标题 (可编辑)</source>
         <translation>Title (editable)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3307" />
+        <location filename="../ui/pages.py" line="3309" />
         <source>默认: {0}</source>
         <translation>Default: {0}</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3313" />
+        <location filename="../ui/pages.py" line="3315" />
         <source>↑ 上移</source>
         <translation>↑ Up</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3314" />
+        <location filename="../ui/pages.py" line="3316" />
         <source>↓ 下移</source>
         <translation>↓ Down</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3315" />
+        <location filename="../ui/pages.py" line="3317" />
         <source>恢复默认</source>
         <translation>Restore default</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3339" />
+        <location filename="../ui/pages.py" line="3341" />
         <source>排版参数</source>
         <translation>Layout parameters</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3343" />
+        <location filename="../ui/pages.py" line="3345" />
         <source>每行 </source>
         <translation>Per row </translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3343" />
+        <location filename="../ui/pages.py" line="3345" />
         <source> 列</source>
         <translation> cols</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3344" />
+        <location filename="../ui/pages.py" line="3346" />
         <source>列数:</source>
         <translation>Columns:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3349" />
+        <location filename="../ui/pages.py" line="3351" />
         <source>图片宽度占列宽的百分比</source>
         <translation>Image width as percent of column width</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3350" />
+        <location filename="../ui/pages.py" line="3352" />
         <source>图片宽(%):</source>
         <translation>Image width (%):</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3352" />
+        <location filename="../ui/pages.py" line="3354" />
         <source>生成章节标题</source>
         <translation>Generate section heading</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3356" />
+        <location filename="../ui/pages.py" line="3358" />
         <source>显示图片题注</source>
         <translation>Show image caption</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3421" />
+        <location filename="../ui/pages.py" line="3423" />
         <source>3D 方向图</source>
         <translation>3D pattern</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3422" />
+        <location filename="../ui/pages.py" line="3424" />
         <source>频点曲线</source>
         <translation>Frequency curve</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3423" />
+        <location filename="../ui/pages.py" line="3425" />
         <source>俯仰面切面</source>
         <translation>Elevation cut</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3424" />
+        <location filename="../ui/pages.py" line="3426" />
         <source>方位面切面</source>
         <translation>Azimuth cut</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3430" />
+        <location filename="../ui/pages.py" line="3432" />
         <source>默认标题模板</source>
         <translation>Default title templates</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3449" />
+        <location filename="../ui/pages.py" line="3451" />
         <source>类别</source>
         <translation>Category</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3449" />
+        <location filename="../ui/pages.py" line="3451" />
         <source>标题模板</source>
         <translation>Title template</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3460" />
+        <location filename="../ui/pages.py" line="3462" />
         <source>内置默认: {0}</source>
         <translation>Built-in default: {0}</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3465" />
+        <location filename="../ui/pages.py" line="3467" />
         <source>恢复内置默认</source>
         <translation>Restore built-in defaults</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3724" />
-        <location filename="../ui/pages.py" line="3728" />
-        <location filename="../ui/pages.py" line="3732" />
+        <location filename="../ui/pages.py" line="3727" />
+        <location filename="../ui/pages.py" line="3731" />
+        <location filename="../ui/pages.py" line="3735" />
         <source>参数</source>
         <translation>Parameters</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3749" />
-        <location filename="../ui/pages.py" line="3861" />
+        <location filename="../ui/pages.py" line="3754" />
+        <location filename="../ui/pages.py" line="3872" />
         <source>参数设置</source>
         <translation>Parameter settings</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3756" />
-        <location filename="../ui/pages.py" line="4175" />
+        <location filename="../ui/pages.py" line="3760" />
+        <location filename="../ui/pages.py" line="4186" />
         <source>DPI:</source>
         <translation>DPI:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3761" />
+        <location filename="../ui/pages.py" line="3762" />
         <source>3D 采样精度: 1°=最细, 30°=最快</source>
         <translation>3D sampling: 1°=finest, 30°=fastest</translation>
     </message>
     <message>
+        <location filename="../ui/pages.py" line="3765" />
+        <source>3D 半径动态范围: 峰值往下多少 dB 收缩到中心 (默认 40)</source>
+        <translation>3D radius dynamic range: dB below peak that collapses to center (default 40)</translation>
+    </message>
+    <message>
         <location filename="../ui/pages.py" line="3766" />
+        <source>动态范围:</source>
+        <translation>Dynamic range:</translation>
+    </message>
+    <message>
+        <location filename="../ui/pages.py" line="3769" />
         <source>图表列表（每视角 = 一张 3D 图）</source>
         <translation>Chart list (each view = one 3D image)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3801" />
+        <location filename="../ui/pages.py" line="3797" />
         <source>编辑选中图表的视角</source>
         <translation>Edit view of selected chart</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3871" />
+        <location filename="../ui/pages.py" line="3804" />
+        <source>(预设视角)</source>
+        <translation>(view preset)</translation>
+    </message>
+    <message>
+        <location filename="../ui/pages.py" line="3829" />
+        <source>预设:</source>
+        <translation>Preset:</translation>
+    </message>
+    <message>
+        <location filename="../ui/pages.py" line="3832" />
+        <source>滚转:</source>
+        <translation>Roll:</translation>
+    </message>
+    <message>
+        <location filename="../ui/pages.py" line="3882" />
         <source>图表列表（每图表 = 一条独立曲线）</source>
         <translation>Chart list (each chart = one curve)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3912" />
+        <location filename="../ui/pages.py" line="3923" />
         <source>编辑选中图表</source>
         <translation>Edit selected chart</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3938" />
+        <location filename="../ui/pages.py" line="3949" />
         <source>名称:</source>
         <translation>Name:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3939" />
+        <location filename="../ui/pages.py" line="3950" />
         <source>频段起:</source>
         <translation>Band start:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3940" />
+        <location filename="../ui/pages.py" line="3951" />
         <source>频段止:</source>
         <translation>Band end:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3945" />
+        <location filename="../ui/pages.py" line="3956" />
         <source>全局参数</source>
         <translation>Global parameters</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3948" />
+        <location filename="../ui/pages.py" line="3959" />
         <source>0=不打断单轴；&gt;0=相邻频点差超此值时分段绘制</source>
         <translation>0=single continuous axis; &gt;0=split segments when adjacent freq gap exceeds this</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3949" />
+        <location filename="../ui/pages.py" line="3960" />
         <source>频段间隔 (MHz):</source>
         <translation>Band gap (MHz):</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3950" />
+        <location filename="../ui/pages.py" line="3961" />
         <source>启用双Y轴配对</source>
         <translation>Enable dual Y-axis pairing</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3952" />
+        <location filename="../ui/pages.py" line="3963" />
         <source>Efficiency%+Gain 和 Directivity+TRP 共用双Y轴</source>
         <translation>Efficiency%+Gain and Directivity+TRP share dual Y-axes</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3984" />
+        <location filename="../ui/pages.py" line="3995" />
         <source>多视角</source>
         <translation>Multi-view</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3987" />
+        <location filename="../ui/pages.py" line="3998" />
         <source>添加多组 (仰角, 方位角) 视角对:</source>
         <translation>Add (elevation, azimuth) view pairs:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3990" />
+        <location filename="../ui/pages.py" line="4001" />
         <source>仰角 (°)</source>
         <translation>Elevation (°)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3990" />
+        <location filename="../ui/pages.py" line="4001" />
         <source>方位角 (°)</source>
         <translation>Azimuth (°)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="3995" />
+        <location filename="../ui/pages.py" line="4006" />
         <source>+ 添加</source>
         <translation>+ Add</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4000" />
+        <location filename="../ui/pages.py" line="4011" />
         <source>删除选中</source>
         <translation>Delete selected</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4036" />
+        <location filename="../ui/pages.py" line="4047" />
         <source>{fmt_name}{dir_name}切面图参数</source>
         <translation>{fmt_name}{dir_name} cut chart settings</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4041" />
+        <location filename="../ui/pages.py" line="4052" />
         <source>图表列表</source>
         <translation>Chart list</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4082" />
+        <location filename="../ui/pages.py" line="4093" />
         <source>天线参数:</source>
         <translation>Antenna parameters:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4091" />
+        <location filename="../ui/pages.py" line="4102" />
         <source>编辑选中图表的 {angle_label} 角度</source>
         <translation>Edit {angle_label} angles of selected chart</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4127" />
+        <location filename="../ui/pages.py" line="4138" />
         <source>添加 {angle_label} 角度:</source>
         <translation>Add {angle_label} angle:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4149" />
-        <location filename="../ui/pages.py" line="4286" />
+        <location filename="../ui/pages.py" line="4160" />
+        <location filename="../ui/pages.py" line="4297" />
         <source>起:</source>
         <translation>From:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4150" />
-        <location filename="../ui/pages.py" line="4287" />
+        <location filename="../ui/pages.py" line="4161" />
+        <location filename="../ui/pages.py" line="4298" />
         <source>止:</source>
         <translation>To:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4151" />
-        <location filename="../ui/pages.py" line="4288" />
+        <location filename="../ui/pages.py" line="4162" />
+        <location filename="../ui/pages.py" line="4299" />
         <source>步:</source>
         <translation>Step:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4166" />
+        <location filename="../ui/pages.py" line="4177" />
         <source>更新选中图表参数</source>
         <translation>Update selected chart settings</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4203" />
+        <location filename="../ui/pages.py" line="4214" />
         <source>选择俯仰面切图 Phi 角度</source>
         <translation>Select elevation-cut Phi angles</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4208" />
+        <location filename="../ui/pages.py" line="4219" />
         <source>图表列表（每图表 = 一张切面图）</source>
         <translation>Chart list (each chart = one cut image)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4247" />
+        <location filename="../ui/pages.py" line="4258" />
         <source>编辑选中图表的 Phi 角度</source>
         <translation>Edit Phi angles of selected chart</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4272" />
+        <location filename="../ui/pages.py" line="4283" />
         <source>Phi:</source>
         <translation>Phi:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4317" />
+        <location filename="../ui/pages.py" line="4328" />
         <source>频点选择</source>
         <translation>Frequency selection</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4348" />
+        <location filename="../ui/pages.py" line="4359" />
         <source>选择频点...</source>
         <translation>Select frequencies...</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4364" />
+        <location filename="../ui/pages.py" line="4375" />
         <source>已选: </source>
         <translation>Selected: </translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4367" />
+        <location filename="../ui/pages.py" line="4378" />
         <source>已选 {len(_selected)} 个频点</source>
         <translation>{len(_selected)} frequencies selected</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4369" />
+        <location filename="../ui/pages.py" line="4380" />
         <source>(全部频点)</source>
         <translation>(all frequencies)</translation>
     </message>
@@ -1340,195 +1365,195 @@ New tasks use them by default; you can override them anytime in the UI.</transla
 <context>
     <name>DocxTemplateToolbox</name>
     <message>
-        <location filename="../ui/pages.py" line="4435" />
+        <location filename="../ui/pages.py" line="4446" />
         <location filename="../ui/template_recognizer.py" line="470" />
         <source>Docx 模板 SDT 工具箱</source>
         <translation>Docx template SDT toolbox</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4449" />
+        <location filename="../ui/pages.py" line="4460" />
         <location filename="../ui/template_recognizer.py" line="484" />
         <source>Word 模板</source>
         <translation>Word template</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4452" />
+        <location filename="../ui/pages.py" line="4463" />
         <location filename="../ui/template_recognizer.py" line="487" />
         <source>选择 .docx 模板文件...</source>
         <translation>Select .docx template file...</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4454" />
+        <location filename="../ui/pages.py" line="4465" />
         <location filename="../ui/template_recognizer.py" line="489" />
         <source>浏览...</source>
         <translation>Browse...</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4457" />
+        <location filename="../ui/pages.py" line="4468" />
         <location filename="../ui/template_recognizer.py" line="492" />
         <source>扫描</source>
         <translation>Scan</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4465" />
+        <location filename="../ui/pages.py" line="4476" />
         <source>#</source>
         <translation>#</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4465" />
+        <location filename="../ui/pages.py" line="4476" />
         <source>位置</source>
         <translation>Location</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4465" />
+        <location filename="../ui/pages.py" line="4476" />
         <source>类型</source>
         <translation>Type</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4465" />
+        <location filename="../ui/pages.py" line="4476" />
         <source>示例文本</source>
         <translation>Sample text</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4466" />
+        <location filename="../ui/pages.py" line="4477" />
         <source>推荐 Tag</source>
         <translation>Suggested tag</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4466" />
+        <location filename="../ui/pages.py" line="4477" />
         <source>确认 Tag</source>
         <translation>Confirm tag</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4486" />
+        <location filename="../ui/pages.py" line="4497" />
         <location filename="../ui/template_recognizer.py" line="567" />
         <source>规则自动匹配</source>
         <translation>Rule auto match</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4489" />
+        <location filename="../ui/pages.py" line="4500" />
         <location filename="../ui/template_recognizer.py" line="570" />
         <source>LLM 智能推荐</source>
         <translation>LLM smart suggest</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4493" />
+        <location filename="../ui/pages.py" line="4504" />
         <location filename="../ui/template_recognizer.py" line="574" />
         <source>插入 SDT 并保存</source>
         <translation>Insert SDT &amp; save</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4497" />
+        <location filename="../ui/pages.py" line="4508" />
         <location filename="../ui/template_recognizer.py" line="578" />
         <source>关闭</source>
         <translation>Close</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4504" />
+        <location filename="../ui/pages.py" line="4515" />
         <location filename="../ui/template_recognizer.py" line="585" />
         <source>选择 Word 模板</source>
         <translation>Select Word template</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4505" />
-        <location filename="../ui/pages.py" line="4596" />
+        <location filename="../ui/pages.py" line="4516" />
+        <location filename="../ui/pages.py" line="4607" />
         <location filename="../ui/template_recognizer.py" line="586" />
         <location filename="../ui/template_recognizer.py" line="789" />
         <source>Word 文档 (*.docx)</source>
         <translation>Word documents (*.docx)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4508" />
+        <location filename="../ui/pages.py" line="4519" />
         <location filename="../ui/template_recognizer.py" line="589" />
         <source>格式不支持</source>
         <translation>Unsupported format</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4509" />
+        <location filename="../ui/pages.py" line="4520" />
         <location filename="../ui/template_recognizer.py" line="590" />
         <source>不支持 .doc 格式。请用 Word 另存为 .docx 后再使用。</source>
         <translation>.doc format is not supported. Save as .docx in Word first.</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4523" />
+        <location filename="../ui/pages.py" line="4534" />
         <location filename="../ui/template_recognizer.py" line="604" />
         <source>扫描失败</source>
         <translation>Scan failed</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4529" />
+        <location filename="../ui/pages.py" line="4540" />
         <location filename="../ui/template_recognizer.py" line="610" />
         <source>共 {} 个表格, {} 张图片</source>
         <translation>{} tables, {} images total</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4546" />
+        <location filename="../ui/pages.py" line="4557" />
         <location filename="../ui/template_recognizer.py" line="738" />
         <source>匹配失败</source>
         <translation>Match failed</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4550" />
+        <location filename="../ui/pages.py" line="4561" />
         <location filename="../ui/template_recognizer.py" line="742" />
         <source>规则匹配: {}/{} 个已推荐</source>
         <translation>Rule match: {}/{} suggested</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4557" />
+        <location filename="../ui/pages.py" line="4568" />
         <location filename="../ui/template_recognizer.py" line="749" />
         <source>LLM 未配置</source>
         <translation>LLM not configured</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4558" />
+        <location filename="../ui/pages.py" line="4569" />
         <location filename="../ui/template_recognizer.py" line="750" />
         <source>尚未配置 AI API。是否打开系统设置？</source>
         <translation>AI API not configured yet. Open system settings?</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4573" />
+        <location filename="../ui/pages.py" line="4584" />
         <location filename="../ui/template_recognizer.py" line="765" />
         <source>LLM 失败</source>
         <translation>LLM failed</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4576" />
+        <location filename="../ui/pages.py" line="4587" />
         <location filename="../ui/template_recognizer.py" line="768" />
         <source>LLM: {} 个新推荐</source>
         <translation>LLM: {} new suggestions</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4589" />
+        <location filename="../ui/pages.py" line="4600" />
         <location filename="../ui/template_recognizer.py" line="782" />
         <source>提示</source>
         <translation>Notice</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4590" />
+        <location filename="../ui/pages.py" line="4601" />
         <location filename="../ui/template_recognizer.py" line="783" />
         <source>请先确认至少一个 SDT tag。</source>
         <translation>Please confirm at least one SDT tag first.</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4593" />
+        <location filename="../ui/pages.py" line="4604" />
         <location filename="../ui/template_recognizer.py" line="786" />
         <source>保存带 SDT 的模板</source>
         <translation>Save template with SDT</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4603" />
+        <location filename="../ui/pages.py" line="4614" />
         <location filename="../ui/template_recognizer.py" line="796" />
         <source>插入失败</source>
         <translation>Insert failed</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4605" />
+        <location filename="../ui/pages.py" line="4616" />
         <location filename="../ui/template_recognizer.py" line="798" />
         <source>已插入 {} 个 SDT tag 到:</source>
         <translation>Inserted {} SDT tags into:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4606" />
+        <location filename="../ui/pages.py" line="4617" />
         <location filename="../ui/template_recognizer.py" line="799" />
         <source>完成</source>
         <translation>Done</translation>
@@ -5026,128 +5051,128 @@ These patterns will be preferred on next template parsing.</translation>
 <context>
     <name>WordTemplatePreviewDialog</name>
     <message>
-        <location filename="../ui/pages.py" line="4621" />
+        <location filename="../ui/pages.py" line="4632" />
         <source>Word 模板预览 — SDT 标注与配置</source>
         <translation>Word template preview — SDT annotations &amp; config</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4640" />
-        <location filename="../ui/pages.py" line="4850" />
+        <location filename="../ui/pages.py" line="4651" />
+        <location filename="../ui/pages.py" line="4861" />
         <source>已设定:{0} | 建议:{1}</source>
         <translation>Set:{0} | Suggested:{1}</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4658" />
+        <location filename="../ui/pages.py" line="4669" />
         <source>当前天线:</source>
         <translation>Current antenna:</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4665" />
+        <location filename="../ui/pages.py" line="4676" />
         <source>搜索 tag...</source>
         <translation>Search tag...</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4667" />
+        <location filename="../ui/pages.py" line="4678" />
         <source>SDT Tag</source>
         <translation>SDT tag</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4672" />
+        <location filename="../ui/pages.py" line="4683" />
         <source>应用选中 Tag</source>
         <translation>Apply selected tag</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4676" />
+        <location filename="../ui/pages.py" line="4687" />
         <source>清除</source>
         <translation>Clear</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4680" />
+        <location filename="../ui/pages.py" line="4691" />
         <source>添加自定义字段...</source>
         <translation>Add custom field...</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4682" />
+        <location filename="../ui/pages.py" line="4693" />
         <source>提示: 双击右侧 Tag 应用到文档</source>
         <translation>Tip: double-click a tag on the right to apply it to the document</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4686" />
+        <location filename="../ui/pages.py" line="4697" />
         <source>🤖 规则自动匹配</source>
         <translation>🤖 Rule auto match</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4688" />
+        <location filename="../ui/pages.py" line="4699" />
         <source>💾 保存到文件</source>
         <translation>💾 Save to file</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4768" />
+        <location filename="../ui/pages.py" line="4779" />
         <source>📋 项目信息</source>
         <translation>📋 Project info</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4769" />
+        <location filename="../ui/pages.py" line="4780" />
         <source>📊 数据表格</source>
         <translation>📊 Data tables</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4770" />
+        <location filename="../ui/pages.py" line="4781" />
         <source>🖼 图片</source>
         <translation>🖼 Images</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4771" />
+        <location filename="../ui/pages.py" line="4782" />
         <source>🔄 循环组</source>
         <translation>🔄 Loop groups</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4772" />
+        <location filename="../ui/pages.py" line="4783" />
         <source>⚙ 测试配置</source>
         <translation>⚙ Test config</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4774" />
+        <location filename="../ui/pages.py" line="4785" />
         <source>📝 自定义</source>
         <translation>📝 Custom</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4823" />
+        <location filename="../ui/pages.py" line="4834" />
         <source>✅ 已应用: {0} ({1} 处)</source>
         <translation>✅ Applied: {0} ({1} places)</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4831" />
+        <location filename="../ui/pages.py" line="4842" />
         <source>已清除临时标记, 恢复为建议状态</source>
         <translation>Cleared temporary marks; restored to suggested state</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4854" />
+        <location filename="../ui/pages.py" line="4865" />
         <source>添加自定义字段</source>
         <translation>Add custom field</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4854" />
+        <location filename="../ui/pages.py" line="4865" />
         <source>SDT Tag 名称 (如 meta_car_model):</source>
         <translation>SDT tag name (e.g. meta_car_model):</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4856" />
+        <location filename="../ui/pages.py" line="4867" />
         <source>字段描述</source>
         <translation>Field description</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4856" />
+        <location filename="../ui/pages.py" line="4867" />
         <source>描述 (如 车型):</source>
         <translation>Description (e.g. car model):</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4876" />
+        <location filename="../ui/pages.py" line="4887" />
         <source>已保存</source>
         <translation>Saved</translation>
     </message>
     <message>
-        <location filename="../ui/pages.py" line="4876" />
+        <location filename="../ui/pages.py" line="4887" />
         <source>已应用 {0} 个 SDT tag 到:
 {1}</source>
         <translation>Applied {0} SDT tags into:
