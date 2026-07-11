@@ -2740,7 +2740,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.progressBar.setMaximum(100)
         self.ui.progressBar.setValue(100)
         self.ui.lblProgressMsg.setText(self.tr("✓ 处理完成"))
-        self._update_status()
 
         # 按天线名存储结果
         ant_name = self._current_antenna_name or "默认天线"
@@ -3105,7 +3104,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if event.type() == QEvent.LanguageChange:
             self.ui.retranslateUi(self)
             self._update_lag_display()
-            self._update_status()
         super().changeEvent(event)
 
     # ==================================================================
@@ -3194,22 +3192,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # ── 按钮行左对齐: 模式 ──
         if hasattr(self, '_mode_freq_label') and self._mode_freq_label:
             self._mode_freq_label.setText(f"{mode_str}")
-    def _update_status(self):
-        """更新状态栏 — 显示模式 + Gain/AR 角度配置概要。"""
-        mode_names = {0: "📡 无源", 1: "📶 TRP", 2: "📻 TIS"}
-        mode_str = mode_names.get(self._test_mode, "?")
-        parts = [mode_str]
-        gain_singles = len(self._lag_config.singles_sorted)
-        gain_ranges = len(self._lag_config.ranges_sorted)
-        ar_cfg = getattr(self, '_ar_lag_config', None)
-        ar_singles = len(ar_cfg.singles_sorted) if ar_cfg else 0
-        ar_ranges = len(ar_cfg.ranges_sorted) if ar_cfg else 0
-        if gain_singles or gain_ranges:
-            parts.append(f"Gain: {gain_singles}单+{gain_ranges}范围")
-        if ar_singles or ar_ranges:
-            parts.append(f"AR: {ar_singles}单+{ar_ranges}范围")
-        self.statusBar().showMessage(
-            self.tr(" | ".join(parts) + " | 就绪"))
 
     # ==================================================================
     # 拖拽文件 (优先级2)
