@@ -210,7 +210,7 @@ def generate_all_for_frequency(
     _t = titles or {}
 
     # ── A 类: 3D 方向图 (per-instance 视角优先; 消 5 类重复) ──
-    _dyn = getattr(chart_config, "dyn_db", 40.0)
+    _dyn = None if getattr(chart_config, "dyn_auto", True) else getattr(chart_config, "dyn_db", 40.0)
 
     def _a_data(param: str):
         """param 名 → (数据矩阵, 默认标题)。"""

@@ -99,7 +99,7 @@ class BaseRenderer(ABC):
         elev: float = 30.0,
         azim: float = -60.0,
         roll: float = 0.0,
-        dyn: float = 40.0,
+        dyn: float | None = None,
         dpi: int = 150,
         title: str = "",
         antenna_name: str = "",
@@ -226,7 +226,7 @@ class MatplotlibRenderer(BaseRenderer):
         elev: float = 30.0,
         azim: float = -60.0,
         roll: float = 0.0,
-        dyn: float = 40.0,
+        dyn: float | None = None,
         dpi: int = 150,
         title: str = "",
         antenna_name: str = "",
@@ -897,7 +897,7 @@ class CloudRenderer(BaseRenderer):
     # ── 渲染方法: 全部委托给 _render_remote_or_fallback ──
 
     def render_3d_pattern(self, theta_deg, phi_deg, gain_dbi, freq_mhz,
-                          *, elev=30.0, azim=-60.0, roll=0.0, dyn=40.0, dpi=150,
+                          *, elev=30.0, azim=-60.0, roll=0.0, dyn=None, dpi=150,
                           title="", antenna_name="", colormap="emquest"):
         return self._render_remote_or_fallback(
             "render_3d_pattern", "/api/v1/render/3d",

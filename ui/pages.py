@@ -2955,6 +2955,7 @@ class ChartSettingsPage(QWidget):
         self._elev = 30.0; self._azim = -60.0
         self._dpi = 150; self._step_deg = 5.0
         self._dyn_db = 40.0   # 3D 半径动态范围 (dB), 可配
+        self._dyn_auto = True # 3D DYN 自动自适应 (默认)
 
         grp_list: list = []
 
@@ -3166,6 +3167,7 @@ class ChartSettingsPage(QWidget):
             self._cut_2d_phi_angles = list(req.cut_2d_phi_angles)
             self._view_angle_pairs = list(req.view_angle_pairs)
             self._dyn_db = float(getattr(req, 'dyn_db', 40.0))
+            self._dyn_auto = bool(getattr(req, 'dyn_auto', True))
         if hasattr(mw, '_chart_config_extra') and mw._chart_config_extra is not None:
             xtr = mw._chart_config_extra
             for key, cb in self._chart_extra.items():
@@ -3542,6 +3544,7 @@ class ChartSettingsPage(QWidget):
         required.dpi = getattr(self, '_dpi', 150)
         required.step_deg = getattr(self, '_step_deg', 5.0)
         required.dyn_db = getattr(self, '_dyn_db', 40.0)
+        required.dyn_auto = getattr(self, '_dyn_auto', True)
         required.embed_in_excel = False  # 图表统一到 Word
         extra.elev = required.elev
         extra.azim = required.azim
@@ -3625,11 +3628,18 @@ class ChartSettingsPage(QWidget):
         categories = ChartConfig.chart_categories(mode)
         labels = ChartConfig.chart_labels()
 
-        # 保存当前勾选状态
+        # 保存当前勾选状态 (守卫已删除的旧 widget)
         saved = {}
         for key, cb_dict in [('req', self._chart_required), ('xtr', self._chart_extra)]:
-            for k, cb in cb_dict.items():
-                saved[k] = cb.isChecked()
+            for k, cb in list(cb_dict.items()):
+                try:
+                    saved[k] = cb.isChecked()
+                except RuntimeError:
+                    pass  # 旧 widget 已被 deleteLater 销毁, 跳过
+        # 清空 dict — 重建时按当前模式重新填充, 防陈旧引用累积 (换模式再换回崩溃根因)
+        self._chart_required.clear()
+        self._chart_extra.clear()
+        self._collapse_map.clear()
 
         # 清除旧的类别 QGroupBox (保留 left_box/right_box 的 header)
         vbox = self._chart_scroll_vbox
@@ -3761,9 +3771,16 @@ class ChartSettingsPage(QWidget):
         spin_step = QSpinBox(); spin_step.setRange(1, 30); spin_step.setValue(int(getattr(self, '_step_deg', 5)))
         spin_step.setSuffix("°"); spin_step.setToolTip(self.tr("3D 采样精度: 1°=最细, 30°=最快"))
         form.addRow(self.tr("采样精度:"), spin_step)
+        dyn_row = QHBoxLayout()
+        chk_dyn_auto = QCheckBox(self.tr("自动(自适应)"))
+        chk_dyn_auto.setChecked(getattr(self, '_dyn_auto', True))
+        chk_dyn_auto.setToolTip(self.tr("自动: 用数据实际范围(推荐, 报告里看不到数据时最稳); 取消勾选手动指定 dB 窗口"))
         spin_dyn = QSpinBox(); spin_dyn.setRange(10, 80); spin_dyn.setValue(int(getattr(self, '_dyn_db', 40)))
-        spin_dyn.setSuffix(" dB"); spin_dyn.setToolTip(self.tr("3D 半径动态范围: 峰值往下多少 dB 收缩到中心 (默认 40)"))
-        form.addRow(self.tr("动态范围:"), spin_dyn)
+        spin_dyn.setSuffix(" dB")
+        spin_dyn.setEnabled(not chk_dyn_auto.isChecked())
+        chk_dyn_auto.toggled.connect(lambda c: spin_dyn.setEnabled(not c))
+        dyn_row.addWidget(chk_dyn_auto); dyn_row.addWidget(spin_dyn); dyn_row.addStretch()
+        form.addRow(self.tr("动态范围:"), dyn_row)
         layout.addLayout(form)
 
         chart_grp = QGroupBox(self.tr("图表列表（每视角 = 一张 3D 图）"))
@@ -3841,6 +3858,7 @@ class ChartSettingsPage(QWidget):
             self._dpi = spin_dpi.value()
             self._step_deg = float(spin_step.value())
             self._dyn_db = float(spin_dyn.value())
+            self._dyn_auto = chk_dyn_auto.isChecked()
             self._sync_selected_frequencies(freq_picker.get_selected(), 'a')
             self._view_angle_pairs.clear()
             for p in _pairs:
