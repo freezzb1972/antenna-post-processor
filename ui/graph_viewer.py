@@ -625,6 +625,9 @@ class GraphViewer(QWidget):
         lay.addWidget(QLabel("数据:"))
         self._cmb_sel_data = QComboBox(); self._cmb_sel_data.setFixedWidth(128)
         self._cmb_sel_data.setToolTip("选中子图显示的数据类型")
+        # 预填固定类型列表 (与源数据是否加载无关; 加载后 _sync_selected_bar 按可用性刷新)
+        for _k in DEFAULT_PATTERN_KEYS:
+            self._cmb_sel_data.addItem(PATTERN_DATA_MAP.get(_k, _k), _k)
         self._cmb_sel_data.currentIndexChanged.connect(self._on_sel_data_changed)
         lay.addWidget(self._cmb_sel_data)
 
