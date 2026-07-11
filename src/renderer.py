@@ -243,9 +243,7 @@ class MatplotlibRenderer(BaseRenderer):
         if antenna_name:
             title_parts.append(antenna_name)
         title_parts.append(f"{freq_mhz:.0f} MHz")
-        if title:
-            title_parts.append(title)
-        ax.set_title(" — ".join(title_parts), fontsize=12, pad=10)
+        ax.set_title((title or " — ".join(title_parts)), fontsize=12, pad=10)
 
         # 关闭轴线框
         ax.xaxis.pane.fill = False
