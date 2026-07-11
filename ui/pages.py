@@ -3242,45 +3242,77 @@ class ChartSettingsPage(QWidget):
         mode_layout.addWidget(self._radio_by_freq)
         mode_layout.addWidget(self._radio_by_type)
         layout.addWidget(mode_grp)
-        sort_grp = QGroupBox(self.tr("图表顺序 (上移/下移调整)"))
+        sort_grp = QGroupBox(self.tr("图表顺序与标题 (上移/下移调顺序; 双击标题单元格编辑)"))
         sort_layout = QVBoxLayout(sort_grp)
-        self._word_chart_list = QListWidget()
-        self._word_chart_list.setDragDropMode(QAbstractItemView.InternalMove)
-        self._word_chart_list.setSelectionMode(QAbstractItemView.SingleSelection)
-        # \u4ece ChartInstance \u5217\u8868\u8bfb\u53d6\uff08\u552f\u4e00\u6570\u636e\u6e90\uff0c\u4e0e Pipeline \u5171\u4eab\uff09
+        hint = QLabel(self.tr("标题留空 = 用类别默认模板 (随频率/天线名自动生成)。悬停查看默认。"))
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: gray; font-size: 11px;")
+        sort_layout.addWidget(hint)
+        # 从 ChartInstance 列表读取（唯一数据源，与 Pipeline 共享）
         from src.chart_plan import ChartCategory
+        from src.chart_titles import build_title
         instances = getattr(self._mw, '_chart_instances', None) or []
-        cat_badges = {ChartCategory.A_3D: "3D", ChartCategory.B_FREQ: "\u66f2\u7ebf",
-                      ChartCategory.C_2D: "\u5207\u9762", ChartCategory.Z_AZIMUTH: "\u65b9\u4f4d\u9762"}
-        active_labels = []
+        cat_badges = {ChartCategory.A_3D: "3D", ChartCategory.B_FREQ: "曲线",
+                      ChartCategory.C_2D: "切面", ChartCategory.Z_AZIMUTH: "方位面"}
+        _antenna = getattr(az, 'antenna_name', '') if az else ''
+        active_insts = []
         if instances:
             for ci in sorted(instances, key=lambda x: x.sort_order):
-                if not ci.enabled:
-                    continue
+                if ci.enabled:
+                    active_insts.append(ci)
+        self._word_chart_table = QTableWidget()
+        self._word_chart_table.setColumnCount(2)
+        self._word_chart_table.setHorizontalHeaderLabels(
+            [self.tr("图表"), self.tr("标题 (可编辑)")])
+        self._word_chart_table.verticalHeader().setVisible(False)
+        self._word_chart_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self._word_chart_table.setSelectionMode(QAbstractItemView.SingleSelection)
+        _hh = self._word_chart_table.horizontalHeader()
+        _hh.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        _hh.setSectionResizeMode(1, QHeaderView.Stretch)
+        # 默认标题表: instance_id -> default_title (accept 时判定是否存空)
+        self._word_default_titles = {}
+
+        def _populate_table(insts):
+            t = self._word_chart_table
+            t.setRowCount(len(insts))
+            self._word_default_titles.clear()
+            for r, ci in enumerate(insts):
                 badge = cat_badges.get(ci.category, "?")
-                active_labels.append(f"[{badge}] {ci.label}")
-        if not active_labels:
-            active_labels = [self.tr("(\u672a\u9009\u62e9\u4efb\u4f55\u56fe\u8868)")]
-        for item in active_labels:
-            self._word_chart_list.addItem(item)
-        sort_layout.addWidget(self._word_chart_list)
+                c0 = QTableWidgetItem(f"[{badge}] {ci.label}")
+                c0.setFlags(c0.flags() & ~Qt.ItemIsEditable)
+                c0.setData(Qt.UserRole, ci.instance_id)
+                t.setItem(r, 0, c0)
+                default_title = build_title(ci, None, _antenna)
+                self._word_default_titles[ci.instance_id] = default_title
+                shown = ci.title if ci.title else default_title
+                c1 = QTableWidgetItem(shown)
+                c1.setToolTip(self.tr("默认: {0}").format(default_title))
+                t.setItem(r, 1, c1)
+
+        _populate_table(active_insts)
+        sort_layout.addWidget(self._word_chart_table)
         btn_row = QHBoxLayout()
-        btn_up = QPushButton(self.tr("\u2191 \u4e0a\u79fb"))
-        btn_down = QPushButton(self.tr("\u2193 \u4e0b\u79fb"))
-        btn_reset = QPushButton(self.tr("\u6062\u590d\u9ed8\u8ba4"))
-        def _move_item(direction):
-            row = self._word_chart_list.currentRow()
-            if 0 <= row < self._word_chart_list.count():
-                item = self._word_chart_list.takeItem(row)
-                new_row = max(0, min(self._word_chart_list.count(), row + direction))
-                self._word_chart_list.insertItem(new_row, item)
-                self._word_chart_list.setCurrentRow(new_row)
-        btn_up.clicked.connect(lambda: _move_item(-1))
-        btn_down.clicked.connect(lambda: _move_item(1))
-        btn_reset.clicked.connect(lambda: (
-            self._word_chart_list.clear(),
-            [self._word_chart_list.addItem(item) for item in active_labels]
-        ))
+        btn_up = QPushButton(self.tr("↑ 上移"))
+        btn_down = QPushButton(self.tr("↓ 下移"))
+        btn_reset = QPushButton(self.tr("恢复默认"))
+
+        def _move_row(direction):
+            t = self._word_chart_table
+            row = t.currentRow()
+            new_row = row + direction
+            if row < 0 or new_row < 0 or new_row >= t.rowCount():
+                return
+            for col in range(t.columnCount()):
+                a = t.takeItem(row, col)
+                b = t.takeItem(new_row, col)
+                t.setItem(row, col, b)
+                t.setItem(new_row, col, a)
+            t.setCurrentCell(new_row, max(0, t.currentColumn()))
+
+        btn_up.clicked.connect(lambda: _move_row(-1))
+        btn_down.clicked.connect(lambda: _move_row(1))
+        btn_reset.clicked.connect(lambda: _populate_table(active_insts))
         btn_row.addWidget(btn_up); btn_row.addWidget(btn_down)
         btn_row.addWidget(btn_reset); btn_row.addStretch()
         sort_layout.addLayout(btn_row)
@@ -3327,16 +3359,25 @@ class ChartSettingsPage(QWidget):
             # 将列表顺序回写到 ChartInstance.sort_order
             instances = getattr(self._mw, '_chart_instances', None) or []
             if instances:
+                by_id = {ci.instance_id: ci for ci in instances}
                 enabled_ids = set()
-                for i in range(self._word_chart_list.count()):
-                    item_text = self._word_chart_list.item(i).text()
-                    # 匹配 label (去掉类别 badge 前缀)
-                    for ci in instances:
-                        if ci.enabled and item_text.endswith(ci.label):
-                            ci.sort_order = i
-                            enabled_ids.add(ci.instance_id)
-                            break
-                # 列表中不存在的实例标记为 disabled
+                t = self._word_chart_table
+                for r in range(t.rowCount()):
+                    c0 = t.item(r, 0)
+                    if c0 is None:
+                        continue
+                    iid = c0.data(Qt.UserRole)
+                    ci = by_id.get(iid)
+                    if ci is None:
+                        continue
+                    ci.sort_order = r
+                    enabled_ids.add(iid)
+                    # 标题: 与默认相同 → 存空 (保持随频率/天线动态); 否则存自定义
+                    cell = t.item(r, 1)
+                    txt = cell.text().strip() if cell else ""
+                    default_title = self._word_default_titles.get(iid, "")
+                    ci.title = "" if (not txt or txt == default_title) else txt
+                # 表中不存在的实例标记为 disabled
                 for ci in instances:
                     if ci.instance_id not in enabled_ids:
                         ci.enabled = False

@@ -17,10 +17,10 @@ from typing import Any
 
 # ── (b) 全局默认: 类别 → 英文模板 ──
 DEFAULT_TITLE_BY_CATEGORY: dict[str, str] = {
-    "A": "{antenna} {freq} MHz — {param} 3D Pattern",
+    "A": "{antenna} {freq} — {param} 3D Pattern",
     "B": "{antenna} — {param} vs Frequency{angle_suffix}",
-    "C": "{antenna} {freq} MHz — Elevation {param}{angle_suffix}",
-    "Z": "{antenna} {freq} MHz — Azimuth {param}{angle_suffix}",
+    "C": "{antenna} {freq} — Elevation {param}{angle_suffix}",
+    "Z": "{antenna} {freq} — Azimuth {param}{angle_suffix}",
 }
 
 PLACEHOLDERS = ["antenna", "freq", "param", "cut", "angles",
@@ -99,7 +99,7 @@ def title_context(inst, freq: float | None, antenna: str) -> dict[str, Any]:
     angle_suffix = f" ({angle_axis}={angles}°)" if angles and angle_axis else ""
     ctx = {
         "antenna": antenna or "",
-        "freq": f"{freq:.0f}" if freq is not None else "",
+        "freq": f"{freq:.0f} MHz" if freq is not None else "",
         "param": _param_label(inst),
         "cut": cut,
         "angles": angles,
@@ -127,5 +127,5 @@ def build_title(inst, freq: float | None = None, antenna: str = "",
     tpl = (getattr(inst, "title", "") or "").strip()
     if not tpl:
         d = defaults if defaults is not None else load_default_templates()
-        tpl = d.get(_cat_value(inst), "{antenna} {freq} MHz — {param}")
+        tpl = d.get(_cat_value(inst), "{antenna} {freq} — {param}")
     return _clean(tpl.format_map(_SafeDict(title_context(inst, freq, antenna))))
