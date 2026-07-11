@@ -3063,6 +3063,10 @@ class ChartSettingsPage(QWidget):
         btn_fr_layout = QPushButton(self.tr("Full Report Word 布局设置..."))
         btn_fr_layout.clicked.connect(lambda: self._show_word_layout_dialog(fr_mode=True))
         row_wl.addWidget(btn_fr_layout)
+        btn_def_titles = QPushButton(self.tr("默认标题模板..."))
+        btn_def_titles.setToolTip(self.tr("编辑各类图表的默认标题模板 (英文, 支持占位符)"))
+        btn_def_titles.clicked.connect(self._show_default_titles_dialog)
+        row_wl.addWidget(btn_def_titles)
         row_wl.addStretch()
         out_layout.addLayout(row_wl)
 
@@ -3384,6 +3388,77 @@ class ChartSettingsPage(QWidget):
             self._sync_to_mw()
             dlg.accept()
         btns.accepted.connect(_on_accept_layout)
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
+
+    def _show_default_titles_dialog(self):
+        """编辑各类图表的默认标题模板 (config/chart_titles.json)。
+
+        标题按类别默认 + 实例覆盖: 此处改类别默认模板 (全局), 逐实例覆盖在
+        「Word 输出布局设置」的标题列。留空的实例标题 → 用这里的类别默认。
+        """
+        from src.chart_titles import (DEFAULT_TITLE_BY_CATEGORY, PLACEHOLDERS,
+                                       load_default_templates, save_default_templates)
+        cat_names = {
+            "A": self.tr("3D 方向图"),
+            "B": self.tr("频点曲线"),
+            "C": self.tr("俯仰面切面"),
+            "Z": self.tr("方位面切面"),
+        }
+        cur = load_default_templates()
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("默认标题模板"))
+        dlg.setMinimumSize(620, 420)
+        layout = QVBoxLayout(dlg)
+
+        hint = QLabel(self.tr(
+            "编辑各类图表的默认标题模板 (英文)。可用占位符:\n{0}\n"
+            "缺失占位符自动省略。逐张图可在「Word 输出布局设置」的标题列单独覆盖。"
+        ).format("  ".join("{" + p + "}" for p in PLACEHOLDERS)))
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: gray; font-size: 11px;")
+        layout.addWidget(hint)
+
+        table = QTableWidget()
+        cats = list(DEFAULT_TITLE_BY_CATEGORY.keys())  # A/B/C/Z
+        table.setColumnCount(2)
+        table.setHorizontalHeaderLabels([self.tr("类别"), self.tr("标题模板")])
+        table.verticalHeader().setVisible(False)
+        table.setRowCount(len(cats))
+        _hh = table.horizontalHeader()
+        _hh.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        _hh.setSectionResizeMode(1, QHeaderView.Stretch)
+        for r, cat in enumerate(cats):
+            c0 = QTableWidgetItem(f"{cat_names.get(cat, cat)} ({cat})")
+            c0.setFlags(c0.flags() & ~Qt.ItemIsEditable)
+            table.setItem(r, 0, c0)
+            c1 = QTableWidgetItem(cur.get(cat, ""))
+            c1.setToolTip(self.tr("内置默认: {0}").format(DEFAULT_TITLE_BY_CATEGORY[cat]))
+            table.setItem(r, 1, c1)
+        layout.addWidget(table)
+
+        btn_row = QHBoxLayout()
+        btn_builtin = QPushButton(self.tr("恢复内置默认"))
+        def _restore_builtin():
+            for r, cat in enumerate(cats):
+                table.item(r, 1).setText(DEFAULT_TITLE_BY_CATEGORY[cat])
+        btn_builtin.clicked.connect(_restore_builtin)
+        btn_row.addWidget(btn_builtin)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        def _on_accept():
+            out = {}
+            for r, cat in enumerate(cats):
+                txt = table.item(r, 1).text().strip()
+                # 留空 → 回退内置默认
+                out[cat] = txt if txt else DEFAULT_TITLE_BY_CATEGORY[cat]
+            save_default_templates(out)
+            dlg.accept()
+        btns.accepted.connect(_on_accept)
         btns.rejected.connect(dlg.reject)
         layout.addWidget(btns)
         dlg.exec()
