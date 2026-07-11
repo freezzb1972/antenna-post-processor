@@ -136,7 +136,9 @@ def expand_to_instances(
             if not getattr(chart_config, key, False):
                 continue
             pairs = chart_config.view_angle_pairs or [(chart_config.elev, chart_config.azim)]
-            for vi, (el, az) in enumerate(pairs):
+            for vi, pair in enumerate(pairs):
+                el = pair[0]; az = pair[1]
+                rl = pair[2] if len(pair) > 2 else 0.0   # 兼容 2/3 元组
                 if len(pairs) == 1:
                     img_key = _3D_IMAGE_KEYS.get(key, key)
                     label = _CHART_LABELS.get(key, key)
@@ -148,7 +150,8 @@ def expand_to_instances(
                 _add(ChartInstance(
                     instance_id=cid, parent_type=key, category=ChartCategory.A_3D,
                     label=label, image_key=img_key, per_freq=True,
-                    params={"elev": float(el), "azim": float(az), "view_index": vi, "param": key.replace("pattern_3d_", "")},
+                    params={"elev": float(el), "azim": float(az), "roll": float(rl),
+                            "view_index": vi, "param": key.replace("pattern_3d_", "")},
                 ))
 
     # ── 公共: 从 bool key 列表创建 ChartInstance ──

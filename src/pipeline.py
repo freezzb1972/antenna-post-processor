@@ -509,6 +509,7 @@ def _process_one_frequency(
                     output_config=output_config,
                     extra_patterns=extra_patterns,
                     titles=_titles,
+                    chart_instances=chart_instances,
                 )
                 if images:
                     row["_images"] = images

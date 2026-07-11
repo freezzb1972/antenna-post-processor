@@ -99,6 +99,7 @@ class BaseRenderer(ABC):
         elev: float = 30.0,
         azim: float = -60.0,
         roll: float = 0.0,
+        dyn: float = 40.0,
         dpi: int = 150,
         title: str = "",
         antenna_name: str = "",
@@ -225,6 +226,7 @@ class MatplotlibRenderer(BaseRenderer):
         elev: float = 30.0,
         azim: float = -60.0,
         roll: float = 0.0,
+        dyn: float = 40.0,
         dpi: int = 150,
         title: str = "",
         antenna_name: str = "",
@@ -243,7 +245,7 @@ class MatplotlibRenderer(BaseRenderer):
         # 半径映射: 标准算法 (公共函数, 与查看器一致 → 所见即所得)。
         # 峰值最外、峰值−DYN 及以下收缩到中心, 呈现真实方向性波瓣。
         X, Y, Z, color_values, vmin, vmax = build_3d_surface(
-            theta_deg, phi_deg, gain_dbi, kind="magnitude", dyn=40.0)
+            theta_deg, phi_deg, gain_dbi, kind="magnitude", dyn=dyn)
 
         fig = plt.figure(figsize=(9, 7), dpi=dpi)
         ax = fig.add_subplot(111, projection="3d")
@@ -895,16 +897,16 @@ class CloudRenderer(BaseRenderer):
     # ── 渲染方法: 全部委托给 _render_remote_or_fallback ──
 
     def render_3d_pattern(self, theta_deg, phi_deg, gain_dbi, freq_mhz,
-                          *, elev=30.0, azim=-60.0, dpi=150,
+                          *, elev=30.0, azim=-60.0, roll=0.0, dyn=40.0, dpi=150,
                           title="", antenna_name="", colormap="emquest"):
         return self._render_remote_or_fallback(
             "render_3d_pattern", "/api/v1/render/3d",
             {"theta": theta_deg.tolist(), "phi": phi_deg.tolist(),
              "gain": gain_dbi.tolist(), "freq_mhz": freq_mhz,
-             "elev": elev, "azim": azim, "dpi": dpi,
+             "elev": elev, "azim": azim, "roll": roll, "dyn": dyn, "dpi": dpi,
              "title": title, "antenna_name": antenna_name, "colormap": colormap},
             (theta_deg, phi_deg, gain_dbi, freq_mhz),
-            {"elev": elev, "azim": azim, "dpi": dpi,
+            {"elev": elev, "azim": azim, "roll": roll, "dyn": dyn, "dpi": dpi,
              "title": title, "antenna_name": antenna_name, "colormap": colormap})
 
     def render_2d_polar(self, angles_deg, gain_dbi, freq_mhz,

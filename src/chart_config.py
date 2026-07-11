@@ -146,9 +146,10 @@ class ChartConfig:
     # 视角参数
     elev: float = 30.0
     azim: float = -60.0
-    view_angle_pairs: list[tuple[float, float]] = field(default_factory=list)  # [(elev, azim), ...]
+    view_angle_pairs: list = field(default_factory=list)  # [(elev, azim[, roll]), ...] 二/三元组兼容
     dpi: int = 100
     step_deg: float = 5.0          # 3D 图形采样精度 (°)
+    dyn_db: float = 40.0           # 3D 半径动态范围 (峰值往下 dB), 可 GUI 调整
 
     # 频点过滤 (空列表 = 所有频点)
     selected_frequencies_a: list[float] = field(default_factory=list)  # A类

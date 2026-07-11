@@ -185,6 +185,7 @@ def generate_all_for_frequency(
     output_config: OutputConfig | None = None,
     extra_patterns: dict[str, np.ndarray] = None,
     titles: dict[str, str] | None = None,
+    chart_instances: list | None = None,
 ) -> dict[str, io.BytesIO]:
     """根据 ChartConfig 为一个频点生成所有需要的图形。
 
@@ -208,78 +209,58 @@ def generate_all_for_frequency(
     extra = extra_patterns or {}
     _t = titles or {}
 
-    def _title_for(key: str, default: str) -> str:
-        """取实例标题(类别默认/用户覆盖), 缺失回退到旧硬编码默认。"""
-        return _t.get(key) or default
+    # ── A 类: 3D 方向图 (per-instance 视角优先; 消 5 类重复) ──
+    _dyn = getattr(chart_config, "dyn_db", 40.0)
 
-    # ── A 类: 3D 方向图 ──
-    # 多视角支持: 若有 view_angle_pairs 则循环，否则用单个 elev/azim
-    view_pairs = list(chart_config.view_angle_pairs) if chart_config.view_angle_pairs else [
-        (getattr(chart_config, 'elev', None) or 30.0,
-         getattr(chart_config, 'azim', None) or -60.0)
-    ]
+    def _a_data(param: str):
+        """param 名 → (数据矩阵, 默认标题)。"""
+        if param == "gain":   return gain_dbi, "3D Gain Pattern"
+        if param == "eirp":   return gain_dbi, "3D EIRP Pattern"          # EIRP≡Gain (无 P_in)
+        if param == "ar":     return ((20.0 * np.log10(np.maximum(ar_linear, 1e-15)))
+                                      if ar_linear is not None else None), "3D Axial Ratio"
+        if param == "etheta": return extra.get("3d_etheta"), "3D E_θ Pattern"
+        if param == "ephi":   return extra.get("3d_ephi"), "3D E_φ Pattern"
+        return None, ""
 
-    if chart_config.pattern_3d_gain:
-        for vi, (el, az) in enumerate(view_pairs):
-            suffix = f"_v{vi}" if len(view_pairs) > 1 else ""
-            images[f"3d_gain{suffix}"] = _renderer.render_3d_pattern(
-                theta_deg, phi_deg, gain_dbi, freq_mhz,
-                elev=el, azim=az,
-                dpi=chart_config.dpi,
-                title=_title_for(f"3d_gain{suffix}", "3D Gain Pattern"),
-                antenna_name=antenna_name,
-                colormap="emquest",
-            )
+    def _render_3d(key, data, el, az, rl, default_title):
+        if data is None:
+            return
+        images[key] = _renderer.render_3d_pattern(
+            theta_deg, phi_deg, data, freq_mhz,
+            elev=el, azim=az, roll=rl, dyn=_dyn, dpi=chart_config.dpi,
+            title=_t.get(key) or default_title,
+            antenna_name=antenna_name, colormap="emquest",
+        )
 
-    if chart_config.pattern_3d_eirp:
-        for vi, (el, az) in enumerate(view_pairs):
-            suffix = f"_v{vi}" if len(view_pairs) > 1 else ""
-            images[f"3d_eirp{suffix}"] = _renderer.render_3d_pattern(
-                theta_deg, phi_deg, gain_dbi, freq_mhz,
-                elev=el, azim=az,
-                dpi=chart_config.dpi,
-                title=_title_for(f"3d_eirp{suffix}", "3D EIRP Pattern"),
-                antenna_name=antenna_name,
-                colormap="emquest",
-            )
-
-    if chart_config.pattern_3d_ar and ar_linear is not None:
-        ar_db = 20.0 * np.log10(np.maximum(ar_linear, 1e-15))
-        for vi, (el, az) in enumerate(view_pairs):
-            suffix = f"_v{vi}" if len(view_pairs) > 1 else ""
-            images[f"3d_ar{suffix}"] = _renderer.render_3d_pattern(
-                theta_deg, phi_deg, ar_db, freq_mhz,
-                elev=el, azim=az,
-                dpi=chart_config.dpi,
-                title=_title_for(f"3d_ar{suffix}", "3D Axial Ratio"),
-                antenna_name=antenna_name,
-                colormap="emquest",
-            )
-
-    # ── A 类: E_θ / E_φ 分量（extra_patterns 提供数据） ──
-    if chart_config.pattern_3d_etheta and "3d_etheta" in extra:
-        for vi, (el, az) in enumerate(view_pairs):
-            suffix = f"_v{vi}" if len(view_pairs) > 1 else ""
-            images[f"3d_etheta{suffix}"] = _renderer.render_3d_pattern(
-                theta_deg, phi_deg, extra["3d_etheta"], freq_mhz,
-                elev=el, azim=az,
-                dpi=chart_config.dpi,
-                title=_title_for(f"3d_etheta{suffix}", "3D E_θ Pattern"),
-                antenna_name=antenna_name,
-                colormap="emquest",
-            )
-
-    if chart_config.pattern_3d_ephi and "3d_ephi" in extra:
-        for vi, (el, az) in enumerate(view_pairs):
-            suffix = f"_v{vi}" if len(view_pairs) > 1 else ""
-            images[f"3d_ephi{suffix}"] = _renderer.render_3d_pattern(
-                theta_deg, phi_deg, extra["3d_ephi"], freq_mhz,
-                elev=el, azim=az,
-                dpi=chart_config.dpi,
-                title=_title_for(f"3d_ephi{suffix}", "3D E_φ Pattern"),
-                antenna_name=antenna_name,
-                colormap="emquest",
-            )
+    _a_instances = [ci for ci in (chart_instances or [])
+                    if getattr(ci.category, "value", ci.category) == "A" and ci.enabled]
+    if _a_instances:
+        # per-instance: 每个 A 实例用自己 params 的视角 (el/az/roll)
+        for ci in _a_instances:
+            p = ci.params or {}
+            data, default_title = _a_data(p.get("param", ""))
+            _render_3d(ci.image_key, data,
+                       p.get("elev", chart_config.elev),
+                       p.get("azim", chart_config.azim),
+                       p.get("roll", 0.0), default_title)
+    else:
+        # 向后兼容: 无 chart_instances → chart_config bool × view_angle_pairs (共享视角)
+        _view_pairs = list(chart_config.view_angle_pairs) or [
+            (getattr(chart_config, 'elev', None) or 30.0,
+             getattr(chart_config, 'azim', None) or -60.0)]
+        _A_SPECS = [("pattern_3d_gain", "gain", "3d_gain"),
+                    ("pattern_3d_eirp", "eirp", "3d_eirp"),
+                    ("pattern_3d_ar", "ar", "3d_ar"),
+                    ("pattern_3d_etheta", "etheta", "3d_etheta"),
+                    ("pattern_3d_ephi", "ephi", "3d_ephi")]
+        for cfg_key, param, img_base in _A_SPECS:
+            if not getattr(chart_config, cfg_key, False):
+                continue
+            data, default_title = _a_data(param)
+            for vi, pair in enumerate(_view_pairs):
+                el = pair[0]; az = pair[1]; rl = pair[2] if len(pair) > 2 else 0.0
+                suffix = f"_v{vi}" if len(_view_pairs) > 1 else ""
+                _render_3d(f"{img_base}{suffix}", data, el, az, rl, default_title)
 
     # ── C 类: 2D 切面图 (俯仰面 + 方位面, 统一使用 cut_param) ──
     from .cut_param import (build_cut_params, build_cut_params_from_entries,
