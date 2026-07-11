@@ -1080,11 +1080,14 @@ def run_pipeline(
             total_angles = sum(len(c.singles_sorted) + len(c.ranges_sorted) for c in sheet_ar_configs.values())
             _log(log_callback, f"自动检测到 {total_angles} 个 AR 角度 (来自 {len(sheet_ar_configs)} 个 sheet)")
 
-    # ---- 2. 预览缓存: 非 compute_only 时尝试加载缓存跳过计算 ----
-    if not compute_only:
+    # ---- 2. 预览缓存: 仅纯 Excel 导出可用 ----
+    # 缓存 (_save_preview_cache) 剥掉了 row["_images"] 等 "_" 开头字段, 所以图表/Word/完整报告
+    # 导出必须重新计算+渲染, 不能走缓存跳过 (否则 image_groups 为空 → Word 静默不生成)。
+    _need_charts = out_word or out_data or bool(full_report_path)
+    if not compute_only and not _need_charts:
         cached = _load_preview_cache(output_config, output_path, template_path)
         if cached is not None:
-            _log(log_callback, "📦 复用预览缓存数据, 跳过计算")
+            _log(log_callback, "📦 复用预览缓存数据, 跳过计算 (纯 Excel)")
             sheet_results = cached
             _close_datasources(use_multi_ds, datasource, datasource_map)
             # 直接跳到导出阶段
@@ -1127,7 +1130,8 @@ def run_pipeline(
         return sheet_results
 
     # ── 阶段 4: 输出 Excel 天线参数 (统一 progress_max) ──
-    total = len(tasks)
+    # skip_to_export(命中预览缓存)时无 tasks, 用缓存行数估进度权重
+    total = len(tasks) if not skip_to_export else sum(len(v) for v in sheet_results.values())
     _load_w = max(total, 1)
     _calc_w = max(total, 1); _render_w = max(total * 5, 1)
     _compute_w = _calc_w + _render_w
