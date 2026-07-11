@@ -98,6 +98,7 @@ class BaseRenderer(ABC):
         *,
         elev: float = 30.0,
         azim: float = -60.0,
+        roll: float = 0.0,
         dpi: int = 150,
         title: str = "",
         antenna_name: str = "",
@@ -223,6 +224,7 @@ class MatplotlibRenderer(BaseRenderer):
         *,
         elev: float = 30.0,
         azim: float = -60.0,
+        roll: float = 0.0,
         dpi: int = 150,
         title: str = "",
         antenna_name: str = "",
@@ -237,14 +239,11 @@ class MatplotlibRenderer(BaseRenderer):
           - 轴标注 + θ=0° 方向箭头
           - colorbar + 标题
         """
-        theta = np.deg2rad(theta_deg)
-        phi = np.deg2rad(phi_deg)
-        TH, PH = np.meshgrid(theta, phi)
-
-        R = np.abs(gain_dbi)
-        X = R * np.sin(TH) * np.cos(PH)
-        Y = R * np.sin(TH) * np.sin(PH)
-        Z = R * np.cos(TH)
+        from .pattern_geometry import build_3d_surface
+        # 半径映射: 标准算法 (公共函数, 与查看器一致 → 所见即所得)。
+        # 峰值最外、峰值−DYN 及以下收缩到中心, 呈现真实方向性波瓣。
+        X, Y, Z, color_values, vmin, vmax = build_3d_surface(
+            theta_deg, phi_deg, gain_dbi, kind="magnitude", dyn=40.0)
 
         fig = plt.figure(figsize=(9, 7), dpi=dpi)
         ax = fig.add_subplot(111, projection="3d")
@@ -252,11 +251,11 @@ class MatplotlibRenderer(BaseRenderer):
         # 选择 colormap
         cmap = EMQUEST_CMAP if colormap == "emquest" else plt.get_cmap(colormap)
 
-        # 曲面着色
-        norm = plt.Normalize(gain_dbi.min(), gain_dbi.max())
+        # 曲面着色 (colorbar 用真实 dBi 范围 vmin..vmax)
+        norm = plt.Normalize(vmin, vmax)
         surf = ax.plot_surface(
             X, Y, Z,
-            facecolors=cmap(norm(gain_dbi)),
+            facecolors=cmap(norm(color_values)),
             rstride=1, cstride=1,
             alpha=0.88, shade=True,
             linewidth=0, antialiased=True,
@@ -267,14 +266,18 @@ class MatplotlibRenderer(BaseRenderer):
         ax.plot_wireframe(X, Y, Z, rstride=stride, cstride=stride,
                           color="gray", linewidth=0.25, alpha=0.25)
 
-        # 参考球 (0 dBi)
-        _add_reference_sphere(ax, theta_deg, phi_deg)
+        # 参考球 (0 dBi 的归一化半径; 仅当 0 落在 [vmin,vmax] 内)
+        r0 = ((0.0 - vmin) / (vmax - vmin)) if (vmin <= 0.0 <= vmax and vmax > vmin) else None
+        _add_reference_sphere(ax, theta_deg, phi_deg, r0)
 
-        # Theta 环
-        _add_theta_rings(ax, theta_deg, phi_deg)
+        # Theta 环 (归一化外半径=1)
+        _add_theta_rings(ax, theta_deg, phi_deg, 1.0)
 
-        # 轴标注
-        _add_axis_labels_3d(ax, R.max())
+        # 限幅 + θ=0° 箭头; 应用视角(含 roll); 去笛卡尔轴 (天线图 X/Y/Z 无物理意义)
+        _add_axis_labels_3d(ax, 1.0)
+        ax.view_init(elev=elev, azim=azim, roll=roll)
+        ax.set_axis_off()
+
 
         # colorbar
         mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
@@ -999,9 +1002,11 @@ def _fig_to_png_buffer(fig, dpi: int) -> io.BytesIO:
 # 3D 视觉增强 — 参考球 / Theta 环 / 轴标注
 # ═══════════════════════════════════════════════════════════════
 
-def _add_reference_sphere(ax, theta_deg, phi_deg):
-    """在 gain=0 dBi 处画灰色虚线参考球。"""
-    r = 1.0
+def _add_reference_sphere(ax, theta_deg, phi_deg, r0=1.0):
+    """在 gain=0 dBi 对应半径 r0 处画灰色虚线参考球。r0 为 None 时跳过。"""
+    if r0 is None or r0 <= 0:
+        return
+    r = float(r0)
     theta = np.deg2rad(theta_deg)
     phi = np.deg2rad(phi_deg)
     TH, PH = np.meshgrid(theta, phi)
@@ -1016,9 +1021,9 @@ def _add_reference_sphere(ax, theta_deg, phi_deg):
                       linestyle="dotted")
 
 
-def _add_theta_rings(ax, theta_deg, phi_deg):
-    """在关键 theta 角处画纬线环。"""
-    rt = 2.5
+def _add_theta_rings(ax, theta_deg, phi_deg, r_outer=2.5):
+    """在关键 theta 角处画纬线环 (缩放到外半径 r_outer)。"""
+    rt = float(r_outer)
     phi = np.linspace(0, 2 * np.pi, 180)
     for t_deg in [30, 60, 90, 120, 150]:
         t = np.deg2rad(t_deg)

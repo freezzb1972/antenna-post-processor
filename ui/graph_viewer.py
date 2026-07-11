@@ -145,19 +145,34 @@ class SubPlotPanel:
     # ── 绘图模式 ──
 
     def _draw_spherical_3d(self, theta_deg, phi_deg, data, cmap):
-        """球面 3D: 将增益值映射到球面半径。"""
-        theta_rad = np.deg2rad(theta_deg)
-        phi_rad = np.deg2rad(phi_deg)
-        tm, pm = np.meshgrid(theta_rad, phi_rad, indexing="ij")
-        r = np.maximum(data.T, 1e-15)
-        x = r * np.sin(tm) * np.cos(pm)
-        y = r * np.sin(tm) * np.sin(pm)
-        z = r * np.cos(tm)
-        self.ax.plot_surface(x, y, z, cmap=cmap, alpha=0.85,
+        """球面 3D: 复用 pattern_geometry.build_3d_surface (与报告导出同算法 → 所见即所得)。
+
+        旧 `r=max(data,eps)` 会让负增益全压中心 → 形状失真; 现用标准半径归一化。
+        """
+        import matplotlib
+        from src.pattern_geometry import build_3d_surface
+
+        key = getattr(self, "data_key", "gain_db")
+        if key == "ar_linear":                       # 线性比值 → dB
+            values = 20.0 * np.log10(np.maximum(data, 1e-15))
+            kind = "magnitude"
+        elif key in ("theta_phase", "phi_phase"):    # 相位 (批B启用)
+            values = data
+            kind = "phase"
+        else:                                        # gain_db/theta_db/phi_db/rhcp_db/lhcp_db/cpxpi_db 已是 dB
+            values = data
+            kind = "magnitude"
+
+        # data 形状 (n_phi, n_theta) 与 build_3d_surface 一致
+        X, Y, Z, cvals, vmin, vmax = build_3d_surface(theta_deg, phi_deg, values, kind=kind)
+        cmap_obj = matplotlib.colormaps[cmap] if isinstance(cmap, str) else cmap
+        mnorm = matplotlib.colors.Normalize(vmin, vmax)
+        self.ax.plot_surface(X, Y, Z, facecolors=cmap_obj(mnorm(cvals)),
+                             rstride=1, cstride=1, alpha=0.85,
                              linewidth=0, antialiased=True)
-        self.ax.set_xlabel(""); self.ax.set_ylabel(""); self.ax.set_zlabel("")
         self.ax.set_box_aspect([1, 1, 1])
         self.ax.view_init(elev=self._elev, azim=self._azim)
+        self.ax.set_axis_off()                       # 天线图无笛卡尔轴意义
 
     def _draw_polar(self, theta_deg, phi_deg, data, cmap):
         """极坐标 2D: 增益 vs φ 在固定 θ 截面。"""
