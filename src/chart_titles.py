@@ -15,13 +15,37 @@ import json
 from pathlib import Path
 from typing import Any
 
-# ── (b) 全局默认: 类别 → 英文模板 ──
+# ── (b) 全局默认: 类别 → 模板 (按语言) ──
+# 英文 (向后兼容: DEFAULT_TITLE_BY_CATEGORY 保留为 en 别名)
 DEFAULT_TITLE_BY_CATEGORY: dict[str, str] = {
     "A": "{antenna} {freq} — {param} 3D Pattern",
     "B": "{antenna} — {param} vs Frequency{angle_suffix}",
     "C": "{antenna} {freq} — Elevation {param}{angle_suffix}",
     "Z": "{antenna} {freq} — Azimuth {param}{angle_suffix}",
 }
+
+# 中文: 结构词译中文, 射频参数名 ({param}) 保留英文
+_DEFAULT_TITLE_ZH: dict[str, str] = {
+    "A": "{antenna} {freq} — {param} 3D方向图",
+    "B": "{antenna} — {param} 随频率{angle_suffix}",
+    "C": "{antenna} {freq} — 俯仰面 {param}{angle_suffix}",
+    "Z": "{antenna} {freq} — 方位面 {param}{angle_suffix}",
+}
+
+_BUILTIN: dict[str, dict[str, str]] = {
+    "en": DEFAULT_TITLE_BY_CATEGORY,
+    "zh": _DEFAULT_TITLE_ZH,
+}
+
+
+def _norm_lang(lang: str) -> str:
+    return "zh" if str(lang).lower().startswith("zh") else "en"
+
+
+def builtin_defaults(lang: str = "en") -> dict[str, str]:
+    """内置默认模板 (按语言)。"""
+    return dict(_BUILTIN.get(_norm_lang(lang), _BUILTIN["en"]))
+
 
 PLACEHOLDERS = ["antenna", "freq", "param", "cut", "angles",
                 "angle_axis", "unit", "N", "angle_suffix"]
@@ -43,24 +67,41 @@ class _SafeDict(dict):
         return ""
 
 
-# ── (b) 默认模板读写 (GUI 可编辑, config/chart_titles.json 覆盖内置默认) ──
-def load_default_templates() -> dict[str, str]:
-    d = dict(DEFAULT_TITLE_BY_CATEGORY)
+def _read_config() -> dict[str, dict[str, str]]:
+    """读 config/chart_titles.json, 统一为 {lang: {cat: tpl}}。
+    迁移: 旧扁平格式 {A:..,B:..} → 视作 {"en": <flat>}。
+    """
     try:
         if _CONFIG_PATH.exists():
-            user = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
-            for k, v in user.items():
-                if k in d and isinstance(v, str) and v.strip():
-                    d[k] = v
+            data = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                # 旧扁平格式: 顶层键是 A/B/C/Z
+                if data and all(k in ("A", "B", "C", "Z") for k in data):
+                    return {"en": data}
+                # 新格式: {lang: {cat: tpl}}
+                return {k: v for k, v in data.items() if isinstance(v, dict)}
     except Exception:
         pass
+    return {}
+
+
+# ── (b) 默认模板读写 (GUI 可编辑, config/chart_titles.json 覆盖内置默认) ──
+def load_default_templates(lang: str = "en") -> dict[str, str]:
+    lang = _norm_lang(lang)
+    d = builtin_defaults(lang)
+    user = _read_config().get(lang, {})
+    for k, v in user.items():
+        if k in d and isinstance(v, str) and v.strip():
+            d[k] = v
     return d
 
 
-def save_default_templates(templates: dict[str, str]) -> None:
+def save_default_templates(templates: dict[str, str], lang: str = "en") -> None:
+    lang = _norm_lang(lang)
     _CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    clean = {k: v for k, v in templates.items() if k in DEFAULT_TITLE_BY_CATEGORY}
-    _CONFIG_PATH.write_text(json.dumps(clean, ensure_ascii=False, indent=2),
+    data = _read_config()  # 已迁移为 {lang: {...}}
+    data[lang] = {k: v for k, v in templates.items() if k in _BUILTIN["en"]}
+    _CONFIG_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2),
                             encoding="utf-8")
 
 
@@ -122,10 +163,10 @@ def _clean(text: str) -> str:
 
 
 def build_title(inst, freq: float | None = None, antenna: str = "",
-                defaults: dict[str, str] | None = None) -> str:
-    """构建一张图的标题。inst.title(用户覆盖)优先, 否则用类别默认模板。"""
+                lang: str = "en", defaults: dict[str, str] | None = None) -> str:
+    """构建一张图的标题。inst.title(用户覆盖)优先, 否则用类别默认模板(按语言)。"""
     tpl = (getattr(inst, "title", "") or "").strip()
     if not tpl:
-        d = defaults if defaults is not None else load_default_templates()
+        d = defaults if defaults is not None else load_default_templates(lang)
         tpl = d.get(_cat_value(inst), "{antenna} {freq} — {param}")
     return _clean(tpl.format_map(_SafeDict(title_context(inst, freq, antenna))))

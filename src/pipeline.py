@@ -494,10 +494,11 @@ def _process_one_frequency(
                 cpxpi_db = row.get("_cp_xpi")
                 # 每图标题: 类别默认模板 (用户可逐实例覆盖 inst.title)
                 _antenna = output_config.antenna_name if output_config is not None else ""
+                _title_lang = output_config.title_lang if output_config is not None else "en"
                 _titles = None
                 if chart_instances:
                     from .chart_titles import build_title
-                    _titles = {ci.image_key: build_title(ci, freq, _antenna)
+                    _titles = {ci.image_key: build_title(ci, freq, _antenna, lang=_title_lang)
                                for ci in chart_instances if ci.enabled}
                 images = generate_all_for_frequency(
                     theta_deg, phi_angles, gain_dbi,

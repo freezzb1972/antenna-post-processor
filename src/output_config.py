@@ -23,6 +23,7 @@ class OutputConfig:
     # 例: [70.0] → 1条 0-70°峰值曲线, [70.0, 110.0] → 2条
     # 空列表 = 不生成峰值曲线
     antenna_name: str = ""                   # 天线名（标题用）
+    title_lang: str = "en"                   # 图表标题语言 en/zh (独立于界面语言)
     freq_gap_mhz: int = 10                  # B类频点曲线多段间隔阈值(MHz), 0=不打断
     dual_y_enabled: bool = False            # B类频点曲线启用双Y轴配对
     share_radial_ticks: bool = False         # 配对图共用径向刻度
@@ -114,6 +115,7 @@ class OutputConfig:
         return {
             "pk_theta_ranges": self.pk_theta_ranges,
             "antenna_name": self.antenna_name,
+            "title_lang": self.title_lang,
             "word_layout_mode": self.word_layout_mode,
             "word_columns": self.word_columns,
             "word_image_width_pct": self.word_image_width_pct,
@@ -142,6 +144,7 @@ class OutputConfig:
         return cls(
             pk_theta_ranges=list(d.get("pk_theta_ranges", [])),
             antenna_name=str(d.get("antenna_name", "")),
+            title_lang=str(d.get("title_lang", "en")),
             word_layout_mode=str(d.get("word_layout_mode", "by_freq")),
             word_columns=int(d.get("word_columns", 2)),
             word_image_width_pct=int(d.get("word_image_width_pct", 100)),
@@ -173,6 +176,7 @@ class OutputConfig:
         return OutputConfig(
             pk_theta_ranges=sorted(set(self.pk_theta_ranges + other.pk_theta_ranges)),
             antenna_name=self.antenna_name or other.antenna_name,
+            title_lang=self.title_lang or other.title_lang,
             word_layout_mode=self.word_layout_mode,
             word_columns=self.word_columns or other.word_columns,
             word_image_width_pct=self.word_image_width_pct or other.word_image_width_pct,

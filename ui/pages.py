@@ -3078,6 +3078,14 @@ class ChartSettingsPage(QWidget):
         self._edit_antenna_name.setMaximumWidth(200)
         self._edit_antenna_name.textChanged.connect(lambda: self._sync_to_mw())
         row_ant.addWidget(self._edit_antenna_name)
+        row_ant.addSpacing(12)
+        row_ant.addWidget(QLabel(self.tr("标题语言:")))
+        self._cmb_title_lang = QComboBox()
+        self._cmb_title_lang.addItem(self.tr("English"), "en")
+        self._cmb_title_lang.addItem(self.tr("中文"), "zh")
+        self._cmb_title_lang.setToolTip(self.tr("图表图片内标题的语言 (独立于界面语言)"))
+        self._cmb_title_lang.currentIndexChanged.connect(lambda: self._sync_to_mw())
+        row_ant.addWidget(self._cmb_title_lang)
         row_ant.addStretch()
         out_layout.addLayout(row_ant)
 
@@ -3179,6 +3187,10 @@ class ChartSettingsPage(QWidget):
             if hasattr(self, '_edit_antenna_name'):
                 self._edit_antenna_name.setText(az.antenna_name)
 
+            if hasattr(self, '_cmb_title_lang'):
+                _li = self._cmb_title_lang.findData(getattr(az, 'title_lang', 'en') or 'en')
+                if _li >= 0:
+                    self._cmb_title_lang.setCurrentIndex(_li)
             if hasattr(self, '_spin_azimuth_dpi'):
                 self._spin_azimuth_dpi.setValue(az.dpi if az.dpi >= 72 else 100)
             if hasattr(self, '_spin_azimuth_dpi_xtr'):
@@ -3259,6 +3271,7 @@ class ChartSettingsPage(QWidget):
         cat_badges = {ChartCategory.A_3D: "3D", ChartCategory.B_FREQ: "曲线",
                       ChartCategory.C_2D: "切面", ChartCategory.Z_AZIMUTH: "方位面"}
         _antenna = getattr(az, 'antenna_name', '') if az else ''
+        _title_lang = getattr(az, 'title_lang', 'en') if az else 'en'
         active_insts = []
         if instances:
             for ci in sorted(instances, key=lambda x: x.sort_order):
@@ -3287,7 +3300,7 @@ class ChartSettingsPage(QWidget):
                 c0.setFlags(c0.flags() & ~Qt.ItemIsEditable)
                 c0.setData(Qt.UserRole, ci.instance_id)
                 t.setItem(r, 0, c0)
-                default_title = build_title(ci, None, _antenna)
+                default_title = build_title(ci, None, _antenna, lang=_title_lang)
                 self._word_default_titles[ci.instance_id] = default_title
                 shown = ci.title if ci.title else default_title
                 c1 = QTableWidgetItem(shown)
@@ -3398,23 +3411,32 @@ class ChartSettingsPage(QWidget):
         标题按类别默认 + 实例覆盖: 此处改类别默认模板 (全局), 逐实例覆盖在
         「Word 输出布局设置」的标题列。留空的实例标题 → 用这里的类别默认。
         """
-        from src.chart_titles import (DEFAULT_TITLE_BY_CATEGORY, PLACEHOLDERS,
+        from src.chart_titles import (PLACEHOLDERS, builtin_defaults,
                                        load_default_templates, save_default_templates)
+        az = getattr(self._mw, '_output_config', None) if self._mw else None
+        _lang = getattr(az, 'title_lang', 'en') if az else 'en'
+        _lang = "zh" if str(_lang).lower().startswith("zh") else "en"
+        _lang_name = self.tr("中文") if _lang == "zh" else self.tr("English")
         cat_names = {
             "A": self.tr("3D 方向图"),
             "B": self.tr("频点曲线"),
             "C": self.tr("俯仰面切面"),
             "Z": self.tr("方位面切面"),
         }
-        cur = load_default_templates()
+        _builtin = builtin_defaults(_lang)
+        cur = load_default_templates(_lang)
 
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("默认标题模板"))
-        dlg.setMinimumSize(620, 420)
+        dlg.setMinimumSize(620, 440)
         layout = QVBoxLayout(dlg)
 
+        lang_lbl = QLabel(self.tr("当前标题语言 = {0}  (在输出设置的「标题语言」切换)").format(_lang_name))
+        lang_lbl.setStyleSheet("font-weight: bold;")
+        layout.addWidget(lang_lbl)
+
         hint = QLabel(self.tr(
-            "编辑各类图表的默认标题模板 (英文)。可用占位符:\n{0}\n"
+            "编辑各类图表的默认标题模板。可用占位符:\n{0}\n"
             "缺失占位符自动省略。逐张图可在「Word 输出布局设置」的标题列单独覆盖。"
         ).format("  ".join("{" + p + "}" for p in PLACEHOLDERS)))
         hint.setWordWrap(True)
@@ -3422,7 +3444,7 @@ class ChartSettingsPage(QWidget):
         layout.addWidget(hint)
 
         table = QTableWidget()
-        cats = list(DEFAULT_TITLE_BY_CATEGORY.keys())  # A/B/C/Z
+        cats = list(_builtin.keys())  # A/B/C/Z
         table.setColumnCount(2)
         table.setHorizontalHeaderLabels([self.tr("类别"), self.tr("标题模板")])
         table.verticalHeader().setVisible(False)
@@ -3435,7 +3457,7 @@ class ChartSettingsPage(QWidget):
             c0.setFlags(c0.flags() & ~Qt.ItemIsEditable)
             table.setItem(r, 0, c0)
             c1 = QTableWidgetItem(cur.get(cat, ""))
-            c1.setToolTip(self.tr("内置默认: {0}").format(DEFAULT_TITLE_BY_CATEGORY[cat]))
+            c1.setToolTip(self.tr("内置默认: {0}").format(_builtin[cat]))
             table.setItem(r, 1, c1)
         layout.addWidget(table)
 
@@ -3443,7 +3465,7 @@ class ChartSettingsPage(QWidget):
         btn_builtin = QPushButton(self.tr("恢复内置默认"))
         def _restore_builtin():
             for r, cat in enumerate(cats):
-                table.item(r, 1).setText(DEFAULT_TITLE_BY_CATEGORY[cat])
+                table.item(r, 1).setText(_builtin[cat])
         btn_builtin.clicked.connect(_restore_builtin)
         btn_row.addWidget(btn_builtin)
         btn_row.addStretch()
@@ -3455,8 +3477,8 @@ class ChartSettingsPage(QWidget):
             for r, cat in enumerate(cats):
                 txt = table.item(r, 1).text().strip()
                 # 留空 → 回退内置默认
-                out[cat] = txt if txt else DEFAULT_TITLE_BY_CATEGORY[cat]
-            save_default_templates(out)
+                out[cat] = txt if txt else _builtin[cat]
+            save_default_templates(out, _lang)
             dlg.accept()
         btns.accepted.connect(_on_accept)
         btns.rejected.connect(dlg.reject)
@@ -3544,6 +3566,7 @@ class ChartSettingsPage(QWidget):
         existing = getattr(mw, '_output_config', None)
         azimuth = existing if existing is not None else OutputConfig()
         azimuth.antenna_name = self._edit_antenna_name.text().strip() if hasattr(self, '_edit_antenna_name') else ""
+        azimuth.title_lang = self._cmb_title_lang.currentData() if hasattr(self, '_cmb_title_lang') else "en"
         azimuth.word_layout_mode = self._word_layout_mode if hasattr(self, '_word_layout_mode') else "side_by_side"
         azimuth.dpi = self._spin_azimuth_dpi.value() if hasattr(self, '_spin_azimuth_dpi') else 100
         if hasattr(self, '_spin_azimuth_dpi_xtr'):
