@@ -1,17 +1,17 @@
 # 反馈汇总 (自动生成)
 
-更新: 2026-07-11 04:24 UTC · 共 1 条已核实
+更新: 2026-07-11 04:27 UTC · 共 1 条已核实
 
 ## 🐞 真 Bug (0)
 _（无）_
 
-## 💡 需求/建议 (1)
-- **出报告时底部状态栏会多出一行冗余信息(无源|Gain..|就绪),没必要**  `bug` `1.0.0` `low`
-  - 核实: ui/main_window.py:_extract_execution_bar() 有意组装执行栏三元素: _mode_freq_label('📡 无源', line 3226) + _params_display('参数: Gain...', line 3201) + lblProgressMsg('就绪', 编译UI line 588)。功能正常无崩溃, 值也正确, 无 QStatusBar; 用户所述'冗余'是主观 UX 偏好(信息与右侧面板重复), 属建议非缺陷。
-  - 建议: 若确认冗余, 可在 _extract_execution_bar 中隐藏 _mode_freq_label 或将 _params_display 折叠, 需先与用户确认哪部分保留 (进度 lblProgressMsg 建议保留)。
-
-## 🔁 重复/已知 (0)
+## 💡 需求/建议 (0)
 _（无）_
+
+## 🔁 重复/已知 (1)
+- **出报告时底部状态栏会多出一行冗余信息(无源|Gain..|就绪),没必要**  `bug` `1.0.0` `low`
+  - 核实: 已由 commit c43d27e (2026-07-11 'refactor(ui): 删除冗余状态栏概要') 修复。该 commit 精确移除了反馈所述的底部状态栏概要串 '无源 | Gain: N单+M范围 | AR: ... | 就绪' — 删除了 ui/main_window.py 的 _update_status() 方法及其 2 个调用点(处理完成后 / 语言切换)。当前代码 grep '_update_status|statusBar().showMessage' 于 ui/ 已无任何残留引用;预览行 _mode_freq_label 模式显示不受影响。
+  - 建议: 无需处理,已修复。可关闭此反馈并告知用户升级到含 c43d27e 的版本(1.0.0 之后)。
 
 ## ⚪ 无效/信息不足 (0)
 _（无）_
