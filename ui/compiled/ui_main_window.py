@@ -189,13 +189,13 @@ class Ui_MainWindow(object):
 
         self.btnStart = QPushButton(self.tabFile)
         self.btnStart.setObjectName(u"btnStart")
-        self.btnStart.setMinimumSize(QSize(160, 36))
+        self.btnStart.setMinimumSize(QSize(180, 36))
 
         self.hButtons.addWidget(self.btnStart)
 
         self.btnStop = QPushButton(self.tabFile)
         self.btnStop.setObjectName(u"btnStop")
-        self.btnStop.setMinimumSize(QSize(110, 36))
+        self.btnStop.setMinimumSize(QSize(120, 36))
         self.btnStop.setEnabled(False)
 
         self.hButtons.addWidget(self.btnStop)

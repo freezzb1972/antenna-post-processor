@@ -541,13 +541,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         btn_wrap = QWidget()
         btn_wrap.setLayout(self.ui.hButtons)
         self._btn_export = QPushButton(self.tr("📄 出报告"))
-        self._btn_export.setMinimumSize(120, 32)
+        self._btn_export.setMinimumSize(140, 32)
         self._btn_export.clicked.connect(self._on_export)
         self._btn_export.setEnabled(False)
         self.ui.hButtons.addWidget(self._btn_export)
 
         self._btn_one_click = QPushButton(self.tr("🚀 一键出报告"))
-        self._btn_one_click.setMinimumSize(130, 32)
+        self._btn_one_click.setMinimumSize(150, 32)
         self._btn_one_click.clicked.connect(self._on_one_click)
         self._btn_one_click.setEnabled(False)
         self.ui.hButtons.addWidget(self._btn_one_click)
@@ -1684,9 +1684,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 文件浏览
         self.ui.btnBrowseTemplate.clicked.connect(self._on_browse_template)
         # 清除模板按钮 (×) — 动态追加到模板编辑框旁
-        self._btn_clear_template = QPushButton("×", parent=self.ui.editTemplatePath.parent())
-        self._btn_clear_template.setFixedWidth(24)
+        self._btn_clear_template = QPushButton("✕", parent=self.ui.editTemplatePath.parent())
+        self._btn_clear_template.setFixedWidth(28)
         self._btn_clear_template.setToolTip(self.tr("清除天线参数模板"))
+        self._btn_clear_template.setStyleSheet("color: #999; font-weight: bold; font-size: 14px; border: none; padding: 0px;")
         self._btn_clear_template.clicked.connect(self._on_clear_template)
         self.ui.hboxLayout1.addWidget(self._btn_clear_template)
 
