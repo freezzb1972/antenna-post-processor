@@ -249,7 +249,7 @@ class MatplotlibRenderer(BaseRenderer):
 
         fig = plt.figure(figsize=(8, 6), dpi=dpi)
         ax = fig.add_subplot(111, projection="3d")
-        fig.subplots_adjust(left=0.08, right=0.90, top=0.92, bottom=0.08)
+        fig.subplots_adjust(left=0.02, right=0.88, top=0.98, bottom=0.02)
 
         # 选择 colormap
         cmap = EMQUEST_CMAP if colormap == "emquest" else plt.get_cmap(colormap)
