@@ -249,7 +249,7 @@ class MatplotlibRenderer(BaseRenderer):
 
         fig = plt.figure(figsize=(8, 6), dpi=dpi)
         ax = fig.add_subplot(111, projection="3d")
-        fig.subplots_adjust(left=-0.05, right=0.90, top=1.05, bottom=-0.05)
+        fig.subplots_adjust(left=0.08, right=0.90, top=0.92, bottom=0.08)
 
         # 选择 colormap
         cmap = EMQUEST_CMAP if colormap == "emquest" else plt.get_cmap(colormap)
@@ -299,7 +299,7 @@ class MatplotlibRenderer(BaseRenderer):
         ax.zaxis.pane.fill = False
         ax.grid(False)
 
-        fig.tight_layout(pad=0.5)
+        # tight_layout removed: use subplots_adjust for consistent margins across all renderers
         buf = _fig_to_png_buffer(fig, dpi)
         return buf
 
@@ -407,7 +407,7 @@ class MatplotlibRenderer(BaseRenderer):
             title_parts.append(cut_label)
         ax.set_title((title or " — ".join(title_parts)), fontsize=12)
 
-        fig.tight_layout(pad=1.2)
+        fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_azimuth_rect(
@@ -448,7 +448,7 @@ class MatplotlibRenderer(BaseRenderer):
             title_parts.append(cut_label)
         ax.set_title((title or " — ".join(title_parts)), fontsize=12)
 
-        fig.tight_layout(pad=1.2)
+        fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_azimuth_polar(
@@ -991,8 +991,7 @@ def detect_available_renderers() -> dict:
 
 def _fig_to_png_buffer(fig, dpi: int) -> io.BytesIO:
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight",
-                facecolor="white", edgecolor="none")
+    fig.savefig(buf, format="png", dpi=dpi, facecolor="white", edgecolor="none")
     buf.seek(0)
     plt.close(fig)
     return buf
