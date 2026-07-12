@@ -267,7 +267,7 @@ class FileSettingsPage(QWidget):
         v_splitter.addWidget(ds)
         v_splitter.setStretchFactor(0, 0)  # 模板区不拉伸
         v_splitter.setStretchFactor(1, 1)  # 数据文件区可拉伸
-        v_splitter.setSizes([60, 500])     # 模板区贴内容, 数据区撑满
+        v_splitter.setSizes([45, 500])     # 模板区贴内容(两行)+数据区撑满
         left_layout.addWidget(v_splitter)
         h_splitter.addWidget(left_widget)
 
