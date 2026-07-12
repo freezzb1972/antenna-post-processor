@@ -1651,6 +1651,7 @@ class GraphViewer(QWidget):
     def _on_anim_tick(self):
         idx = self._cmb_freq.currentIndex() + 1
         total = self._cmb_freq.count()
+        self._lbl_anim_progress.setText(f"{idx}/{total}")
         if idx >= total:
             self._stop_animation()
             return
