@@ -507,6 +507,20 @@ def _process_one_frequency(
                     from .chart_titles import build_title
                     _titles = {ci.image_key: build_title(ci, freq, _antenna, lang=_title_lang)
                                for ci in chart_instances if ci.enabled}
+                # 按分类频点选择过滤 chart_instances: A类仅 selected_frequencies_a, C类仅 _c, B类全保留
+                _filt_instances = None
+                if chart_instances:
+                    _fa = set(getattr(ccfg, 'selected_frequencies_a', []))
+                    _fc = set(getattr(ccfg, 'selected_frequencies_c', []))
+                    if _fa or _fc:
+                        _filt_instances = []
+                        for ci in chart_instances:
+                            cat = getattr(ci.category, "value", ci.category) if hasattr(ci, 'category') else ""
+                            if cat == "A" and _fa and freq not in _fa:
+                                continue
+                            if cat == "C" and _fc and freq not in _fc:
+                                continue
+                            _filt_instances.append(ci)
                 images = generate_all_for_frequency(
                     theta_deg, phi_angles, gain_dbi,
                     freq, ccfg, ar_linear=ar_lin,
@@ -516,7 +530,7 @@ def _process_one_frequency(
                     output_config=output_config,
                     extra_patterns=extra_patterns,
                     titles=_titles,
-                    chart_instances=chart_instances,
+                    chart_instances=_filt_instances if _filt_instances is not None else chart_instances,
                 )
                 if images:
                     row["_images"] = images
