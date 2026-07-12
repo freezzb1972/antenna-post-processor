@@ -199,7 +199,8 @@ def _add_single_image(doc: Document, img_buf: io.BytesIO, caption: str,
         run = cap_para.add_run(caption)
         run.bold = True
         run.font.size = Pt(9)
-        cap_para.paragraph_format.space_after = Pt(2)
+        cap_para.paragraph_format.space_after = Pt(1)
+        cap_para.paragraph_format.space_before = Pt(0)
     img_buf.seek(0)
     img_para = doc.add_paragraph()
     img_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -218,12 +219,15 @@ def _add_cell_image(cell, img_buf: io.BytesIO, caption: str,
         run = cap_para.add_run(caption)
         run.bold = True
         run.font.size = Pt(7)
-        cap_para.paragraph_format.space_after = Pt(2)
+        cap_para.paragraph_format.space_after = Pt(1)
+        cap_para.paragraph_format.space_before = Pt(0)
     img_buf.seek(0)
     img_para = cell.add_paragraph()
     img_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run_img = img_para.add_run()
     run_img.add_picture(img_buf, width=width)
+    img_para.paragraph_format.space_after = Pt(0)
+    img_para.paragraph_format.space_before = Pt(0)
 
 
 def _write_flat_grid(
