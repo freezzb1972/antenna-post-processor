@@ -976,6 +976,15 @@ class GraphViewer(QWidget):
         self._lbl_speed_val.setParent(dlg); row_anim.addWidget(self._lbl_speed_val)
         row_anim.addStretch(); layout.addLayout(row_anim)
 
+        # ── Grid/Line Type ──
+        row_grid = QHBoxLayout()
+        row_grid.addWidget(QLabel("3D 网格线型:"))
+        self._v2_cmb_line_type = QComboBox()
+        self._v2_cmb_line_type.addItems(["Minimum (极细)", "None (平滑无网格)", "Proportional (等宽)"])
+        self._v2_cmb_line_type.setCurrentText(getattr(self, '_line_type', "Minimum (极细)"))
+        row_grid.addWidget(self._v2_cmb_line_type)
+        row_grid.addStretch(); layout.addLayout(row_grid)
+
         # ── 视角微调 (el/az/roll) ──
         grp_v = QGroupBox("视角手动微调"); vlay = QHBoxLayout(grp_v)
         self._spin_elev.setParent(dlg); vlay.addWidget(QLabel("el:")); vlay.addWidget(self._spin_elev)
@@ -992,6 +1001,7 @@ class GraphViewer(QWidget):
             self._scale_lock = self._v2_chk_scale_lock.isChecked()
             self._db_min = self._v2_spin_dbmin.value()
             self._db_max = self._v2_spin_dbmax.value()
+            self._line_type = self._v2_cmb_line_type.currentText()
             self._cmb_cmap.currentTextChanged.connect(self._on_cmap_changed)
             self._spin_step.valueChanged.connect(self._on_step_changed)
             self._slider_speed.valueChanged.connect(self._on_speed_changed)
