@@ -104,7 +104,6 @@ class BaseRenderer(ABC):
         title: str = "",
         antenna_name: str = "",
         colormap: str = "emquest",
-        show_colorbar: bool = True,
     ) -> io.BytesIO:
         """渲染 3D 球面方向图。"""
         ...
@@ -249,13 +248,8 @@ class MatplotlibRenderer(BaseRenderer):
         X, Y, Z, color_values, vmin, vmax = build_3d_surface(
             theta_deg, phi_deg, gain_dbi, kind="magnitude", dyn=dyn)
 
-        fig = plt.figure(figsize=(8, 6), dpi=dpi)
+        fig = plt.figure(figsize=(9, 7), dpi=dpi)
         ax = fig.add_subplot(111, projection="3d")
-        _show_cbar = show_colorbar
-        if _show_cbar:
-            fig.subplots_adjust(left=0.02, right=0.88, top=0.92, bottom=0.02)   # 右边留12%给colorbar
-        else:
-            fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)   # 与2D一致, 类tight紧凑
 
         # 选择 colormap
         cmap = EMQUEST_CMAP if colormap == "emquest" else plt.get_cmap(colormap)
@@ -266,28 +260,28 @@ class MatplotlibRenderer(BaseRenderer):
             X, Y, Z,
             facecolors=cmap(norm(color_values)),
             rstride=1, cstride=1,
-            alpha=1.0, shade=True,
+            alpha=0.88, shade=True,
             linewidth=0, antialiased=True,
         )
 
-        # 贴面网格线 (EMQuest 浅灰, 固定 stride=4, 所有频点一致)
+        # 贴面网格线 (EMQuest 浅灰, 固定 stride=4)
         ax.plot_wireframe(X, Y, Z, rstride=4, cstride=4,
                           color="gray", linewidth=0.2, alpha=0.3)
 
-        # 去笛卡尔轴 + 视角 + θ=0° 箭头 (无灰色参考球/θ环, 保持干净)
+        # 去笛卡尔轴 + 视角 + θ=0° 箭头 (无灰色参考球/θ环)
         _add_axis_labels_3d(ax, 1.0)
         ax.view_init(elev=elev, azim=azim, roll=roll)
         ax.set_axis_off()
 
-        # colorbar (无标签文字, 可选开关控制是否显示)
-        if getattr(self, '_show_3d_colorbar', True):
+        # colorbar (可开关)
+        if show_colorbar:
             mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
             mappable.set_array(gain_dbi)
             cbar = fig.colorbar(mappable, ax=ax, shrink=0.4, aspect=30, pad=0.02)
             cbar.ax.tick_params(labelsize=7)
 
-        # 视角图例 (Theta/Phi/Roll)
-        view_text = f"θ(elev) = {elev:.0f}°\nφ(azim) = {azim:.0f}°\nroll = {roll:.0f}°"
+        # 视角图例 (右上角)
+        view_text = f"θ(el)={elev:.0f}°\nφ(az)={azim:.0f}°\nroll={roll:.0f}°"
         ax.text2D(0.98, 0.98, view_text, transform=ax.transAxes,
                    fontsize=10, color="black", fontfamily="monospace",
                    ha="right", va="top")
@@ -305,7 +299,10 @@ class MatplotlibRenderer(BaseRenderer):
         ax.zaxis.pane.fill = False
         ax.grid(False)
 
-        # tight_layout removed: use subplots_adjust for consistent margins across all renderers
+        if show_colorbar:
+            fig.subplots_adjust(left=0.02, right=0.88, top=0.92, bottom=0.02)
+        else:
+            fig.subplots_adjust(left=0.06, right=0.94, top=0.92, bottom=0.06)
         buf = _fig_to_png_buffer(fig, dpi)
         return buf
 
@@ -331,7 +328,7 @@ class MatplotlibRenderer(BaseRenderer):
         """
         theta_rad = np.deg2rad(angles_deg)
         fig, ax = plt.subplots(subplot_kw={"projection": "polar"},
-                               dpi=dpi, figsize=(8, 6))
+                               dpi=dpi, figsize=(7, 6))
 
         colors = ["#2196F3", "#F44336", "#4CAF50", "#FF9800"]
         if curves:
@@ -369,7 +366,7 @@ class MatplotlibRenderer(BaseRenderer):
         # 图例放到图外右上 (与方位面 render_azimuth_polar 一致)
         if curves and len(curves) > 1:
             angle = np.deg2rad(45)
-            ax.legend(loc="lower left", fontsize=10, framealpha=0.6,
+            ax.legend(loc="lower left", fontsize=9, framealpha=0.6,
                       bbox_to_anchor=(.5 + np.cos(angle) / 2, .5 + np.sin(angle) / 2))
 
         fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
@@ -390,14 +387,14 @@ class MatplotlibRenderer(BaseRenderer):
         curves: list[tuple[str, np.ndarray, np.ndarray]] | None = None,
     ) -> io.BytesIO:
         """2D 直角坐标切面图。支持多曲线叠加。"""
-        fig, ax = plt.subplots(dpi=dpi, figsize=(8, 6))
+        fig, ax = plt.subplots(dpi=dpi, figsize=(8, 5))
         colors = ["#2196F3", "#F44336", "#4CAF50", "#FF9800"]
 
         if curves:
             for i, (label, c_angles, c_values) in enumerate(curves):
                 ax.plot(c_angles, c_values, "-", linewidth=1.2, color=colors[i % len(colors)], label=label)
             if curves:
-                ax.legend(fontsize=10)
+                ax.legend(fontsize=8)
         else:
             ax.plot(angles_deg, gain_dbi, "-", linewidth=1.2, color="#2196F3")
 
@@ -413,7 +410,7 @@ class MatplotlibRenderer(BaseRenderer):
             title_parts.append(cut_label)
         ax.set_title((title or " — ".join(title_parts)), fontsize=12)
 
-        fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
+        fig.tight_layout(pad=1.2)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_azimuth_rect(
@@ -430,7 +427,7 @@ class MatplotlibRenderer(BaseRenderer):
         curves: list[tuple[float, np.ndarray]] | None = None,
     ) -> io.BytesIO:
         """2D 直角坐标方位面切面图。支持多曲线叠加。"""
-        fig, ax = plt.subplots(dpi=dpi, figsize=(8, 6))
+        fig, ax = plt.subplots(dpi=dpi, figsize=(8, 5))
         colors = ["#2196F3", "#F44336", "#4CAF50", "#FF9800"]
 
         if curves:
@@ -438,7 +435,7 @@ class MatplotlibRenderer(BaseRenderer):
                 ax.plot(phi_deg, c_values, "-", linewidth=1.2,
                         color=colors[i % len(colors)], label=f"={theta_angle:.0f}")
             if curves:
-                ax.legend(fontsize=10)
+                ax.legend(fontsize=8)
         else:
             ax.plot(phi_deg, values, "-", linewidth=1.2, color="#2196F3")
 
@@ -454,7 +451,7 @@ class MatplotlibRenderer(BaseRenderer):
             title_parts.append(cut_label)
         ax.set_title((title or " — ".join(title_parts)), fontsize=12)
 
-        fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
+        fig.tight_layout(pad=1.2)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_azimuth_polar(
@@ -477,7 +474,7 @@ class MatplotlibRenderer(BaseRenderer):
         linestyles = ["-", "--", "-.", ":"]
 
         fig, ax = plt.subplots(subplot_kw={"projection": "polar"},
-                               dpi=dpi, figsize=(8, 6))
+                               dpi=dpi, figsize=(7, 7))
 
         sorted_curves = sorted(curves, key=lambda x: x[0])
 
@@ -496,7 +493,7 @@ class MatplotlibRenderer(BaseRenderer):
                     linewidth=1.2, label=label)
 
         if curves:
-            ax.legend(fontsize=10, loc="upper right")
+            ax.legend(fontsize=8, loc="upper right")
         ax.set_theta_zero_location("N")
         ax.set_theta_direction(-1)
         ax.set_thetagrids(range(0, 360, 30),
@@ -528,7 +525,7 @@ class MatplotlibRenderer(BaseRenderer):
         if len(sorted_curves) > 1:
             # 官方极坐标图例: 用极角偏移放到图外 (45° 方向 = 右上角)
             angle = np.deg2rad(45)
-            ax.legend(loc="lower left", fontsize=10, framealpha=0.6,
+            ax.legend(loc="lower left", fontsize=9, framealpha=0.6,
                       bbox_to_anchor=(.5 + np.cos(angle)/2, .5 + np.sin(angle)/2))
 
         fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
@@ -546,7 +543,7 @@ class MatplotlibRenderer(BaseRenderer):
         title: str = "",
     ) -> io.BytesIO:
         """渲染 Gain vs Theta 2D Cartesian 线图 (θ=0-70° 峰值增益)。"""
-        fig, ax = plt.subplots(figsize=(8, 6), dpi=dpi)
+        fig, ax = plt.subplots(figsize=(6, 4), dpi=dpi)
         ax.plot(theta_deg, values, "o-", linewidth=1.5, markersize=3, color="#1f77b4")
         ax.set_xlabel("Theta (°)")
         ax.set_ylabel(ylabel)
@@ -557,7 +554,7 @@ class MatplotlibRenderer(BaseRenderer):
         margin = max((hi - lo) * 0.1, 0.5)
         ax.set_ylim(lo - margin, hi + margin)
         ax.set_title(title or (f"{freq_mhz:.0f} MHz" + (f" — {antenna_name}" if antenna_name else "")),
-                     fontsize=12)
+                     fontsize=10)
 
         fig.tight_layout()
         return _fig_to_png_buffer(fig, dpi)
@@ -607,7 +604,7 @@ class MatplotlibRenderer(BaseRenderer):
         xt.insert(0, x[0]); xl.insert(0, f"{freqs[0]:.0f}")
         xt.append(x[-1]); xl.append(f"{freqs[-1]:.0f}")
 
-        fig, ax = plt.subplots(figsize=(8, 6), dpi=dpi)
+        fig, ax = plt.subplots(figsize=(8, 4.5), dpi=dpi)
         # 分段绘制双Y轴, 段间不连线; twinx 只创建一次
         ax1 = ax
         ax2 = ax1.twinx()
@@ -676,7 +673,7 @@ class MatplotlibRenderer(BaseRenderer):
         xt.insert(0, x[0]); xl.insert(0, f"{freqs[0]:.0f}")
         xt.append(x[-1]); xl.append(f"{freqs[-1]:.0f}")
 
-        fig, ax = plt.subplots(figsize=(8, 6), dpi=dpi)
+        fig, ax = plt.subplots(figsize=(8, 4.5), dpi=dpi)
         # 分段绘制, 段间不连线
         seg_i2 = 0; seg_start2 = 0
         for i2 in range(1, len(freqs) + 1):
@@ -997,7 +994,8 @@ def detect_available_renderers() -> dict:
 
 def _fig_to_png_buffer(fig, dpi: int) -> io.BytesIO:
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, facecolor="white", edgecolor="none")
+    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight",
+                facecolor="white", edgecolor="none")
     buf.seek(0)
     plt.close(fig)
     return buf
@@ -1007,14 +1005,39 @@ def _fig_to_png_buffer(fig, dpi: int) -> io.BytesIO:
 # 3D 视觉增强 — 参考球 / Theta 环 / 轴标注
 # ═══════════════════════════════════════════════════════════════
 
-    """添加轴标签和 θ=0° 方向箭头。"""
-    lim = max_r * 1.3
-    ax.set_xlim(-lim, lim)
-    ax.set_ylim(-lim, lim)
-    ax.set_zlim(-lim, lim)
+def _add_reference_sphere(ax, theta_deg, phi_deg, r0=1.0):
+    """在 gain=0 dBi 对应半径 r0 处画灰色虚线参考球。r0 为 None 时跳过。"""
+    if r0 is None or r0 <= 0:
+        return
+    r = float(r0)
+    theta = np.deg2rad(theta_deg)
+    phi = np.deg2rad(phi_deg)
+    TH, PH = np.meshgrid(theta, phi)
 
-    ax.set_xlabel("X", fontsize=10, labelpad=4)
-    ax.set_ylabel("Y", fontsize=10, labelpad=4)
+    X = r * np.sin(TH) * np.cos(PH)
+    Y = r * np.sin(TH) * np.sin(PH)
+    Z = r * np.cos(TH)
+
+    stride = max(1, min(len(phi_deg), len(theta_deg)) // 15)
+    ax.plot_wireframe(X, Y, Z, rstride=stride, cstride=stride,
+                      color="gray", linewidth=0.3, alpha=0.4,
+                      linestyle="dotted")
+
+
+def _add_theta_rings(ax, theta_deg, phi_deg, r_outer=2.5):
+    """在关键 theta 角处画纬线环 (缩放到外半径 r_outer)。"""
+    rt = float(r_outer)
+    phi = np.linspace(0, 2 * np.pi, 180)
+    for t_deg in [30, 60, 90, 120, 150]:
+        t = np.deg2rad(t_deg)
+        x = rt * np.sin(t) * np.cos(phi)
+        y = rt * np.sin(t) * np.sin(phi)
+        z = rt * np.cos(t) * np.ones_like(phi)
+        # 只在 Z ≥ 0 部分画（上半球）
+        ax.plot(x, y, z, color="gray", linewidth=0.4, alpha=0.3,
+                linestyle="dashed")
+
+
 def _add_axis_labels_3d(ax, max_r: float):
     """添加轴标签和 θ=0° 方向箭头。"""
     lim = max_r * 1.3
