@@ -103,7 +103,7 @@ class SubPlotPanel:
         self.selected = False       # 点选高亮 (联动关闭时控件作用于选中子图)
         self._plot_type = "Spherical 3D"
         self._theta_idx = 0          # Polar 2D 截面索引
-        self._cut_angle = None       # 任意角度切割: None=关, 否则 φ 角度(度), 半平面遮罩露剖面
+        self._cut_angles: list = []    # 连续切割: [(φ角度, side),...]; side=0保留[φ,φ+180),side=1保留[φ+180,φ+360)
         self._fig = fig
         self._position = position
         self.ax = None
@@ -129,8 +129,21 @@ class SubPlotPanel:
         self._theta_idx = idx
 
     def set_cut_angle(self, angle):
-        """任意角度切割: angle=None 关闭, 否则 φ 角度(度)。半平面遮罩露中心剖面 (仅 Spherical 3D)。"""
-        self._cut_angle = angle
+        """(兼容旧接口) 单一切割/关闭。"""
+        self._cut_angles = [(float(angle), 0)] if angle is not None else []
+
+    def add_cut(self, phi: float, side: int = 0):
+        """追加一个切割面。side=0保留[φ,φ+180), side=1保留[φ+180,φ+360)。"""
+        self._cut_angles.append((float(phi) % 360.0, side % 2))
+
+    def clear_cuts(self):
+        self._cut_angles.clear()
+
+    def flip_last_cut(self):
+        """翻转最近一次切割的保留侧。"""
+        if self._cut_angles:
+            phi, side = self._cut_angles.pop()
+            self._cut_angles.append((phi, 1 - side))
 
     def set_view(self, elev, azim, roll=None):
         self._elev, self._azim = elev, azim
@@ -179,17 +192,21 @@ class SubPlotPanel:
 
         theta_arr = np.asarray(theta_deg, dtype=float)
         phi_arr = np.asarray(phi_deg, dtype=float)
-        # 任意角度切割: roll phi 使 φcut 落在开头, 取前半 [φcut, φcut+180] (连续, 免环绕问题) → 露剖面
-        cut_edges = None
-        if self._cut_angle is not None and phi_arr.size >= 4:
-            lo = float(self._cut_angle) % 360.0
-            idx0 = int(np.argmin(np.abs(((phi_arr - lo + 180.0) % 360.0) - 180.0)))
-            phi_arr = np.roll(phi_arr, -idx0)
-            values = np.roll(values, -idx0, axis=0)
-            half = phi_arr.size // 2 + 1
-            phi_arr = phi_arr[:half]
-            values = values[:half, :]
-            cut_edges = (lo, lo + 180.0)
+        # 连续切割: 多切面取交集 (每个切面保留半平面, 多切=取交集)
+        cut_lines = []
+        if self._cut_angles and phi_arr.size >= 4:
+            mask = np.ones(len(phi_arr), dtype=bool)
+            for phi_cut, side in self._cut_angles:
+                lo = float(phi_cut) % 360.0
+                # side=0 保留 [lo, lo+180), side=1 保留 [lo+180, lo+360)
+                if side == 0:
+                    keep = ((phi_arr - lo + 360.0) % 360.0) < 180.0
+                else:
+                    keep = ((phi_arr - lo + 360.0) % 360.0) >= 180.0
+                mask &= keep
+                cut_lines.extend([lo, (lo + 180.0) % 360.0])
+            phi_arr = phi_arr[mask]
+            values = values[mask, :]
 
         # data 形状 (n_phi, n_theta) 与 build_3d_surface 一致
         X, Y, Z, cvals, vmin, vmax = build_3d_surface(theta_arr, phi_arr, values, kind=kind)
@@ -198,16 +215,15 @@ class SubPlotPanel:
         self.ax.plot_surface(X, Y, Z, facecolors=cmap_obj(mnorm(cvals)),
                              rstride=1, cstride=1, alpha=0.85,
                              linewidth=0, antialiased=True)
-        # 切割线: 过中心沿 φcut / φcut+180 的红色直径线 (指示切割角度)
-        if cut_edges is not None:
-            for ang in cut_edges:
-                a = np.deg2rad(ang)
-                self.ax.plot([0, 1.1 * np.cos(a)], [0, 1.1 * np.sin(a)], [0, 0],
-                             color="red", linewidth=1.5, zorder=10)
+        # 切割线: 所有切面的红色虚线
+        for ang in cut_lines:
+            a = np.deg2rad(ang)
+            self.ax.plot([0, 1.1 * np.cos(a)], [0, 1.1 * np.sin(a)], [0, 0],
+                         color="red", linewidth=1.5, linestyle="--", zorder=10)
         self.ax.set_box_aspect([1, 1, 1])
         self.ax.view_init(elev=self._elev, azim=self._azim, roll=self._roll)
         self.ax.set_axis_off()
-        # 缓存读值用: X,Y,Z,cvals,theta,phi (motion_notify 反查)
+        # 缓存读值用: X,Y,Z,cvals,theta,phi (motion_notify 反查 + 单击切割)
         self._last_X, self._last_Y, self._last_Z = X, Y, Z
         self._last_cvals, self._last_theta, self._last_phi = cvals, theta_arr.copy(), phi_arr.copy()
 
@@ -693,7 +709,7 @@ class GraphViewer(QWidget):
         self._cmb_preset.setToolTip("7 视角预设")
         self._cmb_preset.currentIndexChanged.connect(self._on_view_preset_changed)
         lay.addWidget(self._cmb_preset)
-        lay.addWidget(self._lbl_cut)
+
         sep1 = QFrame(); sep1.setFrameShape(QFrame.VLine); lay.addWidget(sep1)
         self._btn_reset_view = QPushButton("↺"); self._btn_reset_view.setFixedWidth(32)
         self._btn_reset_view.setToolTip("重置视角为默认 Iso + 关切割")
@@ -744,27 +760,22 @@ class GraphViewer(QWidget):
         self._cmb_preset.currentIndexChanged.connect(self._on_view_preset_changed)
         lay.addWidget(self._cmb_preset)
         self._chk_cut = QCheckBox("切割")
-        self._chk_cut.setToolTip("任意角度切割: 旋钮选角度(吸附主平面), 右键输精确值")
-        self._chk_cut.toggled.connect(self._on_cut_changed)
+        self._chk_cut.setToolTip("单击3D球面设切割角 | 连续多次切割取交集 | ↔翻转保留侧 | ✕清除")
+        self._chk_cut.toggled.connect(self._on_cut_check_changed)
         lay.addWidget(self._chk_cut)
-        self._dial_cut = QDial()
-        self._dial_cut.setRange(0, 359); self._dial_cut.setWrapping(True)
-        self._dial_cut.setFixedSize(32, 32); self._dial_cut.setNotchesVisible(True)
-        self._dial_cut.setToolTip("切割角度 φ (吸附 0/45/90/135/180/225/270/315°)")
-        self._dial_cut.valueChanged.connect(self._on_cut_dial_changed)
-        lay.addWidget(self._dial_cut)
         self._spin_cut = QSpinBox()
         self._spin_cut.setRange(0, 359); self._spin_cut.setSuffix("°"); self._spin_cut.setFixedWidth(56)
-        self._spin_cut.setToolTip("切割角度 φ 精确值")
-        self._spin_cut.valueChanged.connect(self._on_cut_spin_changed)
+        self._spin_cut.setToolTip("切割角度 φ (或单击3D球面自动填入)")
+        self._spin_cut.valueChanged.connect(self._apply_cut_from_spin)
         lay.addWidget(self._spin_cut)
-        # 4 主平面预设: φ=0(E面), φ=90(H面), θ=90 用 φ 切面近似
-        for lbl, ang in [("E",0),("H",90),("180",180),("270",270)]:
-            btn = QPushButton(lbl); btn.setFixedWidth(24); btn.setToolTip(f"切割 φ={ang}°")
-            btn.clicked.connect(lambda checked, a=ang: self._set_cut_preset(a))
-            lay.addWidget(btn)
-        self._lbl_cut = QLabel("--"); self._lbl_cut.setFixedWidth(32)
-        lay.addWidget(self._lbl_cut)
+        self._btn_cut_flip = QPushButton("↔"); self._btn_cut_flip.setFixedWidth(28)
+        self._btn_cut_flip.setToolTip("翻转保留侧: [φ,φ+180) ↔ [φ+180,φ+360)")
+        self._btn_cut_flip.clicked.connect(self._on_cut_flip)
+        lay.addWidget(self._btn_cut_flip)
+        self._btn_cut_clear = QPushButton("✕"); self._btn_cut_clear.setFixedWidth(28)
+        self._btn_cut_clear.setToolTip("清除所有切割, 恢复完整球面")
+        self._btn_cut_clear.clicked.connect(self._on_cut_clear)
+        lay.addWidget(self._btn_cut_clear)
         sep1 = QFrame(); sep1.setFrameShape(QFrame.VLine); lay.addWidget(sep1)
         self._btn_reset_view = QPushButton("↺"); self._btn_reset_view.setFixedWidth(32)
         self._btn_reset_view.setToolTip("重置视角为默认 Iso + 关切割")
@@ -849,13 +860,12 @@ class GraphViewer(QWidget):
             self._cmb_plot_type.setCurrentIndex(k)
         self._cmb_plot_type.blockSignals(False)
         # 切割
-        self._chk_cut.blockSignals(True); self._dial_cut.blockSignals(True); self._spin_cut.blockSignals(True)
-        on = sp._cut_angle is not None
-        self._chk_cut.setChecked(on)
-        self._dial_cut.setValue(int(sp._cut_angle) if on else 0)
-        self._spin_cut.setValue(int(sp._cut_angle) if on else 0)
-        self._lbl_cut.setText(f"{int(sp._cut_angle)}°" if on else "--")
-        self._chk_cut.blockSignals(False); self._dial_cut.blockSignals(False); self._spin_cut.blockSignals(False)
+        cuts = sp._cut_angles
+        self._chk_cut.blockSignals(True); self._spin_cut.blockSignals(True)
+        self._chk_cut.setChecked(bool(cuts))
+        if cuts:
+            self._spin_cut.setValue(int(cuts[-1][0]))
+        self._chk_cut.blockSignals(False); self._spin_cut.blockSignals(False)
         self._lbl_selected.setText(f"◉ 子图 #{idx + 1}:")
         self._suppress_view = False
 
@@ -895,7 +905,7 @@ class GraphViewer(QWidget):
         self._cmb_preset.setCurrentText("Iso")
         self._chk_cut.setChecked(False); self._spin_cut.setValue(0)
         for sp in self._subplots:
-            sp.set_cut_angle(None)
+            sp.clear_cuts()
         self._on_update()
 
     # 向后兼容别名 (C-3 旧调用)
@@ -924,7 +934,7 @@ class GraphViewer(QWidget):
         self._on_update()
 
     def _on_canvas_click(self, event):
-        """点选子图 → 高亮 + 回填选中子图行 (分别控制时的目标)。"""
+        """点选子图 → 高亮 + 回填选中子图行。若切割模式+Spherical→单击设切割角。"""
         if event.inaxes is None or not self._subplots:
             return
         for i, sp in enumerate(self._subplots):
@@ -935,6 +945,30 @@ class GraphViewer(QWidget):
                     if s.ax is not None and hasattr(s.ax, "title"):
                         s.ax.title.set_color("#ffd700" if s.selected else
                                              ("black" if s._plot_type == "Polar 2D" else "white"))
+                # 切割模式: 单击3D球面 → 设切割角为该点 φ
+                if (hasattr(self, '_chk_cut') and self._chk_cut.isChecked()
+                        and sp._plot_type == "Spherical 3D" and hasattr(sp, '_last_phi')):
+                    try:
+                        from matplotlib.projections import proj3d
+                        x2, y2, _ = proj3d.proj_transform(
+                            sp._last_X.ravel(), sp._last_Y.ravel(), sp._last_Z.ravel(),
+                            sp.ax.get_proj())
+                        x2, y2 = np.asarray(x2), np.asarray(y2)
+                        disp = sp.ax.transData.transform
+                        xy = disp(np.column_stack([x2, y2]))
+                        dist2 = (xy[:,0]-event.x)**2 + (xy[:,1]-event.y)**2
+                        idx = int(np.argmin(dist2))
+                        ntheta = len(sp._last_theta) if sp._last_theta is not None else 0
+                        phi_i = idx // max(ntheta, 1)
+                        if phi_i < len(sp._last_phi):
+                            ang = float(sp._last_phi[phi_i])
+                            self._spin_cut.setValue(int(ang))
+                            for s in self._view_targets():
+                                if s._plot_type == "Spherical 3D":
+                                    s.add_cut(ang, 0)
+                            self._on_update()
+                    except Exception:
+                        pass  # 投影失败静默, 回退到普通选中
                 self._sync_selected_bar()
                 self._canvas.draw_idle()
                 break
@@ -1128,47 +1162,45 @@ class GraphViewer(QWidget):
 
     # ── 切割 (任意角度, 吸附+精确+预设) ──
 
-    _CUT_SNAPS = [0, 45, 90, 135, 180, 225, 270, 315]
+    # ── 切割 (单击球面设角 + 翻转 + 清除) ──
 
-    def _snap_cut(self, val: int) -> int:
-        """吸附到最近的主平面 (±3° 内), 否则保持原值。"""
-        for s in self._CUT_SNAPS:
-            if abs(val - s) <= 3 or abs(val - 360 + s) <= 3 or abs(val + 360 - s) <= 3:
-                return s % 360
-        return val
+    def _on_cut_check_changed(self):
+        """切割勾选 toggled。"""
+        if self._chk_cut.isChecked():
+            ang = float(self._spin_cut.value())
+            for sp in self._view_targets():
+                sp.add_cut(ang, 0)
+            self._on_update()
+        else:
+            for sp in self._view_targets():
+                sp.clear_cuts()
+            self._on_update()
 
-    def _apply_cut(self, angle: float | None):
-        """切割设置应用到目标子图 + 重绘。"""
+    def _apply_cut_from_spin(self):
+        """spinbox 改值 → 更新最后一个切面(或新增)。"""
+        if not self._chk_cut.isChecked():
+            self._chk_cut.setChecked(True)
+        ang = float(self._spin_cut.value())
         for sp in self._view_targets():
-            sp.set_cut_angle(angle)
+            if sp._cut_angles:
+                phi, side = sp._cut_angles.pop()
+                sp._cut_angles.append((ang, side))
+            else:
+                sp.add_cut(ang, 0)
         self._on_update()
 
-    def _on_cut_dial_changed(self):
-        raw = self._dial_cut.value()
-        snapped = self._snap_cut(raw)
-        if snapped != raw:
-            self._dial_cut.blockSignals(True); self._dial_cut.setValue(snapped); self._dial_cut.blockSignals(False)
-        if not self._chk_cut.isChecked():
-            self._chk_cut.setChecked(True)
-        ang = float(snapped)
-        self._spin_cut.blockSignals(True); self._spin_cut.setValue(snapped); self._spin_cut.blockSignals(False)
-        self._lbl_cut.setText(f"{int(ang)}°")
-        self._apply_cut(ang)
+    def _on_cut_flip(self):
+        """翻转最近切面的保留侧。"""
+        for sp in self._view_targets():
+            sp.flip_last_cut()
+        self._on_update()
 
-    def _on_cut_spin_changed(self):
-        ang = self._spin_cut.value()
-        self._dial_cut.blockSignals(True); self._dial_cut.setValue(ang); self._dial_cut.blockSignals(False)
-        if not self._chk_cut.isChecked():
-            self._chk_cut.setChecked(True)
-        self._lbl_cut.setText(f"{int(ang)}°")
-        self._apply_cut(float(ang))
-
-    def _set_cut_preset(self, angle: int):
-        self._chk_cut.setChecked(True)
-        self._dial_cut.blockSignals(True); self._dial_cut.setValue(angle); self._dial_cut.blockSignals(False)
-        self._spin_cut.setValue(angle)
-        self._lbl_cut.setText(f"{angle}°")
-        self._apply_cut(float(angle))
+    def _on_cut_clear(self):
+        """清除所有切割。"""
+        self._chk_cut.setChecked(False)
+        for sp in self._view_targets():
+            sp.clear_cuts()
+        self._on_update()
 
     def _on_cut_changed(self):
         """切割启用勾 toggled。"""
