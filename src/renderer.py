@@ -263,6 +263,11 @@ class MatplotlibRenderer(BaseRenderer):
             linewidth=0, antialiased=True,
         )
 
+        # 贴面网格线 (wireframe, 提供深度线索 / EMQuest 风格表面经纬线)
+        stride = max(1, min(len(phi_deg), len(theta_deg)) // 30)
+        ax.plot_wireframe(X, Y, Z, rstride=stride, cstride=stride,
+                          color="white", linewidth=0.5, alpha=0.35)
+
         # 去笛卡尔轴 + 视角 + θ=0° 箭头 (无灰色参考球/θ环, 保持干净)
         _add_axis_labels_3d(ax, 1.0)
         ax.view_init(elev=elev, azim=azim, roll=roll)
@@ -996,6 +1001,15 @@ def _fig_to_png_buffer(fig, dpi: int) -> io.BytesIO:
 # 3D 视觉增强 — 参考球 / Theta 环 / 轴标注
 # ═══════════════════════════════════════════════════════════════
 
+    """添加轴标签和 θ=0° 方向箭头。"""
+    lim = max_r * 1.3
+    ax.set_xlim(-lim, lim)
+    ax.set_ylim(-lim, lim)
+    ax.set_zlim(-lim, lim)
+
+    ax.set_xlabel("X", fontsize=10, labelpad=4)
+    ax.set_ylabel("Y", fontsize=10, labelpad=4)
+def _add_axis_labels_3d(ax, max_r: float):
     """添加轴标签和 θ=0° 方向箭头。"""
     lim = max_r * 1.3
     ax.set_xlim(-lim, lim)
