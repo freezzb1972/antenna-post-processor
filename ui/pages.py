@@ -4169,7 +4169,7 @@ class ChartSettingsPage(QWidget):
                     row_w = QWidget()
                     h = QHBoxLayout(row_w); h.setContentsMargins(2, 1, 2, 1); h.setSpacing(2)
                     h.addWidget(QLabel(f"{a:.0f}°"))
-                    btn_x = QPushButton("✕"); btn_x.setFixedSize(20, 20)
+                    btn_x = QPushButton("✕"); btn_x.setFixedSize(24, 20)
                     btn_x.clicked.connect(lambda checked, angle=a: (
                         _get_current()[1].remove(angle), _refresh_editor(), _rebuild_list()))
                     h.addWidget(btn_x); h.addStretch()
