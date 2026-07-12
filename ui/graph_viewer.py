@@ -258,9 +258,11 @@ class SubPlotPanel:
         self.ax.set_theta_direction(-1)
         theta_val = theta_deg[min(self._theta_idx, len(theta_deg) - 1)]
         self.ax.set_title(f"{self.title} — θ={theta_val:.0f}°", fontsize=8)
-        # 缓存极坐标数据 (HPBW 双游标用)
+        # 缓存极坐标数据 (HPBW + CSV 导出用)
         self._last_polar_phi = phi_rad.copy()
         self._last_polar_r = r.copy()
+        self._polar_phi_deg = phi_deg.copy()
+        self._polar_values = data[:, idx].copy()
 
     def compute_hpbw(self) -> str:
         """计算 -3dB 半功率波束宽度 (HPBW)。返回标注字符串或空。"""
@@ -338,9 +340,25 @@ class GraphViewer(QWidget):
         self._canvas.mpl_connect("button_release_event", self._on_mouse_release)
         self._canvas.mpl_connect("button_press_event", self._on_canvas_click)
         self._canvas.mpl_connect("motion_notify_event", self._on_mouse_move)
+        self._canvas.mpl_connect("scroll_event", self._on_scroll)
+        # 右键导出 CSV
+        self._canvas.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._canvas.customContextMenuRequested.connect(self._on_canvas_context_menu)
+        self._export_data = {}  # {subplot_idx: {'theta':[], 'phi':[], 'values':[], 'label':str}}
+
+    def _on_scroll(self, event):
+        """Ctrl+滚轮 = Dolly Zoom (缩放 3D 视距)。"""
+        if event.button is None and event.inaxes is not None:
+            for sp in self._subplots:
+                if sp.ax is event.inaxes and sp._plot_type == "Spherical 3D":
+                    scale = 1.1 if event.step > 0 else 0.9
+                    sp.ax.set_box_aspect([scale, scale, scale])
+                    sp.ax.view_init(elev=sp._elev, azim=sp._azim, roll=sp._roll)
+                    self._canvas.draw_idle()
+                    break
 
     def _on_mouse_move(self, event):
-        """Cursor readout: 鼠标悬停时读子图值, 非拖拽时才更新。"""
+        """Cursor readout: 鼠标悬停时读子图值, 非拖拽时才跳过。"""
         if event.button is not None:  # 拖拽旋转/缩放时跳过
             return
         parts = []
@@ -939,8 +957,39 @@ class GraphViewer(QWidget):
             if hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), '_log'):
                 self.parent().parent()._log(f"✓ 图形已导出: {path}")
 
+    def _on_canvas_context_menu(self, pos):
+        """右键导出当前迹线数据为 CSV。"""
+        import csv, io
+        idx = getattr(self, '_selected_idx', 0)
+        if idx >= len(self._subplots) or idx not in self._export_data:
+            return
+        ed = self._export_data[idx]
+        if not ed.get('phi') and not ed.get('freqs'):
+            return
+        menu = self._canvas.createStandardContextMenu()
+        export_action = menu.addAction("📋 导出迹线数据为 CSV...")
+        action = menu.exec(self._canvas.mapToGlobal(pos))
+        if action == export_action:
+            path, _ = QFileDialog.getSaveFileName(self, "导出迹线数据", f"{ed.get('label','trace')}.csv",
+                                                   "CSV 文件 (*.csv)")
+            if path:
+                with open(path, 'w', newline='', encoding='utf-8') as f:
+                    w = csv.writer(f)
+                    if 'phi' in ed:
+                        w.writerow(["Phi(deg)", ed['label']])
+                        for ph, val in zip(ed['phi'], ed['values']):
+                            w.writerow([f"{ph:.3f}", f"{val:.6f}"])
+                    elif 'freqs' in ed:
+                        w.writerow(["Freq(MHz)", ed['label']])
+                        for fr, val in zip(ed['freqs'], ed['values']):
+                            w.writerow([f"{fr:.3f}", f"{val:.6f}"])
 
-    @staticmethod
+    def _cache_export_data(self, idx, **kw):
+        """缓存子图迹线数据供 CSV 导出。"""
+        self._export_data[idx] = kw
+
+    # ==================================================================
+    # ⚙ 图形显示设置 (QDialog, 对标 EMQuest Settings Dialog tabs)
 
     # ==================================================================
     # ⚙ 图形显示设置 (QDialog, 对标 EMQuest Settings Dialog tabs)
@@ -1262,6 +1311,14 @@ class GraphViewer(QWidget):
                 if h: hpbw_parts.append(h)
         if hpbw_parts:
             self._lbl_readout.setText(" | ".join(hpbw_parts))
+
+        # CSV 导出缓存: 为选中子图存迹线数据
+        sel_idx = getattr(self, '_selected_idx', 0)
+        if sel_idx < len(self._subplots):
+            sp = self._subplots[sel_idx]
+            if sp._plot_type == "Polar 2D" and hasattr(sp, '_polar_phi_deg'):
+                self._cache_export_data(sel_idx, phi=list(sp._polar_phi_deg),
+                    values=list(sp._polar_values), label=sp.title)
 
         n = len(theta) * len(phi)
         self._lbl_info.setText(f"θ={len(theta)}×φ={len(phi)}={n}点")
@@ -1654,6 +1711,11 @@ class GraphViewer(QWidget):
 
         # 更新数据表
         self._populate_freq_table(freqs, freq_data, available)
+        # CSV 导出缓存: 存第一条可用曲线的数据
+        if available and freqs:
+            label, key = available[0]
+            vals = [freq_data[f].get(key) for f in freqs]
+            self._cache_export_data(0, freqs=freqs, values=vals, label=label)
 
     def _populate_freq_table(self, freqs, freq_data, available):
         """在数据表中显示频率曲线数据."""
