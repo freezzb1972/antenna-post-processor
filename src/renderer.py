@@ -255,7 +255,7 @@ class MatplotlibRenderer(BaseRenderer):
         if _show_cbar:
             fig.subplots_adjust(left=0.02, right=0.88, top=0.92, bottom=0.02)   # 右边留12%给colorbar
         else:
-            fig.subplots_adjust(left=0.06, right=0.94, top=0.90, bottom=0.06)   # 与2D一致, 类tight紧凑
+            fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)   # 与2D一致, 类tight紧凑
 
         # 选择 colormap
         cmap = EMQUEST_CMAP if colormap == "emquest" else plt.get_cmap(colormap)
@@ -372,7 +372,7 @@ class MatplotlibRenderer(BaseRenderer):
             ax.legend(loc="lower left", fontsize=10, framealpha=0.6,
                       bbox_to_anchor=(.5 + np.cos(angle) / 2, .5 + np.sin(angle) / 2))
 
-        fig.subplots_adjust(left=0.06, right=0.94, top=0.90, bottom=0.06)
+        fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_2d_rect(
@@ -413,7 +413,7 @@ class MatplotlibRenderer(BaseRenderer):
             title_parts.append(cut_label)
         ax.set_title((title or " — ".join(title_parts)), fontsize=12)
 
-        fig.subplots_adjust(left=0.06, right=0.94, top=0.90, bottom=0.06)
+        fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_azimuth_rect(
@@ -454,7 +454,7 @@ class MatplotlibRenderer(BaseRenderer):
             title_parts.append(cut_label)
         ax.set_title((title or " — ".join(title_parts)), fontsize=12)
 
-        fig.subplots_adjust(left=0.06, right=0.94, top=0.90, bottom=0.06)
+        fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_azimuth_polar(
@@ -531,7 +531,7 @@ class MatplotlibRenderer(BaseRenderer):
             ax.legend(loc="lower left", fontsize=10, framealpha=0.6,
                       bbox_to_anchor=(.5 + np.cos(angle)/2, .5 + np.sin(angle)/2))
 
-        fig.subplots_adjust(left=0.06, right=0.94, top=0.90, bottom=0.06)
+        fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
         return _fig_to_png_buffer(fig, dpi)
 
     def render_gain_vs_theta(
@@ -997,7 +997,8 @@ def detect_available_renderers() -> dict:
 
 def _fig_to_png_buffer(fig, dpi: int) -> io.BytesIO:
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, facecolor="white", edgecolor="none")
+    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight",
+                facecolor="white", edgecolor="none")
     buf.seek(0)
     plt.close(fig)
     return buf
