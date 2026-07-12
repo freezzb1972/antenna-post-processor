@@ -283,7 +283,7 @@ class MatplotlibRenderer(BaseRenderer):
         # 视角图例 (Theta/Phi/Roll)
         view_text = f"θ(elev) = {elev:.0f}°\nφ(azim) = {azim:.0f}°\nroll = {roll:.0f}°"
         ax.text2D(0.98, 0.98, view_text, transform=ax.transAxes,
-                   fontsize=9, color="black", fontfamily="monospace",
+                   fontsize=10, color="black", fontfamily="monospace",
                    ha="right", va="top")
 
         # 标题
@@ -363,7 +363,7 @@ class MatplotlibRenderer(BaseRenderer):
         # 图例放到图外右上 (与方位面 render_azimuth_polar 一致)
         if curves and len(curves) > 1:
             angle = np.deg2rad(45)
-            ax.legend(loc="lower left", fontsize=9, framealpha=0.6,
+            ax.legend(loc="lower left", fontsize=10, framealpha=0.6,
                       bbox_to_anchor=(.5 + np.cos(angle) / 2, .5 + np.sin(angle) / 2))
 
         fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
@@ -490,7 +490,7 @@ class MatplotlibRenderer(BaseRenderer):
                     linewidth=1.2, label=label)
 
         if curves:
-            ax.legend(fontsize=8, loc="upper right")
+            ax.legend(fontsize=10, loc="upper right")
         ax.set_theta_zero_location("N")
         ax.set_theta_direction(-1)
         ax.set_thetagrids(range(0, 360, 30),
@@ -522,7 +522,7 @@ class MatplotlibRenderer(BaseRenderer):
         if len(sorted_curves) > 1:
             # 官方极坐标图例: 用极角偏移放到图外 (45° 方向 = 右上角)
             angle = np.deg2rad(45)
-            ax.legend(loc="lower left", fontsize=9, framealpha=0.6,
+            ax.legend(loc="lower left", fontsize=10, framealpha=0.6,
                       bbox_to_anchor=(.5 + np.cos(angle)/2, .5 + np.sin(angle)/2))
 
         fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)
@@ -551,7 +551,7 @@ class MatplotlibRenderer(BaseRenderer):
         margin = max((hi - lo) * 0.1, 0.5)
         ax.set_ylim(lo - margin, hi + margin)
         ax.set_title(title or (f"{freq_mhz:.0f} MHz" + (f" — {antenna_name}" if antenna_name else "")),
-                     fontsize=10)
+                     fontsize=12)
 
         fig.tight_layout()
         return _fig_to_png_buffer(fig, dpi)
