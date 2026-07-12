@@ -304,17 +304,13 @@ class GraphViewer(QWidget):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        # 全局控制先建隐藏辅助控件 (供 bar 引用)
         self._init_hidden_controls()
-        # 两层全局工具栏 + 选中子图行
-        layout.addWidget(self._build_global_bar1())
-        layout.addWidget(self._build_global_bar2())
-        layout.addWidget(self._build_selected_subplot_bar())
-        # 2D Cuts 控制栏 (默认隐藏)
+        layout.addWidget(self._build_control_bar())
+        layout.addWidget(self._build_selected_subplot_bar_v2())
         layout.addWidget(self._build_2d_cuts_bar())
         self._splitter, self._figure, self._canvas, self._table = self._build_graph_area()
         layout.addWidget(self._splitter, stretch=1)
-        self._apply_mode_visibility("3D Pattern")   # 初始模式可见性 (隐藏 双Y/曲线按钮)
+        self._apply_mode_visibility("3D Pattern")
 
     def _build_2d_cuts_bar(self) -> QWidget:
         """2D Cuts 模式工具栏: 频点范围+自定义 + θ角度 + 数据源 + 类型。"""
@@ -498,125 +494,69 @@ class GraphViewer(QWidget):
         """全局行1: 视图模式 / 频点 / 布局 / 精度 / 色图 / 默认类型 / 联动。"""
         w = QWidget(); w.setObjectName("graphCtrlBar")
         lay = QHBoxLayout(w); lay.setContentsMargins(4, 2, 4, 2); lay.setSpacing(6)
-
+    def _build_control_bar(self) -> QWidget:
+        """单行 Control Bar: 三簇(A内容|B序列|C出口), 对标 EMQuest Graph Control Bar。"""
+        w = QWidget(); w.setObjectName("graphCtrlBar")
+        lay = QHBoxLayout(w); lay.setContentsMargins(4, 2, 4, 2); lay.setSpacing(4)
+        # ━━ 簇 A: 内容选择(高频) ━━
         lay.addWidget(QLabel("视图:"))
         self._cmb_view_mode = QComboBox()
         self._cmb_view_mode.setEditable(True); self._cmb_view_mode.setInsertPolicy(QComboBox.NoInsert)
         self._cmb_view_mode.lineEdit().setPlaceholderText("搜索...")
         self._cmb_view_mode.addItems(["3D Pattern", "Freq Curves", "2D Cuts"])
+        self._cmb_view_mode.setFixedWidth(110)
         self._cmb_view_mode.currentIndexChanged.connect(self._on_view_mode_changed)
         lay.addWidget(self._cmb_view_mode)
-
         lay.addWidget(QLabel("频点:"))
         self._cmb_freq = QComboBox()
         self._cmb_freq.setEditable(True); self._cmb_freq.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_freq.lineEdit().setPlaceholderText("搜索或选择频点...")
+        self._cmb_freq.lineEdit().setPlaceholderText("搜索...")
+        self._cmb_freq.setFixedWidth(100)
         self._cmb_freq.currentIndexChanged.connect(self._on_update)
         lay.addWidget(self._cmb_freq)
-
-        self._lbl_layout = QLabel("布局:"); lay.addWidget(self._lbl_layout)
+        lay.addWidget(QLabel("布局:"))
         self._cmb_grid = QComboBox()
         self._cmb_grid.addItems(GRID_OPTIONS); self._cmb_grid.setCurrentIndex(2)
-        self._cmb_grid.setFixedWidth(84)
+        self._cmb_grid.setFixedWidth(72)
         self._cmb_grid.currentIndexChanged.connect(self._on_grid_changed)
         lay.addWidget(self._cmb_grid)
-
-        self._lbl_prec = QLabel("精度:"); lay.addWidget(self._lbl_prec)
-        self._spin_step = QSpinBox()
-        self._spin_step.setRange(1, 30); self._spin_step.setValue(5)
-        self._spin_step.setSuffix("°"); self._spin_step.setFixedWidth(64)
-        self._spin_step.setToolTip("3D 采样步进: 1°最细, 30°最快")
-        self._spin_step.valueChanged.connect(self._on_step_changed)
-        lay.addWidget(self._spin_step)
-
-        lay.addWidget(QLabel("色图:"))
-        self._cmb_cmap = QComboBox()
-        self._cmb_cmap.addItems(["jet", "viridis", "plasma", "inferno", "magma", "cividis",
-                                  "turbo", "hot", "coolwarm", "rainbow"])
-        self._cmb_cmap.setCurrentText("jet"); self._cmb_cmap.setFixedWidth(88)
-        self._cmb_cmap.currentTextChanged.connect(self._on_cmap_changed)
-        lay.addWidget(self._cmb_cmap)
-
-        self._btn_default_types = QPushButton("默认类型…")
-        self._btn_default_types.setToolTip("选择布局默认铺哪些数据类型 (每个子图可在下方行改)")
-        self._btn_default_types.clicked.connect(self._show_default_types_popup)
-        lay.addWidget(self._btn_default_types)
-
-        self._btn_freq_curves = QPushButton("曲线选择…")
-        self._btn_freq_curves.setToolTip("选择显示哪些频率曲线 (Freq Curves 模式)")
-        self._btn_freq_curves.clicked.connect(self._show_freq_curves_popup)
-        lay.addWidget(self._btn_freq_curves)
-
-        sep = QFrame(); sep.setFrameShape(QFrame.VLine); lay.addWidget(sep)
-        self._chk_view_link = QCheckBox("联动")
-        self._chk_view_link.setChecked(True)
-        self._chk_view_link.setToolTip("联动: 视角/图型/切割作用所有子图; 取消: 仅作用点选的子图")
-        self._chk_view_link.toggled.connect(self._on_view_link_toggled)
-        lay.addWidget(self._chk_view_link)
-
-        lay.addStretch()
-        self._lbl_zoom = QLabel("100%")
-        lay.addWidget(self._lbl_zoom)
-        return w
-
-    def _build_global_bar2(self) -> QWidget:
-        """全局行2: 动画 / 双Y轴 / 天线 / 导出。"""
-        w = QWidget(); w.setObjectName("graphCtrlBar")
-        lay = QHBoxLayout(w); lay.setContentsMargins(4, 2, 4, 2); lay.setSpacing(6)
-
-        # 动画
-        self._btn_play = QPushButton("▶ 播放"); self._btn_play.setFixedWidth(80)
-        self._btn_play.setToolTip("频率扫描动画: 逐频点重绘方向图")
+        sep_a = QFrame(); sep_a.setFrameShape(QFrame.VLine); lay.addWidget(sep_a)
+        # ━━ 簇 B: 序列/遍历 ━━
+        self._btn_play = QPushButton("▶"); self._btn_play.setFixedWidth(32)
+        self._btn_play.setToolTip("频率扫描动画")
         self._btn_play.clicked.connect(self._on_play_pause)
         lay.addWidget(self._btn_play)
-        lay.addWidget(QLabel("速度:"))
-        self._slider_speed = QSlider(Qt.Horizontal)
-        self._slider_speed.setMinimum(1); self._slider_speed.setMaximum(10)
-        self._slider_speed.setValue(5); self._slider_speed.setFixedWidth(90)
-        self._slider_speed.valueChanged.connect(self._on_speed_changed)
-        lay.addWidget(self._slider_speed)
-        self._lbl_speed_val = QLabel("600ms"); self._lbl_speed_val.setFixedWidth(50)
-        lay.addWidget(self._lbl_speed_val)
-        self._lbl_anim_progress = QLabel("0 / 0")
+        self._btn_step = QPushButton("▶▶"); self._btn_step.setFixedWidth(32)
+        self._btn_step.setToolTip("下一频点")
+        self._btn_step.clicked.connect(self._on_anim_tick)
+        lay.addWidget(self._btn_step)
+        self._lbl_anim_progress = QLabel("0/0"); self._lbl_anim_progress.setFixedWidth(50)
         lay.addWidget(self._lbl_anim_progress)
-
-        sep = QFrame(); sep.setFrameShape(QFrame.VLine); lay.addWidget(sep)
-        self._lbl_dual = QLabel("双Y轴:"); lay.addWidget(self._lbl_dual)
-        self._cmb_dual_y = QComboBox()
-        self._cmb_dual_y.addItems(["单Y轴", "双Y轴(自动)", "双Y轴(强制)"])
-        self._cmb_dual_y.setToolTip("曲线单位/量级差异大时启用左右双Y轴")
-        self._cmb_dual_y.currentIndexChanged.connect(self._on_update)
-        lay.addWidget(self._cmb_dual_y)
-
-        sep2 = QFrame(); sep2.setFrameShape(QFrame.VLine); lay.addWidget(sep2)
         lay.addWidget(QLabel("天线:"))
-        self._cmb_ant = QComboBox(); self._cmb_ant.setMinimumWidth(100)
+        self._cmb_ant = QComboBox(); self._cmb_ant.setFixedWidth(100)
         self._cmb_ant.setToolTip("选择查看的天线数据")
         self._cmb_ant.currentIndexChanged.connect(self._on_antenna_changed)
         lay.addWidget(self._cmb_ant)
         self._check_ant_link = QCheckBox("随主"); self._check_ant_link.setChecked(True)
         self._check_ant_link.setToolTip("跟随主天线选择器")
         lay.addWidget(self._check_ant_link)
-        self._antenna_list: list[str] = []
-        self._antenna_results: dict[str, dict] = {}
-        self._current_antenna: str = ""
-
-        btn_export = QPushButton("⬇ 导出")
-        btn_export.setToolTip("导出当前视图为图片")
+        sep_b = QFrame(); sep_b.setFrameShape(QFrame.VLine); lay.addWidget(sep_b)
+        # ━━ 簇 C: 全局出口 ━━
+        btn_settings = QPushButton("⚙"); btn_settings.setFixedWidth(32)
+        btn_settings.setToolTip("图形显示设置")
+        btn_settings.clicked.connect(self._show_viewer_settings_v2)
+        lay.addWidget(btn_settings)
+        btn_export = QPushButton("⬇"); btn_export.setFixedWidth(32)
+        btn_export.setToolTip("导出视图为图片")
         btn_export.clicked.connect(self._on_export_view)
         lay.addWidget(btn_export)
-
         lay.addStretch()
         self._lbl_mode = QLabel("")
         self._lbl_mode.setStyleSheet("color: #888; font-style: italic;")
         lay.addWidget(self._lbl_mode)
+        self._lbl_zoom = QLabel("")
+        lay.addWidget(self._lbl_zoom)
         return w
-
-    def _build_selected_subplot_bar(self) -> QWidget:
-        """选中子图行: 数据 / 图型 / 视角(预设+el/az/roll) / 任意角度切割。仅 3D Pattern 模式显示。"""
-        w = QWidget(); w.setObjectName("graphSelBar")
-        lay = QHBoxLayout(w); lay.setContentsMargins(4, 2, 4, 2); lay.setSpacing(6)
-        self._sel_bar = w
 
         self._lbl_selected = QLabel("◉ 子图 #1:")
         self._lbl_selected.setStyleSheet("color: #ffd700; font-weight: bold;")
@@ -673,109 +613,100 @@ class GraphViewer(QWidget):
         lay.addWidget(self._dial_cut)
         self._lbl_cut = QLabel("--")
         self._lbl_cut.setFixedWidth(36)
+    def _build_selected_subplot_bar_v2(self) -> QWidget:
+        """选中子图行: 联动总闸 + 数据/图型/视角/切割/重置 + 读值区。"""
+        w = QWidget(); w.setObjectName("graphSelBar")
+        self._sel_bar = w
+        lay = QHBoxLayout(w); lay.setContentsMargins(4, 2, 4, 2); lay.setSpacing(4)
+        self._chk_view_link = QCheckBox("联动")
+        self._chk_view_link.setChecked(True)
+        self._chk_view_link.setToolTip("on: 图型/视角/切割作用所有子图; off: 仅作用选中的子图")
+        self._chk_view_link.toggled.connect(self._on_view_link_toggled)
+        lay.addWidget(self._chk_view_link)
+        sep0 = QFrame(); sep0.setFrameShape(QFrame.VLine); lay.addWidget(sep0)
+        self._lbl_selected = QLabel("◉ 子图 #1:")
+        self._lbl_selected.setStyleSheet("color: #ffd700; font-weight: bold;")
+        lay.addWidget(self._lbl_selected)
+        lay.addWidget(QLabel("数据:"))
+        self._cmb_sel_data = QComboBox(); self._cmb_sel_data.setFixedWidth(120)
+        for _k in DEFAULT_PATTERN_KEYS:
+            self._cmb_sel_data.addItem(PATTERN_DATA_MAP.get(_k, _k), _k)
+        self._cmb_sel_data.setToolTip("选中子图显示的数据类型")
+        self._cmb_sel_data.currentIndexChanged.connect(self._on_sel_data_changed)
+        lay.addWidget(self._cmb_sel_data)
+        lay.addWidget(QLabel("图型:"))
+        self._cmb_plot_type = QComboBox()
+        self._cmb_plot_type.addItems(PLOT_TYPES); self._cmb_plot_type.setFixedWidth(112)
+        self._cmb_plot_type.setToolTip("3D曲面 / 极坐标2D / 直角3D")
+        self._cmb_plot_type.currentIndexChanged.connect(self._on_toolbar_plot_type)
+        lay.addWidget(self._cmb_plot_type)
+        lay.addWidget(QLabel("视角:"))
+        self._cmb_preset = QComboBox()
+        self._cmb_preset.addItems(list(VIEW_PRESETS.keys())); self._cmb_preset.setFixedWidth(68)
+        self._cmb_preset.setToolTip("7 视角预设, 手动微调在 ⚙ 设置中")
+        self._cmb_preset.currentIndexChanged.connect(self._on_view_preset_changed)
+        lay.addWidget(self._cmb_preset)
+        self._chk_cut = QCheckBox("切割")
+        self._chk_cut.setToolTip("任意角度切割, 转旋钮选角度")
+        self._chk_cut.toggled.connect(self._on_cut_changed)
+        lay.addWidget(self._chk_cut)
+        self._dial_cut = QDial()
+        self._dial_cut.setRange(0, 359); self._dial_cut.setWrapping(True)
+        self._dial_cut.setFixedSize(32, 32); self._dial_cut.setNotchesVisible(True)
+        self._dial_cut.setToolTip("切割角度 φ")
+        self._dial_cut.valueChanged.connect(self._on_cut_changed)
+        lay.addWidget(self._dial_cut)
+        self._lbl_cut = QLabel("--"); self._lbl_cut.setFixedWidth(32)
         lay.addWidget(self._lbl_cut)
-
+        sep1 = QFrame(); sep1.setFrameShape(QFrame.VLine); lay.addWidget(sep1)
+        self._btn_reset_view = QPushButton("↺"); self._btn_reset_view.setFixedWidth(32)
+        self._btn_reset_view.setToolTip("重置视角为默认 Iso + 关切割")
+        self._btn_reset_view.clicked.connect(self._on_reset_view)
+        lay.addWidget(self._btn_reset_view)
         lay.addStretch()
+        self._lbl_readout = QLabel("")
+        self._lbl_readout.setStyleSheet("color: #aaa; font-family: monospace;")
+        self._lbl_readout.setFixedWidth(220)
+        lay.addWidget(self._lbl_readout)
         return w
-
-    def _init_hidden_controls(self):
-        """创建仍需保持信号连接但不常显的辅助控件 + 动画定时器。"""
-        # 联动隐藏代理 (与 _chk_view_link 同步, 供内部逻辑)
-        self._chk_link = QCheckBox("联动视角"); self._chk_link.setChecked(True)
-        self._chk_link.toggled.connect(self._on_link_toggled); self._chk_link.hide()
-        # 信息标签
-        if not hasattr(self, '_lbl_info') or self._lbl_info is None:
-            self._lbl_info = QLabel("")
-        # Theta 截面 (Polar 2D 用, 隐藏; 由 _update_theta_slider 维护)
-        self._slider_theta = QSlider(Qt.Horizontal)
-        self._slider_theta.setMinimum(0); self._slider_theta.setMaximum(0)
-        self._slider_theta.valueChanged.connect(self._on_theta_slider_changed)
-        self._slider_theta.hide()
-        self._lbl_theta_val = QLabel("--°"); self._lbl_theta_val.hide()
-        # 动画定时器
-        if hasattr(self, '_anim_timer') and self._anim_timer is not None:
-            self._anim_timer.stop()
-        self._anim_timer = QTimer(self)
-        self._anim_timer.timeout.connect(self._on_anim_tick)
-        self._anim_playing = False
-
-    # ==================================================================
-    # 弹出配置 (默认类型 / 频率曲线)
-    # ==================================================================
-
-    def _show_default_types_popup(self):
-        """默认数据类型选择: 决定布局默认铺哪些类型 (始终可勾, 不可用仅灰示)。"""
-        dlg = QDialog(self); dlg.setWindowTitle("默认数据类型"); dlg.setMinimumWidth(280)
-        lay = QVBoxLayout(dlg)
-        ff = next(iter(self._graph_data.values()), {}) if self._graph_data else {}
-        checks: Dict[str, QCheckBox] = {}
-        for dk, label in PATTERN_DATA_MAP.items():
-            cb = QCheckBox(label)
-            cb.setChecked(dk in self._active_pattern_keys)
-            if self._graph_data and (dk not in ff or ff.get(dk) is None):
-                cb.setToolTip("当前数据无此类型 (仍可选, 加载相应数据后生效)")
-            checks[dk] = cb; lay.addWidget(cb)
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        def _ok():
-            self._active_pattern_keys = [dk for dk, cb in checks.items() if cb.isChecked()] or list(DEFAULT_PATTERN_KEYS)
-            self._rebuild_subplots(); self._on_update(); dlg.accept()
-        btns.accepted.connect(_ok); btns.rejected.connect(dlg.reject)
-        lay.addWidget(btns); dlg.exec()
-
-    def _show_freq_curves_popup(self):
-        """频率曲线显示选择。"""
-        dlg = QDialog(self); dlg.setWindowTitle("频率曲线选择"); dlg.setMinimumWidth(280)
-        lay = QVBoxLayout(dlg)
-        avail = self._get_available_freq_curves()
-        checks: List[QCheckBox] = []
-        if avail:
-            for i, (label, _) in enumerate(avail):
-                cb = QCheckBox(label)
-                cb.setChecked(not self._active_freq_curve_indices or i in self._active_freq_curve_indices)
-                checks.append(cb); lay.addWidget(cb)
-        else:
-            lay.addWidget(QLabel("(无频率曲线数据 — 请先运行处理)"))
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        def _ok():
-            self._active_freq_curve_indices = [i for i, cb in enumerate(checks) if cb.isChecked()]
-            if self._cmb_view_mode.currentText() == "Freq Curves":
-                self._plot_freq_curves()
-            dlg.accept()
-        btns.accepted.connect(_ok); btns.rejected.connect(dlg.reject)
-        lay.addWidget(btns); dlg.exec()
 
     # ==================================================================
     # 视角控制 (工具栏: 预设下拉 + el/az/roll 数值 + 图型 + 联动)
     # ==================================================================
-
-    def _view_targets(self):
-        """联动 → 所有子图; 分别控制 → 仅点选的子图。"""
-        if self._linked or not self._subplots:
-            return self._subplots
-        idx = min(getattr(self, '_selected_idx', 0), len(self._subplots) - 1)
-        return [self._subplots[idx]]
-
-    def _on_view_preset_changed(self):
-        name = self._cmb_preset.currentText()
-        if name not in VIEW_PRESETS:
-            return
-        el, az, rl = VIEW_PRESETS[name]
-        self._suppress_view = True
-        self._spin_elev.setValue(el); self._spin_azim.setValue(az); self._spin_roll.setValue(rl)
-        self._suppress_view = False
-        self._apply_view_spins()
-
-    def _apply_view_spins(self):
-        """数值框变化 → 作用于目标子图 (联动全部 / 分别选中)。"""
-        if getattr(self, '_suppress_view', False):
-            return
-        el = self._spin_elev.value(); az = self._spin_azim.value(); rl = self._spin_roll.value()
-        for sp in self._view_targets():
-            sp.set_view(el, az, rl)
-        self._elev, self._azim = el, az
-        if hasattr(self, '_lbl_zoom'):
-            self._lbl_zoom.setText(f" el={el:.0f}° az={az:.0f}° roll={rl:.0f}°")
-        self._canvas.draw_idle()
+    def _init_hidden_controls(self):
+        """隐藏控件: el/az/roll 手动微调(⚙用) + θ滑块 + 色图/精度/双Y轴/速度/联动代理 + 动画定时器。"""
+        self._spin_elev = QDoubleSpinBox()
+        self._spin_elev.setRange(-90, 90); self._spin_elev.setValue(30)
+        self._spin_elev.setPrefix("el "); self._spin_elev.setSuffix("°"); self._spin_elev.setFixedWidth(76)
+        self._spin_elev.valueChanged.connect(self._apply_view_spins); self._spin_elev.hide()
+        self._spin_azim = QDoubleSpinBox()
+        self._spin_azim.setRange(-180, 360); self._spin_azim.setValue(-60)
+        self._spin_azim.setPrefix("az "); self._spin_azim.setSuffix("°"); self._spin_azim.setFixedWidth(80)
+        self._spin_azim.valueChanged.connect(self._apply_view_spins); self._spin_azim.hide()
+        self._spin_roll = QDoubleSpinBox()
+        self._spin_roll.setRange(-180, 360); self._spin_roll.setValue(0)
+        self._spin_roll.setPrefix("roll "); self._spin_roll.setSuffix("°"); self._spin_roll.setFixedWidth(88)
+        self._spin_roll.valueChanged.connect(self._apply_view_spins); self._spin_roll.hide()
+        self._cmb_cmap = QComboBox()
+        self._cmb_cmap.addItems(["jet", "viridis", "plasma", "inferno", "magma", "cividis", "turbo", "hot", "coolwarm", "rainbow"])
+        self._cmb_cmap.setCurrentText("jet"); self._cmb_cmap.hide()
+        self._spin_step = QSpinBox()
+        self._spin_step.setRange(1, 30); self._spin_step.setValue(5)
+        self._spin_step.setSuffix("°"); self._spin_step.setFixedWidth(64)
+        self._spin_step.setToolTip("3D 采样步进"); self._spin_step.valueChanged.connect(self._on_step_changed); self._spin_step.hide()
+        self._cmb_dual_y = QComboBox()
+        self._cmb_dual_y.addItems(["单Y轴", "双Y轴(自动)", "双Y轴(强制)"]); self._cmb_dual_y.hide()
+        self._slider_speed = QSlider(Qt.Horizontal)
+        self._slider_speed.setMinimum(1); self._slider_speed.setMaximum(10); self._slider_speed.setValue(5); self._slider_speed.setFixedWidth(90)
+        self._slider_speed.valueChanged.connect(self._on_speed_changed); self._slider_speed.hide()
+        self._lbl_speed_val = QLabel("600ms"); self._lbl_speed_val.setFixedWidth(50); self._lbl_speed_val.hide()
+        self._chk_link = QCheckBox("联动视角"); self._chk_link.setChecked(True)
+        self._chk_link.toggled.connect(self._on_link_toggled); self._chk_link.hide()
+        if not hasattr(self, "_lbl_info") or self._lbl_info is None: self._lbl_info = QLabel("")
+        self._slider_theta = QSlider(Qt.Horizontal)
+        self._slider_theta.setMinimum(0); self._slider_theta.setMaximum(0); self._slider_theta.valueChanged.connect(self._on_theta_slider_changed); self._slider_theta.hide()
+        self._lbl_theta_val = QLabel("--°"); self._lbl_theta_val.hide()
+        if hasattr(self, "_anim_timer") and self._anim_timer is not None: self._anim_timer.stop()
 
     def _on_view_link_toggled(self, checked):
         self._linked = checked
@@ -821,6 +752,45 @@ class GraphViewer(QWidget):
         self._chk_cut.blockSignals(False); self._dial_cut.blockSignals(False)
         self._lbl_selected.setText(f"◉ 子图 #{idx + 1}:")
         self._suppress_view = False
+
+    def _view_targets(self):
+        """联动 → 所有子图; 分别控制 → 仅点选的子图。"""
+        if self._linked or not self._subplots:
+            return self._subplots
+        idx = min(getattr(self, "_selected_idx", 0), len(self._subplots) - 1)
+        return [self._subplots[idx]]
+
+    def _on_view_preset_changed(self):
+        name = self._cmb_preset.currentText()
+        if name not in VIEW_PRESETS:
+            return
+        el, az, rl = VIEW_PRESETS[name]
+        self._suppress_view = True
+        self._spin_elev.setValue(el); self._spin_azim.setValue(az); self._spin_roll.setValue(rl)
+        self._suppress_view = False
+        self._apply_view_spins()
+
+    def _apply_view_spins(self):
+        """数值框变化 → 作用于目标子图 (联动全部 / 分别选中)。(由隐藏 spinbox 或 preset 触发)"""
+        if getattr(self, "_suppress_view", False):
+            return
+        el = self._spin_elev.value(); az = self._spin_azim.value(); rl = self._spin_roll.value()
+        for sp in self._view_targets():
+            sp.set_view(el, az, rl)
+        self._elev, self._azim = el, az
+        if hasattr(self, "_lbl_zoom"):
+            self._lbl_zoom.setText(f" el={el:.0f}° az={az:.0f}° roll={rl:.0f}°")
+        self._canvas.draw_idle()
+
+    def _on_reset_view(self):
+        """↺重置: 视角→Iso预设 + 关闭切割。"""
+        if not self._subplots:
+            return
+        self._cmb_preset.setCurrentText("Iso")
+        self._chk_cut.setChecked(False)
+        for sp in self._subplots:
+            sp.set_cut_angle(None)
+        self._on_update()
 
     # 向后兼容别名 (C-3 旧调用)
     def _sync_spins_to_selected(self):
@@ -881,6 +851,78 @@ class GraphViewer(QWidget):
             if hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), '_log'):
                 self.parent().parent()._log(f"✓ 图形已导出: {path}")
 
+
+    @staticmethod
+
+    # ==================================================================
+    # ⚙ 图形显示设置 (QDialog, 对标 EMQuest Settings Dialog tabs)
+    # ==================================================================
+
+    def _show_viewer_settings_v2(self):
+        """⚙ 图形显示设置 — 色图/精度/默认类型/曲线/动画/视角。"""
+        dlg = QDialog(self); dlg.setWindowTitle("图形显示设置"); dlg.setMinimumWidth(380)
+        layout = QVBoxLayout(dlg); layout.setSpacing(6)
+
+        # ── 色图 + 精度 ──
+        row1 = QHBoxLayout()
+        row1.addWidget(QLabel("色图:"))
+        self._cmb_cmap.setParent(dlg); row1.addWidget(self._cmb_cmap)
+        row1.addWidget(QLabel("  精度:"))
+        self._spin_step.setParent(dlg); row1.addWidget(self._spin_step)
+        row1.addStretch(); layout.addLayout(row1)
+
+        # ── 默认数据类型 ──
+        grp = QGroupBox("默认数据类型 (布局初始铺哪些)"); grp_lay = QVBoxLayout(grp)
+        ff = next(iter(self._graph_data.values()), {}) if self._graph_data else {}
+        self._v2_type_checks = {}
+        for dk, label in PATTERN_DATA_MAP.items():
+            cb = QCheckBox(label)
+            cb.setChecked(dk in self._active_pattern_keys)
+            if self._graph_data and (dk not in ff or ff.get(dk) is None):
+                cb.setToolTip("当前数据无此类型 (仍可选)")
+            self._v2_type_checks[dk] = cb; grp_lay.addWidget(cb)
+        layout.addWidget(grp)
+
+        # ── 频率曲线选择 ──
+        grp2 = QGroupBox("频率曲线选择 (Freq Curves 模式)"); grp2_lay = QVBoxLayout(grp2)
+        avail = self._get_available_freq_curves()
+        self._v2_curve_checks = []
+        if avail:
+            for i, (label, _) in enumerate(avail):
+                cb = QCheckBox(label)
+                cb.setChecked(not self._active_freq_curve_indices or i in self._active_freq_curve_indices)
+                self._v2_curve_checks.append(cb); grp2_lay.addWidget(cb)
+        else:
+            grp2_lay.addWidget(QLabel("(无频率曲线数据 — 请先运行处理)"))
+        layout.addWidget(grp2)
+
+        # ── 动画速度 ──
+        row_anim = QHBoxLayout()
+        row_anim.addWidget(QLabel("动画速度:"))
+        self._slider_speed.setParent(dlg); row_anim.addWidget(self._slider_speed)
+        self._lbl_speed_val.setParent(dlg); row_anim.addWidget(self._lbl_speed_val)
+        row_anim.addStretch(); layout.addLayout(row_anim)
+
+        # ── 视角微调 (el/az/roll) ──
+        grp_v = QGroupBox("视角手动微调"); vlay = QHBoxLayout(grp_v)
+        self._spin_elev.setParent(dlg); vlay.addWidget(QLabel("el:")); vlay.addWidget(self._spin_elev)
+        self._spin_azim.setParent(dlg); vlay.addWidget(QLabel("az:")); vlay.addWidget(self._spin_azim)
+        self._spin_roll.setParent(dlg); vlay.addWidget(QLabel("roll:")); vlay.addWidget(self._spin_roll)
+        vlay.addStretch(); layout.addWidget(grp_v)
+
+        # ── 按钮 ──
+        def _ok():
+            self._active_pattern_keys = [dk for dk, cb in self._v2_type_checks.items() if cb.isChecked()] or list(DEFAULT_PATTERN_KEYS)
+            indices = [i for i, cb in enumerate(self._v2_curve_checks) if cb.isChecked()]
+            if indices: self._active_freq_curve_indices = indices
+            self._cmb_cmap.currentTextChanged.connect(self._on_cmap_changed)  # re-connect after reparent
+            self._spin_step.valueChanged.connect(self._on_step_changed)
+            self._slider_speed.valueChanged.connect(self._on_speed_changed)
+            dlg.accept()
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(_ok); btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        dlg.exec()
 
     @staticmethod
     def _build_graph_area():
@@ -1124,20 +1166,10 @@ class GraphViewer(QWidget):
         """按视图模式 show/hide 各行控件 (初始化 + 切换共用)。"""
         is_pattern = (mode == "3D Pattern")
         is_2d = (mode == "2D Cuts")
-        is_freq = (mode == "Freq Curves")
         if hasattr(self, '_cuts2d_bar'):
             self._cuts2d_bar.setVisible(is_2d)
         if hasattr(self, '_sel_bar'):
             self._sel_bar.setVisible(is_pattern)
-        for w in (getattr(self, '_lbl_layout', None), getattr(self, '_cmb_grid', None),
-                  getattr(self, '_lbl_prec', None), getattr(self, '_spin_step', None),
-                  getattr(self, '_btn_default_types', None)):
-            if w is not None:
-                w.setVisible(is_pattern)
-        for w in (getattr(self, '_lbl_dual', None), getattr(self, '_cmb_dual_y', None),
-                  getattr(self, '_btn_freq_curves', None)):
-            if w is not None:
-                w.setVisible(is_freq)
 
     def _on_view_mode_changed(self, index):
         mode = self._cmb_view_mode.currentText()

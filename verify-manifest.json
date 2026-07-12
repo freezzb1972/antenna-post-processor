@@ -714,24 +714,24 @@
     },
     {
       "id": "enhanced-graph-viewer",
-      "description": "增强3D查看器 — 两层内联工具栏(全局×2+选中子图行), 数据/图型/视角就地控制, 任意角度切割(QDial), 频率扫描动画, 2×2+1/3×3布局",
+      "description": "增强3D查看器 — 两层工具栏(ControlBar+选中子图行)对标EMQuest, 联动左移, el/az/roll进⚙, 任意角度切割(QDial), ↺重置, CursorReadout区",
       "type": "ui",
       "src_modules": [
         "graph_viewer.py"
       ],
       "widgets": [],
       "methods": [
-        "_build_global_bar1",
-        "_build_global_bar2",
-        "_build_selected_subplot_bar",
+        "_build_control_bar",
+        "_build_selected_subplot_bar_v2",
+        "_show_viewer_settings_v2",
+        "_on_reset_view",
         "_on_sel_data_changed",
         "_sync_selected_bar",
         "_on_cut_changed",
         "_apply_mode_visibility",
         "_on_view_preset_changed",
-        "_apply_view_spins",
-        "_on_toolbar_plot_type",
-        "_on_canvas_click"
+        "_view_targets",
+        "_apply_view_spins"
       ],
       "tests": [],
       "e2e_verified": true,
