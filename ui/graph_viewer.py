@@ -584,35 +584,23 @@ class GraphViewer(QWidget):
         self._cmb_preset.setToolTip("7 视角预设")
         self._cmb_preset.currentIndexChanged.connect(self._on_view_preset_changed)
         lay.addWidget(self._cmb_preset)
-        self._spin_elev = QDoubleSpinBox()
-        self._spin_elev.setRange(-90, 90); self._spin_elev.setValue(30)
-        self._spin_elev.setPrefix("el "); self._spin_elev.setSuffix("°"); self._spin_elev.setFixedWidth(76)
-        self._spin_elev.valueChanged.connect(self._apply_view_spins)
-        lay.addWidget(self._spin_elev)
-        self._spin_azim = QDoubleSpinBox()
-        self._spin_azim.setRange(-180, 360); self._spin_azim.setValue(-60)
-        self._spin_azim.setPrefix("az "); self._spin_azim.setSuffix("°"); self._spin_azim.setFixedWidth(80)
-        self._spin_azim.valueChanged.connect(self._apply_view_spins)
-        lay.addWidget(self._spin_azim)
-        self._spin_roll = QDoubleSpinBox()
-        self._spin_roll.setRange(-180, 360); self._spin_roll.setValue(0)
-        self._spin_roll.setPrefix("roll "); self._spin_roll.setSuffix("°"); self._spin_roll.setFixedWidth(88)
-        self._spin_roll.valueChanged.connect(self._apply_view_spins)
-        lay.addWidget(self._spin_roll)
+        lay.addWidget(self._lbl_cut)
+        sep1 = QFrame(); sep1.setFrameShape(QFrame.VLine); lay.addWidget(sep1)
+        self._btn_reset_view = QPushButton("↺"); self._btn_reset_view.setFixedWidth(32)
+        self._btn_reset_view.setToolTip("重置视角为默认 Iso + 关切割")
+        self._btn_reset_view.clicked.connect(self._on_reset_view)
+        lay.addWidget(self._btn_reset_view)
+        lay.addStretch()
+        self._lbl_readout = QLabel("")
+        self._lbl_readout.setStyleSheet("color: #aaa; font-family: monospace;")
+        self._lbl_readout.setFixedWidth(220)
+        lay.addWidget(self._lbl_readout)
+        return w
 
-        sep = QFrame(); sep.setFrameShape(QFrame.VLine); lay.addWidget(sep)
-        self._chk_cut = QCheckBox("切割")
-        self._chk_cut.setToolTip("任意角度切割: 过中心的切割线, 转旋钮选角度, 露出剖面")
-        self._chk_cut.toggled.connect(self._on_cut_changed)
-        lay.addWidget(self._chk_cut)
-        self._dial_cut = QDial()
-        self._dial_cut.setRange(0, 359); self._dial_cut.setWrapping(True)
-        self._dial_cut.setFixedSize(38, 38); self._dial_cut.setNotchesVisible(True)
-        self._dial_cut.setToolTip("切割角度 φ (绕中心旋转)")
-        self._dial_cut.valueChanged.connect(self._on_cut_changed)
-        lay.addWidget(self._dial_cut)
-        self._lbl_cut = QLabel("--")
-        self._lbl_cut.setFixedWidth(36)
+    # ==================================================================
+    # 视角控制 (工具栏: 预设下拉 + el/az/roll 数值 + 图型 + 联动)
+    # ==================================================================
+
     def _build_selected_subplot_bar_v2(self) -> QWidget:
         """选中子图行: 联动总闸 + 数据/图型/视角/切割/重置 + 读值区。"""
         w = QWidget(); w.setObjectName("graphSelBar")
@@ -647,15 +635,25 @@ class GraphViewer(QWidget):
         self._cmb_preset.currentIndexChanged.connect(self._on_view_preset_changed)
         lay.addWidget(self._cmb_preset)
         self._chk_cut = QCheckBox("切割")
-        self._chk_cut.setToolTip("任意角度切割, 转旋钮选角度")
+        self._chk_cut.setToolTip("任意角度切割: 旋钮选角度(吸附主平面), 右键输精确值")
         self._chk_cut.toggled.connect(self._on_cut_changed)
         lay.addWidget(self._chk_cut)
         self._dial_cut = QDial()
         self._dial_cut.setRange(0, 359); self._dial_cut.setWrapping(True)
         self._dial_cut.setFixedSize(32, 32); self._dial_cut.setNotchesVisible(True)
-        self._dial_cut.setToolTip("切割角度 φ")
-        self._dial_cut.valueChanged.connect(self._on_cut_changed)
+        self._dial_cut.setToolTip("切割角度 φ (吸附 0/45/90/135/180/225/270/315°)")
+        self._dial_cut.valueChanged.connect(self._on_cut_dial_changed)
         lay.addWidget(self._dial_cut)
+        self._spin_cut = QSpinBox()
+        self._spin_cut.setRange(0, 359); self._spin_cut.setSuffix("°"); self._spin_cut.setFixedWidth(56)
+        self._spin_cut.setToolTip("切割角度 φ 精确值")
+        self._spin_cut.valueChanged.connect(self._on_cut_spin_changed)
+        lay.addWidget(self._spin_cut)
+        # 4 主平面预设: φ=0(E面), φ=90(H面), θ=90 用 φ 切面近似
+        for lbl, ang in [("E",0),("H",90),("180",180),("270",270)]:
+            btn = QPushButton(lbl); btn.setFixedWidth(24); btn.setToolTip(f"切割 φ={ang}°")
+            btn.clicked.connect(lambda checked, a=ang: self._set_cut_preset(a))
+            lay.addWidget(btn)
         self._lbl_cut = QLabel("--"); self._lbl_cut.setFixedWidth(32)
         lay.addWidget(self._lbl_cut)
         sep1 = QFrame(); sep1.setFrameShape(QFrame.VLine); lay.addWidget(sep1)
@@ -670,9 +668,7 @@ class GraphViewer(QWidget):
         lay.addWidget(self._lbl_readout)
         return w
 
-    # ==================================================================
-    # 视角控制 (工具栏: 预设下拉 + el/az/roll 数值 + 图型 + 联动)
-    # ==================================================================
+
     def _init_hidden_controls(self):
         """隐藏控件: el/az/roll 手动微调(⚙用) + θ滑块 + 色图/精度/双Y轴/速度/联动代理 + 动画定时器。"""
         self._spin_elev = QDoubleSpinBox()
@@ -744,12 +740,13 @@ class GraphViewer(QWidget):
             self._cmb_plot_type.setCurrentIndex(k)
         self._cmb_plot_type.blockSignals(False)
         # 切割
-        self._chk_cut.blockSignals(True); self._dial_cut.blockSignals(True)
+        self._chk_cut.blockSignals(True); self._dial_cut.blockSignals(True); self._spin_cut.blockSignals(True)
         on = sp._cut_angle is not None
         self._chk_cut.setChecked(on)
         self._dial_cut.setValue(int(sp._cut_angle) if on else 0)
+        self._spin_cut.setValue(int(sp._cut_angle) if on else 0)
         self._lbl_cut.setText(f"{int(sp._cut_angle)}°" if on else "--")
-        self._chk_cut.blockSignals(False); self._dial_cut.blockSignals(False)
+        self._chk_cut.blockSignals(False); self._dial_cut.blockSignals(False); self._spin_cut.blockSignals(False)
         self._lbl_selected.setText(f"◉ 子图 #{idx + 1}:")
         self._suppress_view = False
 
@@ -787,7 +784,7 @@ class GraphViewer(QWidget):
         if not self._subplots:
             return
         self._cmb_preset.setCurrentText("Iso")
-        self._chk_cut.setChecked(False)
+        self._chk_cut.setChecked(False); self._spin_cut.setValue(0)
         for sp in self._subplots:
             sp.set_cut_angle(None)
         self._on_update()
@@ -942,13 +939,55 @@ class GraphViewer(QWidget):
     # 球面剖切
     # ==================================================================
 
-    def _on_cut_changed(self):
-        """任意角度切割: 启用勾 + QDial 角度 → 作用于目标子图 (联动全部/分别选中)。"""
-        angle = float(self._dial_cut.value()) if self._chk_cut.isChecked() else None
-        self._lbl_cut.setText(f"{int(angle)}°" if angle is not None else "--")
+    # ── 切割 (任意角度, 吸附+精确+预设) ──
+
+    _CUT_SNAPS = [0, 45, 90, 135, 180, 225, 270, 315]
+
+    def _snap_cut(self, val: int) -> int:
+        """吸附到最近的主平面 (±3° 内), 否则保持原值。"""
+        for s in self._CUT_SNAPS:
+            if abs(val - s) <= 3 or abs(val - 360 + s) <= 3 or abs(val + 360 - s) <= 3:
+                return s % 360
+        return val
+
+    def _apply_cut(self, angle: float | None):
+        """切割设置应用到目标子图 + 重绘。"""
         for sp in self._view_targets():
             sp.set_cut_angle(angle)
         self._on_update()
+
+    def _on_cut_dial_changed(self):
+        raw = self._dial_cut.value()
+        snapped = self._snap_cut(raw)
+        if snapped != raw:
+            self._dial_cut.blockSignals(True); self._dial_cut.setValue(snapped); self._dial_cut.blockSignals(False)
+        if not self._chk_cut.isChecked():
+            self._chk_cut.setChecked(True)
+        ang = float(snapped)
+        self._spin_cut.blockSignals(True); self._spin_cut.setValue(snapped); self._spin_cut.blockSignals(False)
+        self._lbl_cut.setText(f"{int(ang)}°")
+        self._apply_cut(ang)
+
+    def _on_cut_spin_changed(self):
+        ang = self._spin_cut.value()
+        self._dial_cut.blockSignals(True); self._dial_cut.setValue(ang); self._dial_cut.blockSignals(False)
+        if not self._chk_cut.isChecked():
+            self._chk_cut.setChecked(True)
+        self._lbl_cut.setText(f"{int(ang)}°")
+        self._apply_cut(float(ang))
+
+    def _set_cut_preset(self, angle: int):
+        self._chk_cut.setChecked(True)
+        self._dial_cut.blockSignals(True); self._dial_cut.setValue(angle); self._dial_cut.blockSignals(False)
+        self._spin_cut.setValue(angle)
+        self._lbl_cut.setText(f"{angle}°")
+        self._apply_cut(float(angle))
+
+    def _on_cut_changed(self):
+        """切割启用勾 toggled。"""
+        angle = float(self._dial_cut.value()) if self._chk_cut.isChecked() else None
+        self._lbl_cut.setText(f"{int(angle)}°" if angle is not None else "--")
+        self._apply_cut(angle)
 
     # ==================================================================
     # Theta 截面滑块
