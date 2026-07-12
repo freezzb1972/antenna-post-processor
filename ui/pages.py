@@ -195,7 +195,7 @@ class FileSettingsPage(QWidget):
         self._tpl_path_label.setPlaceholderText(self.tr("(未选择)"))
         self._tpl_path_label.setFixedHeight(20)
         _excel_line.addWidget(self._tpl_path_label, 1)
-        self._btn_clear_excel_tpl = QPushButton("✕")
+        self._btn_clear_excel_tpl = QPushButton("×")
         self._btn_clear_excel_tpl.setFixedSize(22, 20)
         self._btn_clear_excel_tpl.setStyleSheet("font-size: 14px; font-weight: bold; border: none; padding: 0px;")
         self._btn_clear_excel_tpl.setToolTip(self.tr("清除 Excel 参数模版"))
