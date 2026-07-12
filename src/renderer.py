@@ -300,9 +300,9 @@ class MatplotlibRenderer(BaseRenderer):
         ax.grid(False)
 
         if show_colorbar:
-            fig.subplots_adjust(left=0.02, right=0.88, top=0.92, bottom=0.02)
+            fig.subplots_adjust(left=0.01, right=0.86, top=0.94, bottom=0.01)
         else:
-            fig.subplots_adjust(left=0.06, right=0.94, top=0.92, bottom=0.06)
+            fig.subplots_adjust(left=0.01, right=0.99, top=0.94, bottom=0.01)
         buf = _fig_to_png_buffer(fig, dpi)
         return buf
 
