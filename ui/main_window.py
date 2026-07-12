@@ -1699,7 +1699,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             item = self.ui.hboxLayout1.itemAt(i)
             w = item.widget()
             if w:
-                print(f"  [{i}] {w.__class__.__name__} visible={w.isVisible()} hidden={w.isHidden()} size={w.width()}x{w.height()} text={getattr(w,'text','')[:20]}")
+                txt = w.text() if hasattr(w, 'text') and callable(w.text) else ''
+                print(f"  [{i}] {w.__class__.__name__} visible={w.isVisible()} hidden={w.isHidden()} size={w.width()}x{w.height()} objName={w.objectName()} text='{str(txt)[:20]}'")
             else:
                 print(f"  [{i}] (layout item, no widget)")
         print("  parent widget:", self.ui.hboxLayout1.parentWidget().__class__.__name__ if self.ui.hboxLayout1.parentWidget() else "None")
