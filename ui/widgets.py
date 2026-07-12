@@ -244,10 +244,11 @@ class TemplateSourceRow(QWidget):
     template_changed = Signal(str)
     template_pair_changed = Signal(str, str)
 
-    def __init__(self, parent=None, on_browse=None, on_preview=None):
+    def __init__(self, parent=None, on_browse=None, on_preview=None, on_clear=None):
         super().__init__(parent)
         self._on_browse_cb = on_browse
         self._on_preview_cb = on_preview
+        self._on_clear_cb = on_clear
         self._path: str = ""
         self._setup_ui()
 
@@ -278,9 +279,13 @@ class TemplateSourceRow(QWidget):
         self.btn_clear_tpl = QPushButton("✕")
         self.btn_clear_tpl.setFixedSize(20, 20)
         self.btn_clear_tpl.setToolTip(self.tr("清除模板"))
-        self.btn_clear_tpl.clicked.connect(self._on_clear_tpl)
+        self.btn_clear_tpl.clicked.connect(self._on_clear_cb if self._on_clear_cb else self._on_clear_tpl)
         layout.addWidget(self.btn_clear_tpl)
         layout.addStretch()
+
+    def _on_clear_tpl(self):
+        """默认清除: 清空下拉选区。"""
+        self._cmb_tpl.setCurrentIndex(-1)
 
     def set_path(self, path: str):
         """手动设置模板路径（非预设选择时使用, 不触发信号以避免递归）。"""
