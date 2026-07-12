@@ -287,6 +287,9 @@ class GraphViewer(QWidget):
         self._step_deg = 5.0
         self._selected_idx = 0                       # 点选的子图 (分别控制时的目标)
         self._suppress_view = False                  # 抑制数值框信号 (预设/回填时)
+        self._normalize = False                       # Normalize: 峰值→0dB, 对比形状
+        self._scale_lock = False                      # dB 量程锁定开关
+        self._db_min, self._db_max = -40.0, 10.0      # 锁定量程范围
         # 可配置状态: 方向图数据类型 (data key 列表)
         self._active_pattern_keys: List[str] = list(DEFAULT_PATTERN_KEYS)
         # 可配置状态: 频率曲线选择 (索引列表, None=全部)
@@ -920,6 +923,27 @@ class GraphViewer(QWidget):
         self._spin_step.setParent(dlg); row1.addWidget(self._spin_step)
         row1.addStretch(); layout.addLayout(row1)
 
+        # ── Normalize + dB 量程锁定 ──
+        row_norm = QHBoxLayout()
+        self._v2_chk_normalize = QCheckBox("Normalize (峰值→0dB, 对比形状用)")
+        self._v2_chk_normalize.setChecked(getattr(self, '_normalize', False))
+        row_norm.addWidget(self._v2_chk_normalize)
+        row_norm.addStretch()
+        layout.addLayout(row_norm)
+        row_scale = QHBoxLayout()
+        self._v2_chk_scale_lock = QCheckBox("dB 量程锁定:")
+        self._v2_chk_scale_lock.setChecked(getattr(self, '_scale_lock', False))
+        row_scale.addWidget(self._v2_chk_scale_lock)
+        self._v2_spin_dbmin = QDoubleSpinBox()
+        self._v2_spin_dbmin.setRange(-80, 20); self._v2_spin_dbmin.setValue(getattr(self, '_db_min', -40))
+        self._v2_spin_dbmin.setSuffix(" dB"); self._v2_spin_dbmin.setFixedWidth(85)
+        row_scale.addWidget(QLabel("~"))
+        self._v2_spin_dbmax = QDoubleSpinBox()
+        self._v2_spin_dbmax.setRange(-40, 60); self._v2_spin_dbmax.setValue(getattr(self, '_db_max', 10))
+        self._v2_spin_dbmax.setSuffix(" dB"); self._v2_spin_dbmax.setFixedWidth(85)
+        row_scale.addWidget(self._v2_spin_dbmax); row_scale.addStretch()
+        layout.addLayout(row_scale)
+
         # ── 默认数据类型 ──
         grp = QGroupBox("默认数据类型 (布局初始铺哪些)"); grp_lay = QVBoxLayout(grp)
         ff = next(iter(self._graph_data.values()), {}) if self._graph_data else {}
@@ -964,7 +988,11 @@ class GraphViewer(QWidget):
             self._active_pattern_keys = [dk for dk, cb in self._v2_type_checks.items() if cb.isChecked()] or list(DEFAULT_PATTERN_KEYS)
             indices = [i for i, cb in enumerate(self._v2_curve_checks) if cb.isChecked()]
             if indices: self._active_freq_curve_indices = indices
-            self._cmb_cmap.currentTextChanged.connect(self._on_cmap_changed)  # re-connect after reparent
+            self._normalize = self._v2_chk_normalize.isChecked()
+            self._scale_lock = self._v2_chk_scale_lock.isChecked()
+            self._db_min = self._v2_spin_dbmin.value()
+            self._db_max = self._v2_spin_dbmax.value()
+            self._cmb_cmap.currentTextChanged.connect(self._on_cmap_changed)
             self._spin_step.valueChanged.connect(self._on_step_changed)
             self._slider_speed.valueChanged.connect(self._on_speed_changed)
             dlg.accept()
