@@ -149,6 +149,7 @@ class ChartConfig:
     view_angle_pairs: list = field(default_factory=list)  # [(elev, azim[, roll]), ...] 二/三元组兼容
     dpi: int = 100
     colormap: str = "emquest"      # 3D 色图: emquest|jet|turbo|viridis|plasma|inferno
+    show_3d_colorbar: bool = True  # 3D图右侧色条; False=关, 3D球体居中匹配2D尺寸
     step_deg: float = 5.0          # 3D 图形采样精度 (°)
     dyn_db: float = 40.0           # 3D 半径动态范围 (峰值往下 dB), 手动模式用
     dyn_auto: bool = True          # 3D 半径自动自适应 (用数据实际范围); True=忽略 dyn_db

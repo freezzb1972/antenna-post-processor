@@ -230,6 +230,7 @@ def generate_all_for_frequency(
             elev=el, azim=az, roll=rl, dyn=_dyn, dpi=chart_config.dpi,
             title=_t.get(key) or default_title,
             antenna_name=antenna_name, colormap=getattr(chart_config, 'colormap', 'emquest'),
+            show_colorbar=getattr(chart_config, 'show_3d_colorbar', True),
         )
 
     _a_instances = [ci for ci in (chart_instances or [])

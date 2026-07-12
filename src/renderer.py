@@ -104,6 +104,7 @@ class BaseRenderer(ABC):
         title: str = "",
         antenna_name: str = "",
         colormap: str = "emquest",
+        show_colorbar: bool = True,
     ) -> io.BytesIO:
         """渲染 3D 球面方向图。"""
         ...
@@ -231,6 +232,7 @@ class MatplotlibRenderer(BaseRenderer):
         title: str = "",
         antenna_name: str = "",
         colormap: str = "emquest",
+        show_colorbar: bool = True,
     ) -> io.BytesIO:
         """EMQuest 风格 3D 球面方向图。
 
@@ -249,7 +251,11 @@ class MatplotlibRenderer(BaseRenderer):
 
         fig = plt.figure(figsize=(8, 6), dpi=dpi)
         ax = fig.add_subplot(111, projection="3d")
-        fig.subplots_adjust(left=0.02, right=0.88, top=0.92, bottom=0.02)
+        _show_cbar = show_colorbar
+        if _show_cbar:
+            fig.subplots_adjust(left=0.02, right=0.88, top=0.92, bottom=0.02)   # 右边留12%给colorbar
+        else:
+            fig.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.08)   # 与2D一致, 对称居中
 
         # 选择 colormap
         cmap = EMQUEST_CMAP if colormap == "emquest" else plt.get_cmap(colormap)
@@ -273,12 +279,12 @@ class MatplotlibRenderer(BaseRenderer):
         ax.view_init(elev=elev, azim=azim, roll=roll)
         ax.set_axis_off()
 
-        # colorbar
-        mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
-        mappable.set_array(gain_dbi)
-        cbar = fig.colorbar(mappable, ax=ax, shrink=0.4, aspect=30, pad=0.02)
-        cbar.set_label("Total Gain (dBi)", fontsize=10, labelpad=8)
-        cbar.ax.tick_params(labelsize=7)
+        # colorbar (无标签文字, 可选开关控制是否显示)
+        if getattr(self, '_show_3d_colorbar', True):
+            mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
+            mappable.set_array(gain_dbi)
+            cbar = fig.colorbar(mappable, ax=ax, shrink=0.4, aspect=30, pad=0.02)
+            cbar.ax.tick_params(labelsize=7)
 
         # 视角图例 (Theta/Phi/Roll)
         view_text = f"θ(elev) = {elev:.0f}°\nφ(azim) = {azim:.0f}°\nroll = {roll:.0f}°"
