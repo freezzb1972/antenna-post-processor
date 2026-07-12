@@ -997,8 +997,7 @@ def detect_available_renderers() -> dict:
 
 def _fig_to_png_buffer(fig, dpi: int) -> io.BytesIO:
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight",
-                facecolor="white", edgecolor="none")
+    fig.savefig(buf, format="png", dpi=dpi, facecolor="white", edgecolor="none")
     buf.seek(0)
     plt.close(fig)
     return buf
