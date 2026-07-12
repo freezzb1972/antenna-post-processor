@@ -82,7 +82,6 @@ class ScaleManager:
             }}
             QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{
                 font-size: {fs:.1f}px;
-                min-height: {24 * f:.0f}px;
                 min-width:  {80 * f:.0f}px;
                 padding: {2 * f:.0f}px {6 * f:.0f}px;
             }}

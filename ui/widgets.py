@@ -274,6 +274,12 @@ class TemplateSourceRow(QWidget):
         btn_preview.setMinimumWidth(110)
         btn_preview.clicked.connect(self._on_preview_cb if self._on_preview_cb else self._on_preview)
         layout.addWidget(btn_preview)
+
+        self.btn_clear_tpl = QPushButton("✕")
+        self.btn_clear_tpl.setFixedSize(20, 20)
+        self.btn_clear_tpl.setToolTip(self.tr("清除模板"))
+        self.btn_clear_tpl.clicked.connect(self._on_clear_tpl)
+        layout.addWidget(self.btn_clear_tpl)
         layout.addStretch()
 
     def set_path(self, path: str):

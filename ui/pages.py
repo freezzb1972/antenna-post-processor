@@ -196,12 +196,20 @@ class FileSettingsPage(QWidget):
             self._tpl_row.populate_presets(presets_list)
         self._tpl_row.template_changed.connect(self._on_preset_template_selected)
         excel_layout.addWidget(self._tpl_row)
+        # Excel 路径行: 显示框 + ✕清除 (仿 Word wrow 做法)
+        _excel_path_row = QHBoxLayout(); _excel_path_row.setSpacing(0)
         self._tpl_path_label = QLineEdit()
         self._tpl_row.template_changed.connect(self._tpl_path_label.setText)
         self._tpl_path_label.setReadOnly(True)
         self._tpl_path_label.setPlaceholderText(self.tr("(未选择 Excel 参数模版)"))
         self._tpl_path_label.setFixedHeight(20)
-        excel_layout.addWidget(self._tpl_path_label)
+        _excel_path_row.addWidget(self._tpl_path_label)
+        self._btn_clear_excel_tpl = QPushButton("✕")
+        self._btn_clear_excel_tpl.setFixedSize(20, 20)
+        self._btn_clear_excel_tpl.setToolTip(self.tr("清除 Excel 参数模版"))
+        self._btn_clear_excel_tpl.clicked.connect(self._on_clear_excel_template)
+        _excel_path_row.addWidget(self._btn_clear_excel_tpl)
+        excel_layout.addLayout(_excel_path_row)
         tpl_row.addWidget(self.excel_grp)
 
         # Word 报告模版组
@@ -614,6 +622,15 @@ class FileSettingsPage(QWidget):
             self._edit_word_report_tpl = d
             if hasattr(self, '_edit_word_tpl_widget'):
                 self._edit_word_tpl_widget.setText(d)
+
+    def _on_clear_excel_template(self):
+        """清除 Excel 参数模版路径 (不改 Excel 输出勾选状态)。"""
+        if hasattr(self, '_tpl_path_label'):
+            self._tpl_path_label.clear()
+        if hasattr(self, '_tpl_row'):
+            self._tpl_row.set_path("")
+        if self._mw:
+            self._mw._cached_datasource_map = None
 
     def _on_clear_word_template(self):
         """清除 Word 报告模版路径 (不改 Word 输出勾选状态)。"""
