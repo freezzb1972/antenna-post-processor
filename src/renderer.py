@@ -391,7 +391,7 @@ class MatplotlibRenderer(BaseRenderer):
             for i, (label, c_angles, c_values) in enumerate(curves):
                 ax.plot(c_angles, c_values, "-", linewidth=1.2, color=colors[i % len(colors)], label=label)
             if curves:
-                ax.legend(fontsize=9)
+                ax.legend(fontsize=10)
         else:
             ax.plot(angles_deg, gain_dbi, "-", linewidth=1.2, color="#2196F3")
 
@@ -432,7 +432,7 @@ class MatplotlibRenderer(BaseRenderer):
                 ax.plot(phi_deg, c_values, "-", linewidth=1.2,
                         color=colors[i % len(colors)], label=f"={theta_angle:.0f}")
             if curves:
-                ax.legend(fontsize=9)
+                ax.legend(fontsize=10)
         else:
             ax.plot(phi_deg, values, "-", linewidth=1.2, color="#2196F3")
 
