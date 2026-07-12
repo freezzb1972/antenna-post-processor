@@ -3273,17 +3273,24 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     # ==================================================================
 
     def closeEvent(self, event):
-        """窗口关闭时停止线程 + 保存位置。"""
-        import base64
-        geom = self.saveGeometry()
-        self._cfg.config.window_geometry = bytes(geom.toBase64().data()).decode()
-        self._cfg._dirty = True
+        """窗口关闭时停止线程 + 保存位置。处理中弹确认防误触。"""
         if self._thread and self._thread.isRunning():
+            reply = QMessageBox.question(
+                self, self.tr("确认退出"),
+                self.tr("正在处理中，确定要退出吗？"),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply != QMessageBox.Yes:
+                event.ignore()
+                return
             if self._worker:
                 self._worker.cancel()
             self._thread.quit()
             if not self._thread.wait(5000):
                 self._thread.terminate()
                 self._thread.wait()
+        import base64
+        geom = self.saveGeometry()
+        self._cfg.config.window_geometry = bytes(geom.toBase64().data()).decode()
+        self._cfg._dirty = True
         self._running = False
         event.accept()
