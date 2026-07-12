@@ -2968,7 +2968,7 @@ class ChartSettingsPage(QWidget):
 
         # 视角参数默认值（每个3D图表参数对话框中可单独调整）
         self._elev = 30.0; self._azim = -60.0
-        self._dpi = 150; self._step_deg = 5.0
+        self._dpi = 150; self._step_deg = 5.0; self._colormap = "emquest"
         self._dyn_db = 40.0   # 3D 半径动态范围 (dB), 可配
         self._dyn_auto = True # 3D DYN 自动自适应 (默认)
 
@@ -3557,6 +3557,7 @@ class ChartSettingsPage(QWidget):
         required.elev = getattr(self, '_elev', 30.0)
         required.azim = getattr(self, '_azim', -60.0)
         required.dpi = getattr(self, '_dpi', 150)
+        required.colormap = getattr(self, '_colormap', 'emquest')
         required.step_deg = getattr(self, '_step_deg', 5.0)
         required.dyn_db = getattr(self, '_dyn_db', 40.0)
         required.dyn_auto = getattr(self, '_dyn_auto', True)
@@ -3786,6 +3787,13 @@ class ChartSettingsPage(QWidget):
         spin_step = QSpinBox(); spin_step.setRange(1, 30); spin_step.setValue(int(getattr(self, '_step_deg', 5)))
         spin_step.setSuffix("°"); spin_step.setToolTip(self.tr("3D 采样精度: 1°=最细, 30°=最快"))
         form.addRow(self.tr("采样精度:"), spin_step)
+        cmb_cmap = QComboBox()
+        cmb_cmap.addItems([("emquest (" + self.tr("EMQuest") + ")"), "jet", "turbo", "viridis", "plasma", "inferno"])
+        cur_cmap = getattr(self, '_colormap', 'emquest')
+        idx = cmb_cmap.findText(cur_cmap)
+        if idx >= 0: cmb_cmap.setCurrentIndex(idx)
+        elif cmb_cmap.findText("emquest") >= 0: cmb_cmap.setCurrentIndex(cmb_cmap.findText("emquest"))
+        form.addRow(self.tr("3D 色图:"), cmb_cmap)
         dyn_row = QHBoxLayout()
         chk_dyn_auto = QCheckBox(self.tr("自动(自适应)"))
         chk_dyn_auto.setChecked(getattr(self, '_dyn_auto', True))
@@ -3871,6 +3879,7 @@ class ChartSettingsPage(QWidget):
 
         def _accept():
             self._dpi = spin_dpi.value()
+            self._colormap = cmb_cmap.currentText().split(" ")[0] if " " in cmb_cmap.currentText() else cmb_cmap.currentText()
             self._step_deg = float(spin_step.value())
             self._dyn_db = float(spin_dyn.value())
             self._dyn_auto = chk_dyn_auto.isChecked()

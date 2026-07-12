@@ -229,7 +229,7 @@ def generate_all_for_frequency(
             theta_deg, phi_deg, data, freq_mhz,
             elev=el, azim=az, roll=rl, dyn=_dyn, dpi=chart_config.dpi,
             title=_t.get(key) or default_title,
-            antenna_name=antenna_name, colormap="emquest",
+            antenna_name=antenna_name, colormap=getattr(chart_config, 'colormap', 'emquest'),
         )
 
     _a_instances = [ci for ci in (chart_instances or [])
