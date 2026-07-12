@@ -240,20 +240,21 @@ def _write_flat_grid(
     """将扁平 (caption, buf) 列表按 columns 列排列 — 所有布局模式的公共底层。
 
     columns 是独立参数，控制每行图片数量，与数据如何排序无关:
-      - columns=1 → 单列, 图片占整页宽
-      - columns=2 → 双列, 图片占半页宽
+      - columns=1 → 单列, 图片占整页宽 (自然堆叠, 无表间空段)
+      - columns>=2 → 单个多行表, 消除表间强制空段落(¶)
     img_width 已由上层根据 col_width * image_width_pct% 算好。
     """
-    for i in range(0, len(items), columns):
-        row_items = items[i:i + columns]
-        if len(row_items) == 1:
-            cap, buf = row_items[0]
+    if columns == 1:
+        for cap, buf in items:
             _add_single_image(doc, buf, cap, width=img_width, show_caption=show_caption)
-        else:
-            table = doc.add_table(rows=1, cols=len(row_items))
-            table.alignment = WD_TABLE_ALIGNMENT.CENTER
-            for j, (cap, buf) in enumerate(row_items):
-                _add_cell_image(table.cell(0, j), buf, cap, width=img_width, show_caption=show_caption)
+    else:
+        n_rows = (len(items) + columns - 1) // columns
+        table = doc.add_table(rows=n_rows, cols=columns)
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        for i, (cap, buf) in enumerate(items):
+            row_i = i // columns
+            col_i = i % columns
+            _add_cell_image(table.cell(row_i, col_i), buf, cap, width=img_width, show_caption=show_caption)
 
 
 def _write_by_freq(doc, ordered_groups, antenna_name, angles_str, img_width, columns, show_heading, show_caption):
