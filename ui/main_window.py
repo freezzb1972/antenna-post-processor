@@ -1684,12 +1684,20 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 文件浏览
         self.ui.btnBrowseTemplate.clicked.connect(self._on_browse_template)
         # 清除模板按钮 (×) — 动态追加到模板编辑框旁
-        # 清除模板按钮 — 插入到 btnBrowseTemplate 之后 (addWidget 顺序决定位置)
-        self._btn_clear_template = QPushButton("✕", parent=self.ui.editTemplatePath.parent())
+        # Excel 模板行包进容器 (仿 Word 做法): editTemplatePath + btnBrowseTemplate + ✕清除
+        _tpl_wrap = QWidget(self.ui.editTemplatePath.parent())
+        _tpl_row = QHBoxLayout(_tpl_wrap); _tpl_row.setContentsMargins(0, 0, 0, 0); _tpl_row.setSpacing(2)
+        self.ui.editTemplatePath.setParent(_tpl_wrap)
+        self.ui.btnBrowseTemplate.setParent(_tpl_wrap)
+        _tpl_row.addWidget(self.ui.editTemplatePath)
+        _tpl_row.addWidget(self.ui.btnBrowseTemplate)
+        self._btn_clear_template = QPushButton("✕")
         self._btn_clear_template.setFixedSize(20, 20)
         self._btn_clear_template.setToolTip(self.tr("清除天线参数模板"))
         self._btn_clear_template.clicked.connect(self._on_clear_template)
-        self.ui.hboxLayout1.insertWidget(self.ui.hboxLayout1.count(), self._btn_clear_template)
+        _tpl_row.addWidget(self._btn_clear_template)
+        # 替换 QFormLayout 中的旧 hboxLayout1
+        self.ui.formInput.setLayout(1, QFormLayout.ItemRole.FieldRole, _tpl_row)
 
         self.ui.btnBrowseOutput.clicked.connect(self._on_browse_output)
         self.ui.editOutputDir.textEdited.connect(self._on_output_dir_edited)
