@@ -263,9 +263,8 @@ class MatplotlibRenderer(BaseRenderer):
             linewidth=0, antialiased=True,
         )
 
-        # 贴面网格线 (EMQuest 浅灰, 提供深度线索)
-        stride = max(1, min(len(phi_deg), len(theta_deg)) // 30)
-        ax.plot_wireframe(X, Y, Z, rstride=stride, cstride=stride,
+        # 贴面网格线 (EMQuest 浅灰, 固定 stride=4, 所有频点一致)
+        ax.plot_wireframe(X, Y, Z, rstride=4, cstride=4,
                           color="gray", linewidth=0.2, alpha=0.3)
 
         # 去笛卡尔轴 + 视角 + θ=0° 箭头 (无灰色参考球/θ环, 保持干净)
