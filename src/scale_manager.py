@@ -78,7 +78,6 @@ class ScaleManager:
             QPushButton {{
                 font-size: {fs:.1f}px;
                 min-height: {24 * f:.0f}px;
-                min-width:  {60 * f:.0f}px;
                 padding: {3 * f:.0f}px {8 * f:.0f}px;
             }}
             QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{

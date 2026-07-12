@@ -174,8 +174,8 @@ class FileSettingsPage(QWidget):
         v_splitter = QSplitter(Qt.Vertical)
         v_splitter.setHandleWidth(4)  # 可拖拽分割线
 
-        # Excel + Word 模版并列
-        tpl_row = QHBoxLayout()
+        # Excel + Word 模版上下堆叠 (各得全宽, 避免并排挤压按钮)
+        tpl_row = QVBoxLayout()
         tpl_row.setSpacing(4)
 
         # Excel 模版组
@@ -202,7 +202,7 @@ class FileSettingsPage(QWidget):
         self._tpl_path_label.setPlaceholderText(self.tr("(未选择 Excel 参数模版)"))
         self._tpl_path_label.setFixedHeight(20)
         excel_layout.addWidget(self._tpl_path_label)
-        tpl_row.addWidget(self.excel_grp, 1)
+        tpl_row.addWidget(self.excel_grp)
 
         # Word 报告模版组
         self.word_grp = QGroupBox(self.tr("Word 报告模版"))
@@ -232,7 +232,7 @@ class FileSettingsPage(QWidget):
         self._btn_clear_word_tpl.clicked.connect(self._on_clear_word_template)
         wrow.addWidget(self._btn_clear_word_tpl)
         word_layout.addLayout(wrow)
-        tpl_row.addWidget(self.word_grp, 1)
+        tpl_row.addWidget(self.word_grp)
 
         # 模板行打包到一个 widget 加入垂直 splitter
         tpl_widget = QWidget()
