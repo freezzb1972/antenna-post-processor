@@ -15,7 +15,7 @@ from typing import Dict, List
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDial, QDialog, QDialogButtonBox, QDoubleSpinBox,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
     QFileDialog, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QScrollArea, QSlider, QSpinBox, QSplitter,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
