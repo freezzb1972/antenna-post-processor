@@ -1692,6 +1692,19 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.hboxLayout1.addWidget(self._btn_clear_template)
         self._btn_clear_template.show()
 
+        # ---- 诊断: 打印 hboxLayout1 内容 ----
+        print("=== hboxLayout1 诊断 ===")
+        print("  count:", self.ui.hboxLayout1.count())
+        for i in range(self.ui.hboxLayout1.count()):
+            item = self.ui.hboxLayout1.itemAt(i)
+            w = item.widget()
+            if w:
+                print(f"  [{i}] {w.__class__.__name__} visible={w.isVisible()} hidden={w.isHidden()} size={w.width()}x{w.height()} text={getattr(w,'text','')[:20]}")
+            else:
+                print(f"  [{i}] (layout item, no widget)")
+        print("  parent widget:", self.ui.hboxLayout1.parentWidget().__class__.__name__ if self.ui.hboxLayout1.parentWidget() else "None")
+        print("========================")
+
         self.ui.btnBrowseOutput.clicked.connect(self._on_browse_output)
         self.ui.editOutputDir.textEdited.connect(self._on_output_dir_edited)
         self.ui.btnBrowseFullReport.clicked.connect(self._on_browse_full_report)
