@@ -282,7 +282,8 @@ class MatplotlibRenderer(BaseRenderer):
         # 视角图例 (Theta/Phi/Roll)
         view_text = f"θ(el)={elev:.0f}°  φ(az)={azim:.0f}°  roll={roll:.0f}°"
         ax.text2D(0.02, 0.02, view_text, transform=ax.transAxes,
-                   fontsize=8, color="white", alpha=0.7, fontfamily="monospace")
+                   fontsize=8, color="white", fontfamily="monospace",
+                   bbox=dict(boxstyle="round,pad=0.2", fc="black", ec="none", alpha=0.5))
 
         # 标题
         title_parts = []
