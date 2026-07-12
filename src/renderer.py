@@ -247,7 +247,7 @@ class MatplotlibRenderer(BaseRenderer):
         X, Y, Z, color_values, vmin, vmax = build_3d_surface(
             theta_deg, phi_deg, gain_dbi, kind="magnitude", dyn=dyn)
 
-        fig = plt.figure(figsize=(8, 7), dpi=dpi)
+        fig = plt.figure(figsize=(8, 6), dpi=dpi)
         ax = fig.add_subplot(111, projection="3d")
         fig.subplots_adjust(left=-0.05, right=0.90, top=1.05, bottom=-0.05)
 
