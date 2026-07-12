@@ -247,9 +247,9 @@ class MatplotlibRenderer(BaseRenderer):
         X, Y, Z, color_values, vmin, vmax = build_3d_surface(
             theta_deg, phi_deg, gain_dbi, kind="magnitude", dyn=dyn)
 
-        fig = plt.figure(figsize=(10, 8), dpi=dpi)
+        fig = plt.figure(figsize=(9, 8), dpi=dpi)
         ax = fig.add_subplot(111, projection="3d")
-        fig.subplots_adjust(left=0.0, right=0.92, top=1.0, bottom=0.0)
+        fig.subplots_adjust(left=-0.05, right=0.90, top=1.05, bottom=-0.05)
 
         # 选择 colormap
         cmap = EMQUEST_CMAP if colormap == "emquest" else plt.get_cmap(colormap)
@@ -276,7 +276,7 @@ class MatplotlibRenderer(BaseRenderer):
         # colorbar
         mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
         mappable.set_array(gain_dbi)
-        cbar = fig.colorbar(mappable, ax=ax, shrink=0.55, aspect=20, pad=0.06)
+        cbar = fig.colorbar(mappable, ax=ax, shrink=0.4, aspect=30, pad=0.02)
         cbar.set_label("Total Gain (dBi)", fontsize=10, labelpad=8)
         cbar.ax.tick_params(labelsize=7)
 
