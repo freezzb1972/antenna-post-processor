@@ -176,48 +176,35 @@ class FileSettingsPage(QWidget):
 
         # Excel + Word 模版上下堆叠 (各得全宽, 避免并排挤压按钮)
         tpl_row = QVBoxLayout()
-        tpl_row.setSpacing(4)
+        tpl_row.setSpacing(2)
 
-        # Excel 模版组
-        self.excel_grp = QGroupBox(self.tr("Excel 参数模版"))
-        excel_layout = QVBoxLayout(self.excel_grp)
-        excel_layout.setContentsMargins(2, 0, 2, 0)
-        excel_layout.setSpacing(0)
+        # ── Excel 模版 (单行: 标签 + TemplateSourceRow + 路径 + ✕) ──
+        _excel_line = QHBoxLayout(); _excel_line.setSpacing(4)
+        _excel_line.addWidget(QLabel(self.tr("Excel 参数模版:")))
         self._tpl_row = TemplateSourceRow(
             on_browse=self._on_browse_template,
             on_preview=self._on_preview_report,
         )
         if self._mw and hasattr(self._mw, '_tm'):
-            presets = self._mw._tm.get_all_templates()
-            presets_list = []
-            for t in presets:
-                presets_list.append({"manufacturer": t.manufacturer, "name": t.name, "path": t.path,
-                    "word_template_path": t.word_template_path})
-            self._tpl_row.populate_presets(presets_list)
+            self._tpl_row.populate_presets(self._mw._tm.get_all_templates())
         self._tpl_row.template_changed.connect(self._on_preset_template_selected)
-        excel_layout.addWidget(self._tpl_row)
-        # Excel 路径行: 显示框 + ✕清除 (仿 Word wrow 做法)
-        _excel_path_row = QHBoxLayout(); _excel_path_row.setSpacing(0)
+        _excel_line.addWidget(self._tpl_row, 1)
         self._tpl_path_label = QLineEdit()
         self._tpl_row.template_changed.connect(self._tpl_path_label.setText)
         self._tpl_path_label.setReadOnly(True)
-        self._tpl_path_label.setPlaceholderText(self.tr("(未选择 Excel 参数模版)"))
+        self._tpl_path_label.setPlaceholderText(self.tr("(未选择)"))
         self._tpl_path_label.setFixedHeight(20)
-        _excel_path_row.addWidget(self._tpl_path_label)
+        _excel_line.addWidget(self._tpl_path_label, 1)
         self._btn_clear_excel_tpl = QPushButton("✕")
         self._btn_clear_excel_tpl.setFixedSize(20, 20)
         self._btn_clear_excel_tpl.setToolTip(self.tr("清除 Excel 参数模版"))
         self._btn_clear_excel_tpl.clicked.connect(self._on_clear_excel_template)
-        _excel_path_row.addWidget(self._btn_clear_excel_tpl)
-        excel_layout.addLayout(_excel_path_row)
-        tpl_row.addWidget(self.excel_grp)
+        _excel_line.addWidget(self._btn_clear_excel_tpl)
+        tpl_row.addLayout(_excel_line)
 
-        # Word 报告模版组
-        self.word_grp = QGroupBox(self.tr("Word 报告模版"))
-        self.word_grp.setStyleSheet("QGroupBox { padding-top: 4px; padding-bottom: 1px; margin-top: 14px; }")
-        word_layout = QVBoxLayout(self.word_grp)
-        word_layout.setContentsMargins(2, 0, 2, 0)
-        word_layout.setSpacing(0)
+        # ── Word 报告模版 (单行: 标签 + TemplateSourceRow + 路径 + ✕) ──
+        _word_line = QHBoxLayout(); _word_line.setSpacing(4)
+        _word_line.addWidget(QLabel(self.tr("Word 报告模版:")))
         self._word_tpl_row = TemplateSourceRow(
             on_browse=self._on_browse_word_template,
             on_preview=self._on_preview_word,
@@ -226,21 +213,19 @@ class FileSettingsPage(QWidget):
             self._word_tpl_row.populate_presets(self._mw._tm.get_all_templates())
         self._word_tpl_row.template_changed.connect(self._on_word_tpl_path_set)
         self._word_tpl_row.template_pair_changed.connect(self._on_word_preset_excel_load)
-        word_layout.addWidget(self._word_tpl_row)
-        wrow = QHBoxLayout(); wrow.setSpacing(0)
+        _word_line.addWidget(self._word_tpl_row, 1)
         self._edit_word_tpl_widget = QLineEdit()
         self._edit_word_tpl_widget.setReadOnly(True)
-        self._edit_word_tpl_widget.setPlaceholderText(self.tr("(未选择 Word 报告模版)"))
+        self._edit_word_tpl_widget.setPlaceholderText(self.tr("(未选择)"))
         self._edit_word_tpl_widget.setFixedHeight(20)
         self._word_tpl_row.template_changed.connect(self._edit_word_tpl_widget.setText)
-        wrow.addWidget(self._edit_word_tpl_widget)
+        _word_line.addWidget(self._edit_word_tpl_widget, 1)
         self._btn_clear_word_tpl = QPushButton("×")
-        self._btn_clear_word_tpl.setFixedSize(24, 20)
+        self._btn_clear_word_tpl.setFixedSize(20, 20)
         self._btn_clear_word_tpl.setToolTip(self.tr("清除 Word 报告模版"))
         self._btn_clear_word_tpl.clicked.connect(self._on_clear_word_template)
-        wrow.addWidget(self._btn_clear_word_tpl)
-        word_layout.addLayout(wrow)
-        tpl_row.addWidget(self.word_grp)
+        _word_line.addWidget(self._btn_clear_word_tpl)
+        tpl_row.addLayout(_word_line)
 
         # 模板行打包到一个 widget 加入垂直 splitter
         tpl_widget = QWidget()
