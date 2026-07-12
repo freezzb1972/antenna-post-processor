@@ -259,14 +259,14 @@ class MatplotlibRenderer(BaseRenderer):
             X, Y, Z,
             facecolors=cmap(norm(color_values)),
             rstride=1, cstride=1,
-            alpha=0.88, shade=True,
+            alpha=1.0, shade=True,
             linewidth=0, antialiased=True,
         )
 
-        # 贴面网格线 (wireframe, 提供深度线索 / EMQuest 风格表面经纬线)
+        # 贴面网格线 (EMQuest 浅灰, 提供深度线索)
         stride = max(1, min(len(phi_deg), len(theta_deg)) // 30)
         ax.plot_wireframe(X, Y, Z, rstride=stride, cstride=stride,
-                          color="white", linewidth=0.5, alpha=0.35)
+                          color="gray", linewidth=0.2, alpha=0.3)
 
         # 去笛卡尔轴 + 视角 + θ=0° 箭头 (无灰色参考球/θ环, 保持干净)
         _add_axis_labels_3d(ax, 1.0)
