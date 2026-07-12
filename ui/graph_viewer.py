@@ -258,6 +258,39 @@ class SubPlotPanel:
         self.ax.set_theta_direction(-1)
         theta_val = theta_deg[min(self._theta_idx, len(theta_deg) - 1)]
         self.ax.set_title(f"{self.title} — θ={theta_val:.0f}°", fontsize=8)
+        # 缓存极坐标数据 (HPBW 双游标用)
+        self._last_polar_phi = phi_rad.copy()
+        self._last_polar_r = r.copy()
+
+    def compute_hpbw(self) -> str:
+        """计算 -3dB 半功率波束宽度 (HPBW)。返回标注字符串或空。"""
+        if not hasattr(self, '_last_polar_r') or self._last_polar_r is None:
+            return ""
+        r = self._last_polar_r.copy()
+        peak_idx = int(np.argmax(r))
+        peak_val = r[peak_idx]
+        thresh = peak_val * 10**(-3.0/20.0)  # -3dB → 线性 1/√2
+        if thresh <= 0:
+            return ""
+        # 向左找 -3dB 交叉
+        left_idx = peak_idx
+        while left_idx > 0 and r[left_idx] > thresh:
+            left_idx -= 1
+        right_idx = peak_idx
+        while right_idx < len(r) - 1 and r[right_idx] > thresh:
+            right_idx += 1
+        if left_idx >= right_idx:
+            return ""
+        phi = self._last_polar_phi
+        hpbw_rad = phi[right_idx] - phi[left_idx]
+        hpbw_deg = np.rad2deg(hpbw_rad) % 360
+        if hpbw_deg > 180:
+            hpbw_deg = 360 - hpbw_deg
+        # 在图上标注 peak 和 -3dB 点
+        for tag, idx, color in [("PK", peak_idx, "lime"), ("-3dB", left_idx, "red"), ("-3dB", right_idx, "red")]:
+            self.ax.plot(phi[idx], r[idx], 'o', color=color, markersize=4, zorder=10)
+        self.ax.axvline(phi[peak_idx], color="lime", alpha=0.3, linewidth=0.8)
+        return f"HPBW={hpbw_deg:.1f}°"
 
     def _draw_cartesian_3d(self, theta_deg, phi_deg, data, cmap):
         """直角坐标 3D: φ-θ-值 曲面。"""
@@ -1220,6 +1253,15 @@ class GraphViewer(QWidget):
                     self._trace_cache.setdefault(sp.data_key, []).append(
                         (theta.copy(), phi.copy(), data.copy()))
         self._canvas.draw()
+
+        # HPBW 双游标: polar 2D 子图自动标注
+        hpbw_parts = []
+        for sp in self._subplots:
+            if sp._plot_type == "Polar 2D":
+                h = sp.compute_hpbw()
+                if h: hpbw_parts.append(h)
+        if hpbw_parts:
+            self._lbl_readout.setText(" | ".join(hpbw_parts))
 
         n = len(theta) * len(phi)
         self._lbl_info.setText(f"θ={len(theta)}×φ={len(phi)}={n}点")
