@@ -263,23 +263,10 @@ class MatplotlibRenderer(BaseRenderer):
             linewidth=0, antialiased=True,
         )
 
-        # wireframe 叠加
-        stride = max(1, min(len(phi_deg), len(theta_deg)) // 25)
-        ax.plot_wireframe(X, Y, Z, rstride=stride, cstride=stride,
-                          color="gray", linewidth=0.25, alpha=0.25)
-
-        # 参考球 (0 dBi 的归一化半径; 仅当 0 落在 [vmin,vmax] 内)
-        r0 = ((0.0 - vmin) / (vmax - vmin)) if (vmin <= 0.0 <= vmax and vmax > vmin) else None
-        _add_reference_sphere(ax, theta_deg, phi_deg, r0)
-
-        # Theta 环 (归一化外半径=1)
-        _add_theta_rings(ax, theta_deg, phi_deg, 1.0)
-
-        # 限幅 + θ=0° 箭头; 应用视角(含 roll); 去笛卡尔轴 (天线图 X/Y/Z 无物理意义)
+        # 去笛卡尔轴 + 视角 + θ=0° 箭头 (无灰色参考球/θ环, 保持干净)
         _add_axis_labels_3d(ax, 1.0)
         ax.view_init(elev=elev, azim=azim, roll=roll)
         ax.set_axis_off()
-
 
         # colorbar
         mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
@@ -287,6 +274,11 @@ class MatplotlibRenderer(BaseRenderer):
         cbar = fig.colorbar(mappable, ax=ax, shrink=0.55, aspect=20, pad=0.06)
         cbar.set_label("Total Gain (dBi)", fontsize=10, labelpad=8)
         cbar.ax.tick_params(labelsize=7)
+
+        # 视角图例 (Theta/Phi/Roll)
+        view_text = f"θ(el)={elev:.0f}°  φ(az)={azim:.0f}°  roll={roll:.0f}°"
+        ax.text2D(0.02, 0.02, view_text, transform=ax.transAxes,
+                   fontsize=8, color="white", alpha=0.7, fontfamily="monospace")
 
         # 标题
         title_parts = []
@@ -1004,40 +996,6 @@ def _fig_to_png_buffer(fig, dpi: int) -> io.BytesIO:
 # 3D 视觉增强 — 参考球 / Theta 环 / 轴标注
 # ═══════════════════════════════════════════════════════════════
 
-def _add_reference_sphere(ax, theta_deg, phi_deg, r0=1.0):
-    """在 gain=0 dBi 对应半径 r0 处画灰色虚线参考球。r0 为 None 时跳过。"""
-    if r0 is None or r0 <= 0:
-        return
-    r = float(r0)
-    theta = np.deg2rad(theta_deg)
-    phi = np.deg2rad(phi_deg)
-    TH, PH = np.meshgrid(theta, phi)
-
-    X = r * np.sin(TH) * np.cos(PH)
-    Y = r * np.sin(TH) * np.sin(PH)
-    Z = r * np.cos(TH)
-
-    stride = max(1, min(len(phi_deg), len(theta_deg)) // 15)
-    ax.plot_wireframe(X, Y, Z, rstride=stride, cstride=stride,
-                      color="gray", linewidth=0.3, alpha=0.4,
-                      linestyle="dotted")
-
-
-def _add_theta_rings(ax, theta_deg, phi_deg, r_outer=2.5):
-    """在关键 theta 角处画纬线环 (缩放到外半径 r_outer)。"""
-    rt = float(r_outer)
-    phi = np.linspace(0, 2 * np.pi, 180)
-    for t_deg in [30, 60, 90, 120, 150]:
-        t = np.deg2rad(t_deg)
-        x = rt * np.sin(t) * np.cos(phi)
-        y = rt * np.sin(t) * np.sin(phi)
-        z = rt * np.cos(t) * np.ones_like(phi)
-        # 只在 Z ≥ 0 部分画（上半球）
-        ax.plot(x, y, z, color="gray", linewidth=0.4, alpha=0.3,
-                linestyle="dashed")
-
-
-def _add_axis_labels_3d(ax, max_r: float):
     """添加轴标签和 θ=0° 方向箭头。"""
     lim = max_r * 1.3
     ax.set_xlim(-lim, lim)
