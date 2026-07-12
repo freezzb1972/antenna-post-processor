@@ -1040,7 +1040,7 @@ def _add_theta_rings(ax, theta_deg, phi_deg, r_outer=2.5):
 
 def _add_axis_labels_3d(ax, max_r: float):
     """添加轴标签和 θ=0° 方向箭头。"""
-    lim = max_r * 1.3
+    lim = max_r * 1.0
     ax.set_xlim(-lim, lim)
     ax.set_ylim(-lim, lim)
     ax.set_zlim(-lim, lim)
