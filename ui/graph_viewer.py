@@ -206,7 +206,47 @@ class SubPlotPanel:
                              color="red", linewidth=1.5, zorder=10)
         self.ax.set_box_aspect([1, 1, 1])
         self.ax.view_init(elev=self._elev, azim=self._azim, roll=self._roll)
-        self.ax.set_axis_off()                       # 天线图无笛卡尔轴意义
+        self.ax.set_axis_off()
+        # 缓存读值用: X,Y,Z,cvals,theta,phi (motion_notify 反查)
+        self._last_X, self._last_Y, self._last_Z = X, Y, Z
+        self._last_cvals, self._last_theta, self._last_phi = cvals, theta_arr.copy(), phi_arr.copy()
+
+    def readout_at(self, event):
+        """返回该子图上鼠标悬停点的 (θ_deg, φ_deg, val_str) 或 None。
+        2D: 直接用 event.xdata/ydata; 3D: 投影顶点找最近点。"""
+        if self._plot_type == "Polar 2D":
+            if event.xdata is None or event.ydata is None:
+                return None
+            return (f"θ={event.xdata:.0f}°", f"r={event.ydata:.2f}", "")
+        if self._plot_type == "Spherical 3D" and hasattr(self, "_last_X"):
+            from matplotlib.projections import proj3d
+            try:
+                x2, y2, _ = proj3d.proj_transform(
+                    self._last_X.ravel(), self._last_Y.ravel(), self._last_Z.ravel(),
+                    self.ax.get_proj())
+                x2 = np.asarray(x2); y2 = np.asarray(y2)
+                px, py = event.x, event.y
+                # 从 ax.transData 转像素坐标
+                disp = self.ax.transData.transform
+                xy_disp = disp(np.column_stack([x2, y2]))
+                dist2 = (xy_disp[:,0]-px)**2 + (xy_disp[:,1]-py)**2
+                idx = int(np.argmin(dist2))
+                # 回查 θ/φ/val
+                ntheta = len(self._last_theta) if self._last_theta is not None else 0
+                phi_i = idx // max(ntheta, 1); theta_i = idx % max(ntheta, 1)
+                if hasattr(self._last_theta, '__len__'):
+                    t = self._last_theta[theta_i] if theta_i < len(self._last_theta) else float('nan')
+                    p = self._last_phi[phi_i] if phi_i < len(self._last_phi) else float('nan')
+                else:
+                    t = p = float('nan')
+                v = float(self._last_cvals.flat[idx]) if hasattr(self._last_cvals, 'flat') else float('nan')
+                return (f"θ={t:.1f}°", f"φ={p:.1f}°", f"{self.display_name()} {v:.1f} {self._unit()}")
+            except Exception:
+                return None
+        return None
+
+    def _unit(self) -> str:
+        return "dB" if self._plot_type == "Polar 2D" else ("dB" if self.data_key != "ar_linear" else "dB")
 
     def _draw_polar(self, theta_deg, phi_deg, data, cmap):
         """极坐标 2D: 增益 vs φ 在固定 θ 截面。"""
@@ -258,6 +298,18 @@ class GraphViewer(QWidget):
         self._setup_ui()
         self._canvas.mpl_connect("button_release_event", self._on_mouse_release)
         self._canvas.mpl_connect("button_press_event", self._on_canvas_click)
+        self._canvas.mpl_connect("motion_notify_event", self._on_mouse_move)
+
+    def _on_mouse_move(self, event):
+        """Cursor readout: 鼠标悬停时读子图值, 非拖拽时才更新。"""
+        if event.button is not None:  # 拖拽旋转/缩放时跳过
+            return
+        parts = []
+        for sp in self._subplots:
+            r = sp.readout_at(event)
+            if r is not None:
+                parts.append(r[0] + (f" {r[1]}" if r[1] else "") + (f" ={r[2]}" if r[2] else ""))
+        self._lbl_readout.setText(" | ".join(parts) if parts else "")
 
     def update_mode_display(self):
         """根据当前测试模式更新模式标签和可选曲线。"""
