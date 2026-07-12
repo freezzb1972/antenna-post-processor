@@ -254,7 +254,7 @@ class SubPlotPanel:
         phi_rad = np.deg2rad(phi_deg)
         r = np.maximum(data[:, idx], 1e-15)
         self.ax.plot(phi_rad, r)
-        self.ax.set_theta_zero_location("N")
+        self.ax.set_theta_zero_location("E" if getattr(self, '_polar_orient_east', False) else "N")
         self.ax.set_theta_direction(-1)
         theta_val = theta_deg[min(self._theta_idx, len(theta_deg) - 1)]
         self.ax.set_title(f"{self.title} — θ={theta_val:.0f}°", fontsize=8)
@@ -290,6 +290,9 @@ class GraphViewer(QWidget):
         self._normalize = False                       # Normalize: 峰值→0dB, 对比形状
         self._scale_lock = False                      # dB 量程锁定开关
         self._db_min, self._db_max = -40.0, 10.0      # 锁定量程范围
+        self._polar_orient_east = False               # 极坐标零度方向: False=N朝上, True=E朝右
+        self._trace_hold = False                       # 记忆迹线叠加 (多频点/天线对比)
+        self._trace_cache: Dict[str, list] = {}          # {data_key: [(theta,phi,data),...]}
         # 可配置状态: 方向图数据类型 (data key 列表)
         self._active_pattern_keys: List[str] = list(DEFAULT_PATTERN_KEYS)
         # 可配置状态: 频率曲线选择 (索引列表, None=全部)
@@ -985,6 +988,16 @@ class GraphViewer(QWidget):
         row_grid.addWidget(self._v2_cmb_line_type)
         row_grid.addStretch(); layout.addLayout(row_grid)
 
+        # ── Polar + Trace Hold ──
+        row_extra = QHBoxLayout()
+        self._v2_chk_polar_east = QCheckBox("极坐标零度朝右 (E)")
+        self._v2_chk_polar_east.setChecked(getattr(self, '_polar_orient_east', False))
+        row_extra.addWidget(self._v2_chk_polar_east)
+        self._v2_chk_trace_hold = QCheckBox("记忆迹线叠加 (多频点对比)")
+        self._v2_chk_trace_hold.setChecked(getattr(self, '_trace_hold', False))
+        row_extra.addWidget(self._v2_chk_trace_hold)
+        row_extra.addStretch(); layout.addLayout(row_extra)
+
         # ── 视角微调 (el/az/roll) ──
         grp_v = QGroupBox("视角手动微调"); vlay = QHBoxLayout(grp_v)
         self._spin_elev.setParent(dlg); vlay.addWidget(QLabel("el:")); vlay.addWidget(self._spin_elev)
@@ -1002,6 +1015,8 @@ class GraphViewer(QWidget):
             self._db_min = self._v2_spin_dbmin.value()
             self._db_max = self._v2_spin_dbmax.value()
             self._line_type = self._v2_cmb_line_type.currentText()
+            self._polar_orient_east = self._v2_chk_polar_east.isChecked()
+            self._trace_hold = self._v2_chk_trace_hold.isChecked()
             self._cmb_cmap.currentTextChanged.connect(self._on_cmap_changed)
             self._spin_step.valueChanged.connect(self._on_step_changed)
             self._slider_speed.valueChanged.connect(self._on_speed_changed)
@@ -1190,10 +1205,20 @@ class GraphViewer(QWidget):
         self._update_theta_slider(theta)
 
         cmap = self._cmb_cmap.currentText() if hasattr(self, '_cmb_cmap') else "jet"
+        # Trace Hold: 先画记忆缓存, 再画当前层 (叠加对比)
+        if getattr(self, '_trace_hold', False):
+            for sp in self._subplots:
+                if sp.data_key in self._trace_cache:
+                    for cached_theta, cached_phi, cached_data in self._trace_cache[sp.data_key]:
+                        sp.draw(cached_theta, cached_phi, cached_data, cmap="gray")
         for sp in self._subplots:
             data = d.get(sp.data_key)
             if data is not None:
                 sp.draw(theta, phi, data, cmap=cmap)
+                # 更新记忆缓存
+                if getattr(self, '_trace_hold', False):
+                    self._trace_cache.setdefault(sp.data_key, []).append(
+                        (theta.copy(), phi.copy(), data.copy()))
         self._canvas.draw()
 
         n = len(theta) * len(phi)
