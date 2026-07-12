@@ -1683,14 +1683,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """连接所有信号/槽。"""
         # 文件浏览
         self.ui.btnBrowseTemplate.clicked.connect(self._on_browse_template)
-        # 清除模板按钮 (×) — 动态追加到模板编辑框旁
-        # 清除模板按钮 (✕) — 直接追加到已就位的 hboxLayout1 (匹配 Word 的 wrow.addWidget 做法)
+        self.ui.editTemplatePath.setFixedHeight(20)  # 对齐 Word 模板行高度
         self._btn_clear_template = QPushButton("✕", self.ui.editTemplatePath.parent())
         self._btn_clear_template.setFixedSize(20, 20)
         self._btn_clear_template.setToolTip(self.tr("清除天线参数模板"))
         self._btn_clear_template.clicked.connect(self._on_clear_template)
         self.ui.hboxLayout1.addWidget(self._btn_clear_template)
-        self._btn_clear_template.show()
 
         self.ui.btnBrowseOutput.clicked.connect(self._on_browse_output)
         self.ui.editOutputDir.textEdited.connect(self._on_output_dir_edited)
