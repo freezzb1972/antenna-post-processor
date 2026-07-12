@@ -541,13 +541,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         btn_wrap = QWidget()
         btn_wrap.setLayout(self.ui.hButtons)
         self._btn_export = QPushButton(self.tr("📄 出报告"))
-        self._btn_export.setMinimumSize(140, 32)
+        self._btn_export.setMinimumSize(110, 32)
         self._btn_export.clicked.connect(self._on_export)
         self._btn_export.setEnabled(False)
         self.ui.hButtons.addWidget(self._btn_export)
 
         self._btn_one_click = QPushButton(self.tr("🚀 一键出报告"))
-        self._btn_one_click.setMinimumSize(150, 32)
+        self._btn_one_click.setMinimumSize(120, 32)
         self._btn_one_click.clicked.connect(self._on_one_click)
         self._btn_one_click.setEnabled(False)
         self.ui.hButtons.addWidget(self._btn_one_click)
@@ -1675,7 +1675,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             border-radius: 4px;
             font-family: "Consolas","Courier New",monospace;
         }
-        QPushButton#btnStart { font-weight: bold; font-size: 12px; letter-spacing: 0px; }
+        QPushButton#btnStart { font-weight: bold; letter-spacing: 1px; }
         QPushButton#btnStop { font-weight: bold; }
         """
 
