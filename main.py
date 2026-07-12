@@ -24,9 +24,15 @@ from ui.theme_manager import ThemeManager
 def _check_license(cfg_mgr) -> bool:
     """启动时检查许可。先检查配置文件，再回退到独立许可文件，
     首次启动自动开启 30 天试用。
+    开发模式（非 PyInstaller 打包）直接放行，不受许可限制。
 
     返回 True 表示通过，False 表示需要激活。
     """
+    # 开发模式: 免许可 (仅源码运行生效, EXE 打包后走正式许可流程)
+    if not getattr(sys, 'frozen', False):
+        print("[许可] 🔓 开发模式 — 免许可验证")
+        return True
+
     # 1. 优先检查配置文件中的许可
     if cfg_mgr.is_license_valid():
         lic = cfg_mgr.get_license_info()
