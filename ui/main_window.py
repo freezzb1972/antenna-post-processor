@@ -2483,10 +2483,16 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         # 在大量文件(>200)时每文件都调用会导致 UI 卡死. 每 20 个文件刷新一次
         # 在响应性和性能之间取得了平衡.
         file_page = getattr(self, '_file_settings_page', None)
+        # 复用前验证: 文件列表变了(换源/清空) → 强制重载
         if reuse_datasource and getattr(self, '_cached_datasource_map', None):
-            datasource_map = self._cached_datasource_map
-            self.ui.progressBar.setMaximum(1); self.ui.progressBar.setValue(1)
-            self.ui.lblProgressMsg.setText(self.tr("✅ 复用已加载数据"))
+            cur_sig = tuple(sorted(file_page._data_file_paths)) if file_page and hasattr(file_page, '_data_file_paths') and file_page._data_file_paths else ()
+            old_sig = getattr(self, '_preview_file_sig', None)
+            if cur_sig and old_sig and cur_sig == old_sig:
+                datasource_map = self._cached_datasource_map
+                self.ui.progressBar.setMaximum(1); self.ui.progressBar.setValue(1)
+                self.ui.lblProgressMsg.setText(self.tr("✅ 复用已加载数据"))
+            else:
+                reuse_datasource = False  # 文件列表变了 → 强制重载
         else:
             self.ui.progressBar.setRange(0, 100)
             self.ui.progressBar.setValue(5)
@@ -2508,6 +2514,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                     )
                 )
             self._cached_datasource_map = datasource_map  # 缓存供导出复用
+            self._preview_file_sig = tuple(sorted(file_page._data_file_paths)) if file_page and hasattr(file_page, '_data_file_paths') else ()
         if not datasource_map:
             QMessageBox.warning(self, self.tr("警告"),
                 self.tr("没有有效的工作表↔文件匹配，请先执行自动匹配。"))
