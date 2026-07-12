@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
@@ -1682,13 +1683,30 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def _connect_signals(self):
         """连接所有信号/槽。"""
         # 文件浏览
-        self.ui.btnBrowseTemplate.clicked.connect(self._on_browse_template)
-        self.ui.editTemplatePath.setFixedHeight(20)  # 对齐 Word 模板行高度
-        self._btn_clear_template = QPushButton("✕", self.ui.editTemplatePath.parent())
+        # 模板行重建 (仿 Word 做法: 干净子树, 不跟 QFormLayout 旧行冲突)
+        self._template_edit = QLineEdit()
+        self._template_edit.setObjectName("editTemplatePath")
+        self._template_edit.setPlaceholderText(self.tr("选择模板 .xlsx ..."))
+        self._template_edit.setFixedHeight(20)
+        self._template_edit.setText(self.ui.editTemplatePath.text())
+        self._btn_browse_tpl = QPushButton(self.tr("浏览..."))
+        self._btn_browse_tpl.setFixedHeight(20)
+        self._btn_browse_tpl.clicked.connect(self._on_browse_template)
+        self._btn_clear_template = QPushButton("✕")
         self._btn_clear_template.setFixedSize(20, 20)
         self._btn_clear_template.setToolTip(self.tr("清除天线参数模板"))
         self._btn_clear_template.clicked.connect(self._on_clear_template)
-        self.ui.hboxLayout1.addWidget(self._btn_clear_template)
+        _tpl_row = QHBoxLayout(); _tpl_row.setContentsMargins(0,0,0,0); _tpl_row.setSpacing(2)
+        _tpl_row.addWidget(self._template_edit)
+        _tpl_row.addWidget(self._btn_browse_tpl)
+        _tpl_row.addWidget(self._btn_clear_template)
+        # 替换: 隐藏旧行控件, 插入新行
+        self.ui.editTemplatePath.hide()
+        self.ui.btnBrowseTemplate.hide()
+        self.ui.formInput.removeRow(1)
+        self.ui.formInput.insertRow(1, self.tr("模板文件:"), _tpl_row)
+        # 重定向旧引用: _on_clear_template / _on_start 等用 self.ui.editTemplatePath
+        self.ui.editTemplatePath = self._template_edit
 
         self.ui.btnBrowseOutput.clicked.connect(self._on_browse_output)
         self.ui.editOutputDir.textEdited.connect(self._on_output_dir_edited)
