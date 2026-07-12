@@ -266,10 +266,12 @@ class TemplateSourceRow(QWidget):
         layout.addWidget(self._cmb_tpl)
 
         btn_browse = QPushButton(self.tr("从电脑选择..."))
+        btn_browse.setMinimumWidth(110)
         btn_browse.clicked.connect(self._on_browse_cb if self._on_browse_cb else self._on_browse)
         layout.addWidget(btn_browse)
 
         btn_preview = QPushButton(self.tr("📋 预览报告"))
+        btn_preview.setMinimumWidth(110)
         btn_preview.clicked.connect(self._on_preview_cb if self._on_preview_cb else self._on_preview)
         layout.addWidget(btn_preview)
         layout.addStretch()
@@ -470,6 +472,7 @@ class DataFileSelector(QGroupBox):
         # 按钮行
         btn_row = QHBoxLayout()
         self.btn_add_files = QPushButton(self.tr("📂 添加数据文件..."))
+        self.btn_add_files.setMinimumWidth(140)
         self.btn_add_files.setToolTip(self.tr("选择多个数据文件 (Ctrl+点击多选 / 拖拽)"))
         self.btn_clear_selected = QPushButton(self.tr("清除选中"))
         self.btn_clear_all = QPushButton(self.tr("全部清除"))
