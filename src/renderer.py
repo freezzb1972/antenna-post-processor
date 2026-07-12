@@ -247,8 +247,9 @@ class MatplotlibRenderer(BaseRenderer):
         X, Y, Z, color_values, vmin, vmax = build_3d_surface(
             theta_deg, phi_deg, gain_dbi, kind="magnitude", dyn=dyn)
 
-        fig = plt.figure(figsize=(9, 7), dpi=dpi)
+        fig = plt.figure(figsize=(10, 8), dpi=dpi)
         ax = fig.add_subplot(111, projection="3d")
+        fig.subplots_adjust(left=0.0, right=0.92, top=1.0, bottom=0.0)
 
         # 选择 colormap
         cmap = EMQUEST_CMAP if colormap == "emquest" else plt.get_cmap(colormap)
@@ -280,10 +281,10 @@ class MatplotlibRenderer(BaseRenderer):
         cbar.ax.tick_params(labelsize=7)
 
         # 视角图例 (Theta/Phi/Roll)
-        view_text = f"θ(el)={elev:.0f}°  φ(az)={azim:.0f}°  roll={roll:.0f}°"
-        ax.text2D(0.02, 0.02, view_text, transform=ax.transAxes,
-                   fontsize=8, color="white", fontfamily="monospace",
-                   bbox=dict(boxstyle="round,pad=0.2", fc="black", ec="none", alpha=0.5))
+        view_text = f"θ(elev) = {elev:.0f}°\nφ(azim) = {azim:.0f}°\nroll = {roll:.0f}°"
+        ax.text2D(0.98, 0.98, view_text, transform=ax.transAxes,
+                   fontsize=9, color="black", fontfamily="monospace",
+                   ha="right", va="top")
 
         # 标题
         title_parts = []
