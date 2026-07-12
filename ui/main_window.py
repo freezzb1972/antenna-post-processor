@@ -1683,6 +1683,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """连接所有信号/槽。"""
         # 文件浏览
         self.ui.btnBrowseTemplate.clicked.connect(self._on_browse_template)
+        # 清除模板按钮 (×) — 动态追加到模板编辑框旁
+        self._btn_clear_template = QPushButton("×", parent=self.ui.editTemplatePath.parent())
+        self._btn_clear_template.setFixedWidth(24)
+        self._btn_clear_template.setToolTip(self.tr("清除天线参数模板"))
+        self._btn_clear_template.clicked.connect(self._on_clear_template)
+        self.ui.hboxLayout1.addWidget(self._btn_clear_template)
+
         self.ui.btnBrowseOutput.clicked.connect(self._on_browse_output)
         self.ui.editOutputDir.textEdited.connect(self._on_output_dir_edited)
         self.ui.btnBrowseFullReport.clicked.connect(self._on_browse_full_report)
@@ -1741,6 +1748,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             # 若已有数据文件，立即重建匹配表
             if self._data_file_paths:
                 self._on_auto_match()
+
+    def _on_clear_template(self):
+        """清除天线参数模板路径 + 取消勾选天线参数报告。"""
+        self.ui.editTemplatePath.clear()
+        self._reset_template_derived_state()
+        fp = getattr(self, '_file_settings_page', None)
+        if fp and hasattr(fp, '_check_out_excel'):
+            fp._check_out_excel.setChecked(False)
 
     def _on_browse_output(self):
         start_dir = self.ui.editOutputDir.text() or str(Path.cwd() / "output")
