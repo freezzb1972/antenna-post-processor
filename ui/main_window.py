@@ -1750,9 +1750,12 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 self._on_auto_match()
 
     def _on_clear_template(self):
-        """清除天线参数模板路径 + 取消勾选天线参数报告 + 清空数据源缓存。"""
+        """清除天线参数模板路径 + 取消勾选天线参数报告 + 清空数据源缓存。
+        注意: 不调 _reset_template_derived_state (会误删图表配置) — 只清参数列状态。
+        """
         self.ui.editTemplatePath.clear()
-        self._reset_template_derived_state()
+        self._cached_template_params = set()
+        self._lag_config = LagConfig()
         self._cached_datasource_map = None
         self._preview_file_sig = None
         fp = getattr(self, '_file_settings_page', None)
