@@ -541,13 +541,13 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         btn_wrap = QWidget()
         btn_wrap.setLayout(self.ui.hButtons)
         self._btn_export = QPushButton(self.tr("📄 出报告"))
-        self._btn_export.setMinimumSize(110, 32)
+        self._btn_export.setMinimumSize(120, 32)
         self._btn_export.clicked.connect(self._on_export)
         self._btn_export.setEnabled(False)
         self.ui.hButtons.addWidget(self._btn_export)
 
         self._btn_one_click = QPushButton(self.tr("🚀 一键出报告"))
-        self._btn_one_click.setMinimumSize(120, 32)
+        self._btn_one_click.setMinimumSize(130, 32)
         self._btn_one_click.clicked.connect(self._on_one_click)
         self._btn_one_click.setEnabled(False)
         self.ui.hButtons.addWidget(self._btn_one_click)
@@ -1675,7 +1675,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             border-radius: 4px;
             font-family: "Consolas","Courier New",monospace;
         }
-        QPushButton#btnStart { font-weight: bold; letter-spacing: 1px; }
+        QPushButton#btnStart { font-weight: bold; font-size: 12px; letter-spacing: 0px; }
         QPushButton#btnStop { font-weight: bold; }
         """
 
@@ -1750,9 +1750,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 self._on_auto_match()
 
     def _on_clear_template(self):
-        """清除天线参数模板路径 + 取消勾选天线参数报告。"""
+        """清除天线参数模板路径 + 取消勾选天线参数报告 + 清空数据源缓存。"""
         self.ui.editTemplatePath.clear()
         self._reset_template_derived_state()
+        self._cached_datasource_map = None
+        self._preview_file_sig = None
         fp = getattr(self, '_file_settings_page', None)
         if fp and hasattr(fp, '_check_out_excel'):
             fp._check_out_excel.setChecked(False)

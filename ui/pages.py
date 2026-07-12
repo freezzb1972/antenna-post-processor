@@ -219,12 +219,19 @@ class FileSettingsPage(QWidget):
         self._word_tpl_row.template_changed.connect(self._on_word_tpl_path_set)
         self._word_tpl_row.template_pair_changed.connect(self._on_word_preset_excel_load)
         word_layout.addWidget(self._word_tpl_row)
+        wrow = QHBoxLayout(); wrow.setSpacing(0)
         self._edit_word_tpl_widget = QLineEdit()
         self._edit_word_tpl_widget.setReadOnly(True)
         self._edit_word_tpl_widget.setPlaceholderText(self.tr("(未选择 Word 报告模版)"))
         self._edit_word_tpl_widget.setFixedHeight(20)
         self._word_tpl_row.template_changed.connect(self._edit_word_tpl_widget.setText)
-        word_layout.addWidget(self._edit_word_tpl_widget)
+        wrow.addWidget(self._edit_word_tpl_widget)
+        self._btn_clear_word_tpl = QPushButton("×")
+        self._btn_clear_word_tpl.setFixedSize(24, 20)
+        self._btn_clear_word_tpl.setToolTip(self.tr("清除 Word 报告模版"))
+        self._btn_clear_word_tpl.clicked.connect(self._on_clear_word_template)
+        wrow.addWidget(self._btn_clear_word_tpl)
+        word_layout.addLayout(wrow)
         tpl_row.addWidget(self.word_grp, 1)
 
         # 模板行打包到一个 widget 加入垂直 splitter
@@ -607,6 +614,14 @@ class FileSettingsPage(QWidget):
             self._edit_word_report_tpl = d
             if hasattr(self, '_edit_word_tpl_widget'):
                 self._edit_word_tpl_widget.setText(d)
+
+    def _on_clear_word_template(self):
+        """清除 Word 报告模版路径 (不改 Word 输出勾选状态)。"""
+        self._edit_word_report_tpl = ""
+        if hasattr(self, '_edit_word_tpl_widget'):
+            self._edit_word_tpl_widget.clear()
+        if self._mw:
+            self._mw._cached_datasource_map = None
 
         if self._mw:
             from src.config_manager import get_config_manager
