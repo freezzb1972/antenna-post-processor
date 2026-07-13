@@ -2669,6 +2669,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._thread.finished.connect(self._thread.deleteLater)
 
             self._thread.start()
+            import builtins
+            _clog3 = getattr(builtins, '_antenna_crash_log', lambda m: None)
+            builtins._antenna_pipeline_started = True
+            _clog3("_on_start: thread started OK")
         except Exception as e:
             import traceback
             self._log(f"❌ 启动失败: {e}")
@@ -2759,6 +2763,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._log(message)
 
     def _on_finished(self, results, images):
+        import builtins
+        _clog4 = getattr(builtins, '_antenna_crash_log', lambda m: None)
+        builtins._antenna_pipeline_done = True
+        _clog4(f"_on_finished: state={self._preview_state}")
         # 防 QThread.finished 二次发射: 非运行态直接 return
         if self._preview_state not in (self._PREVIEWING, self._EXPORTING):
             return
@@ -3164,6 +3172,9 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._log("图形数据已加载 — 可在「📈 图形展示」标签页查看 3D 方向图")
 
     def _on_error(self, message: str):
+        import builtins
+        _clog5 = getattr(builtins, '_antenna_crash_log', lambda m: None)
+        _clog5(f"_on_error: {message[:500]}")
         self._running = False
         self._worker = None
         self._data_stale = True  # 错误后数据陈旧，下次处理前自动清除
