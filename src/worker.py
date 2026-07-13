@@ -8,6 +8,7 @@ QThread 封装的异步处理任务，通过 Signal 与 GUI 通信。
 from __future__ import annotations
 
 import os
+import sys
 import traceback
 from typing import TYPE_CHECKING
 
@@ -204,7 +205,9 @@ class ProcessingWorker(QObject):
                 worksheet_naming_mode=self.worksheet_naming_mode,
                 chart_instances=getattr(self, 'chart_instances', None),
                 antenna_freq_selection=getattr(self, 'antenna_freq_selection', None),
-                parallel=max(1, (os.cpu_count() or 4) - 1),  # 预留1核给UI
+                # EXE 环境: ProcessPoolExecutor 子进程中 matplotlib 可能找不到
+                # mpl-data(字体/样式), 强制串行避免闪退。源码环境保持并行。
+                parallel=1 if getattr(sys, 'frozen', False) else max(1, (os.cpu_count() or 4) - 1),
                 compute_only=self.compute_only,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
