@@ -208,7 +208,10 @@ class ProcessingWorker(QObject):
                 worksheet_naming_mode=self.worksheet_naming_mode,
                 chart_instances=getattr(self, 'chart_instances', None),
                 antenna_freq_selection=getattr(self, 'antenna_freq_selection', None),
-                parallel=max(1, (os.cpu_count() or 4) - 1),  # 预留1核给UI; 并行失败时 pipeline 自动降级串行
+                # EXE 冻结环境: ProcessPoolExecutor 子进程可能找不到
+                # matplotlib/DLL 等资源 → 硬崩溃 + 残留孤儿进程。
+                # 源码环境正常并行 (子进程共享 Python 环境)。
+                parallel=1 if getattr(sys, 'frozen', False) else max(1, (os.cpu_count() or 4) - 1),
                 compute_only=self.compute_only,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
