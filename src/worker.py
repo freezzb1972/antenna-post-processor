@@ -175,6 +175,9 @@ class ProcessingWorker(QObject):
 
     def run(self):
         try:
+            import builtins
+            _clog = getattr(builtins, '_antenna_crash_log', lambda m: None)
+            _clog(f"worker.run() started, compute_only={self.compute_only}, out_word={self.out_word}")
             if self._cancelled:
                 self.log.emit("处理已取消")
                 return
@@ -205,9 +208,10 @@ class ProcessingWorker(QObject):
                 worksheet_naming_mode=self.worksheet_naming_mode,
                 chart_instances=getattr(self, 'chart_instances', None),
                 antenna_freq_selection=getattr(self, 'antenna_freq_selection', None),
-                # EXE 环境: ProcessPoolExecutor 子进程中 matplotlib 可能找不到
-                # mpl-data(字体/样式), 强制串行避免闪退。源码环境保持并行。
-                parallel=1 if getattr(sys, 'frozen', False) else max(1, (os.cpu_count() or 4) - 1),
+                # Windows spawn 模式可能被安全策略拦截([WinError 5] 拒绝访问)
+                # + EXE 子进程 matplotlib 找不到 mpl-data → 统一串行。
+                # Linux/macOS 保持并行 (fork 安全)。
+                parallel=1 if sys.platform == 'win32' else max(1, (os.cpu_count() or 4) - 1),
                 compute_only=self.compute_only,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
@@ -235,6 +239,9 @@ class ProcessingWorker(QObject):
                 results = run_batch_pipeline(csv_path=self.csv_path, **kwargs)
 
             if not self._cancelled:
+                import builtins
+                _clog2 = getattr(builtins, '_antenna_crash_log', lambda m: None)
+                _clog2(f"worker.run() OK, emitting finished signal")
                 self.finished.emit(results, {})
 
         except Exception as e:
