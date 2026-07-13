@@ -1211,6 +1211,14 @@ class FileSettingsPage(QWidget):
             self._file_list_widget.setRowCount(0)
             self._lbl_match_status.setText("")
             self._mw._cached_datasource_map = None  # 文件变更, 清除数据源缓存
+            # 换源 → 重置天线参数和图表配置的频点选择为"全部频点"
+            self._mw._antenna_freq_selection = []
+            for _attr in ('_chart_config_required', '_chart_config_extra'):
+                _ccfg = getattr(self._mw, _attr, None)
+                if _ccfg is not None:
+                    _ccfg.selected_frequencies_a = []
+                    _ccfg.selected_frequencies_b = []
+                    _ccfg.selected_frequencies_c = []
         existing = set(self._data_file_paths)
         new_paths = [p for p in paths if p not in existing]
         if not new_paths:
