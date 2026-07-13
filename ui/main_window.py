@@ -2620,6 +2620,26 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         gen_diff = ant_page.get_gen_diff() if ant_page else False
         gen_diff_chart = ant_page.get_gen_diff_chart() if ant_page else False
 
+        # 多步进整数倍校验: 选中步进必须是原始步进的整数倍
+        if step_values:
+            _orig_step = None
+            for _ds in datasource_map.values():
+                if hasattr(_ds, 'theta_angles') and len(_ds.theta_angles) > 1:
+                    _orig_step = round(_ds.theta_angles[1] - _ds.theta_angles[0], 9)
+                    break
+            if _orig_step and _orig_step > 0:
+                _invalid = []
+                for _s in step_values:
+                    _r = _s / _orig_step
+                    if abs(_r - round(_r)) > 1e-9:
+                        _invalid.append(_s)
+                if _invalid:
+                    self._restore_start_button()
+                    QMessageBox.warning(self, self.tr("步进校验"),
+                        self.tr("选中的步进 {0} 不是原始步进 {1}° 的整数倍。\n请修改后重新选择。")
+                        .format(", ".join(f"{s}°" for s in _invalid), _orig_step))
+                    return
+
         try:
             self._worker = ProcessingWorker(
                 datasource_map=datasource_map,
