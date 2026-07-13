@@ -3953,7 +3953,21 @@ class ChartSettingsPage(QWidget):
             self._dpi = spin_dpi.value()
             self._colormap = cmb_cmap.currentText().split(" ")[0] if " " in cmb_cmap.currentText() else cmb_cmap.currentText()
             self._show_3d_colorbar = chk_colorbar.isChecked()
-            self._step_deg = float(spin_step.value())
+            step_val = spin_step.value()
+            # 整数倍校验: 采样精度应是原始数据步进的整数倍
+            _orig_step = None
+            _ds_map = getattr(self._mw, '_cached_datasource_map', None) if self._mw else None
+            if _ds_map:
+                for _ds in _ds_map.values():
+                    if hasattr(_ds, 'theta_angles') and len(_ds.theta_angles) > 1:
+                        _orig_step = round(_ds.theta_angles[1] - _ds.theta_angles[0], 9)
+                        break
+            if _orig_step and _orig_step > 0:
+                _r = step_val / _orig_step
+                if abs(_r - round(_r)) > 1e-9:
+                    QMessageBox.warning(dlg, self.tr("采样精度"),
+                        self.tr("{0}° 不是原始步进 {1}° 的整数倍, 将取近似值。").format(step_val, _orig_step))
+            self._step_deg = float(step_val)
             self._dyn_db = float(spin_dyn.value())
             self._dyn_auto = chk_dyn_auto.isChecked()
             self._sync_selected_frequencies(freq_picker.get_selected(), 'a')
