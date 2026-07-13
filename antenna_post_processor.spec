@@ -69,20 +69,11 @@ a = Analysis(
         # ---- openpyxl ----
         'openpyxl.cell._writer',
 
-        # ---- matplotlib — 确保 hook 运行, 收集 mpl-data (字体/样式) ----
-        'matplotlib',
-
         # ---- 延迟导入模块（方法内部 import，静态分析可能遗漏） ----
         'ui.template_recognizer',
         'ui.window_manager',
         'src.column_mapping',
         'src.word_reporter',
-        'src.plotter',             # pipeline._render_charts → generate_all_for_frequency
-        'src.chart_titles',        # pipeline → build_title
-        'src.cut_param',           # plotter → build_cut_params / CutChartEntry
-        'src.chart_word_writer',   # Word 报告写入引擎
-        'src.sheet_file_matcher',  # pipeline → sanitize_sheet_name / extract_key
-        'src.ui_utils',            # pages → ANGLE_TYPE_CONFIG / _ANGLE_BY_PARAM_KEY
 
         # ---- python-docx (Word 报告输出引擎，无 PyInstaller hook) ----
         'docx',
