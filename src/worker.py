@@ -208,10 +208,7 @@ class ProcessingWorker(QObject):
                 worksheet_naming_mode=self.worksheet_naming_mode,
                 chart_instances=getattr(self, 'chart_instances', None),
                 antenna_freq_selection=getattr(self, 'antenna_freq_selection', None),
-                # Windows spawn 模式可能被安全策略拦截([WinError 5] 拒绝访问)
-                # + EXE 子进程 matplotlib 找不到 mpl-data → 统一串行。
-                # Linux/macOS 保持并行 (fork 安全)。
-                parallel=1 if sys.platform == 'win32' else max(1, (os.cpu_count() or 4) - 1),
+                parallel=max(1, (os.cpu_count() or 4) - 1),  # 预留1核给UI; 并行失败时 pipeline 自动降级串行
                 compute_only=self.compute_only,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,

@@ -908,26 +908,34 @@ def _load_and_compute(
     if parallel > 1 and len(compute_tasks) > 1:
         _log(log_callback, f"并行计算: {parallel} 进程 × {len(compute_tasks)} 频点")
         _report(progress_callback, data_done, progress_max, "[🧮] 启动并行引擎...")
-        # chunk_size=1 → 每任务独立 future, 逐任务报告进度
         chunks = [compute_tasks[i:i + 1] for i in range(0, len(compute_tasks), 1)]
-        with ProcessPoolExecutor(max_workers=parallel) as executor:
-            futures = [executor.submit(_compute_chunk, chunk) for chunk in chunks]
-            completed = 0
-            for fut in futures:
-                if cancel_callback and cancel_callback():
-                    for f in futures:
-                        f.cancel()
-                    break
-                for sheet_name, row in fut.result():
-                    sheet_results[sheet_name].append(row)
-                    completed += 1
-                step = data_done + int(_calc_w * completed / len(compute_tasks))
-                _report(progress_callback, step, progress_max,
-                        f"[🧮] 计算参数 {completed}/{len(compute_tasks)}")
-                if _will_render:
-                    rstep = data_done + _calc_w + int(_render_w * completed / len(compute_tasks))
-                    _report(progress_callback, rstep, progress_max,
-                            f"[🎨] 渲染图表 {completed}/{len(compute_tasks)}")
+        try:
+            with ProcessPoolExecutor(max_workers=parallel) as executor:
+                futures = [executor.submit(_compute_chunk, chunk) for chunk in chunks]
+                completed = 0
+                for fut in futures:
+                    if cancel_callback and cancel_callback():
+                        for f in futures:
+                            f.cancel()
+                        break
+                    for sheet_name, row in fut.result():
+                        sheet_results[sheet_name].append(row)
+                        completed += 1
+                    step = data_done + int(_calc_w * completed / len(compute_tasks))
+                    _report(progress_callback, step, progress_max,
+                            f"[🧮] 计算参数 {completed}/{len(compute_tasks)}")
+                    if _will_render:
+                        rstep = data_done + _calc_w + int(_render_w * completed / len(compute_tasks))
+                        _report(progress_callback, rstep, progress_max,
+                                f"[🎨] 渲染图表 {completed}/{len(compute_tasks)}")
+        except (PermissionError, OSError, RuntimeError) as e:
+            _log(log_callback, f"⚠ 并行引擎启动失败: {e} → 自动降级为串行")
+            _run_compute_serial(compute_tasks, sheet_results, data_done, progress_max,
+                                cancel_callback, progress_callback, log_cb=log_callback,
+                                output_config=output_config,
+                                dir_extrap_method=dir_extrap_method,
+                                calc_w=_calc_w, render_w=_render_w,
+                                compute_total=len(compute_tasks))
     else:
         _run_compute_serial(compute_tasks, sheet_results, data_done, progress_max,
                             cancel_callback, progress_callback, log_cb=log_callback,
