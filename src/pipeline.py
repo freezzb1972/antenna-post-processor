@@ -471,35 +471,57 @@ def _process_one_frequency(
     phi_angles = np.array(_pa, dtype=np.float64) if _pa is not None and len(_pa) else np.arange(n_phi, dtype=np.float64)
     ar_lin = None
 
-    # ── 图形生成 (仅图表/方位面驱动; matplotlib 仅非 compute_only) ──
-    if want_render:
-        try:
-            from .plotter import generate_all_for_frequency
-            ccfg = chart_config if chart_config is not None else ChartConfig()
-            need_ar_for_graphics = (
-                ccfg.pattern_3d_ar or
-                any("ar" in str(e[0]) for e in getattr(ccfg, 'cut_2d_polar_entries', []))
-                or any("ar" in str(e[0]) for e in getattr(ccfg, 'cut_2d_rect_entries', []))
-                or any("ar" in str(e[0]) for e in getattr(ccfg, 'cut_azimuth_polar_entries', []))
-                or any("ar" in str(e[0]) for e in getattr(ccfg, 'cut_azimuth_rect_entries', []))
-            )
-            if need_ar_for_graphics and "axial_ratio" not in str(row.get("axial_ratio_error", "")):
-                tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
-                if tp is not None and pp is not None:
-                    ar_result = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
-                    if ar_result is not None:
-                        ar_lin = ar_result[0]
-            if not compute_only:
+    # ── 图形生成 ──
+    if want_render and not compute_only:
+        ccfg = chart_config or ChartConfig()
+        _fa = set(getattr(ccfg, 'selected_frequencies_a', []))
+        _fc = set(getattr(ccfg, 'selected_frequencies_c', []))
+
+        # 判断此频点是否被图表需要
+        _chart_needed = True  # 图表无频点选择 → 全部频点都需要
+        if _fa or _fc:
+            _chart_needed = (freq in _fa) or (freq in _fc)
+            if not _chart_needed and chart_instances:
+                _has_b = any(getattr(ci.category, "value", ci.category) == "B" and ci.enabled
+                             for ci in chart_instances)
+                _chart_needed = _has_b  # B 类需要全部频点
+
+        if _chart_needed:
+            try:
+                from .plotter import generate_all_for_frequency
+                # 每频点独立拷贝, 不修改共享 ccfg
+                import copy
+                _ccfg = copy.copy(ccfg)
+                if _fa and freq not in _fa:
+                    for _k in ('pattern_3d_gain','pattern_3d_eirp','pattern_3d_ar','pattern_3d_etheta','pattern_3d_ephi'):
+                        setattr(_ccfg, _k, False)
+                if _fc and freq not in _fc:
+                    for _k in ('cut_2d_polar','cut_2d_rect','cut_azimuth_polar','cut_azimuth_rect'):
+                        setattr(_ccfg, _k, False)
+
+                need_ar_for_graphics = (
+                    _ccfg.pattern_3d_ar or
+                    any("ar" in str(e[0]) for e in getattr(_ccfg, 'cut_2d_polar_entries', []))
+                    or any("ar" in str(e[0]) for e in getattr(_ccfg, 'cut_2d_rect_entries', []))
+                    or any("ar" in str(e[0]) for e in getattr(_ccfg, 'cut_azimuth_polar_entries', []))
+                    or any("ar" in str(e[0]) for e in getattr(_ccfg, 'cut_azimuth_rect_entries', []))
+                )
+                if need_ar_for_graphics and "axial_ratio" not in str(row.get("axial_ratio_error", "")):
+                    tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
+                    if tp is not None and pp is not None:
+                        ar_result = compute_axial_ratio(theta_lm, tp, phi_lm, pp)
+                        if ar_result is not None:
+                            ar_lin = ar_result[0]
+
                 extra_patterns = {}
-                if ccfg.pattern_3d_etheta:
+                if _ccfg.pattern_3d_etheta:
                     extra_patterns["3d_etheta"] = theta_lm
-                if ccfg.pattern_3d_ephi:
+                if _ccfg.pattern_3d_ephi:
                     extra_patterns["3d_ephi"] = phi_lm
                 extra_patterns = extra_patterns if extra_patterns else None
                 rhcp_db = row.get("_rhcp_gain")
                 lhcp_db = row.get("_lhcp_gain")
                 cpxpi_db = row.get("_cp_xpi")
-                # 每图标题: 类别默认模板 (用户可逐实例覆盖 inst.title)
                 _antenna = output_config.antenna_name if output_config is not None else ""
                 _title_lang = output_config.title_lang if output_config is not None else "en"
                 _titles = None
@@ -507,47 +529,24 @@ def _process_one_frequency(
                     from .chart_titles import build_title
                     _titles = {ci.image_key: build_title(ci, freq, _antenna, lang=_title_lang)
                                for ci in chart_instances if ci.enabled}
-                # 按分类频点选择过滤: A类仅 selected_frequencies_a, C类仅 _c, B类全保留
-                _fa = set(getattr(ccfg, 'selected_frequencies_a', [])) if ccfg else set()
-                _fc = set(getattr(ccfg, 'selected_frequencies_c', [])) if ccfg else set()
-                _filt_instances = None
-                _saved_a = {}; _saved_c = {}      # 必须在 if 外初始化, finally 引用
-                if _fa or _fc:
-                    if chart_instances:
-                        _filt_instances = [ci for ci in chart_instances
-                            if not (getattr(ci.category, "value", ci.category) if hasattr(ci, 'category') else "") in ("A","C")
-                            or (cat := getattr(ci.category, "value", ci.category) if hasattr(ci, 'category') else "",
-                                (cat == "A" and freq in _fa) or (cat == "C" and freq in _fc) or cat not in ("A","C"))[1]]
-                    # fallback: 无 instances 时临时关掉不在选中频点内的 ccfg bools
-                    _saved_a = {}; _saved_c = {}
-                    for _k in ('pattern_3d_gain','pattern_3d_eirp','pattern_3d_ar','pattern_3d_etheta','pattern_3d_ephi'):
-                        if _fa and freq not in _fa and getattr(ccfg, _k, False):
-                            _saved_a[_k] = True; setattr(ccfg, _k, False)
-                    for _k in ('cut_2d_polar','cut_2d_rect','cut_azimuth_polar','cut_azimuth_rect'):
-                        if _fc and freq not in _fc and getattr(ccfg, _k, False):
-                            _saved_c[_k] = True; setattr(ccfg, _k, False)
-                try:
-                    images = generate_all_for_frequency(
+
+                images = generate_all_for_frequency(
                     theta_deg, phi_angles, gain_dbi,
-                    freq, ccfg, ar_linear=ar_lin,
+                    freq, _ccfg, ar_linear=ar_lin,
                     rhcp_db=rhcp_db, lhcp_db=lhcp_db,
                     cpxpi_db=cpxpi_db,
                     antenna_name=_antenna,
                     output_config=output_config,
                     extra_patterns=extra_patterns,
                     titles=_titles,
-                    chart_instances=_filt_instances if _filt_instances is not None else chart_instances,
+                    chart_instances=chart_instances,
                 )
-                finally:
-                    # 恢复 fallback 路径中被临时关闭的 ccfg bools
-                    for _k, _ in _saved_a.items(): setattr(ccfg, _k, True)
-                    for _k, _ in _saved_c.items(): setattr(ccfg, _k, True)
                 if images:
                     row["_images"] = images
                 if "_azimuth_theta_deg" not in row:
                     row["_azimuth_theta_deg"] = theta_deg.copy()
-        except Exception as e:
-            row["_graph_error"] = str(e)  # 图形生成失败不阻塞数据处理
+            except Exception as e:
+                row["_graph_error"] = str(e)  # 图形生成失败不阻塞数据处理
 
     # ── 中间数据矩阵存储 (out_data 或 有图表时都存; 不触发 matplotlib 渲染) ──
     if store_matrices or want_render:
