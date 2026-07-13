@@ -2926,7 +2926,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             )
             results.update(res)
             # 生成前几频点图
-            gd = extract_graph_data(res, step_deg=5.0)
+            gd = extract_graph_data(res)  # step_deg=0 → 原始步长,不降采样
             renderer = MatplotlibRenderer()
             for freq, d in sorted(gd.items())[:3]:
                 gain = d.get("gain_db")

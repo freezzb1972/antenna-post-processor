@@ -46,7 +46,7 @@ def downsample_pattern(
     data_2d: np.ndarray,
     theta_angles: np.ndarray,
     phi_angles: np.ndarray,
-    step_deg: float = 5.0,
+    step_deg: float = 0.0,  # 0=原始步长不降采样; >0=目标步进(度)
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """将 (n_phi, n_theta) 方向图降采样到指定步进。
 
@@ -71,7 +71,7 @@ def downsample_pattern(
 
 def extract_graph_data(
     results: dict[str, list[dict]],
-    step_deg: float = 5.0,
+    step_deg: float = 0.0,  # 0=原始步长不降采样; >0=目标步进(度)
 ) -> dict[float, dict[str, np.ndarray]]:
     """从处理结果中提取每个频点的图形数据。
 
