@@ -523,7 +523,7 @@ def _process_one_frequency(
                     for _k in ('pattern_3d_gain','pattern_3d_eirp','pattern_3d_ar','pattern_3d_etheta','pattern_3d_ephi'):
                         if _fa and freq not in _fa and getattr(ccfg, _k, False):
                             _saved_a[_k] = True; setattr(ccfg, _k, False)
-                    for _k in ('cut_azimuth_polar','cut_azimuth_rect','cut_elevation_polar','cut_elevation_rect'):
+                    for _k in ('cut_2d_polar','cut_2d_rect','cut_azimuth_polar','cut_azimuth_rect'):
                         if _fc and freq not in _fc and getattr(ccfg, _k, False):
                             _saved_c[_k] = True; setattr(ccfg, _k, False)
                 try:
