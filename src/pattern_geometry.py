@@ -57,9 +57,12 @@ def build_3d_surface(
         (X, Y, Z, color_values, vmin, vmax) —— 均 (n_phi, n_theta)/标量。
     """
     theta = np.deg2rad(np.asarray(theta_deg, dtype=float))
-    phi = np.deg2rad(np.asarray(phi_deg, dtype=float))
-    TH, PH = np.meshgrid(theta, phi)          # (n_phi, n_theta)
+    phi_raw = np.asarray(phi_deg, dtype=float)
+    # 闭合 phi 轴: 末尾追加 phi[0]+360° 使曲面无缝连接
+    phi = np.deg2rad(np.append(phi_raw, phi_raw[0] + 360.0))
+    TH, PH = np.meshgrid(theta, phi)          # (n_phi+1, n_theta)
     vals = np.asarray(values, dtype=float)
+    vals = np.vstack([vals, vals[0:1, :]])    # 复制第一行数据到尾行
 
     if kind == "phase":
         # 相位无"大小"概念 → 半径取常数球面, 颜色表相位 (−180~180°)
