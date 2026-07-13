@@ -54,6 +54,9 @@ a = Analysis(
         'matplotlib.backends.backend_qtagg',
         'matplotlib.backends.backend_qt',
 
+        # ---- lxml (python-docx 必需) ----
+        'lxml', 'lxml.etree',
+
         # ---- numpy ----
         'numpy.lib.format',
 
@@ -164,11 +167,8 @@ a = Analysis(
         'matplotlib.backends.backend_tkagg',
         'matplotlib.backends.backend_wxagg',
         'matplotlib.backends.backend_gtk3agg',
-        # openpyxl 可选依赖（自动降级到 stdlib xml，不影响功能）
-        'lxml',
-        'lxml.*',
         # 排除环境中的污染包（chromadb/openai/huggingface 等间接引入）
-        # 注意：不排除 PIL（matplotlib 保存图片需要）和 lxml（openpyxl 可选优化）
+        # 注意：不排除 PIL（matplotlib 保存图片需要）和 lxml（python-docx 必需）
         'pandas',
         'pandas.*',
         'sqlalchemy',
