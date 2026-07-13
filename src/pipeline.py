@@ -918,7 +918,7 @@ def _load_and_compute(
                         for f in futures:
                             f.cancel()
                         break
-                    for sheet_name, row in fut.result():
+                    for sheet_name, row in fut.result(timeout=300):
                         sheet_results[sheet_name].append(row)
                         completed += 1
                     step = data_done + int(_calc_w * completed / len(compute_tasks))
