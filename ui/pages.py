@@ -2569,6 +2569,8 @@ class AntennaParamsPage(QWidget):
 
         # 同步频点选择
         mw._antenna_freq_selection = list(self._antenna_freq_selected)
+        if hasattr(mw, '_update_exec_freq_summary'):
+            mw._update_exec_freq_summary()
 
     def _on_antenna_freq_pick(self):
         all_freqs = self._get_all_frequencies()
