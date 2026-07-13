@@ -107,41 +107,6 @@ def _show_activation() -> bool:
 
 
 def main():
-    # 崩溃日志: 捕获所有未处理异常写入桌面文件
-    import atexit
-    _crash_log = Path.home() / "Desktop" / "antenna_pp_crash.log"
-    _crash_started = False
-
-    def _log_crash(msg: str):
-        try:
-            with open(_crash_log, "a", encoding="utf-8") as f:
-                from datetime import datetime
-                f.write(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}\n")
-        except Exception:
-            pass
-
-    def _excepthook(exc_type, exc_val, exc_tb):
-        import traceback
-        tb_str = "".join(traceback.format_exception(exc_type, exc_val, exc_tb))
-        _log_crash(f"UNHANDLED EXCEPTION:\n{tb_str}")
-        sys.__excepthook__(exc_type, exc_val, exc_tb)
-
-    def _atexit_handler():
-        import builtins
-        started = getattr(builtins, '_antenna_pipeline_started', False)
-        done = getattr(builtins, '_antenna_pipeline_done', False)
-        if started and not done:
-            _log_crash("PROCESS EXITED ABNORMALLY (pipeline started but not completed)")
-
-    sys.excepthook = _excepthook
-    atexit.register(_atexit_handler)
-    _log_crash("=== main() started ===")
-
-    # 暴露给 pipeline 使用
-    import builtins
-    builtins._antenna_crash_log = _log_crash
-    builtins._antenna_pipeline_started = False
-    builtins._antenna_pipeline_done = False
 
     app = QApplication(sys.argv)
     app.setApplicationName("AntennaPostProcessor")

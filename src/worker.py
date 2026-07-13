@@ -175,9 +175,6 @@ class ProcessingWorker(QObject):
 
     def run(self):
         try:
-            import builtins
-            _clog = getattr(builtins, '_antenna_crash_log', lambda m: None)
-            _clog(f"worker.run() started, compute_only={self.compute_only}, out_word={self.out_word}")
             if self._cancelled:
                 self.log.emit("处理已取消")
                 return
@@ -240,9 +237,6 @@ class ProcessingWorker(QObject):
                 results = run_batch_pipeline(csv_path=self.csv_path, **kwargs)
 
             if not self._cancelled:
-                import builtins
-                _clog2 = getattr(builtins, '_antenna_crash_log', lambda m: None)
-                _clog2(f"worker.run() OK, emitting finished signal")
                 self.finished.emit(results, {})
 
         except Exception as e:
