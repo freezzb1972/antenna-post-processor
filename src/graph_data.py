@@ -59,8 +59,13 @@ def downsample_pattern(
     Returns:
         (data_ds, theta_ds, phi_ds): 降采样后的数据和角度.
     """
-    theta_idx = np.arange(0, len(theta_angles), max(1, int(step_deg)))
-    phi_idx = np.arange(0, len(phi_angles), max(1, int(step_deg)))
+    # 根据实际数据步长计算索引步长 (兼容 1°/2°/5° 等各种步进)
+    _theta_step = (theta_angles[-1] - theta_angles[0]) / max(1, len(theta_angles) - 1)
+    _phi_step = (phi_angles[-1] - phi_angles[0]) / max(1, len(phi_angles) - 1)
+    theta_stride = max(1, int(round(step_deg / _theta_step))) if _theta_step > 0 else max(1, int(step_deg))
+    phi_stride = max(1, int(round(step_deg / _phi_step))) if _phi_step > 0 else max(1, int(step_deg))
+    theta_idx = np.arange(0, len(theta_angles), theta_stride)
+    phi_idx = np.arange(0, len(phi_angles), phi_stride)
     return data_2d[phi_idx][:, theta_idx], theta_angles[theta_idx], phi_angles[phi_idx]
 
 
