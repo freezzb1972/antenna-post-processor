@@ -1767,6 +1767,21 @@ class AntennaParamsPage(QWidget):
 
         left_grp = QGroupBox(self.tr("天线参数"))
         left_layout = QVBoxLayout(left_grp)
+
+        # 频点选择 (天线参数独立过滤) — 左侧顶部，始终可见
+        freq_sel_grp = QGroupBox(self.tr("频点选择"))
+        freq_sel_lo = QVBoxLayout(freq_sel_grp)
+        self._antenna_freq_selected: list[float] = []
+        self._antenna_freq_summary = QLabel(self.tr("(全部频点)"))
+        self._antenna_freq_summary.setStyleSheet("color: #888; font-size: 10pt;")
+        freq_row2 = QHBoxLayout()
+        freq_row2.addWidget(self._antenna_freq_summary, 1)
+        btn_freq = QPushButton(self.tr("选择频点..."))
+        btn_freq.clicked.connect(self._on_antenna_freq_pick)
+        freq_row2.addWidget(btn_freq)
+        freq_sel_lo.addLayout(freq_row2)
+        left_layout.addWidget(freq_sel_grp)
+
         self._left_scroll = QScrollArea()
         self._left_scroll.setWidgetResizable(True)
         self._left_scroll.setFrameShape(QScrollArea.NoFrame)
@@ -1802,20 +1817,6 @@ class AntennaParamsPage(QWidget):
         self._cmb_freq_src.currentIndexChanged.connect(lambda: self._sync_to_mw())
         freq_row.addWidget(self._cmb_freq_src)
         algo_layout.addWidget(self._freq_widget)
-
-        # 频点选择 (天线参数独立过滤)
-        freq_sel_grp = QGroupBox(self.tr("频点选择"))
-        freq_sel_lo = QVBoxLayout(freq_sel_grp)
-        self._antenna_freq_selected: list[float] = []
-        self._antenna_freq_summary = QLabel(self.tr("(全部频点)"))
-        self._antenna_freq_summary.setStyleSheet("color: #888; font-size: 10pt;")
-        freq_row2 = QHBoxLayout()
-        freq_row2.addWidget(self._antenna_freq_summary, 1)
-        btn_freq = QPushButton(self.tr("选择频点..."))
-        btn_freq.clicked.connect(self._on_antenna_freq_pick)
-        freq_row2.addWidget(btn_freq)
-        freq_sel_lo.addLayout(freq_row2)
-        algo_layout.addWidget(freq_sel_grp)
 
         trim_row = QHBoxLayout()
         trim_row.addWidget(QLabel(self.tr("去前")))
