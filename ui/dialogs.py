@@ -3424,6 +3424,25 @@ class ResampleDialog(QDialog):
             QMessageBox.warning(self, self.tr("提示"), self.tr("请选择目标步进值。"))
             return
 
+        # 整数倍校验: 目标步进必须是原始步进的整数倍
+        try:
+            from src.step_resampler import _read_all
+            _, theta_angles, _, _ = _read_all(path)
+            if len(theta_angles) > 1:
+                orig_step = round(theta_angles[1] - theta_angles[0], 9)
+                invalid = []
+                for s in steps:
+                    r = s / orig_step
+                    if abs(r - round(r)) > 1e-9:
+                        invalid.append(s)
+                if invalid:
+                    QMessageBox.warning(self, self.tr("步进校验"),
+                        self.tr("选中的步进 {0} 不是原始步进 {1}° 的整数倍。\n请修改后重新选择。")
+                        .format(", ".join(f"{s}°" for s in invalid), orig_step))
+                    return
+        except Exception:
+            pass  # 读取失败不阻塞，让后续 batch_resample 报错
+
         out_dir = self._edit_dir.text().strip()
         if not out_dir:
             out_dir = str(Path(path).parent)
