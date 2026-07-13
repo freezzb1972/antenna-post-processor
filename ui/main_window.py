@@ -136,6 +136,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._extra_params: set = set()      # 用户额外选择的计算参数
         self._dir_extrap_method: str = "none"  # Directivity 外推算法 (默认不外推)
         self._test_mode: int = 0             # 0=passive, 1=TRP, 2=TIS
+        self._antenna_freq_selection: list[float] = []  # 天线参数频点选择 (空=全部)
         self._worksheet_naming_mode: int = 0  # 0=保留原模板工作表名, 1=用数据源名命名
         self._mode_states = [{}, {}, {}]     # 三种测试模式独立参数状态
         self._ar_lag_config = LagConfig()     # AR 独立角度配置
@@ -2654,6 +2655,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             gen_diff_chart=gen_diff_chart,
             antenna_configs=self._antenna_configs if self._antenna_configs else None,
             chart_instances=(self._chart_instances if test_enabled else []),
+            antenna_freq_selection=self._antenna_freq_selection if self._antenna_freq_selection else None,
         )
         self._worker.moveToThread(self._thread)
 

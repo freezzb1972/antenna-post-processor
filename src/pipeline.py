@@ -809,6 +809,7 @@ def _load_and_compute(
     compute_only: bool = False,
     store_matrices: bool = False,
     chart_instances: list | None = None,
+    antenna_freq_selection: list[float] | None = None,
     cancel_callback=None,
     progress_callback=None,
     log_callback=None,
@@ -828,7 +829,8 @@ def _load_and_compute(
     if chart_config:
         sel = (set(getattr(chart_config, 'selected_frequencies_a', []))
                | set(getattr(chart_config, 'selected_frequencies_b', []))
-               | set(getattr(chart_config, 'selected_frequencies_c', [])))
+               | set(getattr(chart_config, 'selected_frequencies_c', []))
+               | set(antenna_freq_selection or []))
         if sel:
             orig_total = len(tasks)
             tasks = [t for t in tasks if t[1] in sel]
@@ -1022,6 +1024,7 @@ def run_pipeline(
     ar_output_db: bool = True,
     worksheet_naming_mode: int = 0,  # 0=保留模板工作表名, 1=用数据源名
     chart_instances: list | None = None,  # ChartInstance 列表, 为空则使用旧行为
+    antenna_freq_selection: list[float] | None = None,  # 天线参数频点选择 (空=全频点)
     parallel: int = 1,
     cancel_callback: Callable[[], bool] | None = None,
     progress_callback: Callable[[int, int, str], None] | None = None,
@@ -1146,6 +1149,7 @@ def run_pipeline(
                 compute_only=compute_only,
                 store_matrices=out_data,
                 chart_instances=chart_instances,
+                antenna_freq_selection=antenna_freq_selection,
                 cancel_callback=cancel_callback, progress_callback=progress_callback, log_callback=log_callback,
             )
         finally:

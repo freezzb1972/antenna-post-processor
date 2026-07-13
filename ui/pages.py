@@ -1803,6 +1803,20 @@ class AntennaParamsPage(QWidget):
         freq_row.addWidget(self._cmb_freq_src)
         algo_layout.addWidget(self._freq_widget)
 
+        # 频点选择 (天线参数独立过滤)
+        freq_sel_grp = QGroupBox(self.tr("频点选择"))
+        freq_sel_lo = QVBoxLayout(freq_sel_grp)
+        self._antenna_freq_selected: list[float] = []
+        self._antenna_freq_summary = QLabel(self.tr("(全部频点)"))
+        self._antenna_freq_summary.setStyleSheet("color: #888; font-size: 10pt;")
+        freq_row2 = QHBoxLayout()
+        freq_row2.addWidget(self._antenna_freq_summary, 1)
+        btn_freq = QPushButton(self.tr("选择频点..."))
+        btn_freq.clicked.connect(self._on_antenna_freq_pick)
+        freq_row2.addWidget(btn_freq)
+        freq_sel_lo.addLayout(freq_row2)
+        algo_layout.addWidget(freq_sel_grp)
+
         trim_row = QHBoxLayout()
         trim_row.addWidget(QLabel(self.tr("去前")))
         self._spin_trim_start = QSpinBox()
@@ -2552,6 +2566,44 @@ class AntennaParamsPage(QWidget):
                 if idx >= 0:
                     self._cmb_dir_extrap_de_xtr.setCurrentIndex(idx)
                 self._cmb_dir_extrap_de_xtr.blockSignals(False)
+
+        # 同步频点选择
+        mw._antenna_freq_selection = list(self._antenna_freq_selected)
+
+    def _on_antenna_freq_pick(self):
+        all_freqs = self._get_all_frequencies()
+        if not all_freqs:
+            QMessageBox.information(self, self.tr("提示"), self.tr("请先加载数据源文件"))
+            return
+        from ui.widgets import FrequencyPickerDialog
+        dlg = FrequencyPickerDialog(all_freqs, list(self._antenna_freq_selected), parent=self)
+        if dlg.exec() == QDialog.Accepted:
+            self._antenna_freq_selected = list(dlg.get_selected())
+            if self._antenna_freq_selected:
+                self._antenna_freq_summary.setText(
+                    self.tr(f"已选 {len(self._antenna_freq_selected)} 个频点"))
+            else:
+                self._antenna_freq_summary.setText(self.tr("(全部频点)"))
+            self._sync_to_mw()
+
+    def _get_all_frequencies(self) -> list[float]:
+        all_freqs = set()
+        ds_map = getattr(self._mw, '_cached_datasource_map', None) if self._mw else None
+        if ds_map:
+            for ds_list in ds_map.values():
+                for ds in (ds_list if isinstance(ds_list, list) else [ds_list]):
+                    if hasattr(ds, 'frequencies'):
+                        all_freqs.update(ds.frequencies)
+        if not all_freqs and self._mw and getattr(self._mw, '_data_file_paths', None):
+            from src.datasource import DataSource
+            for fp in self._mw._data_file_paths[:3]:
+                try:
+                    ds = DataSource.from_path(fp)
+                    if hasattr(ds, 'frequencies'):
+                        all_freqs.update(ds.frequencies)
+                except Exception:
+                    pass
+        return sorted(all_freqs)
 
     def _on_dir_extrap_xtr_changed(self, cmb: QComboBox):
         """右侧 full_report 栏 Directivity 外推下拉变更 → 同步到左侧 + MainWindow。"""
