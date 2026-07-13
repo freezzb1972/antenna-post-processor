@@ -211,7 +211,8 @@ class ProcessingWorker(QObject):
                 # EXE 冻结环境: ProcessPoolExecutor 子进程可能找不到
                 # matplotlib/DLL 等资源 → 硬崩溃 + 残留孤儿进程。
                 # 源码环境正常并行 (子进程共享 Python 环境)。
-                parallel=1 if getattr(sys, 'frozen', False) else max(1, (os.cpu_count() or 4) - 1),
+                # 诊断: 排除 ProcessPoolExecutor (用户测试用)
+                parallel=1,  # max(1, (os.cpu_count() or 4) - 1),
                 compute_only=self.compute_only,
                 cancel_callback=self._is_cancelled,
                 progress_callback=self._on_progress,
