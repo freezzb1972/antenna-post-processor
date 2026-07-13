@@ -585,20 +585,15 @@ def _process_one_frequency(
         except Exception as e:
             row["_data_matrix_error"] = str(e)
 
-    # 存储原始数据供图形展示使用
-    # NOTE: 每频点存储 _raw_data 会大幅增加内存开销。
-    # 若有 N 个频点，每个频点的数据为 (n_phi × n_theta) float64 矩阵，
-    # 总内存占用 = N × n_phi × n_theta × 8 字节。
-    # 对高分辨率扫描 (如 361×181) 和大量频点，可能达到数百 MB。
-    # 建议通过 chart_config 限制图形生成频率数，或在 pipeline 层面
-    # 仅存储必要的 raw_data。
-    row["_raw_data"] = {k: v for k, v in raw.items() if v is not None}
+    # 角度数组 (小, 始终存储)
     row["_theta_angles"] = list(theta_deg)
     row["_phi_angles"] = [float(i) for i in np.linspace(0, 360, phi_lm.shape[0], endpoint=False)]
-    # 2D Cuts 模式数据源: E_θ/E_φ 分量 + 总增益
-    row["theta_db"] = theta_lm
-    row["phi_db"] = phi_lm
-    row["gain_db"] = gain_dbi
+    # 全分辨率矩阵: 仅 3D 查看器 / 中间数据导出需要, 报告生成不存储
+    if store_matrices:
+        row["_raw_data"] = {k: v for k, v in raw.items() if v is not None}
+        row["theta_db"] = theta_lm
+        row["phi_db"] = phi_lm
+        row["gain_db"] = gain_dbi
 
     return row
 
