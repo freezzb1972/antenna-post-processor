@@ -167,7 +167,8 @@ class ChartConfig:
 
     @property
     def has_any_a_class(self) -> bool:
-        return self.pattern_3d_gain or self.pattern_3d_eirp or self.pattern_3d_ar
+        return (self.pattern_3d_gain or self.pattern_3d_eirp or self.pattern_3d_ar
+                or self.pattern_3d_etheta or self.pattern_3d_ephi)
 
     @property
     def has_any_b_class(self) -> bool:
