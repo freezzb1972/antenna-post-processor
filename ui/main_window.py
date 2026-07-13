@@ -2756,8 +2756,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                         "border: 1px solid #ccc; border-radius: 3px;"
                     )
         self.ui.lblProgressMsg.setText(f"[{pct}%] {message}")
-        # 不调用 processEvents(): Qt 信号间自动刷新 UI,
-        # 显式调用会导致信号嵌套递归 → C 栈溢出(Windows 1MB)
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()
 
     def _on_worker_log(self, message: str):
         self._log(message)
