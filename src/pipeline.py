@@ -825,16 +825,20 @@ def _load_and_compute(
 
     # 统一进度条: 权重在频点过滤后重新计算
 
-    # 频点过滤
-    if chart_config:
-        sel = (set(getattr(chart_config, 'selected_frequencies_a', []))
-               | set(getattr(chart_config, 'selected_frequencies_b', []))
-               | set(getattr(chart_config, 'selected_frequencies_c', []))
-               | set(antenna_freq_selection or []))
+    # 频点过滤 — 天线参数与图表独立
+    #   天线频点: 空列表=全部频点, 非空=只计算指定频点
+    #   图表频点: per-instance 层(lines 510-544)独立处理, 不参与全局任务过滤
+    #   仅当天线参数有特定频点选择时, 才限制任务(并集图表频点以确保图表也渲染)
+    if chart_config and antenna_freq_selection:
+        ant_sel = set(antenna_freq_selection)
+        chart_sel = (set(getattr(chart_config, 'selected_frequencies_a', []))
+                     | set(getattr(chart_config, 'selected_frequencies_b', []))
+                     | set(getattr(chart_config, 'selected_frequencies_c', [])))
+        sel = ant_sel | chart_sel
         if sel:
             orig_total = len(tasks)
             tasks = [t for t in tasks if t[1] in sel]
-            _log(log_callback, f"🎯 频点过滤: {len(tasks)}/{orig_total} 个频点")
+            _log(log_callback, f"🎯 频点过滤: {len(tasks)}/{orig_total} 个频点 (天线={len(ant_sel)} + 图表={len(chart_sel)})")
 
     # 重新计算权重 (total 可能因过滤减少)
     total = len(tasks)
