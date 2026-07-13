@@ -2031,10 +2031,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         清空后由 _auto_apply_template_params + _auto_update_angle_config_from_template
         从新模板重新检测并重填。
         """
-        # 图表配置(旧模板残留)
-        self._chart_config_required = None
-        self._chart_config_extra = None
-        self._chart_instances = []
+        # 图表配置(用户手动设置, 不随模板清空)
         self._cached_template_params = set()
         # 全局角度配置 → 空(检测重填)
         self._lag_config = LagConfig()
