@@ -507,21 +507,27 @@ def _process_one_frequency(
                     from .chart_titles import build_title
                     _titles = {ci.image_key: build_title(ci, freq, _antenna, lang=_title_lang)
                                for ci in chart_instances if ci.enabled}
-                # 按分类频点选择过滤 chart_instances: A类仅 selected_frequencies_a, C类仅 _c, B类全保留
+                # 按分类频点选择过滤: A类仅 selected_frequencies_a, C类仅 _c, B类全保留
+                _fa = set(getattr(ccfg, 'selected_frequencies_a', [])) if ccfg else set()
+                _fc = set(getattr(ccfg, 'selected_frequencies_c', [])) if ccfg else set()
                 _filt_instances = None
-                if chart_instances:
-                    _fa = set(getattr(ccfg, 'selected_frequencies_a', []))
-                    _fc = set(getattr(ccfg, 'selected_frequencies_c', []))
-                    if _fa or _fc:
-                        _filt_instances = []
-                        for ci in chart_instances:
-                            cat = getattr(ci.category, "value", ci.category) if hasattr(ci, 'category') else ""
-                            if cat == "A" and _fa and freq not in _fa:
-                                continue
-                            if cat == "C" and _fc and freq not in _fc:
-                                continue
-                            _filt_instances.append(ci)
-                images = generate_all_for_frequency(
+                _saved_a = {}; _saved_c = {}      # 必须在 if 外初始化, finally 引用
+                if _fa or _fc:
+                    if chart_instances:
+                        _filt_instances = [ci for ci in chart_instances
+                            if not (getattr(ci.category, "value", ci.category) if hasattr(ci, 'category') else "") in ("A","C")
+                            or (cat := getattr(ci.category, "value", ci.category) if hasattr(ci, 'category') else "",
+                                (cat == "A" and freq in _fa) or (cat == "C" and freq in _fc) or cat not in ("A","C"))[1]]
+                    # fallback: 无 instances 时临时关掉不在选中频点内的 ccfg bools
+                    _saved_a = {}; _saved_c = {}
+                    for _k in ('pattern_3d_gain','pattern_3d_eirp','pattern_3d_ar','pattern_3d_etheta','pattern_3d_ephi'):
+                        if _fa and freq not in _fa and getattr(ccfg, _k, False):
+                            _saved_a[_k] = True; setattr(ccfg, _k, False)
+                    for _k in ('cut_azimuth_polar','cut_azimuth_rect','cut_elevation_polar','cut_elevation_rect'):
+                        if _fc and freq not in _fc and getattr(ccfg, _k, False):
+                            _saved_c[_k] = True; setattr(ccfg, _k, False)
+                try:
+                    images = generate_all_for_frequency(
                     theta_deg, phi_angles, gain_dbi,
                     freq, ccfg, ar_linear=ar_lin,
                     rhcp_db=rhcp_db, lhcp_db=lhcp_db,
@@ -532,6 +538,10 @@ def _process_one_frequency(
                     titles=_titles,
                     chart_instances=_filt_instances if _filt_instances is not None else chart_instances,
                 )
+                finally:
+                    # 恢复 fallback 路径中被临时关闭的 ccfg bools
+                    for _k, _ in _saved_a.items(): setattr(ccfg, _k, True)
+                    for _k, _ in _saved_c.items(): setattr(ccfg, _k, True)
                 if images:
                     row["_images"] = images
                 if "_azimuth_theta_deg" not in row:
