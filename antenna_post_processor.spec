@@ -20,6 +20,9 @@ block_cipher = None
 
 PROJECT_ROOT = Path(SPECPATH).resolve()
 
+# matplotlib 数据文件 (字体/样式/backends) — PyInstaller hook 可能遗漏
+from PyInstaller.utils.hooks import collect_data_files
+
 a = Analysis(
     ['main.py'],
     pathex=[str(PROJECT_ROOT)],
@@ -41,7 +44,7 @@ a = Analysis(
         (str(PROJECT_ROOT / 'license.json'), '.'),
         # 试用配置（编译时固化: build_date + trial_days，防备份攻击）
         (str(PROJECT_ROOT / 'trial_config.json'), '.'),
-    ],
+    ] + collect_data_files('matplotlib'),
     hiddenimports=[
         # ---- PySide6 — 仅引用实际使用的模块，避免 collect_submodules 拉入全部 426MB ----
         'PySide6.QtCore',
@@ -49,6 +52,7 @@ a = Analysis(
         'PySide6.QtWidgets',
 
         # ---- matplotlib backends（Agg 必需；QtAgg 用于 GUI 交互式 3D 图） ----
+        'matplotlib',
         'matplotlib.backends.backend_agg',
         'matplotlib.backends.backend_svg',
         'matplotlib.backends.backend_qtagg',
