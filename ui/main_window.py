@@ -537,15 +537,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._mode_freq_label = QLabel()
         self._mode_freq_label.setTextFormat(Qt.RichText)
         self._mode_freq_label.setStyleSheet("padding: 2px 4px; font-size: 12px;")
-        # 频点选择 (执行栏左端, 各tab均可见)
-        self._exec_freq_summary = QLabel(self.tr("频点: 全部"))
-        self._exec_freq_summary.setStyleSheet("color: #888; font-size: 10pt; padding: 0 4px;")
-        btn_row.addWidget(self._exec_freq_summary)
-        btn_pick_freq = QPushButton(self.tr("选择..."))
-        btn_pick_freq.setFixedWidth(52)
-        btn_pick_freq.clicked.connect(self._on_exec_freq_pick)
-        btn_row.addWidget(btn_pick_freq)
-        btn_row.addSpacing(8)
         btn_row.addWidget(self._mode_freq_label)
         btn_row.addStretch()
         # hButtons 直接包进 QWidget 保持原对齐
@@ -2315,46 +2306,6 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._enter_exporting()
         self._do_run(compute_only=False, reuse_datasource=True)
 
-    def _on_exec_freq_pick(self):
-        """执行栏频点选择按钮 → 弹窗选频点。"""
-        all_freqs = self._get_all_frequencies()
-        if not all_freqs:
-            QMessageBox.information(self, self.tr("提示"), self.tr("请先加载数据源文件"))
-            return
-        from ui.widgets import FrequencyPickerDialog
-        cur = list(self._antenna_freq_selection) if self._antenna_freq_selection else []
-        dlg = FrequencyPickerDialog(all_freqs, cur, parent=self)
-        if dlg.exec() == QDialog.Accepted:
-            self._antenna_freq_selection = list(dlg.get_selected())
-            self._update_exec_freq_summary()
-
-    def _get_all_frequencies(self) -> list[float]:
-        """收集所有可用频点。"""
-        all_freqs = set()
-        ds_map = getattr(self, '_cached_datasource_map', None)
-        if ds_map:
-            for ds_list in ds_map.values():
-                for ds in (ds_list if isinstance(ds_list, list) else [ds_list]):
-                    if hasattr(ds, 'frequencies'):
-                        all_freqs.update(ds.frequencies)
-        if not all_freqs and getattr(self, '_data_file_paths', None):
-            from src.datasource import DataSource
-            for fp in self._data_file_paths[:3]:
-                try:
-                    ds = DataSource.from_path(fp)
-                    if hasattr(ds, 'frequencies'):
-                        all_freqs.update(ds.frequencies)
-                except Exception:
-                    pass
-        return sorted(all_freqs)
-
-    def _update_exec_freq_summary(self):
-        sel = self._antenna_freq_selection if self._antenna_freq_selection else []
-        if sel:
-            self._exec_freq_summary.setText(self.tr(f"频点: {len(sel)}个"))
-        else:
-            self._exec_freq_summary.setText(self.tr("频点: 全部"))
-
     def _on_one_click(self):
         """一键出报告: 支持多天线逐个处理。"""
         self._save_current_antenna_config()
@@ -2672,51 +2623,61 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         gen_diff = ant_page.get_gen_diff() if ant_page else False
         gen_diff_chart = ant_page.get_gen_diff_chart() if ant_page else False
 
-        self._worker = ProcessingWorker(
-            datasource_map=datasource_map,
-            sheet_mode_map=sheet_mode_map,
-            template_path=template_path,
-            output_path=output_path,
-            lag_config=self._lag_config,
-            plot_config=plot_config,
-            full_report_path=full_report_path,
-            theta_extrap_method=extrapolate_theta,
-            freq_source=freq_source,
-            trim_start=trim_start,
-            trim_end=trim_end,
-            robust_peak=robust_peak,
-            extra_params=self._extra_params if self._extra_params else None,
-            nh_custom_angles=self._nh_custom_angles if self._nh_custom_angles else None,
-            worksheet_naming_mode=self._worksheet_naming_mode,
-            chart_config_obj=full_chart_config,
-            ar_lag_config=self._ar_lag_config if hasattr(self, '_ar_lag_config') and not self._ar_lag_config.is_empty() else None,
-            ar_output_db=self._ar_output_db,
-            output_config=getattr(self, '_output_config', None),  # 始终传递(含输出路径)
-            out_excel=out_excel,
-            out_word=out_word,
-            out_data=out_data,
-            compute_only=compute_only,
-            dir_extrap_method=dir_extrap,
-            # 多步进参数
-            step_values=step_values,
-            skip_original=skip_original,
-            gen_diff=gen_diff,
-            gen_diff_chart=gen_diff_chart,
-            antenna_configs=self._antenna_configs if self._antenna_configs else None,
-            chart_instances=(self._chart_instances if test_enabled else []),
-            antenna_freq_selection=self._antenna_freq_selection if self._antenna_freq_selection else None,
-        )
-        self._worker.moveToThread(self._thread)
+        try:
+            self._worker = ProcessingWorker(
+                datasource_map=datasource_map,
+                sheet_mode_map=sheet_mode_map,
+                template_path=template_path,
+                output_path=output_path,
+                lag_config=self._lag_config,
+                plot_config=plot_config,
+                full_report_path=full_report_path,
+                theta_extrap_method=extrapolate_theta,
+                freq_source=freq_source,
+                trim_start=trim_start,
+                trim_end=trim_end,
+                robust_peak=robust_peak,
+                extra_params=self._extra_params if self._extra_params else None,
+                nh_custom_angles=self._nh_custom_angles if self._nh_custom_angles else None,
+                worksheet_naming_mode=self._worksheet_naming_mode,
+                chart_config_obj=full_chart_config,
+                ar_lag_config=self._ar_lag_config if hasattr(self, '_ar_lag_config') and not self._ar_lag_config.is_empty() else None,
+                ar_output_db=self._ar_output_db,
+                output_config=getattr(self, '_output_config', None),  # 始终传递(含输出路径)
+                out_excel=out_excel,
+                out_word=out_word,
+                out_data=out_data,
+                compute_only=compute_only,
+                dir_extrap_method=dir_extrap,
+                # 多步进参数
+                step_values=step_values,
+                skip_original=skip_original,
+                gen_diff=gen_diff,
+                gen_diff_chart=gen_diff_chart,
+                antenna_configs=self._antenna_configs if self._antenna_configs else None,
+                chart_instances=(self._chart_instances if test_enabled else []),
+                antenna_freq_selection=self._antenna_freq_selection if self._antenna_freq_selection else None,
+            )
+            self._worker.moveToThread(self._thread)
 
-        # 连接信号
-        self._thread.started.connect(self._worker.run)
-        self._worker.progress.connect(self._on_progress)
-        self._worker.log.connect(self._on_worker_log)
-        self._worker.finished.connect(self._on_finished)
-        self._worker.error.connect(self._on_error)
-        self._thread.finished.connect(self._thread.deleteLater)
+            # 连接信号
+            self._thread.started.connect(self._worker.run)
+            self._worker.progress.connect(self._on_progress)
+            self._worker.log.connect(self._on_worker_log)
+            self._worker.finished.connect(self._on_finished)
+            self._worker.error.connect(self._on_error)
+            self._thread.finished.connect(self._thread.deleteLater)
 
-        self._thread.start()
+            self._thread.start()
+        except Exception as e:
+            import traceback
+            self._log(f"❌ 启动失败: {e}")
+            QMessageBox.critical(self, self.tr("启动失败"),
+                self.tr("处理管线启动异常: ") + str(e))
+            self._restore_start_button()
+            self.ui.btnStop.setEnabled(False)
+            return
+
         self._log(self.tr(f"▶ 开始处理 (命名模式={self._worksheet_naming_mode}, 0=模板原名, 1=数据源名)"))
         self._log(self.tr(f"  模板: {template_path}"))
         self._log(self.tr(f"  输出: {output_path}"))

@@ -127,6 +127,7 @@ class ProcessingWorker(QObject):
         gen_diff_chart: bool = False,
         antenna_configs: dict | None = None,
         chart_instances: list | None = None,
+        antenna_freq_selection: list[float] | None = None,
     ):
         super().__init__()
         self.antenna_configs = antenna_configs or {}
@@ -156,6 +157,7 @@ class ProcessingWorker(QObject):
         self.ar_output_db = ar_output_db
         self.worksheet_naming_mode = worksheet_naming_mode
         self.chart_instances = chart_instances
+        self.antenna_freq_selection = antenna_freq_selection
         self.step_values = step_values or []
         self.skip_original = skip_original
         self.gen_diff = gen_diff
@@ -201,6 +203,7 @@ class ProcessingWorker(QObject):
                 ar_output_db=self.ar_output_db,
                 worksheet_naming_mode=self.worksheet_naming_mode,
                 chart_instances=getattr(self, 'chart_instances', None),
+                antenna_freq_selection=getattr(self, 'antenna_freq_selection', None),
                 parallel=max(1, (os.cpu_count() or 4) - 1),  # 预留1核给UI
                 compute_only=self.compute_only,
                 cancel_callback=self._is_cancelled,

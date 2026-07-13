@@ -1567,6 +1567,7 @@ def run_batch_pipeline(
     cancel_callback=None,
     progress_callback=None,
     log_callback=None,
+    antenna_freq_selection: list[float] | None = None,
     **_ignored,  # 接受但不使用 worker 可能传入的额外参数
 ):
     """旧版 pipeline: 接受 CSV 路径，内部创建 MergedCSVParser。"""
@@ -1582,6 +1583,7 @@ def run_batch_pipeline(
         cancel_callback=cancel_callback,
         progress_callback=progress_callback,
         log_callback=log_callback,
+        antenna_freq_selection=antenna_freq_selection,
     )
 
 
