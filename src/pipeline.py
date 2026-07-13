@@ -466,6 +466,17 @@ def _process_one_frequency(
     az_need = (output_config is not None and output_config.has_any_azimuth)
     want_render = (chart_config is not None and chart_config.has_any_pattern_or_cut) or az_need
 
+    # 提前跳过: 此频点仅天线参数需要, 图表不选它 → 跳过全部图表逻辑
+    if want_render and not compute_only and not az_need:
+        _tmp_cfg = chart_config or ChartConfig()
+        _tmp_fa = set(getattr(_tmp_cfg, 'selected_frequencies_a', []))
+        _tmp_fc = set(getattr(_tmp_cfg, 'selected_frequencies_c', []))
+        if _tmp_fa or _tmp_fc:
+            _tmp_has_b = any(getattr(ci.category, "value", ci.category) == "B" and ci.enabled
+                             for ci in (chart_instances or []))
+            if not _tmp_has_b and freq not in _tmp_fa and freq not in _tmp_fc:
+                want_render = False
+
     n_phi = phi_lm.shape[0]
     _pa = raw.get("_phi_angles")
     phi_angles = np.array(_pa, dtype=np.float64) if _pa is not None and len(_pa) else np.arange(n_phi, dtype=np.float64)
