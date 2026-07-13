@@ -3965,8 +3965,12 @@ class ChartSettingsPage(QWidget):
             if _orig_step and _orig_step > 0:
                 _r = step_val / _orig_step
                 if abs(_r - round(_r)) > 1e-9:
-                    QMessageBox.warning(dlg, self.tr("采样精度"),
-                        self.tr("{0}° 不是原始步进 {1}° 的整数倍, 将取近似值。").format(step_val, _orig_step))
+                    _reply = QMessageBox.warning(dlg, self.tr("采样精度"),
+                        self.tr("{0}° 不是原始步进 {1}° 的整数倍, 将取近似值。\n\n"
+                                "是否返回修改?").format(step_val, _orig_step),
+                        QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                    if _reply == QMessageBox.Yes:
+                        return  # 不关闭对话框, 让用户修改
             self._step_deg = float(step_val)
             self._dyn_db = float(spin_dyn.value())
             self._dyn_auto = chk_dyn_auto.isChecked()
