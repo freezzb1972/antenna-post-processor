@@ -9,6 +9,9 @@
 ## A. 本次会话完成的工作 — 9 个提交
 
 ```
+3c9dfc6  feat(i18n): main_window.py 手写控件接入翻译 — P4 覆盖收尾
+537ea7e  feat(i18n): 剩余 5 个文件接入翻译（P4 收尾）+ 修 2 个既有真 bug
+53329ef  docs: 状态固化 — 记录 .ui/compiled 不同步等 4 项新发现
 a13f3ce  feat(i18n): dialogs.py 接入翻译（P4）+ 拆除 3 个隐患、修 2 个既有 bug
 d52fcd2  chore: 同步 verify-manifest（P7）
 95dfa14  chore(i18n): 收口 — 重写工具链脚本 + 漏包守卫 + 状态固化
@@ -102,6 +105,9 @@ editable combo 的 lineEdit —— 改了会破坏用户数据。
 | 11 | **`.ui` 与 `compiled/` 已不同步** | 用当前 `pyside6-uic` 重编译 `main_window.ui` → `hButtons` 挂到 `rootVBox`(编译产物里是 `vTabFile`) → `_extract_execution_bar()` 抛「QLayout already has a parent」→ **MainWindow 构造直接失败** | **在两者对齐前不要重编译 UI**。需专人比对 `.ui` 与编译产物的结构差异 |
 | 12 | **反查候选降级顺序会影响带点的缩写** | `'Contract No.:'` 反查时激进剥离把结尾 `.:` 一起去掉 → `'Contract No'` ≠ 源串 `'Contract No.'` → 切英文后还原不回中文 | 候选顺序: 精确 → 去 HTML → **只剥行尾冒号** → 剥首尾非文字字符 → 抽中文核心 |
 | 13 | **`pgrep -f` / `pkill -f` 会匹配到自己的命令行** | `pkill -f "gui_integrity_check"` 把执行该命令的 shell 自己杀了; `pgrep -f "a\|b"` 在 ERE 下 `\|` 是字面竖线, 静默匹配不到 → 误判"已结束" | 用 `pgrep -f` 前先在别的命令里确认模式; 杀进程用 `pgrep` 取 PID 再 `kill` |
+| 14 | **`self.tr` 用在没有 `self` 的地方** | ① 模块级/普通函数内(如 `main.py` 的 `main()`) ② **`def` 行的参数默认值** —— 默认值在函数定义时求值, 此刻处于 class body 作用域。两者都 `py_compile` 通过、**运行才 NameError** | 非方法内用 `QCoreApplication.translate("Ctx", ...)`; 默认值改为 `None` + 函数体内取。包裹脚本已加两道守卫: 「必须在含 self 的函数内」+「排除 `def` 行」 |
+| 15 | **字符串前缀会被吞进 `self.tr`** | `re.findall(r"[a-z一-鿿]+", ...)` → `rself.tr("[a-z一-鿿]+")` —— 语法合法、运行 NameError。`f` 前缀则会被翻译插值结果 | 包裹脚本跳过 `r`/`f`/`b`/`u` 及其组合前缀 |
+| 16 | **`processEvents()` 不处理 DeferredDelete** | 语言切换后控件数每次 +1, 看着像泄漏; 换真实事件循环(`QEventLoop` + `QTimer.singleShot(0, quit)`)后**恒为 804 稳定** | 判断"控件/对象是否收敛"必须用真实事件循环, 不能用 `processEvents()` |
 
 ### 运行时守卫
 
@@ -122,23 +128,30 @@ bash scripts/update_i18n.sh            # lupdate → lrelease → 生成反查�
 > `update_i18n.sh` 本次已重写: 旧版只扫 3 个文件 (**照跑会丢掉约 61% 译文条目**),
 > 且硬编码本 checkout 不存在的 `.venv`。新版含完整清单 + PATH/Windows 双工具链回退。
 
-**进度**:
+**进度: 全部 UI 文件已完成 (P4 收尾)**
 
 | 文件 | 状态 | 备注 |
 |---|---|---|
+| `ui/pages.py` | ✅ 完成 | + 修 `cmb_cmap` 色图无法恢复的既有 bug + 8 处 `self.tr(f"...")` |
+| `ui/dialogs.py` | ✅ 完成 | 180 段 + 拆 3 隐患 + 修 2 既有 bug |
+| `ui/main_window.py` | ✅ 完成 | **手写控件**(此前被 `retranslateUi` 的假定漏掉) |
 | `ui/graph_viewer.py` | ✅ 完成 | 顺带修 3 个 bug |
-| `ui/rsp_picker_dialog.py` | ✅ 完成 | |
-| `ui/theme_manager.py` | ✅ 完成(消费点翻译) | |
-| `ui/dialogs.py` | ✅ 完成 | 180 段包裹 + 271 条译文; 拆 3 隐患 + 修 2 既有 bug |
-| `ui/window_manager.py` / `ui/splash_screen.py` | ✅ 无 UI 字面量 | |
-| **`ui/pages.py`** | ⬜ 未做 | |
-| `ui/widgets.py` | ⬜ 未做 | |
-| `main.py` | ⬜ 未做 | |
-| `ui/template_recognizer.py` / `ui/project_manager.py` / `ui/shell_window.py` / `ui/feedback_dialog.py` | ⬜ 未做 | 量较小 |
+| `ui/widgets.py` / `ui/project_manager.py` / `ui/template_recognizer.py` | ✅ 完成 | 模块级表在消费点翻译 |
+| `main.py` | ✅ 完成 | 普通函数 -> `QCoreApplication.translate("App", ...)` |
+| `ui/rsp_picker_dialog.py` / `ui/theme_manager.py` / `ui/multi_antenna_page.py` | ✅ 完成 | |
+| `ui/feedback_dialog.py` / `ui/window_manager.py` / `ui/splash_screen.py` | ✅ 无 UI 字面量 | |
+| `ui/shell_window.py` | ⚪ 死代码, 未处理 | 全项目无实例化点 |
 
-**已知残留** (非阻塞): `CalcParamsDialog` 汇总标签 2 处、`HelpDialog` 状态 2 处
-—— 均为**动态 f-string**(含内插值), 反查表还原不出源串, 需各自的更新方法重算,
-或接受"下次动作才用新语言"。
+**最终规模**: 40 context / **1666 条英文译文**(仅 2 条 CSS 未译, 是刻意的 ——
+那两处本就误用了 `tr()`, 见 F-5) / 同 context 内反向碰撞 **0**。
+
+**已知残留** (非阻塞, 均为**动态 f-string**——含内插值, 反查表还原不出源串):
+`CalcParamsDialog` 汇总标签 2、`HelpDialog` 状态 2, 以及各文件的
+`f"{len(x)} 个文件"` 类计数文本。需各自的重算钩子, 或接受"下次动作才用新语言"。
+
+**`scripts/check_i18n.py` 现报 180 处**, 但其中绝大多数是正当项:
+「模块级表(已在消费点翻译)」与「文件名/f-string(本就不该翻)」。
+判断某处是否真缺口时, 先看它属于哪类。
 
 **`scripts/check_i18n.py`** 为漏包守卫(已支持单引号字面量), 输出含日志/正则等
 不该 tr 的条目, 需人工逐条判断。
