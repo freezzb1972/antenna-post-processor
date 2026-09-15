@@ -3223,23 +3223,22 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
 
     def changeEvent(self, event: QEvent):
-        """语言切换事件 → 刷新所有 UI 文字。"""
-        if event.type() == QEvent.LanguageChange:
-            # LanguageChange 由 installTranslator 异步投递。窗口销毁期间事件
-            # 仍可能到达, 此时部分子 widget 的 C++ 对象已回收, retranslateUi
-            # 会抛 RuntimeError (libshiboken: already deleted)。
-            # 吞掉该异常: 窗口正在消失, 文案是否刷新已无意义。
-            # ⚠️ 不要用这个 except 掩盖正常路径的 RuntimeError —— 曾因
-            # lblTemplate/btnBrowseTemplate 悬垂(removeRow 删除)导致每次切
-            # 语言都从 ui_main_window.py:530 中断, 却被这里静默吞掉, 表现为
-            # 「切了语言但界面几乎没变」。悬垂引用已在 _connect_signals 修掉;
-            # 若再出现「只翻译了前几个控件」, 先查是否有新的悬垂 widget。
-            try:
-                self.ui.retranslateUi(self)
-                self._update_lag_display()
-            except RuntimeError:
-                pass
+        """语言切换事件。
+
+        实际刷新由 I18nManager.switch() **同步**完成 —— _refresh_all 遍历所有
+        顶层窗口, 对其调用 ui.retranslateUi 与 _on_language_changed。此处不再
+        重复刷新: LanguageChange 是异步投递的, 依赖它会让「切换完成」与
+        「界面已刷新」之间出现窗口期, 调用方与测试都可能读到旧语言。
+        """
         super().changeEvent(event)
+
+    def _on_language_changed(self):
+        """动态/格式化文案的刷新钩子 (由 I18nManager._refresh_all 调用)。
+
+        这类文案是方法现算的 (如 LAG 已配置项、参数摘要), 控件文本不等于源串,
+        反查表还原不出来, 只能重新执行产生它们的逻辑。
+        """
+        self._update_lag_display()
 
     # ==================================================================
     # 辅助

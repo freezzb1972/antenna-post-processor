@@ -22,7 +22,11 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import QLocale, QTranslator
-from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
+    QAbstractButton, QAbstractSpinBox, QApplication, QComboBox, QGroupBox,
+    QLabel, QLineEdit, QListWidget, QTabWidget, QTableWidget, QWidget,
+)
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +83,7 @@ class I18nManager:
         # 移除旧翻译器。QTranslator 不设 parent → 置 None 后由 Python GC
         # 回收其 C++ 对象。不要用 deleteLater(): 那会留下「Python 包装器仍在、
         # C++ 对象已删」的悬垂引用, 正是本类要避免的崩溃模式。
+        previous = cls._current_lang
         if cls._translator is not None:
             app.removeTranslator(cls._translator)
             cls._translator = None
@@ -89,7 +94,13 @@ class I18nManager:
         translator.load(str(qm_path))
         app.installTranslator(translator)
         cls._translator = translator
+
+        # 同步刷新。installTranslator 投递 LanguageChange 是异步的, 若只靠
+        # 各类的 changeEvent, 调用方返回时界面可能仍是旧语言。反查方向由
+        # 显式传入的 previous 决定 (而非读 _current_lang), 故先落语言再刷新,
+        # 让刷新期间读到 current_language() 的钩子拿到新值。
         cls._current_lang = language
+        cls._refresh_all(app, previous, language)
 
     @classmethod
     def current_language(cls) -> str:
@@ -170,3 +181,152 @@ class I18nManager:
         return (cls._table.get(context, {}).get(source)
                 or cls._forward_flat.get(source)
                 or source)
+
+    # ==================================================================
+    # 运行时重翻译 (widget 树遍历)
+    # ==================================================================
+
+    @classmethod
+    def _context_of(cls, widget) -> str:
+        """沿 parent 链找最近的「已知 context」类名。
+
+        控件多由页面类匿名创建 —— 如 `QLabel(self.tr("Excel 参数模版:"))`,
+        其 tr 的 context 是**页面类名**, 而非 QLabel。所以必须向上找
+        「谁创建了我」, 否则反查会因 context 不匹配而失准。
+        """
+        known = cls._table or {}
+        node = widget
+        while node is not None:
+            name = type(node).__name__
+            if name in known:
+                return name
+            try:
+                node = node.parent()
+            except RuntimeError:
+                break
+        return type(widget).__name__
+
+    @classmethod
+    def _retranslate_text(cls, text: str, widget, from_lang: str, to_lang: str):
+        """文本 → 目标语言译文。无需改动或无法确定时返回 None。"""
+        if not text:
+            return None
+        ctx = cls._context_of(widget)
+        source = cls.to_source(text, ctx, from_lang)
+        if source is None:
+            return None
+        new = cls.from_source(source, ctx, to_lang)
+        return new if new != text else None
+
+    @classmethod
+    def _retranslate_one(cls, widget, getter, setter, from_lang, to_lang) -> int:
+        try:
+            cur = getter()
+        except RuntimeError:
+            return 0                      # C++ 对象已回收 (窗口销毁期)
+        new = cls._retranslate_text(cur, widget, from_lang, to_lang)
+        if new is None:
+            return 0
+        try:
+            setter(new)
+        except RuntimeError:
+            return 0
+        return 1
+
+    @classmethod
+    def _refresh_widget_tree(cls, root, from_lang: str, to_lang: str) -> int:
+        """遍历 root 子树, 就地重翻译全部「界面文案」载体。返回改动条数。
+
+        刻意**不碰**用户输入与数据: QLineEdit.text / QTextEdit / 表格数据单元格
+        / editable combo 的 lineEdit —— 改了会破坏用户数据。
+        """
+        n = 0
+        for w in [root] + list(root.findChildren(QWidget)):
+            try:
+                if isinstance(w, QLabel):
+                    n += cls._retranslate_one(w, w.text, w.setText, from_lang, to_lang)
+                elif isinstance(w, QAbstractButton):   # QPushButton/QCheckBox/QRadioButton
+                    n += cls._retranslate_one(w, w.text, w.setText, from_lang, to_lang)
+                elif isinstance(w, QGroupBox):
+                    n += cls._retranslate_one(w, w.title, w.setTitle, from_lang, to_lang)
+                elif isinstance(w, QLineEdit):
+                    # 只译占位符; .text() 是用户输入, 绝不碰
+                    n += cls._retranslate_one(w, w.placeholderText,
+                                              w.setPlaceholderText, from_lang, to_lang)
+                elif isinstance(w, QComboBox):
+                    for i in range(w.count()):
+                        new = cls._retranslate_text(w.itemText(i), w, from_lang, to_lang)
+                        if new is not None:
+                            w.setItemText(i, new)      # 保留 itemData
+                            n += 1
+                elif isinstance(w, QTabWidget):
+                    for i in range(w.count()):
+                        new = cls._retranslate_text(w.tabText(i), w, from_lang, to_lang)
+                        if new is not None:
+                            w.setTabText(i, new)
+                            n += 1
+                elif isinstance(w, QListWidget):
+                    for i in range(w.count()):
+                        item = w.item(i)
+                        new = cls._retranslate_text(item.text(), w, from_lang, to_lang)
+                        if new is not None:
+                            item.setText(new)          # 保留 UserRole data
+                            n += 1
+                elif isinstance(w, QTableWidget):
+                    # 只译表头; 数据单元格不动
+                    for r in range(w.columnCount()):
+                        h = w.horizontalHeaderItem(r)
+                        if h is not None:
+                            new = cls._retranslate_text(h.text(), w, from_lang, to_lang)
+                            if new is not None:
+                                h.setText(new); n += 1
+                    for r in range(w.rowCount()):
+                        h = w.verticalHeaderItem(r)
+                        if h is not None:
+                            new = cls._retranslate_text(h.text(), w, from_lang, to_lang)
+                            if new is not None:
+                                h.setText(new); n += 1
+                if isinstance(w, QAbstractSpinBox):
+                    n += cls._retranslate_one(w, w.prefix, w.setPrefix, from_lang, to_lang)
+                    n += cls._retranslate_one(w, w.suffix, w.setSuffix, from_lang, to_lang)
+                if w.isWindow():
+                    n += cls._retranslate_one(w, w.windowTitle,
+                                              w.setWindowTitle, from_lang, to_lang)
+                # toolTip 所有 QWidget 都有
+                n += cls._retranslate_one(w, w.toolTip, w.setToolTip, from_lang, to_lang)
+            except RuntimeError:
+                continue                       # 遍历途中对象被回收
+        for act in root.findChildren(QAction):
+            n += cls._retranslate_one(act, act.text, act.setText, from_lang, to_lang)
+        return n
+
+    @classmethod
+    def _refresh_all(cls, app: QApplication, from_lang: str, to_lang: str) -> int:
+        """重翻译所有顶层窗口。返回改动条数。
+
+        遍历 topLevelWidgets 天然覆盖正在 modal exec() 的对话框
+        (如 SystemSettingsDialog —— 语言切换按钮就在其中, 它必须同步变)。
+        带 parent 的对话框会随父窗口一并遍历, 故此处重复处理一次属幂等无害。
+        """
+        if from_lang == to_lang:
+            return 0
+        # 反查表缺失只影响手写控件的树遍历; retranslateUi 与钩子不依赖它,
+        # 必须照常执行 —— 否则一个数据文件缺失就会让 .ui 控件也停止刷新。
+        has_table = cls._load_table()
+        total = 0
+        for top in app.topLevelWidgets():
+            try:
+                if has_table:
+                    total += cls._refresh_widget_tree(top, from_lang, to_lang)
+                # .ui 生成的窗口 (仅 MainWindow) 自带 retranslateUi, 放最后执行,
+                # 让它对 .ui 控件拥有最终话语权
+                ui = getattr(top, "ui", None)
+                if ui is not None and hasattr(ui, "retranslateUi"):
+                    ui.retranslateUi(top)
+                hook = getattr(top, "_on_language_changed", None)
+                if callable(hook):
+                    hook()          # 动态/format 文案: 由各类自行重算
+            except RuntimeError:
+                continue            # 窗口销毁期
+        log.debug("语言切换 %s -> %s: 重翻译 %d 处", from_lang, to_lang, total)
+        return total

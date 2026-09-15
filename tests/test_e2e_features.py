@@ -155,17 +155,45 @@ class TestThemeI18n:
             ThemeManager.apply(current)
             ThemeManager.save_theme(current)
 
-    def test_language_toggle_button_exists(self, window, qtbot):
-        """语言切换通过 I18nManager 正常工作。"""
+    def test_language_switch_refreshes_widget_text(self, window, qtbot):
+        """切换语言必须刷新**真实控件文本**, 而非仅更新 manager 字段。
+
+        历史: 本测试原为 test_language_toggle_button_exists, 只断言
+        I18nManager.current_language() 被赋值 —— 对界面文字是否真的变了零覆盖。
+        正是这一假通过, 让「切语言只翻译了 retranslateUi 前 5 个控件」的缺陷
+        (removeRow 留下悬垂 widget 所致) 长期潜伏。
+
+        switch() 是同步刷新的, 故返回后即可断言, 无需等事件循环。
+        """
         from i18n.i18n_manager import I18nManager
+        app = QApplication.instance()
         original = I18nManager.current_language()
-        new_lang = "en_US" if original == "zh_CN" else "zh_CN"
+        target = "en_US" if original == "zh_CN" else "zh_CN"
+
+        def snapshot():
+            """采样多种文本载体 —— 覆盖 QPushButton/QLabel/QCheckBox/QTabWidget。"""
+            return {
+                "QPushButton": window._btn_export.text(),
+                "QLabel": window._stage_labels[0].text(),
+                "QCheckBox": window._check_enable_chart_viewer.text(),
+                "QTabWidget": window.ui.tabConfig.tabText(0),
+            }
+
+        before = snapshot()
         try:
-            I18nManager.switch(QApplication.instance(), new_lang)
-            qtbot.wait(100)
-            assert I18nManager.current_language() == new_lang
+            I18nManager.switch(app, target)
+            after = snapshot()
         finally:
-            I18nManager.switch(QApplication.instance(), original)
+            I18nManager.switch(app, original)
+        restored = snapshot()
+
+        for key, val in before.items():
+            assert after[key] != val, (
+                f"{key} 未随语言切换刷新: 切换前后都是 {val!r} ({original} -> {target})"
+            )
+        assert restored == before, (
+            f"切回 {original} 后未还原 (en->zh 反查失败): {restored} != {before}"
+        )
 
     def test_font_size_persists(self, window, qtbot):
         """字体大小设置持久化到 QSettings。"""
