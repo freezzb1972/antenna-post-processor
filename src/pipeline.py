@@ -1072,6 +1072,14 @@ def run_pipeline(
         raise ValueError("必须提供 datasource 或 datasource_map")
     use_multi_ds = datasource_map is not None
 
+    # 把取消回调注入各数据源 —— 让「首次解析源文件」这一步也可被中断。
+    # 本函数内的 cancel_callback 检查只按文件/频点粒度, 覆盖不到那次解析
+    # (158MB merged.csv 单次索引 5-7s); 用户在解析中途点「停止」此前要等它跑完。
+    if cancel_callback is not None:
+        for _ds in ((datasource_map or {}).values() if use_multi_ds else [datasource]):
+            if _ds is not None and hasattr(_ds, "set_cancel_callback"):
+                _ds.set_cancel_callback(cancel_callback)
+
     # ---- 1. 读取模板 (无模板时从数据源推导) ----
     if template_path and os.path.exists(template_path):
         _log(log_callback, f"读取模板: {template_path}")

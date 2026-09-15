@@ -20,7 +20,7 @@ from openpyxl.utils import get_column_letter
 from PySide6.QtCore import QObject, Signal
 
 from .chart_config import ChartConfig
-from .datasource import DataSource, ResampledDataSource
+from .datasource import DataSource, PipelineCancelled, ResampledDataSource
 from .lag_config import LagConfig
 from .pipeline import run_batch_pipeline, run_pipeline
 from .plot_config import PlotConfig
@@ -239,6 +239,10 @@ class ProcessingWorker(QObject):
             if not self._cancelled:
                 self.finished.emit(results, {})
 
+        except PipelineCancelled:
+            # 用户在长耗时步骤(如首次索引 158MB CSV)中途点了「停止」。
+            # 这是**正常取消, 不是失败** —— 走 error 会让用户以为出错了。
+            self.log.emit("处理已取消")
         except Exception as e:
             import traceback
             self.error.emit(f"{e}\n{traceback.format_exc()}")

@@ -3,8 +3,21 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Callable
 
 import numpy as np
+
+
+class PipelineCancelled(Exception):
+    """解析/计算被用户取消。
+
+    **必须与普通异常区分**: worker 捕获它时应报告「已取消」而非「失败」。
+
+    为什么需要异常而不是像 pipeline 那样 `if cancel_callback(): break`:
+    长耗时的解析(如 158MB merged.csv 的首次索引, 单次 5-7s)若中途 break,
+    frequencies 会返回**不完整的频点表** —— 后续照样能算出一份"看起来合理
+    但是错的"结果, 比直接报错更危险。
+    """
 
 
 class DataSource(ABC):
@@ -14,6 +27,24 @@ class DataSource(ABC):
       - MergedCsvSource:   EMQuest 合并 CSV 格式
       - FinalSummarySource: FinalSummary.xlsx 格式
     """
+
+    # 取消回调 —— 由 pipeline 在开始处理前注入 (见 set_cancel_callback)。
+    # 长耗时解析在循环里周期性检查它, 以便用户点「停止」能及时生效。
+    _cancel_callback: "Callable[[], bool] | None" = None
+
+    def set_cancel_callback(self, cb: "Callable[[], bool] | None") -> None:
+        """注入取消回调。返回 True 表示应中止。
+
+        由 pipeline 调用, 使「首次解析数据源」这一步也可被中断 ——
+        此前 pipeline 的 cancel_callback 只按文件/频点粒度检查, 覆盖不到它。
+        """
+        self._cancel_callback = cb
+
+    def _check_cancelled(self) -> None:
+        """若已取消则抛 PipelineCancelled。供子类在长循环里调用。"""
+        cb = self._cancel_callback
+        if cb is not None and cb():
+            raise PipelineCancelled()
 
     @property
     @abstractmethod

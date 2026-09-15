@@ -170,8 +170,16 @@ class MergedCSVParser(DataSource):
             # so we use raw readline and minimal parsing.
             self._section_offsets = {name: [] for name in self.SECTION_NAMES}
             current_section: str | None = None
+            _scanned = 0
 
             while True:
+                # 周期性检查取消: 158MB merged.csv 有 19 万行, 单次索引要 5-7s。
+                # 每 4096 行查一次, 让用户点「停止」在百毫秒级生效, 而不是等
+                # 整个文件扫描完。取消时抛异常而非 break —— 半截的频点表会算出
+                # 「看起来合理但错误」的结果, 比报错更危险。
+                _scanned += 1
+                if _scanned % 4096 == 0:
+                    self._check_cancelled()
                 pos = f.tell()
                 line = f.readline()
                 if not line:
