@@ -25,7 +25,18 @@ class I18nManager:
 
     @classmethod
     def init(cls, app: QApplication, language: Optional[str] = None):
-        """初始化翻译。如未指定语言，跟随系统 locale。"""
+        """初始化翻译。
+
+        语言来源优先级:
+          1. 显式传入的 language (来自 antenna_config.json 的用户设定)
+          2. 系统 locale (仅当未传入或传入值无对应 .qm 时)
+
+        传入值没有对应翻译文件时回退系统 locale — 配置文件被改成
+        非法值时界面仍能拿到合理翻译，而不是退化成无翻译状态。
+        """
+        if language and not (cls._translations_dir / f"app_{language}.qm").exists():
+            language = None
+
         if language is None:
             sys_locale = QLocale.system().name()  # e.g., "zh_CN"
             # 只支持 zh_CN 和 en_US

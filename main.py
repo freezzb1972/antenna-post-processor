@@ -153,8 +153,8 @@ def main():
     ThemeManager.load_and_apply()
     splash.advance("正在配置语言...", 60)
 
-    # 国际化
-    I18nManager.init(app)
+    # 国际化 — 语言来自用户配置 (antenna_config.json)，未设定时跟随系统 locale
+    I18nManager.init(app, cfg_mgr.config.language)
     splash.advance("正在创建主窗口...", 80)
 
     # 主窗口（多窗口时关闭最后一个自动退出）

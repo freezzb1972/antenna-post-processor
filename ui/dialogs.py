@@ -2816,6 +2816,12 @@ class SystemSettingsDialog(QDialog):
         new_lang = "en_US" if I18nManager.current_language() == "zh_CN" else "zh_CN"
         I18nManager.switch(QApplication.instance(), new_lang)
         self._btn_lang.setText("English" if new_lang == "zh_CN" else "中文")
+        # 立即持久化 — 语言切换即时生效，不能等到 _on_accept，
+        # 否则点「取消」会留下「界面已变但配置未存」的不一致状态
+        from src.config_manager import get_config_manager
+        mgr = get_config_manager()
+        mgr.config.language = new_lang
+        mgr.save()
 
     def _on_accept(self):
         # 模板预设 — 应用选中的模板
