@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "antenna-post-processor",
-  "last_verified": "2026-07-01",
+  "last_verified": "2026-09-15",
   "ui": {
     "compiled_widgets": [
       "btnAddCustomAngle",
@@ -141,7 +141,10 @@
       "_params_display",
       "_cmb_extrapolate",
       "_btn_one_click",
-      "_check_enable_chart_viewer"
+      "_check_enable_chart_viewer",
+      "_btn_browse_tpl",
+      "_btn_clear_template",
+      "_template_edit"
     ],
     "methods": [
       "__init__",

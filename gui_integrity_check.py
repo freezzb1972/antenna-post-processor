@@ -424,11 +424,31 @@ def check_g6_gui_flow() -> List[str]:
     from src.sheet_file_matcher import MatchResult
     w._last_matches = [MatchResult(sheet_name="5G1", file_path=csv_path, confidence=1.0)]
 
+    # 至少勾选一种输出类型 — 否则 _on_start 会在校验处提前 return,
+    # 线程不会启动, G6 就测不到它本该验证的目标
+    fp = getattr(w, '_file_settings_page', None)
+    if fp is not None and hasattr(fp, '_check_out_excel'):
+        fp._check_out_excel.setChecked(True)
+
     # 触发开始
+    # _on_start 校验不通过时会弹模态 QMessageBox (如未选输出类型),
+    # offscreen 平台下无人点击 → 永久挂起。临时换成静默桩, 完成后恢复。
+    from PySide6.QtWidgets import QMessageBox
+    _saved_boxes = {
+        _n: getattr(QMessageBox, _n)
+        for _n in ("warning", "information", "critical", "question")
+    }
+    QMessageBox.warning = staticmethod(lambda *a, **k: QMessageBox.StandardButton.Ok)
+    QMessageBox.information = staticmethod(lambda *a, **k: QMessageBox.StandardButton.Ok)
+    QMessageBox.critical = staticmethod(lambda *a, **k: QMessageBox.StandardButton.Ok)
+    QMessageBox.question = staticmethod(lambda *a, **k: QMessageBox.StandardButton.No)
     try:
         w._on_start()
     except SystemExit:
         pass
+    finally:
+        for _n, _fn in _saved_boxes.items():
+            setattr(QMessageBox, _n, _fn)
 
     # 验证线程启动 (处理可能很快完成, 此时 _running=False/_thread=None 也是正常的)
     if not w._running and w._thread is None:

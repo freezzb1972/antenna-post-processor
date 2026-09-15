@@ -2710,13 +2710,24 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self._data_stale = True  # 中断的计算，数据标记为陈旧
         self._worker = None
         self._multi_antenna_active = False  # 中断后清除多天线续跑状态，防止下次误触发
-        # 安全退出线程：quit() 退出事件循环，wait(3000) 等待线程结束
-        if self._thread is not None:
-            self._thread.quit()
-            self._thread.wait(3000)
-        self._thread = None
+        self._stop_thread_safely(3000)
         self._restore_start_button()
         self.ui.btnStop.setEnabled(False)
+
+    def _stop_thread_safely(self, timeout_ms: int = 5000):
+        """安全停止工作线程：quit → wait → 超时 terminate 兜底。
+
+        terminate 兜底不可省 — worker 未在超时内响应 cancel 时，若
+        _thread 带着仍运行中的线程被析构，Qt 会直接 abort (SIGABRT):
+          "QThread: Destroyed while thread is still running"
+        """
+        if self._thread is None:
+            return
+        self._thread.quit()
+        if not self._thread.wait(timeout_ms):
+            self._thread.terminate()
+            self._thread.wait()
+        self._thread = None
 
     def _restore_start_button(self):
         """恢复按钮到空闲状态（向后兼容，内部委托 _enter_idle）。"""
@@ -3358,10 +3369,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 return
             if self._worker:
                 self._worker.cancel()
-            self._thread.quit()
-            if not self._thread.wait(5000):
-                self._thread.terminate()
-                self._thread.wait()
+            self._stop_thread_safely(5000)
         import base64
         geom = self.saveGeometry()
         self._cfg.config.window_geometry = bytes(geom.toBase64().data()).decode()
