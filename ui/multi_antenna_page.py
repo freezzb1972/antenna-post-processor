@@ -154,9 +154,11 @@ class MultiAntennaPage(QWidget):
         chart_tab = QWidget()
         chart_scroll = QVBoxLayout(chart_tab)
         from src.chart_config import ChartConfig
-        labels = ChartConfig.chart_labels()
+        from i18n.i18n_manager import tr_shared
+        labels = {k: tr_shared(v, "ChartConfig")
+                  for k, v in ChartConfig.chart_labels().items()}
         for cat_name, keys in ChartConfig.chart_categories(0).items():
-            grp = QGroupBox(cat_name)
+            grp = QGroupBox(tr_shared(cat_name, "ChartConfig"))
             gl = QVBoxLayout(grp)
             gl.setSpacing(2)
             for key in keys:

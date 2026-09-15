@@ -871,7 +871,9 @@ class FileSettingsPage(QWidget):
         def _build_type_combo(col, ctype):
             from src.column_mapping import get_col_type_labels
             cur_mode = cmb_mode.currentData() or 0
-            labels = get_col_type_labels(cur_mode)
+            from i18n.i18n_manager import tr_shared
+            labels = [(t, tr_shared(l, "AntennaParamsPage"))
+                      for t, l in get_col_type_labels(cur_mode)]
             cmb = QComboBox()
             for t, label in labels:
                 cmb.addItem(label, t)
@@ -885,7 +887,9 @@ class FileSettingsPage(QWidget):
         def _rebuild_preview_types(mode: int):
             """模式变更 → 重建所有修正类型下拉列表，保留已选值。"""
             from src.column_mapping import get_col_type_labels
-            labels = get_col_type_labels(mode)
+            from i18n.i18n_manager import tr_shared
+            labels = [(t, tr_shared(l, "AntennaParamsPage"))
+                      for t, l in get_col_type_labels(mode)]
             for ci in range(table.columnCount()):
                 old_cmb = table.cellWidget(4, ci)
                 old_val = old_cmb.currentData() if old_cmb else None
@@ -921,8 +925,9 @@ class FileSettingsPage(QWidget):
             # 修正类型下拉 (按当前模式过滤)
             cmb = QComboBox()
             from src.column_mapping import get_col_type_labels
+            from i18n.i18n_manager import tr_shared
             for ct, label in get_col_type_labels(cur_mode):
-                cmb.addItem(label, ct)
+                cmb.addItem(tr_shared(label, "AntennaParamsPage"), ct)
             idx = cmb.findData(m.detected_type)
             if idx >= 0:
                 cmb.setCurrentIndex(idx)
@@ -3008,7 +3013,11 @@ class ChartSettingsPage(QWidget):
 
     def _setup_ui(self):
         from src.chart_config import ChartConfig
-        labels = ChartConfig.chart_labels()
+        from i18n.i18n_manager import tr_shared
+        # 图表标签定义在 src/ 配置表, 不能原地改 (pipeline 依赖中文原值做报告
+        # 标题匹配), 故在消费点翻译
+        labels = {k: tr_shared(v, "ChartConfig")
+                  for k, v in ChartConfig.chart_labels().items()}
         mode = getattr(self._mw, '_test_mode', 0) if self._mw else 0
         categories = ChartConfig.chart_categories(mode)
 
@@ -3709,8 +3718,10 @@ class ChartSettingsPage(QWidget):
             return
         self._current_mode = mode
         from src.chart_config import ChartConfig
+        from i18n.i18n_manager import tr_shared
         categories = ChartConfig.chart_categories(mode)
-        labels = ChartConfig.chart_labels()
+        labels = {k: tr_shared(v, "ChartConfig")
+                  for k, v in ChartConfig.chart_labels().items()}
 
         # 保存当前勾选状态 (守卫已删除的旧 widget)
         saved = {}
@@ -3835,7 +3846,9 @@ class ChartSettingsPage(QWidget):
     def _show_a3d_param_dialog(self, chart_key: str):
         """A 类 3D 方向图参数设置 — DPI + 采样精度 + 动态范围 + 图表列表(每视角 elev/azim/roll)。"""
         from src.chart_config import ChartConfig
-        label = ChartConfig.chart_labels().get(chart_key, chart_key)
+        from i18n.i18n_manager import tr_shared
+        label = tr_shared(ChartConfig.chart_labels().get(chart_key, chart_key),
+                          "ChartConfig")
 
         def _as3(p):
             return [float(p[0]), float(p[1]), float(p[2]) if len(p) > 2 else 0.0]
@@ -3988,8 +4001,9 @@ class ChartSettingsPage(QWidget):
     def _show_bclass_param_dialog(self, chart_key: str):
         """B 类频率曲线参数设置 — 图表列表 + 频段间隔 + 双Y轴。"""
         from src.chart_config import ChartConfig
+        from i18n.i18n_manager import tr_shared
         label_map = ChartConfig.chart_labels()
-        chart_label = label_map.get(chart_key, chart_key)
+        chart_label = tr_shared(label_map.get(chart_key, chart_key), "ChartConfig")
 
         # 图表列表: 从持久存储恢复
         if not hasattr(self, '_b_class_charts'):

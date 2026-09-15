@@ -195,6 +195,36 @@ class TestThemeI18n:
             f"切回 {original} 后未还原 (en->zh 反查失败): {restored} != {before}"
         )
 
+    def test_no_reverse_collision_within_context(self):
+        """守护反查正确性: 同一 context 内不同源串不得译成同一英文。
+
+        重翻译引擎靠「英文 -> 源串」反查 (I18nManager.to_source)。同一 context
+        内若两条源串的英文相同, 反查即有歧义, 会翻错控件。跨 context 的碰撞由
+        flat 兜底的「候选唯一才采用」策略处理, 故此处只查 context 内部。
+        """
+        import collections
+        import xml.etree.ElementTree as ET
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent.parent
+        ts = ET.parse(root / "i18n" / "app_en_US.ts").getroot()
+
+        collisions = []
+        for ctx in ts.iter("context"):
+            rev = collections.defaultdict(list)
+            for msg in ctx.iter("message"):
+                src, node = msg.findtext("source"), msg.find("translation")
+                if src is None or node is None or not (node.text or "").strip():
+                    continue
+                rev[node.text].append(src)
+            for en, srcs in rev.items():
+                if len(srcs) > 1:
+                    collisions.append((ctx.findtext("name"), en, srcs))
+
+        assert not collisions, (
+            f"同 context 内反向碰撞会使反查失准: {collisions}"
+        )
+
     def test_font_size_persists(self, window, qtbot):
         """字体大小设置持久化到 QSettings。"""
         from PySide6.QtCore import QSettings

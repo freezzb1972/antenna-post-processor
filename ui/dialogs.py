@@ -253,8 +253,9 @@ class DataSourceDialog(QDialog):
                 table.setItem(ri, 0, QTableWidgetItem(m.col_letter))
                 table.setItem(ri, 1, QTableWidgetItem(m.raw_header))
                 cmb = QComboBox()
+                from i18n.i18n_manager import tr_shared
                 for ct, label in get_col_type_labels(0):
-                    cmb.addItem(f"{label} ({ct})", ct)
+                    cmb.addItem(f"{tr_shared(label, 'AntennaParamsPage')} ({ct})", ct)
                 idx = cmb.findData(m.detected_type)
                 if idx >= 0:
                     cmb.setCurrentIndex(idx)
@@ -1544,7 +1545,9 @@ class PlotConfigDialog(QDialog):
 
     def _setup_ui(self):
         from src.chart_config import ChartConfig
-        labels = ChartConfig.chart_labels()
+        from i18n.i18n_manager import tr_shared
+        labels = {k: tr_shared(v, "ChartConfig")
+                  for k, v in ChartConfig.chart_labels().items()}
         categories = ChartConfig.chart_categories()
 
         # ── 子角度选择状态 ──

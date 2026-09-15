@@ -18,10 +18,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QLocale, QTranslator
+from PySide6.QtCore import QCoreApplication, QLocale, QTranslator
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QAbstractButton, QAbstractSpinBox, QApplication, QComboBox, QGroupBox,
@@ -29,6 +30,18 @@ from PySide6.QtWidgets import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def tr_shared(label: str, context: str) -> str:
+    """翻译来自 src/ 的共享文本源 (图表标签 / 列类型标签)。
+
+    这些标签定义在 src/ 的配置表里, **不能原地改成返回译文**:
+      - src/pipeline.py:1350 依赖 ChartConfig.chart_labels() 的中文原值
+        做报告内图表标题匹配 (非 Qt), 改了会破坏报告生成
+      - src/ 禁止 import Qt (架构铁律)
+    故翻译只能发生在 UI 消费点。源串经 ui/i18n_catalog.py 注册进 .ts。
+    """
+    return QCoreApplication.translate(context, label)
 
 
 class I18nManager:
@@ -206,17 +219,59 @@ class I18nManager:
                 break
         return type(widget).__name__
 
+    # 拼接串降级用: 形如 "<b>" + self.tr("测试类型:") + "</b>"、
+    # "📡 " + self.tr("无源天线")、"NHPRP / NHPIS " + self.tr("自定义角度")
+    # 会让控件文本 != 源串, 精确反查必然失配。抽出「核心文案」再试。
+    _HTML_TAG_RE = re.compile(r"<[^>]+>")
+    _EDGE_NONWORD_RE = re.compile(r"^[^\w]+|[^\w]+$")
+    _FIRST_CJK_RE = re.compile(r"[一-鿿].*", re.S)
+
+    @classmethod
+    def _candidate_cores(cls, text: str) -> list:
+        """产出 T 的候选核心文案, 精确版在前 (去重)。
+
+        拼接成分在**两个方向上不对称**, 单一策略不够:
+          zh 态 "📂 输入输出"     → 剥前缀即可
+          en 态 "📂 Input/Output" → 英文里没有中文可供抽取, 只能靠剥首尾非文字字符
+        故「抽中文核心」与「剥首尾非文字字符」两条路都要走。候选串的查找只是
+        一次 dict 命中, 多试几个代价可忽略。
+        """
+        out: list = []
+
+        def add(s):
+            if s and s not in out:
+                out.append(s)
+
+        add(text)                                            # 精确
+        add(cls._HTML_TAG_RE.sub("", text).strip())          # 去 HTML 标签
+        add(cls._EDGE_NONWORD_RE.sub("", text))              # 剥首尾 emoji/标点/空白
+        m = cls._FIRST_CJK_RE.search(text)
+        if m:
+            add(m.group(0).rstrip())                         # 首个中文到结尾
+            add(cls._EDGE_NONWORD_RE.sub("", m.group(0)))    # 同上, 再去尾部标点
+        return out
+
     @classmethod
     def _retranslate_text(cls, text: str, widget, from_lang: str, to_lang: str):
-        """文本 → 目标语言译文。无需改动或无法确定时返回 None。"""
+        """文本 → 目标语言译文。无需改动或无法确定时返回 None。
+
+        先按精确文本反查; 失配则降级到候选核心文案, 命中后把核心替换回原
+        文本 (保留 emoji/HTML 等前后缀)。
+        """
         if not text:
             return None
         ctx = cls._context_of(widget)
-        source = cls.to_source(text, ctx, from_lang)
-        if source is None:
-            return None
-        new = cls.from_source(source, ctx, to_lang)
-        return new if new != text else None
+        for core in cls._candidate_cores(text):
+            source = cls.to_source(core, ctx, from_lang)
+            if source is None:
+                continue
+            new_core = cls.from_source(source, ctx, to_lang)
+            if new_core == core:
+                continue
+            new = new_core if core == text else text.replace(core, new_core, 1)
+            if new != text:
+                return new
+        return None
 
     @classmethod
     def _retranslate_one(cls, widget, getter, setter, from_lang, to_lang) -> int:

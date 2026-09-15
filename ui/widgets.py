@@ -356,8 +356,9 @@ class TemplateSourceRow(QWidget):
             table.setItem(ri, 0, QTableWidgetItem(m.col_letter))
             table.setItem(ri, 1, QTableWidgetItem(m.raw_header))
             cmb = QComboBox()
+            from i18n.i18n_manager import tr_shared
             for ct, label in get_col_type_labels(0):
-                cmb.addItem(label, ct)
+                cmb.addItem(tr_shared(label, "AntennaParamsPage"), ct)
             idx = cmb.findData(m.detected_type)
             if idx >= 0:
                 cmb.setCurrentIndex(idx)

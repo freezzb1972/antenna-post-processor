@@ -609,7 +609,8 @@
       ],
       "src_modules": [
         "theme_manager.py",
-        "i18n_manager.py"
+        "i18n_manager.py",
+        "ui/i18n_catalog.py"
       ],
       "tests": [
         "test_e2e_features.py::TestThemeI18n"
