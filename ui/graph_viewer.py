@@ -1854,6 +1854,14 @@ class GraphDataTab(QWidget):
         ctrl.addWidget(QLabel(f"共 {len(self._gd)} 个频点, 步进 5°"))
         layout.addLayout(ctrl)
 
+        if not self._gd:
+            # 数据为空时给出显式提示 — 否则整页空白且无任何说明 (静默失效)
+            _hint = QLabel(self.tr(
+                "未找到图形数据 — 请勾选「中间数据输出」或启用图表后重新处理"))
+            _hint.setWordWrap(True)
+            _hint.setStyleSheet("color: #d9534f; padding: 12px;")
+            layout.addWidget(_hint)
+
         self._table = QTableWidget()
         self._table.setObjectName("graphDataTable")
         layout.addWidget(self._table)

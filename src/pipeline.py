@@ -576,9 +576,12 @@ def _process_one_frequency(
     # 角度数组 (小, 始终存储)
     row["_theta_angles"] = list(theta_deg)
     row["_phi_angles"] = [float(i) for i in np.linspace(0, 360, phi_lm.shape[0], endpoint=False)]
-    # 全分辨率矩阵: 仅 3D 查看器 / 中间数据导出需要, 报告生成不存储
-    if store_matrices:
+    # 全分辨率矩阵: 3D 查看器 / 中间数据导出需要。
+    # want_render (有图表) 时也必须存 _raw_data — extract_graph_data 靠它重建
+    # E_θ/E_φ/相位等分量图; 只存 _chart_* 会让「图形数据」页静默空白。
+    if store_matrices or want_render:
         row["_raw_data"] = {k: v for k, v in raw.items() if v is not None}
+    if store_matrices:
         row["theta_db"] = theta_lm
         row["phi_db"] = phi_lm
         row["gain_db"] = gain_dbi
