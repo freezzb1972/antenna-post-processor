@@ -5930,7 +5930,7 @@ Please change it and select again.</translation>
     <message>
         <location filename="../ui/rsp_picker_dialog.py" line="182"/>
         <source>请选择一个预设，或浏览文件，或点击「跳过」。</source>
-        <translation>Select a preset, browse for files, or click "Skip".</translation>
+        <translation>Select a preset, browse for files, or click &quot;Skip&quot;.</translation>
     </message>
 </context>
 <context>
