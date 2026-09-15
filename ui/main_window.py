@@ -2721,18 +2721,38 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.btnStop.setEnabled(False)
 
     def _stop_thread_safely(self, timeout_ms: int = 5000):
-        """安全停止工作线程：quit → wait → 超时 terminate 兜底。
+        """安全停止工作线程：quit → 有界 wait → 超时则保留引用让其自然结束。
 
-        terminate 兜底不可省 — worker 未在超时内响应 cancel 时，若
-        _thread 带着仍运行中的线程被析构，Qt 会直接 abort (SIGABRT):
-          "QThread: Destroyed while thread is still running"
+        ⚠️ **绝不使用 `QThread.terminate()`** —— Qt 明确不鼓励强制终止线程:
+        worker 常正卡在长原生调用里(NumPy 解析 158MB merged.csv 需 5-7s),
+        强杀会让线程在持有 Qt/NumPy 内部状态时被撕裂 → **进程 SIGSEGV**。
+        实测: 门禁 G6 循环调用时第 3 轮必崩(core dumped, exit 139),
+        崩前 faulthandler 转储也被截断。原实现同时还有「terminate 后无超时
+        wait()」——那会让用户点「⏹ 停止」时界面永久冻死。
+
+        正解: 超时后不杀线程, 而是**保留引用**避免析构 abort
+        ("QThread: Destroyed while thread is still running"), 让 worker 在
+        下一个取消检查点自行退出; finished 信号触发时释放引用。
         """
         if self._thread is None:
             return
         self._thread.quit()
-        if not self._thread.wait(timeout_ms):
-            self._thread.terminate()
-            self._thread.wait()
+        if self._thread.wait(timeout_ms):
+            self._thread = None
+            return
+
+        # 仍未停: worker 卡在不可中断的长步骤里(实测: 解析 158MB merged.csv 需
+        # 5-7s, 而 pipeline 的 cancel_callback 只按文件/频点粒度检查, 覆盖不到
+        # 这一步)。
+        # **保留在 self._thread 上, 不置 None** —— 引用在, 线程就不会被析构
+        # abort("QThread: Destroyed while thread is still running")。
+        # 待其跑到下一个取消检查点时自行退出, finished 触发后再清引用。
+        # 不阻塞返回, 界面保持响应。
+        self._thread.finished.connect(self._on_worker_thread_finished)
+        self._log(self.tr("⚠ 正在完成当前步骤后停止…"))
+
+    def _on_worker_thread_finished(self):
+        """工作线程自然结束 —— 清引用, 允许下次启动。"""
         self._thread = None
 
     def _restore_start_button(self):
@@ -3386,6 +3406,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             if self._worker:
                 self._worker.cancel()
             self._stop_thread_safely(5000)
+            # _stop_thread_safely 超时会保留 _thread(不置 None)以免析构 abort。
+            # 关窗在即, 必须**真正等它结束** —— worker 可能仍卡在解析大文件这类
+            # 不可中断的长步骤里(实测 5-7s, 大文件更久), 故给足 30s。
+            if self._thread is not None and self._thread.isRunning():
+                self._thread.wait(30000)
         import base64
         geom = self.saveGeometry()
         self._cfg.config.window_geometry = bytes(geom.toBase64().data()).decode()

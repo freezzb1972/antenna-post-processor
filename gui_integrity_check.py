@@ -456,10 +456,20 @@ def check_g6_gui_flow() -> List[str]:
     elif w._thread is not None and not w._thread.isRunning():
         errors.append("G6_FLOW: thread.isRunning()=False — 线程未run")
 
-    # 不等完成, 立即停止清理
-    if w._thread and w._thread.isRunning():
-        try: w._on_stop(); w._thread.quit(); w._thread.wait(3000)
-        except Exception: pass
+    # 停止并**真正等线程结束** —— 否则本进程退出时 Qt 会 abort:
+    #   "QThread: Destroyed while thread is still running" (实测 EXIT=134)。
+    # worker 可能正卡在不可中断的长步骤里: pipeline 的 cancel_callback 只按
+    # 文件/频点粒度检查, 覆盖不到「首次解析数据源」——而 data/5G1_merged.csv
+    # 是 158MB, 单次 _build_index 就要 5-7s。故给足 30s。
+    # 另注: 绝不能用 _thread.terminate() 强杀 —— 那会让线程在持有 NumPy/Qt
+    # 内部状态时被撕裂, 进程 SIGSEGV(实测第 3 轮必崩)。
+    if w._thread is not None:
+        try:
+            w._on_stop()
+        except Exception:
+            pass
+    if w._thread is not None and w._thread.isRunning():
+        w._thread.wait(30000)
 
     return errors
 
