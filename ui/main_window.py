@@ -3208,8 +3208,15 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
     def changeEvent(self, event: QEvent):
         """语言切换事件 → 刷新所有 UI 文字。"""
         if event.type() == QEvent.LanguageChange:
-            self.ui.retranslateUi(self)
-            self._update_lag_display()
+            # LanguageChange 由 installTranslator 异步投递。窗口销毁期间事件
+            # 仍可能到达, 此时部分子 widget 的 C++ 对象已回收, retranslateUi
+            # 会抛 RuntimeError (libshiboken: already deleted)。
+            # 吞掉该异常: 窗口正在消失, 文案是否刷新已无意义。
+            try:
+                self.ui.retranslateUi(self)
+                self._update_lag_display()
+            except RuntimeError:
+                pass
         super().changeEvent(event)
 
     # ==================================================================
