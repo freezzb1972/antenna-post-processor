@@ -43,6 +43,15 @@ DEFAULT_PATTERN_KEYS = list(PATTERN_DATA_MAP.keys())
 GRID_OPTIONS = ["1×1", "1×2", "2×2", "3×3", "2×2+1"]
 PLOT_TYPES = ["Spherical 3D", "Polar 2D", "Cartesian 3D"]
 
+# 图型显示名 —— **键是内部标识**(set_plot_type/子图状态都用它), 不能翻译。
+# 与 VIEW_PRESETS 同一道理: 显示名必须与键分离, 否则 findText/比较在切换语言后失效。
+# 字面量写在此处以便 lupdate 静态提取(见 ui/i18n_catalog.py)。
+PLOT_TYPE_LABELS = {
+    "Spherical 3D": "球面 3D",
+    "Polar 2D": "极坐标 2D",
+    "Cartesian 3D": "直角坐标 3D",
+}
+
 # 7 视角预设 (elev, azim, roll) — 与报告 A 类弹窗 7 预设一致 (Iso + 上下左右前后)
 VIEW_PRESETS = {
     "Iso":    (30, -60, 0),
@@ -681,7 +690,9 @@ class GraphViewer(QWidget):
         lay.addWidget(self._cmb_freq)
         lay.addWidget(QLabel(self.tr("布局:")))
         self._cmb_grid = QComboBox()
-        self._cmb_grid.addItems(GRID_OPTIONS); self._cmb_grid.setCurrentIndex(2)
+        for _g in GRID_OPTIONS:
+            self._cmb_grid.addItem(_g, _g)          # 尺寸记号无需翻译, 但仍走 data 消费
+        self._cmb_grid.setCurrentIndex(2)
         self._cmb_grid.setFixedWidth(72)
         self._cmb_grid.currentIndexChanged.connect(self._on_grid_changed)
         lay.addWidget(self._cmb_grid)
@@ -738,7 +749,9 @@ class GraphViewer(QWidget):
 
         lay.addWidget(QLabel(self.tr("图型:")))
         self._cmb_plot_type = QComboBox()
-        self._cmb_plot_type.addItems(PLOT_TYPES); self._cmb_plot_type.setFixedWidth(112)
+        for _pt in PLOT_TYPES:
+            self._cmb_plot_type.addItem(self.tr(PLOT_TYPE_LABELS[_pt]), _pt)
+        self._cmb_plot_type.setFixedWidth(112)
         self._cmb_plot_type.setToolTip(self.tr("3D曲面 / 极坐标2D切面 / 直角3D"))
         self._cmb_plot_type.currentIndexChanged.connect(self._on_toolbar_plot_type)
         lay.addWidget(self._cmb_plot_type)
@@ -793,7 +806,9 @@ class GraphViewer(QWidget):
         lay.addWidget(self._cmb_sel_data)
         lay.addWidget(QLabel(self.tr("图型:")))
         self._cmb_plot_type = QComboBox()
-        self._cmb_plot_type.addItems(PLOT_TYPES); self._cmb_plot_type.setFixedWidth(112)
+        for _pt in PLOT_TYPES:
+            self._cmb_plot_type.addItem(self.tr(PLOT_TYPE_LABELS[_pt]), _pt)
+        self._cmb_plot_type.setFixedWidth(112)
         self._cmb_plot_type.setToolTip(self.tr("3D曲面 / 极坐标2D / 直角3D"))
         self._cmb_plot_type.currentIndexChanged.connect(self._on_toolbar_plot_type)
         lay.addWidget(self._cmb_plot_type)
@@ -878,7 +893,7 @@ class GraphViewer(QWidget):
             self._chk_link.setChecked(checked)   # 保持隐藏控件同步
 
     def _on_toolbar_plot_type(self):
-        pt = self._cmb_plot_type.currentText()
+        pt = self._cmb_plot_type.currentData() or self._cmb_plot_type.currentText()
         for sp in self._view_targets():
             sp.set_plot_type(pt)
         self._on_update()
@@ -903,7 +918,7 @@ class GraphViewer(QWidget):
         self._cmb_sel_data.blockSignals(False)
         # 图型
         self._cmb_plot_type.blockSignals(True)
-        k = self._cmb_plot_type.findText(sp._plot_type)
+        k = self._cmb_plot_type.findData(sp._plot_type)
         if k >= 0:
             self._cmb_plot_type.setCurrentIndex(k)
         self._cmb_plot_type.blockSignals(False)
@@ -1285,7 +1300,7 @@ class GraphViewer(QWidget):
         old_views = {sp.data_key: (sp._elev, sp._azim, sp._roll) for sp in self._subplots}
         self._figure.clear()
         self._subplots = []
-        grid = self._cmb_grid.currentText()
+        grid = self._cmb_grid.currentData() or self._cmb_grid.currentText()
         if grid == "2×2+1":
             self._rebuild_2x2plus1(old_views)
         else:
@@ -1322,7 +1337,8 @@ class GraphViewer(QWidget):
     def _grid_dims(self):
         mapping = {"1×1": (1, 1), "1×2": (1, 2), "2×2": (2, 2),
                    "3×3": (3, 3), "2×2+1": (2, 3)}
-        return mapping.get(self._cmb_grid.currentText(), (2, 2))
+        return mapping.get(self._cmb_grid.currentData()
+                           or self._cmb_grid.currentText(), (2, 2))
 
     def _on_grid_changed(self):
         self._rebuild_subplots()

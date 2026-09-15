@@ -39,7 +39,7 @@ def collect() -> dict[str, set]:
                               "ThemeManager": set(), "CalcParamsDialog": set(),
                               "ReportMetadataDialog": set(),
                               "TemplateRecognizerDialog": set(),
-                              "ProjectManagerDialog": set()}
+                              "ProjectManagerDialog": set(), "GraphViewer": set()}
 
     # ── 主题显示名 ──
     # ALL_THEMES 是 class body 数据, 不能在里面包 translate (import 期求值会冻结
@@ -57,6 +57,11 @@ def collect() -> dict[str, set]:
         result["TemplateRecognizerDialog"].add(_label)
     for _t, _label in CATEGORIES:
         result["ProjectManagerDialog"].add(_label)
+
+    # ── 图型显示名 (graph_viewer 的模块级常量表) ──
+    from ui.graph_viewer import PLOT_TYPE_LABELS
+
+    result.setdefault("GraphViewer", set()).update(PLOT_TYPE_LABELS.values())
 
     # ── 图表标签 + 类别名 ──
     from src.chart_config import ChartConfig

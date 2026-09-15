@@ -139,6 +139,11 @@ def _catalog():
     QCoreApplication.translate("ChartConfig", '直角坐标俯仰面切面图')
     QCoreApplication.translate("ChartConfig", '直角坐标方位面切面图')
 
+    # ── GraphViewer (3 条) ──
+    QCoreApplication.translate("GraphViewer", '极坐标 2D')
+    QCoreApplication.translate("GraphViewer", '球面 3D')
+    QCoreApplication.translate("GraphViewer", '直角坐标 3D')
+
     # ── ProjectManagerDialog (4 条) ──
     QCoreApplication.translate("ProjectManagerDialog", 'EMC 测试')
     QCoreApplication.translate("ProjectManagerDialog", 'SAR 测试')

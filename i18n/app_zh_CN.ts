@@ -3626,22 +3626,22 @@
 <context>
     <name>GraphDataTab</name>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1885"/>
+        <location filename="../ui/graph_viewer.py" line="1901"/>
         <source>📊 图形数据</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1900"/>
+        <location filename="../ui/graph_viewer.py" line="1916"/>
         <source>频点:</source>
         <translation type="unfinished">频点:</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1910"/>
+        <location filename="../ui/graph_viewer.py" line="1926"/>
         <source>未找到图形数据 — 请勾选「中间数据输出」或启用图表后重新处理</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1941"/>
+        <location filename="../ui/graph_viewer.py" line="1957"/>
         <source>共 {0} 个频点, 步进 5°</source>
         <translation type="unfinished"></translation>
     </message>
@@ -3649,451 +3649,466 @@
 <context>
     <name>GraphViewer</name>
     <message>
-        <location filename="../ui/graph_viewer.py" line="68"/>
+        <location filename="../ui/graph_viewer.py" line="77"/>
         <source>Iso</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="69"/>
+        <location filename="../ui/graph_viewer.py" line="78"/>
         <source>顶</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="70"/>
+        <location filename="../ui/graph_viewer.py" line="79"/>
         <source>底</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="71"/>
+        <location filename="../ui/graph_viewer.py" line="80"/>
         <source>前</source>
         <translation type="unfinished">前</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="72"/>
+        <location filename="../ui/graph_viewer.py" line="81"/>
         <source>后</source>
         <translation type="unfinished">后</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="73"/>
+        <location filename="../ui/graph_viewer.py" line="82"/>
         <source>左</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="74"/>
+        <location filename="../ui/graph_viewer.py" line="83"/>
         <source>右</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="412"/>
+        <location filename="../ui/graph_viewer.py" line="421"/>
         <source>无源天线</source>
         <translation type="unfinished">无源天线</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="412"/>
+        <location filename="../ui/graph_viewer.py" line="421"/>
         <source>有源发射 TRP</source>
         <translation type="unfinished">有源发射 TRP</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="412"/>
+        <location filename="../ui/graph_viewer.py" line="421"/>
         <source>有源接收 TIS</source>
         <translation type="unfinished">有源接收 TIS</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="414"/>
+        <location filename="../ui/graph_viewer.py" line="423"/>
         <source>测试类型: {0}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="423"/>
+        <location filename="../ui/graph_viewer.py" line="432"/>
         <source>({0}个)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="437"/>
-        <location filename="../ui/graph_viewer.py" line="917"/>
+        <location filename="../ui/graph_viewer.py" line="446"/>
+        <location filename="../ui/graph_viewer.py" line="932"/>
         <source>◉ 子图 #{0}:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="492"/>
-        <location filename="../ui/graph_viewer.py" line="675"/>
+        <location filename="../ui/graph_viewer.py" line="501"/>
+        <location filename="../ui/graph_viewer.py" line="684"/>
         <source>频点:</source>
         <translation type="unfinished">频点:</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="506"/>
+        <location filename="../ui/graph_viewer.py" line="515"/>
         <source>步:</source>
         <translation type="unfinished">步:</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="510"/>
+        <location filename="../ui/graph_viewer.py" line="519"/>
         <source>自定义...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="522"/>
         <location filename="../ui/graph_viewer.py" line="531"/>
+        <location filename="../ui/graph_viewer.py" line="540"/>
         <source>⚙ 角度...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="539"/>
+        <location filename="../ui/graph_viewer.py" line="548"/>
         <source>  数据源:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="543"/>
         <location filename="../ui/graph_viewer.py" line="552"/>
-        <location filename="../ui/graph_viewer.py" line="670"/>
-        <location filename="../ui/graph_viewer.py" line="678"/>
+        <location filename="../ui/graph_viewer.py" line="561"/>
+        <location filename="../ui/graph_viewer.py" line="679"/>
+        <location filename="../ui/graph_viewer.py" line="687"/>
         <source>搜索...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="548"/>
+        <location filename="../ui/graph_viewer.py" line="557"/>
         <source>类型:</source>
         <translation type="unfinished">类型:</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="581"/>
+        <location filename="../ui/graph_viewer.py" line="590"/>
         <source>选择频点</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="584"/>
+        <location filename="../ui/graph_viewer.py" line="593"/>
         <source>搜索频点...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="596"/>
+        <location filename="../ui/graph_viewer.py" line="605"/>
         <source>全选</source>
         <translation type="unfinished">全选</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="597"/>
+        <location filename="../ui/graph_viewer.py" line="606"/>
         <source>清空</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="615"/>
+        <location filename="../ui/graph_viewer.py" line="624"/>
         <source>选择 {0} 角度</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="619"/>
+        <location filename="../ui/graph_viewer.py" line="628"/>
         <source>+ 添加</source>
         <translation type="unfinished">+ 添加</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="667"/>
+        <location filename="../ui/graph_viewer.py" line="676"/>
         <source>视图:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="682"/>
+        <location filename="../ui/graph_viewer.py" line="691"/>
         <source>布局:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="691"/>
+        <location filename="../ui/graph_viewer.py" line="702"/>
         <source>频率扫描动画</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="695"/>
+        <location filename="../ui/graph_viewer.py" line="706"/>
         <source>下一频点</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="700"/>
+        <location filename="../ui/graph_viewer.py" line="711"/>
         <source>天线:</source>
         <translation type="unfinished">天线:</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="702"/>
+        <location filename="../ui/graph_viewer.py" line="713"/>
         <source>选择查看的天线数据</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="705"/>
+        <location filename="../ui/graph_viewer.py" line="716"/>
         <source>随主</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="706"/>
+        <location filename="../ui/graph_viewer.py" line="717"/>
         <source>跟随主天线选择器</source>
         <translation type="unfinished">跟随主天线选择器</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="711"/>
-        <location filename="../ui/graph_viewer.py" line="1084"/>
+        <location filename="../ui/graph_viewer.py" line="722"/>
+        <location filename="../ui/graph_viewer.py" line="1099"/>
         <source>图形显示设置</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="715"/>
+        <location filename="../ui/graph_viewer.py" line="726"/>
         <source>导出视图为图片</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="726"/>
-        <location filename="../ui/graph_viewer.py" line="784"/>
+        <location filename="../ui/graph_viewer.py" line="737"/>
+        <location filename="../ui/graph_viewer.py" line="797"/>
         <source>◉ 子图 #1:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="730"/>
-        <location filename="../ui/graph_viewer.py" line="787"/>
+        <location filename="../ui/graph_viewer.py" line="741"/>
+        <location filename="../ui/graph_viewer.py" line="800"/>
         <source>数据:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="732"/>
-        <location filename="../ui/graph_viewer.py" line="791"/>
+        <location filename="../ui/graph_viewer.py" line="743"/>
+        <location filename="../ui/graph_viewer.py" line="804"/>
         <source>选中子图显示的数据类型</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="739"/>
-        <location filename="../ui/graph_viewer.py" line="794"/>
+        <location filename="../ui/graph_viewer.py" line="750"/>
+        <location filename="../ui/graph_viewer.py" line="807"/>
         <source>图型:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="742"/>
+        <location filename="../ui/graph_viewer.py" line="755"/>
         <source>3D曲面 / 极坐标2D切面 / 直角3D</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="746"/>
-        <location filename="../ui/graph_viewer.py" line="800"/>
+        <location filename="../ui/graph_viewer.py" line="759"/>
+        <location filename="../ui/graph_viewer.py" line="815"/>
         <source>视角:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="753"/>
+        <location filename="../ui/graph_viewer.py" line="766"/>
         <source>7 视角预设</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="759"/>
-        <location filename="../ui/graph_viewer.py" line="829"/>
+        <location filename="../ui/graph_viewer.py" line="772"/>
+        <location filename="../ui/graph_viewer.py" line="844"/>
         <source>重置视角为默认 Iso + 关切割</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="778"/>
+        <location filename="../ui/graph_viewer.py" line="791"/>
         <source>联动</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="780"/>
+        <location filename="../ui/graph_viewer.py" line="793"/>
         <source>on: 图型/视角/切割作用所有子图; off: 仅作用选中的子图</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="797"/>
+        <location filename="../ui/graph_viewer.py" line="812"/>
         <source>3D曲面 / 极坐标2D / 直角3D</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="807"/>
+        <location filename="../ui/graph_viewer.py" line="822"/>
         <source>7 视角预设, 手动微调在 ⚙ 设置中</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="810"/>
+        <location filename="../ui/graph_viewer.py" line="825"/>
         <source>切割</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="811"/>
+        <location filename="../ui/graph_viewer.py" line="826"/>
         <source>单击3D球面设切割角 | 连续多次切割取交集 | ↔翻转保留侧 | ✕清除</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="816"/>
+        <location filename="../ui/graph_viewer.py" line="831"/>
         <source>切割角度 φ (或单击3D球面自动填入)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="820"/>
+        <location filename="../ui/graph_viewer.py" line="835"/>
         <source>翻转保留侧: [φ,φ+180) ↔ [φ+180,φ+360)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="824"/>
+        <location filename="../ui/graph_viewer.py" line="839"/>
         <source>清除所有切割, 恢复完整球面</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="860"/>
+        <location filename="../ui/graph_viewer.py" line="875"/>
         <source>3D 采样步进</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="862"/>
-        <location filename="../ui/graph_viewer.py" line="1791"/>
+        <location filename="../ui/graph_viewer.py" line="877"/>
+        <location filename="../ui/graph_viewer.py" line="1807"/>
         <source>单Y轴</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="862"/>
-        <location filename="../ui/graph_viewer.py" line="1791"/>
+        <location filename="../ui/graph_viewer.py" line="877"/>
+        <location filename="../ui/graph_viewer.py" line="1807"/>
         <source>双Y轴(自动)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="862"/>
-        <location filename="../ui/graph_viewer.py" line="1791"/>
+        <location filename="../ui/graph_viewer.py" line="877"/>
+        <location filename="../ui/graph_viewer.py" line="1807"/>
         <source>双Y轴(强制)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="867"/>
+        <location filename="../ui/graph_viewer.py" line="882"/>
         <source>联动视角</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1037"/>
+        <location filename="../ui/graph_viewer.py" line="1052"/>
         <source>导出图形视图</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1038"/>
+        <location filename="../ui/graph_viewer.py" line="1053"/>
         <source>PNG 图片 (*.png);;JPEG 图片 (*.jpg);;所有文件 (*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1054"/>
+        <location filename="../ui/graph_viewer.py" line="1069"/>
         <source>📋 导出迹线数据为 CSV...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1057"/>
+        <location filename="../ui/graph_viewer.py" line="1072"/>
         <source>导出迹线数据</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1058"/>
+        <location filename="../ui/graph_viewer.py" line="1073"/>
         <source>CSV 文件 (*.csv)</source>
         <translation type="unfinished">CSV 文件 (*.csv)</translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1089"/>
+        <location filename="../ui/graph_viewer.py" line="1104"/>
         <source>色图:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1091"/>
+        <location filename="../ui/graph_viewer.py" line="1106"/>
         <source>  精度:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1097"/>
+        <location filename="../ui/graph_viewer.py" line="1112"/>
         <source>Normalize (峰值→0dB, 对比形状用)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1103"/>
+        <location filename="../ui/graph_viewer.py" line="1118"/>
         <source>dB 量程锁定:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1117"/>
+        <location filename="../ui/graph_viewer.py" line="1132"/>
         <source>默认数据类型 (布局初始铺哪些)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1124"/>
+        <location filename="../ui/graph_viewer.py" line="1139"/>
         <source>当前数据无此类型 (仍可选)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1129"/>
+        <location filename="../ui/graph_viewer.py" line="1144"/>
         <source>频率曲线选择 (Freq Curves 模式)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1138"/>
+        <location filename="../ui/graph_viewer.py" line="1153"/>
         <source>(无频率曲线数据 — 请先运行处理)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1143"/>
+        <location filename="../ui/graph_viewer.py" line="1158"/>
         <source>动画速度:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1150"/>
+        <location filename="../ui/graph_viewer.py" line="1165"/>
         <source>3D 网格线型:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1152"/>
-        <location filename="../ui/graph_viewer.py" line="1153"/>
+        <location filename="../ui/graph_viewer.py" line="1167"/>
+        <location filename="../ui/graph_viewer.py" line="1168"/>
         <source>Minimum (极细)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1152"/>
+        <location filename="../ui/graph_viewer.py" line="1167"/>
         <source>None (平滑无网格)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1152"/>
+        <location filename="../ui/graph_viewer.py" line="1167"/>
         <source>Proportional (等宽)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1159"/>
+        <location filename="../ui/graph_viewer.py" line="1174"/>
         <source>极坐标零度朝右 (E)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1162"/>
+        <location filename="../ui/graph_viewer.py" line="1177"/>
         <source>记忆迹线叠加 (多频点对比)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1168"/>
+        <location filename="../ui/graph_viewer.py" line="1183"/>
         <source>视角手动微调</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1406"/>
+        <location filename="../ui/graph_viewer.py" line="1422"/>
         <source>θ={0}×φ={1}={2}点</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1455"/>
-        <location filename="../ui/graph_viewer.py" line="1861"/>
+        <location filename="../ui/graph_viewer.py" line="1471"/>
+        <location filename="../ui/graph_viewer.py" line="1877"/>
         <source>▶ 播放</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1635"/>
+        <location filename="../ui/graph_viewer.py" line="1651"/>
         <source>无频率曲线数据可用</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1646"/>
+        <location filename="../ui/graph_viewer.py" line="1662"/>
         <source>未选择任何频率曲线</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1663"/>
+        <location filename="../ui/graph_viewer.py" line="1679"/>
         <source>无频率曲线数据</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1793"/>
+        <location filename="../ui/graph_viewer.py" line="1809"/>
         <source>频率曲线: {0} 项, {1} 个频点 [{2}]</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/graph_viewer.py" line="1855"/>
+        <location filename="../ui/graph_viewer.py" line="1871"/>
         <source>⏸ 暂停</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/i18n_catalog.py" line="143"/>
+        <source>极坐标 2D</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/i18n_catalog.py" line="144"/>
+        <source>球面 3D</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/i18n_catalog.py" line="145"/>
+        <source>直角坐标 3D</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -4523,7 +4538,7 @@
     </message>
     <message>
         <location filename="../ui/main_window.py" line="430"/>
-        <location filename="../ui/main_window.py" line="3097"/>
+        <location filename="../ui/main_window.py" line="3117"/>
         <source>天线:</source>
         <translation>天线:</translation>
     </message>
@@ -4602,7 +4617,7 @@
         <location filename="../ui/main_window.py" line="566"/>
         <location filename="../ui/main_window.py" line="2279"/>
         <location filename="../ui/main_window.py" line="2284"/>
-        <location filename="../ui/main_window.py" line="2758"/>
+        <location filename="../ui/main_window.py" line="2778"/>
         <source>👁 预览</source>
         <translation>👁 预览</translation>
     </message>
@@ -5003,37 +5018,42 @@ GitHub: freezzb1972/antenna-post-processor</translation>
         <translation>正在打开数据文件...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2806"/>
+        <location filename="../ui/main_window.py" line="2752"/>
+        <source>⚠ 正在完成当前步骤后停止…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="2826"/>
         <source>✅ 完成</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2874"/>
+        <location filename="../ui/main_window.py" line="2894"/>
         <source>默认天线</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3279"/>
+        <location filename="../ui/main_window.py" line="3299"/>
         <source>📡 无源</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3311"/>
+        <location filename="../ui/main_window.py" line="3331"/>
         <source>&lt;b&gt;参数:&lt;/b&gt; &lt;span style=&apos;color:#888;&apos;&gt;(未选择)&lt;/span&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3326"/>
+        <location filename="../ui/main_window.py" line="3346"/>
         <source>外推</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3380"/>
+        <location filename="../ui/main_window.py" line="3400"/>
         <source>确认退出</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3381"/>
+        <location filename="../ui/main_window.py" line="3401"/>
         <source>正在处理中，确定要退出吗？</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5141,7 +5161,7 @@ GitHub: freezzb1972/antenna-post-processor</translation>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="2376"/>
-        <location filename="../ui/main_window.py" line="2749"/>
+        <location filename="../ui/main_window.py" line="2769"/>
         <source>⏳ 处理中...</source>
         <translation>⏳ 处理中...</translation>
     </message>
@@ -5237,57 +5257,57 @@ GitHub: freezzb1972/antenna-post-processor</translation>
         <translation>  完整报告: {full_report_path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2825"/>
+        <location filename="../ui/main_window.py" line="2845"/>
         <source>📦 正在打包任务包...</source>
         <translation>📦 正在打包任务包...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2893"/>
+        <location filename="../ui/main_window.py" line="2913"/>
         <source>📝 正在填充 Word 模板...</source>
         <translation>📝 正在填充 Word 模板...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3110"/>
+        <location filename="../ui/main_window.py" line="3130"/>
         <source>  数据层:</source>
         <translation>  数据层:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3112"/>
+        <location filename="../ui/main_window.py" line="3132"/>
         <source>最终参数</source>
         <translation>最终参数</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3113"/>
+        <location filename="../ui/main_window.py" line="3133"/>
         <source>中间数据</source>
         <translation>中间数据</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3114"/>
+        <location filename="../ui/main_window.py" line="3134"/>
         <source>原始数据 (TODO)</source>
         <translation>原始数据 (TODO)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3117"/>
+        <location filename="../ui/main_window.py" line="3137"/>
         <source>☑ 联动</source>
         <translation>☑ 联动</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3119"/>
+        <location filename="../ui/main_window.py" line="3139"/>
         <source>跟随主天线选择器</source>
         <translation>跟随主天线选择器</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3129"/>
+        <location filename="../ui/main_window.py" line="3149"/>
         <source>  (暂无计算结果 — 请先预览)</source>
         <translation>  (暂无计算结果 — 请先预览)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3134"/>
+        <location filename="../ui/main_window.py" line="3154"/>
         <source>  (无数据)</source>
         <translation>  (无数据)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3177"/>
+        <location filename="../ui/main_window.py" line="3197"/>
         <source>📊 参数表格已更新: {len(keys)} 列 × {len(first_sheet)} 行</source>
         <translation>📊 参数表格已更新: {len(keys)} 列 × {len(first_sheet)} 行</translation>
     </message>
@@ -5376,12 +5396,12 @@ GitHub: freezzb1972/antenna-post-processor</translation>
         <translation>  输出: {output_path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2871"/>
+        <location filename="../ui/main_window.py" line="2891"/>
         <source>✓ 处理完成</source>
         <translation>✓ 处理完成</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3219"/>
+        <location filename="../ui/main_window.py" line="3239"/>
         <source>处理错误</source>
         <translation>处理错误</translation>
     </message>
@@ -6890,22 +6910,22 @@ GitHub: freezzb1972/antenna-post-processor</translation>
 {}?</translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="143"/>
+        <location filename="../ui/i18n_catalog.py" line="148"/>
         <source>EMC 测试</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="144"/>
+        <location filename="../ui/i18n_catalog.py" line="149"/>
         <source>SAR 测试</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="145"/>
+        <location filename="../ui/i18n_catalog.py" line="150"/>
         <source>天线测试</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="146"/>
+        <location filename="../ui/i18n_catalog.py" line="151"/>
         <source>安规测试</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8186,207 +8206,207 @@ JSON 文件由 EMQuest 导出，包含被测件型号、操作员、测试时间
 {e}</translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="151"/>
+        <location filename="../ui/i18n_catalog.py" line="156"/>
         <source>AR 单角度</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="152"/>
+        <location filename="../ui/i18n_catalog.py" line="157"/>
         <source>AR 范围</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="153"/>
+        <location filename="../ui/i18n_catalog.py" line="158"/>
         <source>Boresight Phi</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="154"/>
+        <location filename="../ui/i18n_catalog.py" line="159"/>
         <source>Boresight Theta</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="155"/>
+        <location filename="../ui/i18n_catalog.py" line="160"/>
         <source>LAG (单角度)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="156"/>
+        <location filename="../ui/i18n_catalog.py" line="161"/>
         <source>LAG (范围)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="157"/>
+        <location filename="../ui/i18n_catalog.py" line="162"/>
         <source>LH/TRP 比率 (%)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="158"/>
+        <location filename="../ui/i18n_catalog.py" line="163"/>
         <source>LH/TRP 比率 (dB)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="159"/>
+        <location filename="../ui/i18n_catalog.py" line="164"/>
         <source>Mismatch Loss</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="160"/>
+        <location filename="../ui/i18n_catalog.py" line="165"/>
         <source>NHPRP ±22.5°</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="161"/>
+        <location filename="../ui/i18n_catalog.py" line="166"/>
         <source>NHPRP ±30°</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="162"/>
+        <location filename="../ui/i18n_catalog.py" line="167"/>
         <source>NHPRP ±45°</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="163"/>
+        <location filename="../ui/i18n_catalog.py" line="168"/>
         <source>NHPRP225/TRP 比率 (%)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="164"/>
+        <location filename="../ui/i18n_catalog.py" line="169"/>
         <source>NHPRP225/TRP 比率 (dB)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="165"/>
+        <location filename="../ui/i18n_catalog.py" line="170"/>
         <source>NHPRP30/TRP 比率 (%)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="166"/>
+        <location filename="../ui/i18n_catalog.py" line="171"/>
         <source>NHPRP30/TRP 比率 (dB)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="167"/>
+        <location filename="../ui/i18n_catalog.py" line="172"/>
         <source>NHPRP45/TRP 比率 (%)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="168"/>
+        <location filename="../ui/i18n_catalog.py" line="173"/>
         <source>NHPRP45/TRP 比率 (dB)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="169"/>
+        <location filename="../ui/i18n_catalog.py" line="174"/>
         <source>Peak EIRP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="170"/>
+        <location filename="../ui/i18n_catalog.py" line="175"/>
         <source>Phase Center θ</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="171"/>
+        <location filename="../ui/i18n_catalog.py" line="176"/>
         <source>Phase Center φ</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="172"/>
+        <location filename="../ui/i18n_catalog.py" line="177"/>
         <source>TRP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="173"/>
+        <location filename="../ui/i18n_catalog.py" line="178"/>
         <source>UH/TRP 比率 (%)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="174"/>
+        <location filename="../ui/i18n_catalog.py" line="179"/>
         <source>UH/TRP 比率 (dB)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="175"/>
+        <location filename="../ui/i18n_catalog.py" line="180"/>
         <source>XPI Boresight</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="176"/>
+        <location filename="../ui/i18n_catalog.py" line="181"/>
         <source>XPI Mean</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="177"/>
+        <location filename="../ui/i18n_catalog.py" line="182"/>
         <source>XPI Min</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="178"/>
+        <location filename="../ui/i18n_catalog.py" line="183"/>
         <source>上半球 PRP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="179"/>
+        <location filename="../ui/i18n_catalog.py" line="184"/>
         <source>下半球 PRP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="180"/>
+        <location filename="../ui/i18n_catalog.py" line="185"/>
         <source>峰值增益</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="181"/>
+        <location filename="../ui/i18n_catalog.py" line="186"/>
         <source>平均功率</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="182"/>
+        <location filename="../ui/i18n_catalog.py" line="187"/>
         <source>平均增益</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="183"/>
+        <location filename="../ui/i18n_catalog.py" line="188"/>
         <source>总效率 (%)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="184"/>
+        <location filename="../ui/i18n_catalog.py" line="189"/>
         <source>总效率 (dB)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="185"/>
+        <location filename="../ui/i18n_catalog.py" line="190"/>
         <source>效率 (%)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="186"/>
+        <location filename="../ui/i18n_catalog.py" line="191"/>
         <source>效率 (dB)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="187"/>
+        <location filename="../ui/i18n_catalog.py" line="192"/>
         <source>方向性</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="188"/>
+        <location filename="../ui/i18n_catalog.py" line="193"/>
         <source>最大功率</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="189"/>
+        <location filename="../ui/i18n_catalog.py" line="194"/>
         <source>最小功率</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="190"/>
+        <location filename="../ui/i18n_catalog.py" line="195"/>
         <source>未知 (跳过)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="191"/>
+        <location filename="../ui/i18n_catalog.py" line="196"/>
         <source>频率</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8447,37 +8467,37 @@ JSON 文件由 EMQuest 导出，包含被测件型号、操作员、测试时间
 <context>
     <name>ThemeManager</name>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="194"/>
+        <location filename="../ui/i18n_catalog.py" line="199"/>
         <source>亮色 蓝色</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="195"/>
+        <location filename="../ui/i18n_catalog.py" line="200"/>
         <source>亮色 青绿</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="196"/>
+        <location filename="../ui/i18n_catalog.py" line="201"/>
         <source>暗色 复古暖</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="197"/>
+        <location filename="../ui/i18n_catalog.py" line="202"/>
         <source>暗色 琥珀</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="198"/>
+        <location filename="../ui/i18n_catalog.py" line="203"/>
         <source>暗色 白框白字</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="199"/>
+        <location filename="../ui/i18n_catalog.py" line="204"/>
         <source>暗色 蓝色</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/i18n_catalog.py" line="200"/>
+        <location filename="../ui/i18n_catalog.py" line="205"/>
         <source>暗色 青绿 ★</source>
         <translation type="unfinished"></translation>
     </message>
