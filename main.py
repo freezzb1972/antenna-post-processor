@@ -13,6 +13,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from PySide6.QtGui import QFont
+from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from i18n.i18n_manager import I18nManager
@@ -111,7 +112,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("AntennaPostProcessor")
     app.setOrganizationName("AntennaPP")
-    app.setApplicationDisplayName("天线参数后处理")
+    app.setApplicationDisplayName(QCoreApplication.translate("App", "天线参数后处理"))
     # 默认字体: 跨平台一致基准。QSettings 有保存值时会由 ThemeManager 覆盖。
     app.setFont(QFont("Sans Serif", 10))
     # Windows 任务栏分组: 所有窗口归入同一图标
@@ -124,13 +125,13 @@ def main():
 
     # 闪屏 — 立即显示, 告知用户程序正在加载
     splash = SplashScreen(app)
-    splash.advance("正在初始化...", 5)
+    splash.advance(QCoreApplication.translate("App", "正在初始化..."), 5)
 
     # 加载用户配置 (antenna_config.json) — 包含许可
     from src.config_manager import get_config_manager
     cfg_mgr = get_config_manager()
     cfg_mgr.load()
-    splash.advance("配置已加载", 10)
+    splash.advance(QCoreApplication.translate("App", "配置已加载"), 10)
 
     # 许可检查 + 激活流程
     if not _check_license(cfg_mgr):
@@ -142,26 +143,26 @@ def main():
         # 重新检查许可（激活后许可应已保存在配置文件中）
         if not cfg_mgr.is_license_valid():
             QMessageBox.critical(
-                None, "许可验证失败",
-                "激活后许可仍然无效，请联系管理员。"
+                None, QCoreApplication.translate("App", "许可验证失败"),
+                QCoreApplication.translate("App", "激活后许可仍然无效，请联系管理员。")
             )
             sys.exit(1)
 
-    splash.advance("正在加载主题...", 30)
+    splash.advance(QCoreApplication.translate("App", "正在加载主题..."), 30)
 
     # 主题（从上次保存恢复，首次使用默认 dark_teal）
     ThemeManager.load_and_apply()
-    splash.advance("正在配置语言...", 60)
+    splash.advance(QCoreApplication.translate("App", "正在配置语言..."), 60)
 
     # 国际化 — 语言来自用户配置 (antenna_config.json)，未设定时跟随系统 locale
     I18nManager.init(app, cfg_mgr.config.language)
-    splash.advance("正在创建主窗口...", 80)
+    splash.advance(QCoreApplication.translate("App", "正在创建主窗口..."), 80)
 
     # 主窗口（多窗口时关闭最后一个自动退出）
     from ui.window_manager import WindowManager
     wm = WindowManager.instance()
     window = MainWindow(app)
-    splash.advance("启动完成", 100)
+    splash.advance(QCoreApplication.translate("App", "启动完成"), 100)
 
     splash.finish(window)
     window.show()

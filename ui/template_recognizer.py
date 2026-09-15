@@ -15,8 +15,9 @@ from typing import TYPE_CHECKING
 import openpyxl
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor          # QColor 属 QtGui, 放 QtWidgets 会 ImportError
 from PySide6.QtWidgets import (
-    QColor, QComboBox, QDialog, QDialogButtonBox,
+    QComboBox, QDialog, QDialogButtonBox,
     QTreeWidget, QTreeWidgetItem, QFileDialog, QFormLayout,
     QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox,
     QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout,
@@ -311,7 +312,11 @@ class TemplateRecognizerDialog(QDialog):
         self._table.setRowCount(len(cols))
 
         # 构建类型 → 显示名映射
-        type_labels = {t: l for t, l in ALL_COL_TYPES}
+        from i18n.i18n_manager import tr_shared
+        # ALL_COL_TYPES 是模块级数据(import 期求值, 在里面包 tr 会冻结译文),
+        # 故只在消费点翻译
+        type_labels = {t: tr_shared(l, "TemplateRecognizerDialog")
+                       for t, l in ALL_COL_TYPES}
 
         for row, (col_letter, raw_header, ctype) in enumerate(cols):
             # 列号
@@ -320,7 +325,9 @@ class TemplateRecognizerDialog(QDialog):
             self._table.setItem(row, 1, QTableWidgetItem(raw_header))
             # 检测类型 — 用下拉框
             cmb = QComboBox()
+            from i18n.i18n_manager import tr_shared
             for t, label in ALL_COL_TYPES:
+                label = tr_shared(label, "TemplateRecognizerDialog")
                 cmb.addItem(label, t)
             idx = cmb.findData(ctype)
             if idx >= 0:
@@ -416,7 +423,8 @@ class TemplateRecognizerDialog(QDialog):
                 negate = ["nhprp"]
             new_patterns.append({
                 "col_type": ctype,
-                "label": dict(ALL_COL_TYPES).get(ctype, ctype),
+                "label": tr_shared(dict(ALL_COL_TYPES).get(ctype, ctype),
+                                   "TemplateRecognizerDialog"),
                 "keywords": [k.lower() for k in keywords],
                 "negate": [n.lower() for n in negate],
             })

@@ -77,7 +77,10 @@ class ProjectManagerDialog(QDialog):
         search_row.addWidget(QLabel(self.tr(" 类别:")))
         self._cmb_cat = QComboBox()
         self._cmb_cat.addItem(self.tr("全部"), "")
+        from i18n.i18n_manager import tr_shared
+        # CATEGORIES 是模块级数据(import 期求值), 只在消费点翻译
         for cat, label in SORTED_CATEGORIES:
+            label = tr_shared(label, "ProjectManagerDialog")
             self._cmb_cat.addItem(label, cat)
         self._cmb_cat.currentIndexChanged.connect(self._refresh)
         search_row.addWidget(self._cmb_cat)
@@ -155,7 +158,10 @@ class ProjectManagerDialog(QDialog):
         for i, t in enumerate(tests):
             self._table.setItem(i, 0, QTableWidgetItem(t.get('customer_name', '')))
             self._table.setItem(i, 1, QTableWidgetItem(t.get('model', '')))
-            cat_label = dict(CATEGORIES).get(t.get('category', ''), t.get('category', ''))
+            from i18n.i18n_manager import tr_shared
+            cat_label = tr_shared(
+                dict(CATEGORIES).get(t.get('category', ''), t.get('category', '')),
+                "ProjectManagerDialog")
             self._table.setItem(i, 2, QTableWidgetItem(cat_label))
             self._table.setItem(i, 3, QTableWidgetItem(t.get('test_date', '')[:16]))
             self._table.setItem(i, 4, QTableWidgetItem(t.get('operator', '')))
@@ -334,7 +340,9 @@ class ProjectEditDialog(QDialog):
         f2 = QFormLayout(tab2)
         f2.setSpacing(6)
         self._edit_category = QComboBox()
+        from i18n.i18n_manager import tr_shared
         for cat, label in CATEGORIES:
+            label = tr_shared(label, "ProjectManagerDialog")
             self._edit_category.addItem(label, cat)
         f2.addRow(self.tr("测试类别:"), self._edit_category)
         self._edit_date = QLineEdit()
@@ -517,10 +525,10 @@ class ImportFromJSONDialog(QDialog):
         self._form = QFormLayout()
         self._form.setSpacing(6)
         fields = [
-            ('customer', '客户名称'), ('model', '天线型号'),
-            ('operator', '操作员'), ('freq_range', '频率范围'),
-            ('test_method', '测试方法'), ('test_date', '测试日期'),
-            ('serial', '序列号'),
+            ('customer', self.tr('客户名称')), ('model', self.tr('天线型号')),
+            ('operator', self.tr('操作员')), ('freq_range', self.tr('频率范围')),
+            ('test_method', self.tr('测试方法')), ('test_date', self.tr('测试日期')),
+            ('serial', self.tr('序列号')),
         ]
         self._edits = {}
         for key, label in fields:

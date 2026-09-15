@@ -820,7 +820,7 @@ class FileSettingsPage(QWidget):
             from src.column_mapping import detect_columns_from_template, TemplatePreset, save_preset
             mappings = detect_columns_from_template(tpl_path)
         except Exception as e:
-            QMessageBox.warning(self, self.tr("检测失败"), self.tr(f"列头检测失败:\n{e}"))
+            QMessageBox.warning(self, self.tr("检测失败"), self.tr("列头检测失败:\n{0}").format(e))
             return
 
         def _extract_angle(raw: str, ctype: str) -> str:
@@ -1010,7 +1010,7 @@ class FileSettingsPage(QWidget):
             )
             save_preset(preset)
             QMessageBox.information(dlg, self.tr("保存成功"),
-                self.tr(f"模板预设已保存: {name}\n包含 {len(col_mappings)} 列映射"))
+                self.tr("模板预设已保存: {0}\n包含 {1} 列映射").format(name, len(col_mappings)))
 
         btn_save.clicked.connect(_on_save)
         layout.addLayout(btn_row)
@@ -2272,7 +2272,7 @@ class AntennaParamsPage(QWidget):
                     info = _ANGLE_BY_PARAM_KEY[key]
                     btn = QPushButton(self.tr("⚙ 参数"))
                     btn.setFixedWidth(60)
-                    btn.setToolTip(self.tr(f"{info.label} 参数设置"))
+                    btn.setToolTip(self.tr("{0} 参数设置").format(info.label))
                     btn.clicked.connect(lambda checked, t=info.popup: self._show_angle_popup(t))
                     row.addWidget(btn)
                 row.addStretch()
@@ -2318,7 +2318,7 @@ class AntennaParamsPage(QWidget):
                     info = _ANGLE_BY_PARAM_KEY[key]
                     btn = QPushButton(self.tr("⚙ 参数"))
                     btn.setFixedWidth(60)
-                    btn.setToolTip(self.tr(f"{info.label} 参数设置"))
+                    btn.setToolTip(self.tr("{0} 参数设置").format(info.label))
                     btn.clicked.connect(lambda checked, t=info.popup: self._show_angle_popup(t))
                     row.addWidget(btn)
                 row.addStretch()
@@ -2597,7 +2597,7 @@ class AntennaParamsPage(QWidget):
             self._antenna_freq_selected = list(dlg.get_selected())
             if self._antenna_freq_selected:
                 self._antenna_freq_summary.setText(
-                    self.tr(f"已选 {len(self._antenna_freq_selected)} 个频点"))
+                    self.tr("已选 {0} 个频点").format(len(self._antenna_freq_selected)))
             else:
                 self._antenna_freq_summary.setText(self.tr("(全部频点)"))
             self._sync_to_mw()
@@ -2944,7 +2944,7 @@ class PatternManagerDialog(QDialog):
                 er._PARAM_PATTERNS = None
                 er.reload_column_patterns()
                 QMessageBox.information(self, self.tr("已保存"),
-                    self.tr(f"已保存 {self._table.rowCount()} 个参数规则"))
+                    self.tr("已保存 {0} 个参数规则").format(self._table.rowCount()))
                 return
         QMessageBox.warning(self, self.tr("错误"), self.tr("找不到 param_patterns.json"))
 
@@ -2964,7 +2964,7 @@ class PatternManagerDialog(QDialog):
                 self._lbl_test_result.setText(f"△ 内置: {result2}")
                 self._lbl_test_result.setStyleSheet("color: orange;")
             else:
-                self._lbl_test_result.setText("✗ 未匹配")
+                self._lbl_test_result.setText(self.tr("✗ 未匹配"))
                 self._lbl_test_result.setStyleSheet("color: red;")
 
 
@@ -3363,8 +3363,8 @@ class ChartSettingsPage(QWidget):
         from src.chart_plan import ChartCategory
         from src.chart_titles import build_title
         instances = getattr(self._mw, '_chart_instances', None) or []
-        cat_badges = {ChartCategory.A_3D: "3D", ChartCategory.B_FREQ: "曲线",
-                      ChartCategory.C_2D: "切面", ChartCategory.Z_AZIMUTH: "方位面"}
+        cat_badges = {ChartCategory.A_3D: "3D", ChartCategory.B_FREQ: self.tr("曲线"),
+                      ChartCategory.C_2D: self.tr("切面"), ChartCategory.Z_AZIMUTH: self.tr("方位面")}
         _antenna = getattr(az, 'antenna_name', '') if az else ''
         _title_lang = getattr(az, 'title_lang', 'en') if az else 'en'
         active_insts = []
@@ -3869,11 +3869,15 @@ class ChartSettingsPage(QWidget):
         spin_step.setSuffix("°"); spin_step.setToolTip(self.tr("3D 采样精度: 1°=最细, 30°=最快"))
         form.addRow(self.tr("采样精度:"), spin_step)
         cmb_cmap = QComboBox()
-        cmb_cmap.addItems([("emquest (" + self.tr("EMQuest") + ")"), "jet", "turbo", "viridis", "plasma", "inferno"])
+        # 显示名进 itemText, 色图标识进 itemData。原先只有文本且用 findText 查
+        # 'emquest' —— 而文本是 "emquest (EMQuest)", **永远匹配不上**,
+        # 保存的色图从来没能恢复; 且一旦显示名被翻译, 下方 split(" ")[0] 也会失效。
+        cmb_cmap.addItem(f"emquest ({self.tr('EMQuest')})", "emquest")
+        for _cm in ("jet", "turbo", "viridis", "plasma", "inferno"):
+            cmb_cmap.addItem(_cm, _cm)
         cur_cmap = getattr(self, '_colormap', 'emquest')
-        idx = cmb_cmap.findText(cur_cmap)
-        if idx >= 0: cmb_cmap.setCurrentIndex(idx)
-        elif cmb_cmap.findText("emquest") >= 0: cmb_cmap.setCurrentIndex(cmb_cmap.findText("emquest"))
+        _i = cmb_cmap.findData(cur_cmap)
+        if _i >= 0: cmb_cmap.setCurrentIndex(_i)
         form.addRow(self.tr("3D 色图:"), cmb_cmap)
         chk_colorbar = QCheckBox(self.tr("显示色条 (右侧colorbar)"))
         chk_colorbar.setChecked(getattr(self, '_show_3d_colorbar', True))
@@ -3964,7 +3968,7 @@ class ChartSettingsPage(QWidget):
 
         def _accept():
             self._dpi = spin_dpi.value()
-            self._colormap = cmb_cmap.currentText().split(" ")[0] if " " in cmb_cmap.currentText() else cmb_cmap.currentText()
+            self._colormap = cmb_cmap.currentData() or cmb_cmap.currentText()
             self._show_3d_colorbar = chk_colorbar.isChecked()
             step_val = spin_step.value()
             # 整数倍校验: 采样精度应是原始数据步进的整数倍
@@ -4078,8 +4082,8 @@ class ChartSettingsPage(QWidget):
 
         edit_label = QLineEdit()
         edit_label.setPlaceholderText(chart_label)
-        spin_fs = QSpinBox(); spin_fs.setRange(0, 100000); spin_fs.setSuffix(" MHz"); spin_fs.setSpecialValueText("全频段")
-        spin_fe = QSpinBox(); spin_fe.setRange(0, 100000); spin_fe.setSuffix(" MHz"); spin_fe.setSpecialValueText("全频段")
+        spin_fs = QSpinBox(); spin_fs.setRange(0, 100000); spin_fs.setSuffix(" MHz"); spin_fs.setSpecialValueText(self.tr("全频段"))
+        spin_fe = QSpinBox(); spin_fe.setRange(0, 100000); spin_fe.setSuffix(" MHz"); spin_fe.setSpecialValueText(self.tr("全频段"))
 
         def _refresh_edit():
             cur = _get_current()
@@ -4189,9 +4193,11 @@ class ChartSettingsPage(QWidget):
             _entries = []
 
         dlg = QDialog(self)
-        fmt_name = "直角坐标" if "rect" in chart_key else "极坐标"
-        dir_name = "方位面" if is_azimuth else "俯仰面"
-        dlg.setWindowTitle(self.tr(f"{fmt_name}{dir_name}切面图参数"))
+        fmt_name = self.tr("直角坐标") if "rect" in chart_key else self.tr("极坐标")
+        dir_name = self.tr("方位面") if is_azimuth else self.tr("俯仰面")
+        # 不用 self.tr(f"...") —— 那是对**插值后**的结果查表, 永远匹配不到源串。
+        # 模板 + .format, 且 fmt_name/dir_name 各自已翻译, 组合后仍是正确语言。
+        dlg.setWindowTitle(self.tr("{0}{1}切面图参数").format(fmt_name, dir_name))
         dlg.setMinimumSize(560, 520)
         layout = QVBoxLayout(dlg)
 
@@ -4206,7 +4212,7 @@ class ChartSettingsPage(QWidget):
             chart_list.clear()
             for i, e in enumerate(_entries):
                 pname = {"gain": "Gain", "ar": "AR", "rhcp": "RHCP", "lhcp": "LHCP"}.get(e[0], e[0])
-                ang = ", ".join(f"{a:.0f}°" for a in sorted(set(e[1]))) if e[1] else "(空)"
+                ang = ", ".join(f"{a:.0f}°" for a in sorted(set(e[1]))) if e[1] else self.tr("(空)")
                 chart_list.addItem(f"图表 {i+1}: {pname} — {ang}")
             if _sel_idx[0] >= chart_list.count():
                 _sel_idx[0] = max(0, chart_list.count() - 1)
@@ -4246,7 +4252,7 @@ class ChartSettingsPage(QWidget):
         layout.addLayout(param_row)
 
         # ── 角度编辑区 ──
-        edit_grp = QGroupBox(self.tr(f"编辑选中图表的 {angle_label} 角度"))
+        edit_grp = QGroupBox(self.tr("编辑选中图表的 {0} 角度").format(angle_label))
         edit_lo = QVBoxLayout(edit_grp)
         tags_lo = QVBoxLayout()
 
@@ -4282,7 +4288,7 @@ class ChartSettingsPage(QWidget):
 
         # 添加角度
         add_row = QHBoxLayout()
-        add_row.addWidget(QLabel(self.tr(f"添加 {angle_label} 角度:")))
+        add_row.addWidget(QLabel(self.tr("添加 {0} 角度:").format(angle_label)))
         spin_angle = QDoubleSpinBox()
         spin_angle.setRange(-180, 360); spin_angle.setValue(default_angle)
         spin_angle.setSuffix("°"); spin_angle.setDecimals(0)
@@ -4522,7 +4528,7 @@ class ChartSettingsPage(QWidget):
                         self.tr("已选: ") + ", ".join(f"{f:.0f} MHz" for f in _selected))
                 else:
                     self._freq_summary_label.setText(
-                        self.tr(f"已选 {len(_selected)} 个频点"))
+                        self.tr("已选 {0} 个频点").format(len(_selected)))
             else:
                 self._freq_summary_label.setText(self.tr("(全部频点)"))
 
@@ -4862,13 +4868,13 @@ class WordTemplatePreviewDialog(QDialog):
             bg = getattr(self, '_theme_bg', '#ffffff')
             header = '<div style="color:#888;font-size:9pt;margin-bottom:8px;">'
             header += '📄 ' + Path(self._path).name + ' — ' + str(len(self._existing_tags)) + ' SDT'
-            header += ' <span style="color:#e65100;">(pip install mammoth 获得更好渲染)</span></div>'
+            header += self.tr(' <span style="color:#e65100;">(pip install mammoth 获得更好渲染)</span></div>')
             full = '<html><head><meta charset=utf-8><style>'
             full += 'body{font-family:Calibri,sans-serif;font-size:11pt;background:' + bg + ';color:inherit;}'
             full += '</style></head><body>' + header + html + '</body></html>'
             self._doc_browser.setHtml(full)
         except Exception as e:
-            self._doc_browser.setPlainText("加载失败: " + str(e))
+            self._doc_browser.setPlainText(self.tr("加载失败: ") + str(e))
 
     def _build_document_view_fallback(self) -> str:
         """无 mammoth 时的简化 HTML 渲染。"""
@@ -4877,7 +4883,7 @@ class WordTemplatePreviewDialog(QDialog):
         with zipfile.ZipFile(self._path, 'r') as zf:
             doc_xml = etree.parse(zf.open('word/document.xml'))
         body = doc_xml.getroot().find(f"{{{NS_W}}}body")
-        if body is None: return "<p>无法解析</p>"
+        if body is None: return self.tr("<p>无法解析</p>")
         parts = []
         tbl_idx = 0
         for child in body:
@@ -4892,8 +4898,8 @@ class WordTemplatePreviewDialog(QDialog):
                 rows = list(child.iter(f"{{{NS_W}}}tr"))
                 sdt = self._get_sdt_tag(child)
                 suggestion = next((p.suggested_tag for p in self._positions if p.pos_type.startswith("table") and p.index==tbl_idx), "")
-                tl = sdt or suggestion or "未设置"
-                parts.append('<p>📊 <b>[' + tl + ']</b> — ' + str(len(rows)) + '行</p>')
+                tl = sdt or suggestion or self.tr("未设置")
+                parts.append('<p>📊 <b>[' + tl + ']</b> — ' + str(len(rows)) + self.tr('行</p>'))
                 if rows:
                     cells = ["".join(c.itertext()).strip()[:20] for c in rows[0].iter(f"{{{NS_W}}}tc")]
                     parts.append('<p style="font-size:9pt;color:#888;">' + " | ".join(cells[:5]) + '</p>')

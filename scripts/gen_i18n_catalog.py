@@ -37,7 +37,9 @@ def collect() -> dict[str, set]:
     """返回 {context: {字面量, ...}}。"""
     result: dict[str, set] = {"ChartConfig": set(), "AntennaParamsPage": set(),
                               "ThemeManager": set(), "CalcParamsDialog": set(),
-                              "ReportMetadataDialog": set()}
+                              "ReportMetadataDialog": set(),
+                              "TemplateRecognizerDialog": set(),
+                              "ProjectManagerDialog": set()}
 
     # ── 主题显示名 ──
     # ALL_THEMES 是 class body 数据, 不能在里面包 translate (import 期求值会冻结
@@ -46,6 +48,15 @@ def collect() -> dict[str, set]:
 
     for _theme_id, _name in ThemeManager.ALL_THEMES:
         result["ThemeManager"].add(_name)
+
+    # ── 模块级常量表的标签 (import 期求值, 只能消费点翻译) ──
+    from ui.template_recognizer import ALL_COL_TYPES
+    from ui.project_manager import CATEGORIES
+
+    for _t, _label in ALL_COL_TYPES:
+        result["TemplateRecognizerDialog"].add(_label)
+    for _t, _label in CATEGORIES:
+        result["ProjectManagerDialog"].add(_label)
 
     # ── 图表标签 + 类别名 ──
     from src.chart_config import ChartConfig

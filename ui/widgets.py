@@ -534,7 +534,7 @@ class FrequencyPickerDialog(QDialog):
 
     def __init__(self, all_freqs: list[float], selected: list[float], parent=None):
         super().__init__(parent)
-        self.setWindowTitle("频点选择")
+        self.setWindowTitle(self.tr("频点选择"))
         self.setMinimumSize(600, 450)
         self._all_freqs = sorted(set(all_freqs))
         self._selected = sorted(set(selected))
@@ -584,12 +584,12 @@ class FrequencyPickerDialog(QDialog):
 
         # ── 粘贴输入 ──
         paste_row = QHBoxLayout()
-        paste_row.addWidget(QLabel("粘贴/输入:"))
+        paste_row.addWidget(QLabel(self.tr("粘贴/输入:")))
         self._edit_paste = QLineEdit()
-        self._edit_paste.setPlaceholderText("逗号/空格/换行分隔, 不在列表中的拒绝")
+        self._edit_paste.setPlaceholderText(self.tr("逗号/空格/换行分隔, 不在列表中的拒绝"))
         self._edit_paste.returnPressed.connect(self._apply_paste)
         paste_row.addWidget(self._edit_paste)
-        btn_apply = QPushButton("应用")
+        btn_apply = QPushButton(self.tr("应用"))
         btn_apply.clicked.connect(self._apply_paste)
         paste_row.addWidget(btn_apply)
         paste_row.addStretch()
@@ -663,7 +663,7 @@ class FrequencyPickerDialog(QDialog):
         self._edit_paste.clear()
         if rejected:
             QMessageBox.information(
-                self, "频点验证",
+                self, self.tr("频点验证"),
                 f"以下频点不在全部频点列表中，已拒绝:\n{', '.join(str(r) for r in rejected)}")
 
     def get_selected(self) -> list[float]:
@@ -698,13 +698,13 @@ class FrequencyPickerWidget(QWidget):
 
         # ── 操作按钮行 ──
         btn_row = QHBoxLayout()
-        btn_all = QPushButton("全选")
+        btn_all = QPushButton(self.tr("全选"))
         btn_all.clicked.connect(self._select_all)
         btn_row.addWidget(btn_all)
-        btn_clear = QPushButton("清除")
+        btn_clear = QPushButton(self.tr("清除"))
         btn_clear.clicked.connect(self._clear_all)
         btn_row.addWidget(btn_clear)
-        btn_range = QPushButton("范围选择...")
+        btn_range = QPushButton(self.tr("范围选择..."))
         btn_range.clicked.connect(self._show_range_dialog)
         btn_row.addWidget(btn_range)
         btn_row.addStretch()
@@ -723,7 +723,7 @@ class FrequencyPickerWidget(QWidget):
         layout.addWidget(scroll)
 
         # ── 计数 ──
-        self._lbl_count = QLabel("已选: 0 / 0")
+        self._lbl_count = QLabel(self.tr("已选: 0 / 0"))
         self._lbl_count.setStyleSheet("color: #888; font-size: 9pt;")
         layout.addWidget(self._lbl_count)
 
@@ -781,7 +781,7 @@ class FrequencyPickerWidget(QWidget):
         if not self._freqs:
             return
         dlg = QDialog(self)
-        dlg.setWindowTitle("频点范围选择")
+        dlg.setWindowTitle(self.tr("频点范围选择"))
         layout = QVBoxLayout(dlg)
         form = QFormLayout()
         spin_lo = QDoubleSpinBox()
@@ -789,13 +789,13 @@ class FrequencyPickerWidget(QWidget):
         spin_lo.setValue(min(self._freqs))
         spin_lo.setDecimals(1)
         spin_lo.setSuffix(" MHz")
-        form.addRow("起始频率:", spin_lo)
+        form.addRow(self.tr("起始频率:"), spin_lo)
         spin_hi = QDoubleSpinBox()
         spin_hi.setRange(min(self._freqs), max(self._freqs))
         spin_hi.setValue(max(self._freqs))
         spin_hi.setDecimals(1)
         spin_hi.setSuffix(" MHz")
-        form.addRow("结束频率:", spin_hi)
+        form.addRow(self.tr("结束频率:"), spin_hi)
         layout.addLayout(form)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
