@@ -47,6 +47,10 @@ main.py → ui/main_window.py (PySide6 GUI)
 ### 关键规则
 
 1. `ui/compiled/ui_main_window.py` **禁止手动编辑** — 用 Qt Designer 改 `.ui` 后重新编译
+   > ⚠️ **但当前 `.ui` 与 `compiled/` 已不同步，先别重编译**：用当前
+   > `pyside6-uic` 重编译会把 `hButtons` 挂到 `rootVBox`（编译产物里是
+   > `vTabFile`），`_extract_execution_bar()` 随即抛 `QLayout already has a
+   > parent`，**`MainWindow` 构造直接失败**。需先比对两者结构差异并修正。
 2. 模板列头识别用**正则**不用 LLM — 命名准则见 `USER_GUIDE.html` 第 6.1 节
 3. `DataSource.from_path()` 工厂支持 `.csv`/`.xlsx`/`.xls`
 4. 频点匹配用最近邻 (容差 ±5 MHz)
@@ -54,6 +58,9 @@ main.py → ui/main_window.py (PySide6 GUI)
 6. 多文件模式: 工作表名 ↔ 文件名通过 `sheet_file_matcher.py` 的 `extract_key()` 匹配
 7. 所有计算值 `round(val, 6)` 保留 6 位小数
 8. **所有 UI 文本必须用 `self.tr()` 包裹**，禁止硬编码中文 — 详细准则见下方「国际化规范」
+9. **下拉框必须「显示名与内部键分离」** — 禁止用显示文本当键。本项目已发生 4 次
+   （`VIEW_PRESETS` / `_cmb_ai_mode` / graph_viewer 图型下拉 / `ThemeManager`），
+   后果是**选了下拉毫无反应且不报错**。详细准则见下方「国际化规范」必须遵守表末行。
 
 ### 国际化规范（所有 UI 类强制执行）
 
@@ -68,6 +75,22 @@ main.py → ui/main_window.py (PySide6 GUI)
 | 按钮文本 | `QPushButton(self.tr("浏览..."))` | `QPushButton("浏览...")` |
 | QMessageBox | `QMessageBox.warning(self, self.tr("标题"), self.tr("内容"))` | `QMessageBox.warning(self, "标题", "内容")` |
 | 带变量的文本 | `self.tr("已保存 {0} 个文件到:\n{1}").format(n, path)` | `f"已保存 {n} 个文件到:\n{path}"` |
+| QComboBox **填充** | `cmb.addItem(self.tr("球面 3D"), "Spherical 3D")` | `cmb.addItems(["Spherical 3D", ...])` |
+| QComboBox **读取** | `cmb.currentData()` | `cmb.currentText()` |
+| QComboBox **恢复** | `cmb.findData(key)` | `cmb.findText(key)` |
+| 位置 | 只能在**含 `self` 的方法内**用 `self.tr()`；模块级/普通函数用 `QCoreApplication.translate("Ctx", ...)`；**class body 禁止翻译**（import 期求值会冻结译文） | `class X: NAME = self.tr(...)` → 导入即 NameError；`def f(self, t=self.tr(...))` → 默认值在**定义时**求值，同样 NameError |
+
+**QComboBox 三条为什么必须遵守**：`addItems([...])` 之后若下游用
+`currentText()` 比较或查表，一旦显示名被翻译（哪怕只是切换语言），
+`==` / `findText` / `dict.get` 全部失配 —— **选了下拉毫无反应，且不报错**。
+本项目已中招 3 次：`VIEW_PRESETS`（切语言后视角预设失效）、
+`_cmb_ai_mode`（`cfg.ai.mode` 被写入译文）、graph_viewer 图型下拉。
+**检查方法**：看到 `addItems([` → 立刻搜该变量在别处的 `currentText()` /
+`findText(`；只要下游把它当键用，此处就必须先改成 `itemData`。
+
+> 上述两条（尤其 `self.tr` 的位置）的共同点：**`py_compile` 与导入检查都查不出**，
+> 只有跑起来或逐行读代码才暴露。批量包裹字面量时务必用 AST 校验位置，
+> 工具见 `scripts/check_i18n.py`。
 
 **新建 UI 类后必须执行**:
 ```bash
