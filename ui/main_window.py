@@ -1702,9 +1702,15 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         _tpl_row.addWidget(self._btn_browse_tpl)
         _tpl_row.addWidget(self._btn_clear_template)
         # 替换: 隐藏旧行控件, 插入新行
+        # 用 takeRow 而非 removeRow: removeRow 会 deleteLater 掉该行的 label 与
+        # button, 但 compiled retranslateUi 仍对 self.ui.lblTemplate /
+        # btnBrowseTemplate setText → 每次切语言都在 ui_main_window.py:530 抛
+        # RuntimeError 中断, 其后几百行控件永不翻译。takeRow 只摘除不删除,
+        # 旧引用保持有效(隐藏后无害)。
         self.ui.editTemplatePath.hide()
+        self.ui.lblTemplate.hide()
         self.ui.btnBrowseTemplate.hide()
-        self.ui.formInput.removeRow(1)
+        self.ui.formInput.takeRow(1)
         self.ui.formInput.insertRow(1, self.tr("模板文件:"), _tpl_row)
         # 重定向旧引用: _on_clear_template / _on_start 等用 self.ui.editTemplatePath
         self.ui.editTemplatePath = self._template_edit
@@ -3223,6 +3229,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             # 仍可能到达, 此时部分子 widget 的 C++ 对象已回收, retranslateUi
             # 会抛 RuntimeError (libshiboken: already deleted)。
             # 吞掉该异常: 窗口正在消失, 文案是否刷新已无意义。
+            # ⚠️ 不要用这个 except 掩盖正常路径的 RuntimeError —— 曾因
+            # lblTemplate/btnBrowseTemplate 悬垂(removeRow 删除)导致每次切
+            # 语言都从 ui_main_window.py:530 中断, 却被这里静默吞掉, 表现为
+            # 「切了语言但界面几乎没变」。悬垂引用已在 _connect_signals 修掉;
+            # 若再出现「只翻译了前几个控件」, 先查是否有新的悬垂 widget。
             try:
                 self.ui.retranslateUi(self)
                 self._update_lag_display()

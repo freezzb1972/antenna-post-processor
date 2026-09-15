@@ -82,14 +82,37 @@ class TestFileDisplay:
 
 
 class TestTemplateReadOnly:
-    """Bug #3: 模板路径持久化（始终从 config_manager 恢复）。"""
+    """Bug #3: 模板路径持久化到 config_manager, 但有意不自动回填输入框。
 
-    def test_template_persists_across_restart(self, window):
-        """模板路径持久化到 config_manager 并正确恢复。"""
+    历史: 原测试断言「重启后自动恢复上次模板」, 该行为已在 9cab0cc
+    (fix: 不自动恢复上次模板 — 用户需手动选择) 有意移除, 理由是避免
+    「旧模板自动加载 → 自动匹配 → 意外 Excel 输出」。测试随之过期。
+    """
+
+    def test_template_not_auto_restored(self, window):
+        """启动时不自动回填模板输入框 — 用户须手动选择。"""
         window._cfg.config.last_template_path = "/test/persisted_template.xlsx"
-        window._init_file_paths()
-        assert window.ui.editTemplatePath.text() == "/test/persisted_template.xlsx"
-        window._cfg.config.last_template_path = ""  # cleanup
+        try:
+            window._init_file_paths()
+            assert window.ui.editTemplatePath.text() == ""
+        finally:
+            window._cfg.config.last_template_path = ""  # cleanup
+
+    def test_template_path_used_as_dialog_start_dir(self, window, monkeypatch):
+        """持久化的真实用途: 作为选择模板对话框的起始目录。"""
+        window._cfg.config.last_template_path = "/test/persisted_template.xlsx"
+        captured = {}
+
+        def _fake_get_open_file_name(parent, title, start_dir, filt):
+            captured["start_dir"] = start_dir
+            return ("", "")
+
+        monkeypatch.setattr(QFileDialog, "getOpenFileName", _fake_get_open_file_name)
+        try:
+            window._on_browse_template()
+        finally:
+            window._cfg.config.last_template_path = ""  # cleanup
+        assert captured.get("start_dir") == "/test/persisted_template.xlsx"
 
 
 class TestStartValidation:
