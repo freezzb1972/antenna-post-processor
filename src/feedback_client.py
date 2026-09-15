@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -144,11 +145,29 @@ def submit_or_queue(payload: dict, server_url: str | None = None) -> tuple[bool,
     return True, msg
 
 
+# resend_queue 可能被多个线程并发调用(启动时的后台重发 + 用户手动触发),
+# 而它「读取 → 逐条发送 → 重写或删除」整个过程不是原子的。
+_QUEUE_LOCK = threading.Lock()
+
+
 def resend_queue(server_url: str | None = None) -> tuple[int, int]:
     """重发本地队列。返回 (成功数, 剩余数)。全部成功则删除队列文件。"""
-    if not _QUEUE_PATH.exists():
+    with _QUEUE_LOCK:
+        return _resend_queue_locked(server_url)
+
+
+def _resend_queue_locked(server_url: str | None) -> tuple[int, int]:
+    """resend_queue 的实际实现 —— 调用方必须持有 _QUEUE_LOCK。"""
+    # 不用 `if not _QUEUE_PATH.exists(): return` 预检查: 那与下面的 read_text
+    # 之间存在 TOCTOU 窗口 —— 并发调用时一个线程 unlink() 掉文件, 另一个正在
+    # read_text() 的线程就会抛 FileNotFoundError。直接读并捕获异常才无窗口。
+    try:
+        content = _QUEUE_PATH.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return (0, 0)          # 队列不存在, 或已被另一调用清空
+    except OSError:
         return (0, 0)
-    lines = [ln for ln in _QUEUE_PATH.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    lines = [ln for ln in content.splitlines() if ln.strip()]
     remain: list[str] = []
     sent = 0
     for ln in lines:
