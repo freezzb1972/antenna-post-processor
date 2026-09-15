@@ -176,12 +176,28 @@ class SemanticIndex:
         return self._available
 
     def build(self, chunks: list[HelpChunk]):
+        """构建语义索引。
+
+        只加载本地已缓存的模型 (local_files_only) — 不联网下载: 下载是
+        同步阻塞的, GUI 线程里会冻结界面数分钟; 网络不通时 huggingface_hub
+        反复重试, 表现为无提示的长时间挂起。
+        语义检索是可选增强层, 模型缺失时 BM25 检索照常工作。
+        确需语义检索可先手动预下载模型。
+
+        注意: 不能用设 HF_HUB_OFFLINE 环境变量的办法 — huggingface_hub
+        在模块导入时就把该变量读成常量 (constants.py), 运行时设置无效。
+        """
         try:
             import numpy as np
             from sentence_transformers import SentenceTransformer
+        except ImportError:
+            self._available = False
+            return
 
+        try:
             self._model = SentenceTransformer(
-                'paraphrase-multilingual-MiniLM-L12-v2')
+                'paraphrase-multilingual-MiniLM-L12-v2',
+                local_files_only=True)
             self._chunks = chunks
             texts = [ch.content[:2000] for ch in chunks]
             embeddings = self._model.encode(texts, show_progress_bar=False)
@@ -202,7 +218,8 @@ class SemanticIndex:
                 self._faiss = True
 
             self._available = True
-        except ImportError:
+        except Exception:
+            # 模型未缓存 / 加载失败 → 降级到 BM25, 不影响其余功能
             self._available = False
 
     def search(self, query: str, top_k: int = 5) -> list[tuple[HelpChunk, float]]:
