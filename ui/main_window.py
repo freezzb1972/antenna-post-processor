@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLayout,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -190,6 +191,15 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.checkEmbedExcel.hide()  # 图表统一到 Word
         self.ui.checkSavePng.hide()
         self.ui.groupOutput.hide()  # 旧输出控件 → 已迁移到 FileSettingsPage
+        # 顶部工具栏是 .ui 里**未完成的改版**: lblAppTitle/lblTheme/cmbThemeSelector/
+        # btnLangToggle 由 Designer 加了进去, 但代码从未接线(全文零引用), 且
+        # 上方注释已说明「主题/语言已移至系统设置对话框」。它们挂在 rootVBox 下
+        # 无容器可整体隐藏, 故逐个 hide —— 保持与已发布版本一致的界面。
+        # 若日后决定启用该工具栏: 删除本段 + 在 _init_menu/_init_theme_selector 接线。
+        for _wip in ("lblAppTitle", "lblTheme", "cmbThemeSelector", "btnLangToggle"):
+            _o = getattr(self.ui, _wip, None)
+            if _o is not None:
+                _o.hide()
         self._enter_idle()  # 初始化按钮状态机（btnStart/btnExport/btnOneClick/btnStop）
         self._log("天线参数后处理工具已启动")
 
@@ -540,6 +550,15 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         btn_row.addWidget(self._mode_freq_label)
         btn_row.addStretch()
         # hButtons 直接包进 QWidget 保持原对齐
+        # 兼容两种 .ui 结构: 旧编译产物把 hButtons 放在 vTabFile 内(上方循环已
+        # takeAt 摘除); 当前 .ui 已把它直接放在 rootVBox 下。setLayout 要求布局
+        # 当前**无宿主**, 否则抛 "QLayout already has a parent" —— 这正是
+        # 重编译后 MainWindow 构造失败的原因。此处兜底再摘一次。
+        _owner = self.ui.hButtons.parent()
+        if isinstance(_owner, QLayout):
+            _owner.removeItem(self.ui.hButtons)
+        elif isinstance(_owner, QWidget) and _owner.layout() is not None:
+            _owner.layout().removeItem(self.ui.hButtons)
         btn_wrap = QWidget()
         btn_wrap.setLayout(self.ui.hButtons)
         self._btn_export = QPushButton(self.tr("📄 出报告"))
