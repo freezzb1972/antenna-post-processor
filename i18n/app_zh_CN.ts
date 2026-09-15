@@ -4438,7 +4438,6 @@
         <translation>模板文件异常</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="890"/>
         <source>选择的模板文件大小为 {size_mb:.0f} MB，
 通常模板文件不超过 1 MB。
 
@@ -4446,7 +4445,7 @@
 继续解析可能需要较长时间。
 
 是否仍然使用此文件作为模板？</source>
-        <translation>选择的模板文件大小为 {size_mb:.0f} MB，
+        <translation type="vanished">选择的模板文件大小为 {size_mb:.0f} MB，
 通常模板文件不超过 1 MB。
 
 可能误选了源数据文件（如 RawData / FinalSummary），
@@ -4524,7 +4523,7 @@
     </message>
     <message>
         <location filename="../ui/main_window.py" line="430"/>
-        <location filename="../ui/main_window.py" line="3091"/>
+        <location filename="../ui/main_window.py" line="3097"/>
         <source>天线:</source>
         <translation>天线:</translation>
     </message>
@@ -4603,7 +4602,7 @@
         <location filename="../ui/main_window.py" line="566"/>
         <location filename="../ui/main_window.py" line="2279"/>
         <location filename="../ui/main_window.py" line="2284"/>
-        <location filename="../ui/main_window.py" line="2752"/>
+        <location filename="../ui/main_window.py" line="2758"/>
         <source>👁 预览</source>
         <translation>👁 预览</translation>
     </message>
@@ -4708,6 +4707,17 @@
         <translation>📈 图表查看</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.py" line="890"/>
+        <source>选择的模板文件大小为 {0:.0f} MB，
+通常模板文件不超过 1 MB。
+
+可能误选了源数据文件（如 RawData / FinalSummary），
+继续解析可能需要较长时间。
+
+是否仍然使用此文件作为模板？</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../ui/main_window.py" line="940"/>
         <source>打开任务包</source>
         <translation>打开任务包</translation>
@@ -4795,6 +4805,21 @@
         <translation>导出格式</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.py" line="1181"/>
+        <source>CSV (数据)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="1181"/>
+        <source>Excel (数据)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="1181"/>
+        <source>JSON (数据+参数)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../ui/main_window.py" line="1183"/>
         <source>格式:</source>
         <translation>格式:</translation>
@@ -4849,6 +4874,16 @@
         <translation>选择包含 .raw 文件的文件夹</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.py" line="1263"/>
+        <source>⚠ 请先选择 .raw 文件</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="1266"/>
+        <source>⚠ 请选择输出目录</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../ui/main_window.py" line="1284"/>
         <source>检测到大文件 (EMQuest 为 32 位，内存上限约 4GB):
 
@@ -4866,6 +4901,14 @@
         <location filename="../ui/main_window.py" line="1308"/>
         <source>⏳ EMQuest 导出中...</source>
         <translation>⏳ EMQuest 导出中...</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="1327"/>
+        <source>
+
+失败详情:
+</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="1343"/>
@@ -4913,6 +4956,11 @@
         <translation>❌ 失败: {e}</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.py" line="1444"/>
+        <source>许可管理</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../ui/main_window.py" line="1447"/>
         <source>关于</source>
         <translation>关于</translation>
@@ -4955,12 +5003,37 @@ GitHub: freezzb1972/antenna-post-processor</translation>
         <translation>正在打开数据文件...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3374"/>
+        <location filename="../ui/main_window.py" line="2806"/>
+        <source>✅ 完成</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="2874"/>
+        <source>默认天线</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="3279"/>
+        <source>📡 无源</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="3311"/>
+        <source>&lt;b&gt;参数:&lt;/b&gt; &lt;span style=&apos;color:#888;&apos;&gt;(未选择)&lt;/span&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="3326"/>
+        <source>外推</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="3380"/>
         <source>确认退出</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3375"/>
+        <location filename="../ui/main_window.py" line="3381"/>
         <source>正在处理中，确定要退出吗？</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5068,6 +5141,7 @@ GitHub: freezzb1972/antenna-post-processor</translation>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="2376"/>
+        <location filename="../ui/main_window.py" line="2749"/>
         <source>⏳ 处理中...</source>
         <translation>⏳ 处理中...</translation>
     </message>
@@ -5163,57 +5237,57 @@ GitHub: freezzb1972/antenna-post-processor</translation>
         <translation>  完整报告: {full_report_path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2819"/>
+        <location filename="../ui/main_window.py" line="2825"/>
         <source>📦 正在打包任务包...</source>
         <translation>📦 正在打包任务包...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2887"/>
+        <location filename="../ui/main_window.py" line="2893"/>
         <source>📝 正在填充 Word 模板...</source>
         <translation>📝 正在填充 Word 模板...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3104"/>
+        <location filename="../ui/main_window.py" line="3110"/>
         <source>  数据层:</source>
         <translation>  数据层:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3106"/>
+        <location filename="../ui/main_window.py" line="3112"/>
         <source>最终参数</source>
         <translation>最终参数</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3107"/>
+        <location filename="../ui/main_window.py" line="3113"/>
         <source>中间数据</source>
         <translation>中间数据</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3108"/>
+        <location filename="../ui/main_window.py" line="3114"/>
         <source>原始数据 (TODO)</source>
         <translation>原始数据 (TODO)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3111"/>
+        <location filename="../ui/main_window.py" line="3117"/>
         <source>☑ 联动</source>
         <translation>☑ 联动</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3113"/>
+        <location filename="../ui/main_window.py" line="3119"/>
         <source>跟随主天线选择器</source>
         <translation>跟随主天线选择器</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3123"/>
+        <location filename="../ui/main_window.py" line="3129"/>
         <source>  (暂无计算结果 — 请先预览)</source>
         <translation>  (暂无计算结果 — 请先预览)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3128"/>
+        <location filename="../ui/main_window.py" line="3134"/>
         <source>  (无数据)</source>
         <translation>  (无数据)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3171"/>
+        <location filename="../ui/main_window.py" line="3177"/>
         <source>📊 参数表格已更新: {len(keys)} 列 × {len(first_sheet)} 行</source>
         <translation>📊 参数表格已更新: {len(keys)} 列 × {len(first_sheet)} 行</translation>
     </message>
@@ -5302,12 +5376,12 @@ GitHub: freezzb1972/antenna-post-processor</translation>
         <translation>  输出: {output_path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2865"/>
+        <location filename="../ui/main_window.py" line="2871"/>
         <source>✓ 处理完成</source>
         <translation>✓ 处理完成</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3213"/>
+        <location filename="../ui/main_window.py" line="3219"/>
         <source>处理错误</source>
         <translation>处理错误</translation>
     </message>

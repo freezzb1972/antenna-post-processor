@@ -63,31 +63,50 @@ def scan(path: Path) -> list:
         cb = set()
 
     hits = []
+    open_tr_depth = 0        # 跨行 tr( 的括号深度
     for i, line in enumerate(lines, start=1):
         s = line.strip()
         if s.startswith("#") or s.startswith('"""') or s.startswith("'''"):
             continue
         if SKIP_LINE.search(line):
             continue
+        # 同行内出现过 tr( / translate( 且位于字面量之前 -> 视为已包
+        # (用「之前出现过」而非「紧邻」, 否则 translate("Ctx", "...") 这种
+        #  第二参数会被误报 —— i18n_catalog.py 整文件都是这种形态)
+        tr_positions = [mm.start() for mm in re.finditer(r"\b(tr|translate)\(", line)]
         for m in LIT.finditer(line):
             lit = m.group(0)
             if not CJK.search(lit):
                 continue
-            if line[: m.start()].rstrip().endswith(("tr(", "translate(")):
-                continue          # 已包
+            if any(pos < m.start() for pos in tr_positions):
+                continue          # 已包 (同行)
+            if open_tr_depth > 0:
+                continue          # 已包 (跨行, 如 self.tr(\n  "...") )
             kind = ("class body: ①在消费点翻译(推荐, 见 ThemeManager 主题名) "
                     "或 ②改用 QCoreApplication.translate —— "
                     "切勿原地包 translate, import 期求值会冻结译文"
                     if i in cb else "UI 文案?")
             hits.append((i, lit[:56], kind))
+        # 维护跨行 tr( 深度 (粗略: 只数括号)
+        _seg = line
+        _d = 0
+        for ch in _seg:
+            if ch == "(":
+                _d += 1
+            elif ch == ")":
+                _d -= 1
+        if re.search(r"\b(tr|translate)\(", line):
+            open_tr_depth = max(0, open_tr_depth + _d)
+        elif open_tr_depth > 0:
+            open_tr_depth = max(0, open_tr_depth + _d)
     return hits
 
 
 def main() -> int:
     total = 0
     for path in sorted(UI_DIR.glob("*.py")):
-        if path.name == "__init__.py":
-            continue
+        if path.name in ("__init__.py", "i18n_catalog.py"):
+            continue   # i18n_catalog 是生成物, 全为 translate() 调用
         hits = scan(path)
         if not hits:
             continue

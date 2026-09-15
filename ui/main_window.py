@@ -887,11 +887,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if size_mb > 10:
             reply = QMessageBox.question(
                 self, self.tr("模板文件异常"),
-                self.tr(f"选择的模板文件大小为 {size_mb:.0f} MB，\n"
+                self.tr("选择的模板文件大小为 {0:.0f} MB，\n"
                         "通常模板文件不超过 1 MB。\n\n"
                         "可能误选了源数据文件（如 RawData / FinalSummary），\n"
                         "继续解析可能需要较长时间。\n\n"
-                        "是否仍然使用此文件作为模板？"),
+                        "是否仍然使用此文件作为模板？").format(size_mb),
                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No
             )
             if reply == QMessageBox.No:
@@ -1178,7 +1178,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         fmt_group = QGroupBox(self.tr("导出格式"))
         fmt_layout = QHBoxLayout(fmt_group)
         fmt_combo = QComboBox()
-        fmt_combo.addItems(["CSV (数据)", "Excel (数据)", "JSON (数据+参数)"])
+        fmt_combo.addItems([self.tr("CSV (数据)"), self.tr("Excel (数据)"), self.tr("JSON (数据+参数)")])
         fmt_combo.setCurrentIndex(0)
         fmt_layout.addWidget(QLabel(self.tr("格式:")))
         fmt_layout.addWidget(fmt_combo)
@@ -1260,10 +1260,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
 
         def on_ok():
             if not selected_paths:
-                status_label.setText("⚠ 请先选择 .raw 文件")
+                status_label.setText(self.tr("⚠ 请先选择 .raw 文件"))
                 return
             if not out_edit.text():
-                status_label.setText("⚠ 请选择输出目录")
+                status_label.setText(self.tr("⚠ 请选择输出目录"))
                 return
             dlg.accept()
 
@@ -1324,7 +1324,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 total_mb = sum(e["size_mb"] for e in result["exported"])
                 summary += f"\n总大小: {total_mb:.1f} MB\n\n输出目录:\n{output_dir}"
             if fail > 0:
-                summary += "\n\n失败详情:\n"
+                summary += self.tr("\n\n失败详情:\n")
                 for f in result["failed"]:
                     summary += f"  • {Path(f['source']).name}: {f['error']}\n"
             QMessageBox.information(self, self.tr("完成"), summary)
@@ -1441,7 +1441,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             msg = (f"许可状态: {mgr.status_text}\n被许可方: {info.licensee}\n到期: {info.expiry}\n机器ID: {mid}")
         else:
             msg = (f"许可状态: 未找到有效许可\n\n将 license.json 放到程序目录\n机器ID: {mid}")
-        QMessageBox.information(self, "许可管理", msg)
+        QMessageBox.information(self, self.tr("许可管理"), msg)
 
     def _on_about(self):
         QMessageBox.about(self, self.tr("关于"),
@@ -2739,8 +2739,14 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """恢复按钮到空闲状态（向后兼容，内部委托 _enter_idle）。"""
         self._enter_idle()
 
-    def _enter_busy(self, text="⏳ 处理中..."):
-        """进入忙碌状态：锁定预览按钮，防止主计算与工具操作并发。"""
+    def _enter_busy(self, text=None):
+        """进入忙碌状态：锁定预览按钮，防止主计算与工具操作并发。
+
+        默认文案在**函数体内**取 —— 不能写成 `text=self.tr(...)`:
+        默认参数在函数定义时求值(此时处于 class body 作用域, 没有 self) -> NameError。
+        """
+        if text is None:
+            text = self.tr("⏳ 处理中...")
         self._running = True
         self.ui.btnStart.setEnabled(False)
         self._btn_export.setEnabled(False)
@@ -2797,7 +2803,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         if self._preview_state not in (self._PREVIEWING, self._EXPORTING):
             return
         self.ui.progressBar.setValue(self.ui.progressBar.maximum())
-        self.ui.lblProgressMsg.setText("✅ 完成")
+        self.ui.lblProgressMsg.setText(self.tr("✅ 完成"))
         self._running = False
         self._worker = None
         self._data_stale = True  # 计算完成，数据变为陈旧
@@ -2865,7 +2871,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         self.ui.lblProgressMsg.setText(self.tr("✓ 处理完成"))
 
         # 按天线名存储结果
-        ant_name = self._current_antenna_name or "默认天线"
+        ant_name = self._current_antenna_name or self.tr("默认天线")
         self._antenna_results[ant_name] = results
         self._antenna_images[ant_name] = images
 
@@ -3270,7 +3276,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         """刷新执行栏左侧天线参数面板（实时更新，不累积）。"""
         if not hasattr(self, '_params_display') or not self._params_display:
             return
-        mode_names = {0: "📡 无源", 1: "📶 TRP", 2: "📻 TIS"}
+        mode_names = {0: self.tr("📡 无源"), 1: "📶 TRP", 2: "📻 TIS"}
         mode_str = mode_names.get(self._test_mode, "?")
         freq = self._cmb_freq_source.currentText() if hasattr(self, '_cmb_freq_source') else "—"
         extrap = self._cmb_extrapolate.currentData() if hasattr(self, '_cmb_extrapolate') else None
@@ -3302,7 +3308,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             param_names = [labels.get(k, k) for k in checked]
             lines.append(f"<b>参数:</b> {', '.join(param_names)}")
         else:
-            lines.append("<b>参数:</b> <span style='color:#888;'>(未选择)</span>")
+            lines.append(self.tr("<b>参数:</b> <span style='color:#888;'>(未选择)</span>"))
 
         # 角度显示: 从 ANGLE_TYPE_CONFIG 读取，与右边面板共用同一数据源
         from src.ui_utils import ANGLE_TYPE_CONFIG
@@ -3317,7 +3323,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 parts += [f"({lo}–{hi}°)" for lo, hi in ranges]
                 lines.append(f"<b>{info.label}:</b> {', '.join(parts)}")
         algo = []
-        if extrap: algo.append("外推")
+        if extrap: algo.append(self.tr("外推"))
         if robust: algo.append("Robust")
         if algo: lines.append(f"<b>算法:</b> {', '.join(algo)}")
 

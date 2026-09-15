@@ -4567,7 +4567,6 @@ On first use, configure the API key in ⚙</translation>
         <translation>Template File Warning</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="890"/>
         <source>选择的模板文件大小为 {size_mb:.0f} MB，
 通常模板文件不超过 1 MB。
 
@@ -4575,7 +4574,7 @@ On first use, configure the API key in ⚙</translation>
 继续解析可能需要较长时间。
 
 是否仍然使用此文件作为模板？</source>
-        <translation>The selected template file is {size_mb:.0f} MB,
+        <translation type="vanished">The selected template file is {size_mb:.0f} MB,
 template files are usually under 1 MB.
 
 You may have selected a source data file (e.g. RawData / FinalSummary);
@@ -4653,7 +4652,7 @@ Use this file as template anyway?</translation>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="430"/>
-        <location filename="../ui/main_window.py" line="3091"/>
+        <location filename="../ui/main_window.py" line="3097"/>
         <source>天线:</source>
         <translation>Antenna:</translation>
     </message>
@@ -4732,7 +4731,7 @@ Use this file as template anyway?</translation>
         <location filename="../ui/main_window.py" line="566"/>
         <location filename="../ui/main_window.py" line="2279"/>
         <location filename="../ui/main_window.py" line="2284"/>
-        <location filename="../ui/main_window.py" line="2752"/>
+        <location filename="../ui/main_window.py" line="2758"/>
         <source>👁 预览</source>
         <translation>👁 Preview</translation>
     </message>
@@ -4837,6 +4836,23 @@ Use this file as template anyway?</translation>
         <translation>📈 Chart view</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.py" line="890"/>
+        <source>选择的模板文件大小为 {0:.0f} MB，
+通常模板文件不超过 1 MB。
+
+可能误选了源数据文件（如 RawData / FinalSummary），
+继续解析可能需要较长时间。
+
+是否仍然使用此文件作为模板？</source>
+        <translation>The selected template file is {0:.0f} MB.
+Template files are usually under 1 MB.
+
+You may have picked a source data file (such as RawData / FinalSummary).
+Parsing may take a long time.
+
+Use this file as the template anyway?</translation>
+    </message>
+    <message>
         <location filename="../ui/main_window.py" line="940"/>
         <source>打开任务包</source>
         <translation>Open task bundle</translation>
@@ -4924,6 +4940,21 @@ Use this file as template anyway?</translation>
         <translation>Export Format</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.py" line="1181"/>
+        <source>CSV (数据)</source>
+        <translation>CSV (data)</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="1181"/>
+        <source>Excel (数据)</source>
+        <translation>Excel (data)</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="1181"/>
+        <source>JSON (数据+参数)</source>
+        <translation>JSON (data + parameters)</translation>
+    </message>
+    <message>
         <location filename="../ui/main_window.py" line="1183"/>
         <source>格式:</source>
         <translation>Format:</translation>
@@ -4978,6 +5009,16 @@ Use this file as template anyway?</translation>
         <translation>Select folder containing .raw files</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.py" line="1263"/>
+        <source>⚠ 请先选择 .raw 文件</source>
+        <translation>⚠ Please select .raw files first</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="1266"/>
+        <source>⚠ 请选择输出目录</source>
+        <translation>⚠ Please select an output directory</translation>
+    </message>
+    <message>
         <location filename="../ui/main_window.py" line="1284"/>
         <source>检测到大文件 (EMQuest 为 32 位，内存上限约 4GB):
 
@@ -4995,6 +5036,17 @@ Use this file as template anyway?</translation>
         <location filename="../ui/main_window.py" line="1308"/>
         <source>⏳ EMQuest 导出中...</source>
         <translation>⏳ EMQuest exporting...</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="1327"/>
+        <source>
+
+失败详情:
+</source>
+        <translation>
+
+Failure details:
+</translation>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="1343"/>
@@ -5042,6 +5094,11 @@ Use this file as template anyway?</translation>
         <translation>❌ Failed: {e}</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.py" line="1444"/>
+        <source>许可管理</source>
+        <translation>License management</translation>
+    </message>
+    <message>
         <location filename="../ui/main_window.py" line="1447"/>
         <source>关于</source>
         <translation>About</translation>
@@ -5084,12 +5141,37 @@ GitHub: freezzb1972/antenna-post-processor</translation>
         <translation>Opening data file...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3374"/>
+        <location filename="../ui/main_window.py" line="2806"/>
+        <source>✅ 完成</source>
+        <translation>✅ Done</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="2874"/>
+        <source>默认天线</source>
+        <translation>Default antenna</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="3279"/>
+        <source>📡 无源</source>
+        <translation>📡 Passive</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="3311"/>
+        <source>&lt;b&gt;参数:&lt;/b&gt; &lt;span style=&apos;color:#888;&apos;&gt;(未选择)&lt;/span&gt;</source>
+        <translation>&lt;b&gt;Parameters:&lt;/b&gt; &lt;span style=&apos;color:#888;&apos;&gt;(none selected)&lt;/span&gt;</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="3326"/>
+        <source>外推</source>
+        <translation>Extrapolation</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="3380"/>
         <source>确认退出</source>
         <translation>Confirm exit</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3375"/>
+        <location filename="../ui/main_window.py" line="3381"/>
         <source>正在处理中，确定要退出吗？</source>
         <translation>Processing is in progress. Are you sure you want to exit?</translation>
     </message>
@@ -5197,6 +5279,7 @@ Open the file in Word and save as .docx first.</translation>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="2376"/>
+        <location filename="../ui/main_window.py" line="2749"/>
         <source>⏳ 处理中...</source>
         <translation>⏳ Processing...</translation>
     </message>
@@ -5293,57 +5376,57 @@ Please change it and select again.</translation>
         <translation>  Full report: {full_report_path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2819"/>
+        <location filename="../ui/main_window.py" line="2825"/>
         <source>📦 正在打包任务包...</source>
         <translation>📦 Packing task bundle...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2887"/>
+        <location filename="../ui/main_window.py" line="2893"/>
         <source>📝 正在填充 Word 模板...</source>
         <translation>📝 Filling Word template...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3104"/>
+        <location filename="../ui/main_window.py" line="3110"/>
         <source>  数据层:</source>
         <translation>  Data layer:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3106"/>
+        <location filename="../ui/main_window.py" line="3112"/>
         <source>最终参数</source>
         <translation>Final parameters</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3107"/>
+        <location filename="../ui/main_window.py" line="3113"/>
         <source>中间数据</source>
         <translation>Intermediate data</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3108"/>
+        <location filename="../ui/main_window.py" line="3114"/>
         <source>原始数据 (TODO)</source>
         <translation>Raw data (TODO)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3111"/>
+        <location filename="../ui/main_window.py" line="3117"/>
         <source>☑ 联动</source>
         <translation>☑ Linked</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3113"/>
+        <location filename="../ui/main_window.py" line="3119"/>
         <source>跟随主天线选择器</source>
         <translation>Follow the main antenna selector</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3123"/>
+        <location filename="../ui/main_window.py" line="3129"/>
         <source>  (暂无计算结果 — 请先预览)</source>
         <translation>  (no results yet — preview first)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3128"/>
+        <location filename="../ui/main_window.py" line="3134"/>
         <source>  (无数据)</source>
         <translation>  (no data)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3171"/>
+        <location filename="../ui/main_window.py" line="3177"/>
         <source>📊 参数表格已更新: {len(keys)} 列 × {len(first_sheet)} 行</source>
         <translation>📊 Parameter table updated: {len(keys)} cols × {len(first_sheet)} rows</translation>
     </message>
@@ -5432,12 +5515,12 @@ Please change it and select again.</translation>
         <translation>  Output: {output_path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2865"/>
+        <location filename="../ui/main_window.py" line="2871"/>
         <source>✓ 处理完成</source>
         <translation>✓ Complete</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3213"/>
+        <location filename="../ui/main_window.py" line="3219"/>
         <source>处理错误</source>
         <translation>Processing Error</translation>
     </message>
