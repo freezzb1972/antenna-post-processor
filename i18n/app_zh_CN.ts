@@ -2468,6 +2468,480 @@
     </message>
 </context>
 <context>
+    <name>GraphDataTab</name>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1885"/>
+        <source>📊 图形数据</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1900"/>
+        <source>频点:</source>
+        <translation type="unfinished">频点:</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1910"/>
+        <source>未找到图形数据 — 请勾选「中间数据输出」或启用图表后重新处理</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1941"/>
+        <source>共 {0} 个频点, 步进 5°</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>GraphViewer</name>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="68"/>
+        <source>Iso</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="69"/>
+        <source>顶</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="70"/>
+        <source>底</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="71"/>
+        <source>前</source>
+        <translation type="unfinished">前</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="72"/>
+        <source>后</source>
+        <translation type="unfinished">后</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="73"/>
+        <source>左</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="74"/>
+        <source>右</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="412"/>
+        <source>无源天线</source>
+        <translation type="unfinished">无源天线</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="412"/>
+        <source>有源发射 TRP</source>
+        <translation type="unfinished">有源发射 TRP</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="412"/>
+        <source>有源接收 TIS</source>
+        <translation type="unfinished">有源接收 TIS</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="414"/>
+        <source>测试类型: {0}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="423"/>
+        <source>({0}个)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="437"/>
+        <location filename="../ui/graph_viewer.py" line="917"/>
+        <source>◉ 子图 #{0}:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="492"/>
+        <location filename="../ui/graph_viewer.py" line="675"/>
+        <source>频点:</source>
+        <translation type="unfinished">频点:</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="506"/>
+        <source>步:</source>
+        <translation type="unfinished">步:</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="510"/>
+        <source>自定义...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="522"/>
+        <location filename="../ui/graph_viewer.py" line="531"/>
+        <source>⚙ 角度...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="539"/>
+        <source>  数据源:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="543"/>
+        <location filename="../ui/graph_viewer.py" line="552"/>
+        <location filename="../ui/graph_viewer.py" line="670"/>
+        <location filename="../ui/graph_viewer.py" line="678"/>
+        <source>搜索...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="548"/>
+        <source>类型:</source>
+        <translation type="unfinished">类型:</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="581"/>
+        <source>选择频点</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="584"/>
+        <source>搜索频点...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="596"/>
+        <source>全选</source>
+        <translation type="unfinished">全选</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="597"/>
+        <source>清空</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="615"/>
+        <source>选择 {0} 角度</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="619"/>
+        <source>+ 添加</source>
+        <translation type="unfinished">+ 添加</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="667"/>
+        <source>视图:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="682"/>
+        <source>布局:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="691"/>
+        <source>频率扫描动画</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="695"/>
+        <source>下一频点</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="700"/>
+        <source>天线:</source>
+        <translation type="unfinished">天线:</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="702"/>
+        <source>选择查看的天线数据</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="705"/>
+        <source>随主</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="706"/>
+        <source>跟随主天线选择器</source>
+        <translation type="unfinished">跟随主天线选择器</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="711"/>
+        <location filename="../ui/graph_viewer.py" line="1084"/>
+        <source>图形显示设置</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="715"/>
+        <source>导出视图为图片</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="726"/>
+        <location filename="../ui/graph_viewer.py" line="784"/>
+        <source>◉ 子图 #1:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="730"/>
+        <location filename="../ui/graph_viewer.py" line="787"/>
+        <source>数据:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="732"/>
+        <location filename="../ui/graph_viewer.py" line="791"/>
+        <source>选中子图显示的数据类型</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="739"/>
+        <location filename="../ui/graph_viewer.py" line="794"/>
+        <source>图型:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="742"/>
+        <source>3D曲面 / 极坐标2D切面 / 直角3D</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="746"/>
+        <location filename="../ui/graph_viewer.py" line="800"/>
+        <source>视角:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="753"/>
+        <source>7 视角预设</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="759"/>
+        <location filename="../ui/graph_viewer.py" line="829"/>
+        <source>重置视角为默认 Iso + 关切割</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="778"/>
+        <source>联动</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="780"/>
+        <source>on: 图型/视角/切割作用所有子图; off: 仅作用选中的子图</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="797"/>
+        <source>3D曲面 / 极坐标2D / 直角3D</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="807"/>
+        <source>7 视角预设, 手动微调在 ⚙ 设置中</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="810"/>
+        <source>切割</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="811"/>
+        <source>单击3D球面设切割角 | 连续多次切割取交集 | ↔翻转保留侧 | ✕清除</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="816"/>
+        <source>切割角度 φ (或单击3D球面自动填入)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="820"/>
+        <source>翻转保留侧: [φ,φ+180) ↔ [φ+180,φ+360)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="824"/>
+        <source>清除所有切割, 恢复完整球面</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="860"/>
+        <source>3D 采样步进</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="862"/>
+        <location filename="../ui/graph_viewer.py" line="1791"/>
+        <source>单Y轴</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="862"/>
+        <location filename="../ui/graph_viewer.py" line="1791"/>
+        <source>双Y轴(自动)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="862"/>
+        <location filename="../ui/graph_viewer.py" line="1791"/>
+        <source>双Y轴(强制)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="867"/>
+        <source>联动视角</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1037"/>
+        <source>导出图形视图</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1038"/>
+        <source>PNG 图片 (*.png);;JPEG 图片 (*.jpg);;所有文件 (*)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1054"/>
+        <source>📋 导出迹线数据为 CSV...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1057"/>
+        <source>导出迹线数据</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1058"/>
+        <source>CSV 文件 (*.csv)</source>
+        <translation type="unfinished">CSV 文件 (*.csv)</translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1089"/>
+        <source>色图:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1091"/>
+        <source>  精度:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1097"/>
+        <source>Normalize (峰值→0dB, 对比形状用)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1103"/>
+        <source>dB 量程锁定:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1117"/>
+        <source>默认数据类型 (布局初始铺哪些)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1124"/>
+        <source>当前数据无此类型 (仍可选)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1129"/>
+        <source>频率曲线选择 (Freq Curves 模式)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1138"/>
+        <source>(无频率曲线数据 — 请先运行处理)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1143"/>
+        <source>动画速度:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1150"/>
+        <source>3D 网格线型:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1152"/>
+        <location filename="../ui/graph_viewer.py" line="1153"/>
+        <source>Minimum (极细)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1152"/>
+        <source>None (平滑无网格)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1152"/>
+        <source>Proportional (等宽)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1159"/>
+        <source>极坐标零度朝右 (E)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1162"/>
+        <source>记忆迹线叠加 (多频点对比)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1168"/>
+        <source>视角手动微调</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1406"/>
+        <source>θ={0}×φ={1}={2}点</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1455"/>
+        <location filename="../ui/graph_viewer.py" line="1861"/>
+        <source>▶ 播放</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1635"/>
+        <source>无频率曲线数据可用</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1646"/>
+        <source>未选择任何频率曲线</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1663"/>
+        <source>无频率曲线数据</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1793"/>
+        <source>频率曲线: {0} 项, {1} 个频点 [{2}]</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/graph_viewer.py" line="1855"/>
+        <source>⏸ 暂停</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>ImportFromJSONDialog</name>
     <message>
         <location filename="../ui/project_manager.py" line="479"/>
@@ -5748,6 +6222,7 @@ JSON 文件由 EMQuest 导出，包含被测件型号、操作员、测试时间
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../ui/dialogs.py" line="2501"/>
         <location filename="../ui/dialogs.py" line="2544"/>
         <source>模型:</source>
         <translation type="unfinished"></translation>

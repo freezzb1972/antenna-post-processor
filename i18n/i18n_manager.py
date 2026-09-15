@@ -378,9 +378,13 @@ class I18nManager:
                 ui = getattr(top, "ui", None)
                 if ui is not None and hasattr(ui, "retranslateUi"):
                     ui.retranslateUi(top)
-                hook = getattr(top, "_on_language_changed", None)
-                if callable(hook):
-                    hook()          # 动态/format 文案: 由各类自行重算
+                # 动态/format 文案由各类自行重算。必须遍历**整棵子树**而非只调顶层:
+                # GraphViewer / GraphDataTab 这类子控件的文案也是现算的, 顶层钩子
+                # 覆盖不到它们。
+                for w in [top] + list(top.findChildren(QWidget)):
+                    hook = getattr(w, "_on_language_changed", None)
+                    if callable(hook):
+                        hook()
             except RuntimeError:
                 continue            # 窗口销毁期
         log.debug("语言切换 %s -> %s: 重翻译 %d 处", from_lang, to_lang, total)
