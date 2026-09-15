@@ -1153,6 +1153,25 @@
   "错误": "Error",
   "默认: 源文件所在目录": "Default: source file directory"
  },
+ "RspPickerDialog": {
+  "(通用)": "(generic)",
+  "-- 选择预设（或使用下方浏览）--": "-- Select a preset (or browse below) --",
+  "CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)": "CSV/Excel files (*.csv *.xlsx *.xls);;All files (*)",
+  "或者手动浏览文件": "Or browse for files manually",
+  "描述:": "Description:",
+  "提示": "Notice",
+  "浏览...": "Browse...",
+  "请选择一个预设，或浏览文件，或点击「跳过」。": "Select a preset, browse for files, or click \"Skip\".",
+  "跳过 — 不应用 RSP 校准": "Skip — do not apply RSP calibration",
+  "选择 H-pol RSP 文件...": "Select H-pol RSP file...",
+  "选择 H-pol RSP 校准文件": "Select H-pol RSP calibration file",
+  "选择 RSP 校准预设": "Select RSP Calibration Preset",
+  "选择 V-pol RSP 文件...": "Select V-pol RSP file...",
+  "选择 V-pol RSP 校准文件": "Select V-pol RSP calibration file",
+  "选择预设:": "Select preset:",
+  "预设 RSP 校准": "Preset RSP calibration",
+  "（未设置）": "(not set)"
+ },
  "ShellWindow": {
   "\n⚠ {len(modified)} 个数据文件已修改，建议重新计算。": "\n⚠ {len(modified)} data files modified; recompute recommended.",
   "\n❌ {len(missing)} 个数据文件已移动，请查找。": "\n❌ {len(missing)} data files moved; please locate them.",
@@ -1285,6 +1304,15 @@
   "类型": "Type",
   "选择模板文件": "Select template file",
   "📋 预览报告": "📋 Preview report"
+ },
+ "ThemeManager": {
+  "亮色 蓝色": "Light Blue",
+  "亮色 青绿": "Light Teal",
+  "暗色 复古暖": "Dark Gruvbox",
+  "暗色 琥珀": "Dark Amber",
+  "暗色 白框白字": "Dark Mono",
+  "暗色 蓝色": "Dark Blue",
+  "暗色 青绿 ★": "Dark Teal ★"
  },
  "WordTemplatePreviewDialog": {
   "SDT Tag": "SDT tag",

@@ -38,7 +38,7 @@ class RspPickerDialog(QDialog):
         self._result_h: str = ""
         self._result_v: str = ""
 
-        self.setWindowTitle("选择 RSP 校准预设")
+        self.setWindowTitle(self.tr("选择 RSP 校准预设"))
         self.setMinimumWidth(480)
         self._setup_ui()
         self._load_presets()
@@ -48,14 +48,14 @@ class RspPickerDialog(QDialog):
         layout.setSpacing(10)
 
         # ── 预设选择 ──
-        preset_grp = QGroupBox("预设 RSP 校准")
+        preset_grp = QGroupBox(self.tr("预设 RSP 校准"))
         preset_layout = QFormLayout(preset_grp)
         preset_layout.setSpacing(6)
 
         self._cmb_preset = QComboBox()
         self._cmb_preset.setMinimumWidth(350)
         self._cmb_preset.currentIndexChanged.connect(self._on_preset_selected)
-        preset_layout.addRow("选择预设:", self._cmb_preset)
+        preset_layout.addRow(self.tr("选择预设:"), self._cmb_preset)
 
         self._lbl_h_path = QLabel("")
         self._lbl_h_path.setWordWrap(True)
@@ -70,26 +70,26 @@ class RspPickerDialog(QDialog):
         self._lbl_desc = QLabel("")
         self._lbl_desc.setWordWrap(True)
         self._lbl_desc.setStyleSheet("color: #888;")
-        preset_layout.addRow("描述:", self._lbl_desc)
+        preset_layout.addRow(self.tr("描述:"), self._lbl_desc)
 
         layout.addWidget(preset_grp)
 
         # ── 手动浏览 ──
-        browse_grp = QGroupBox("或者手动浏览文件")
+        browse_grp = QGroupBox(self.tr("或者手动浏览文件"))
         browse_layout = QFormLayout(browse_grp)
         browse_layout.setSpacing(6)
 
         h_row = QHBoxLayout()
-        self._edit_browse_h = self._make_path_edit("选择 H-pol RSP 文件...")
-        btn_browse_h = QPushButton("浏览...")
+        self._edit_browse_h = self._make_path_edit(self.tr("选择 H-pol RSP 文件..."))
+        btn_browse_h = QPushButton(self.tr("浏览..."))
         btn_browse_h.clicked.connect(self._on_browse_h)
         h_row.addWidget(self._edit_browse_h)
         h_row.addWidget(btn_browse_h)
         browse_layout.addRow("H-pol:", h_row)
 
         v_row = QHBoxLayout()
-        self._edit_browse_v = self._make_path_edit("选择 V-pol RSP 文件...")
-        btn_browse_v = QPushButton("浏览...")
+        self._edit_browse_v = self._make_path_edit(self.tr("选择 V-pol RSP 文件..."))
+        btn_browse_v = QPushButton(self.tr("浏览..."))
         btn_browse_v.clicked.connect(self._on_browse_v)
         v_row.addWidget(self._edit_browse_v)
         v_row.addWidget(btn_browse_v)
@@ -99,7 +99,7 @@ class RspPickerDialog(QDialog):
 
         # ── 跳过 + 确认 ──
         bottom_row = QHBoxLayout()
-        btn_skip = QPushButton("跳过 — 不应用 RSP 校准")
+        btn_skip = QPushButton(self.tr("跳过 — 不应用 RSP 校准"))
         btn_skip.clicked.connect(self._on_skip)
         bottom_row.addWidget(btn_skip)
         bottom_row.addStretch()
@@ -121,7 +121,7 @@ class RspPickerDialog(QDialog):
 
     def _load_presets(self):
         mgr = RspPresetManager()
-        self._cmb_preset.addItem("-- 选择预设（或使用下方浏览）--", None)
+        self._cmb_preset.addItem(self.tr("-- 选择预设（或使用下方浏览）--"), None)
 
         # 精确匹配在前
         exact = [p for p in mgr.presets if p.test_mode == self._test_mode]
@@ -131,7 +131,7 @@ class RspPickerDialog(QDialog):
         for preset in exact:
             self._cmb_preset.addItem(f"✓ {preset.name}", preset)
         for preset in any_mode:
-            self._cmb_preset.addItem(f"  {preset.name} (通用)", preset)
+            self._cmb_preset.addItem(f"  {preset.name} " + self.tr("(通用)"), preset)
         if others:
             self._cmb_preset.insertSeparator(self._cmb_preset.count())
             for preset in others:
@@ -140,23 +140,23 @@ class RspPickerDialog(QDialog):
     def _on_preset_selected(self, _index: int):
         preset: RspPreset = self._cmb_preset.currentData()
         if preset:
-            self._lbl_h_path.setText(preset.rsp_h_path or "（未设置）")
-            self._lbl_v_path.setText(preset.rsp_v_path or "（未设置）")
+            self._lbl_h_path.setText(preset.rsp_h_path or self.tr("（未设置）"))
+            self._lbl_v_path.setText(preset.rsp_v_path or self.tr("（未设置）"))
             self._lbl_desc.setText(preset.description or "—")
 
     # ── 浏览 ──
 
     def _on_browse_h(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择 H-pol RSP 校准文件", "",
-            "CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)")
+            self, self.tr("选择 H-pol RSP 校准文件"), "",
+            self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
         if path:
             self._edit_browse_h.setText(path)
 
     def _on_browse_v(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择 V-pol RSP 校准文件", "",
-            "CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)")
+            self, self.tr("选择 V-pol RSP 校准文件"), "",
+            self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
         if path:
             self._edit_browse_v.setText(path)
 
@@ -178,8 +178,8 @@ class RspPickerDialog(QDialog):
             self.accept()
             return
 
-        QMessageBox.warning(self, "提示",
-            "请选择一个预设，或浏览文件，或点击「跳过」。")
+        QMessageBox.warning(self, self.tr("提示"),
+            self.tr("请选择一个预设，或浏览文件，或点击「跳过」。"))
 
     def _on_skip(self):
         self._result_h = ""

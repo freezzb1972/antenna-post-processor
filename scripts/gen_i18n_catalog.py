@@ -35,7 +35,16 @@ sys.path.insert(0, str(ROOT))
 
 def collect() -> dict[str, set]:
     """返回 {context: {字面量, ...}}。"""
-    result: dict[str, set] = {"ChartConfig": set(), "AntennaParamsPage": set()}
+    result: dict[str, set] = {"ChartConfig": set(), "AntennaParamsPage": set(),
+                              "ThemeManager": set()}
+
+    # ── 主题显示名 ──
+    # ALL_THEMES 是 class body 数据, 不能在里面包 translate (import 期求值会冻结
+    # 译文), 故在消费点 (ui/dialogs.py 主题下拉) 用 tr_shared 翻译, 此处仅供提取
+    from ui.theme_manager import ThemeManager
+
+    for _theme_id, _name in ThemeManager.ALL_THEMES:
+        result["ThemeManager"].add(_name)
 
     # ── 图表标签 + 类别名 ──
     from src.chart_config import ChartConfig

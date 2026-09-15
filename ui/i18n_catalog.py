@@ -46,3 +46,12 @@ def _catalog():
     QCoreApplication.translate("ChartConfig", '直角坐标俯仰面切面图')
     QCoreApplication.translate("ChartConfig", '直角坐标方位面切面图')
 
+    # ── ThemeManager (7 条) ──
+    QCoreApplication.translate("ThemeManager", '亮色 蓝色')
+    QCoreApplication.translate("ThemeManager", '亮色 青绿')
+    QCoreApplication.translate("ThemeManager", '暗色 复古暖')
+    QCoreApplication.translate("ThemeManager", '暗色 琥珀')
+    QCoreApplication.translate("ThemeManager", '暗色 白框白字')
+    QCoreApplication.translate("ThemeManager", '暗色 蓝色')
+    QCoreApplication.translate("ThemeManager", '暗色 青绿 ★')
+

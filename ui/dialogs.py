@@ -2583,8 +2583,12 @@ class SystemSettingsDialog(QDialog):
         self._spin_font.setValue(cfg.font_size)
         # 主题
         from ui.theme_manager import ThemeManager
+        from i18n.i18n_manager import tr_shared
+        # 在消费点翻译, 不在 ThemeManager.ALL_THEMES 里包 translate ——
+        # 那是 class body, import 期就求值, 翻译会被冻结(那时 QApplication 还没建),
+        # 语言切换将失效
         for theme_id, name in ThemeManager.ALL_THEMES:
-            self._cmb_theme.addItem(name, theme_id)
+            self._cmb_theme.addItem(tr_shared(name, "ThemeManager"), theme_id)
         cur = ThemeManager.current_theme()
         for i in range(self._cmb_theme.count()):
             if self._cmb_theme.itemData(i) == cur:
