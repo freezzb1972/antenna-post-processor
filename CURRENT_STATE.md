@@ -9,6 +9,9 @@
 ## A. 本次会话完成的工作 — 9 个提交
 
 ```
+a13f3ce  feat(i18n): dialogs.py 接入翻译（P4）+ 拆除 3 个隐患、修 2 个既有 bug
+d52fcd2  chore: 同步 verify-manifest（P7）
+95dfa14  chore(i18n): 收口 — 重写工具链脚本 + 漏包守卫 + 状态固化
 09e9615  feat(i18n): RspPickerDialog + 主题下拉接入翻译（P4）
 08fc2fe  feat(i18n): graph_viewer.py 接入翻译 + 修 3 个 bug（P4 第 1 个文件）
 d23f543  feat(i18n): SystemSettingsDialog 接入翻译 + 补 254 条英文译文
@@ -95,6 +98,10 @@ editable combo 的 lineEdit —— 改了会破坏用户数据。
 | 7 | **`.ts` 不进 EXE** | 运行时读不到 `.ts` | 反查表走构建期 JSON 产物 + spec datas |
 | 8 | **门禁/测试在资源争抢下会假死** | 门禁曾被 900s timeout 杀掉, 同一份代码随后干净跑完 ~50s | 跑前确认无残留后台任务; 用 `python3 -u` + 直写文件, 别用管道 (`| tail` 会丢缓冲) |
 | 9 | **批量写入译文时要转义 `"`** | 只转义 `<`/`>`/`&` 时, 下次 lupdate 会把 `"` 规范化成 `&quot;`, 产生 1 行无谓 churn (功能无影响) | 写入时把 `"` 也转义为 `&quot;`, 或接受 lupdate 自愈 |
+| 10 | **隐式字符串拼接会被逐行包裹拆散** | `"A\n"` / `"B"` 两行本是一个参数, 逐行各包一层 `self.tr()` → 变成两个参数 → SyntaxError | 包裹脚本必须**先按「字面量之间只有空白」分组成段**, 整段作为一个参数包一层 tr (Python 相邻字面量会自动连接) |
+| 11 | **`.ui` 与 `compiled/` 已不同步** | 用当前 `pyside6-uic` 重编译 `main_window.ui` → `hButtons` 挂到 `rootVBox`(编译产物里是 `vTabFile`) → `_extract_execution_bar()` 抛「QLayout already has a parent」→ **MainWindow 构造直接失败** | **在两者对齐前不要重编译 UI**。需专人比对 `.ui` 与编译产物的结构差异 |
+| 12 | **反查候选降级顺序会影响带点的缩写** | `'Contract No.:'` 反查时激进剥离把结尾 `.:` 一起去掉 → `'Contract No'` ≠ 源串 `'Contract No.'` → 切英文后还原不回中文 | 候选顺序: 精确 → 去 HTML → **只剥行尾冒号** → 剥首尾非文字字符 → 抽中文核心 |
+| 13 | **`pgrep -f` / `pkill -f` 会匹配到自己的命令行** | `pkill -f "gui_integrity_check"` 把执行该命令的 shell 自己杀了; `pgrep -f "a\|b"` 在 ERE 下 `\|` 是字面竖线, 静默匹配不到 → 误判"已结束" | 用 `pgrep -f` 前先在别的命令里确认模式; 杀进程用 `pgrep` 取 PID 再 `kill` |
 
 ### 运行时守卫
 
@@ -115,20 +122,31 @@ bash scripts/update_i18n.sh            # lupdate → lrelease → 生成反查�
 > `update_i18n.sh` 本次已重写: 旧版只扫 3 个文件 (**照跑会丢掉约 61% 译文条目**),
 > 且硬编码本 checkout 不存在的 `.venv`。新版含完整清单 + PATH/Windows 双工具链回退。
 
-**进度** (本次已完成 4 个文件):
+**进度**:
 
-| 文件 | 状态 | 待新增译文 |
+| 文件 | 状态 | 备注 |
 |---|---|---|
-| `ui/graph_viewer.py` | ✅ 完成 | — |
-| `ui/rsp_picker_dialog.py` | ✅ 完成 | — |
-| `ui/theme_manager.py` | ✅ 完成(消费点翻译) | — |
-| `ui/window_manager.py` / `ui/splash_screen.py` | ✅ 无 UI 字面量 | — |
-| **`ui/dialogs.py`** | ⬜ 未做 | ~196 |
-| **`ui/pages.py`** | ⬜ 未做 | ~140 |
-| `ui/widgets.py` | ⬜ 未做 | ~37 |
-| `main.py` | ⬜ 未做 | ~21 |
+| `ui/graph_viewer.py` | ✅ 完成 | 顺带修 3 个 bug |
+| `ui/rsp_picker_dialog.py` | ✅ 完成 | |
+| `ui/theme_manager.py` | ✅ 完成(消费点翻译) | |
+| `ui/dialogs.py` | ✅ 完成 | 180 段包裹 + 271 条译文; 拆 3 隐患 + 修 2 既有 bug |
+| `ui/window_manager.py` / `ui/splash_screen.py` | ✅ 无 UI 字面量 | |
+| **`ui/pages.py`** | ⬜ 未做 | |
+| `ui/widgets.py` | ⬜ 未做 | |
+| `main.py` | ⬜ 未做 | |
+| `ui/template_recognizer.py` / `ui/project_manager.py` / `ui/shell_window.py` / `ui/feedback_dialog.py` | ⬜ 未做 | 量较小 |
 
-**`scripts/check_i18n.py` 当前报 439 处** (含日志/正则等不该 tr 的, 实际低于此)。
+**已知残留** (非阻塞): `CalcParamsDialog` 汇总标签 2 处、`HelpDialog` 状态 2 处
+—— 均为**动态 f-string**(含内插值), 反查表还原不出源串, 需各自的更新方法重算,
+或接受"下次动作才用新语言"。
+
+**`scripts/check_i18n.py`** 为漏包守卫(已支持单引号字面量), 输出含日志/正则等
+不该 tr 的条目, 需人工逐条判断。
+
+> **做下拉框前必查**: 它是按 `itemData` 还是按 `currentText()` 消费?
+> 按 text 的必须先改成 data, 否则翻译会**静默破坏功能**。本会话已在
+> `VIEW_PRESETS`(中招已修)、`_cmb_ai_mode`(中招已修)、`ThemeManager`(结构本就正确)
+> 三处遇到同一模式。
 
 ### 开工前必做
 
