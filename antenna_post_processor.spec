@@ -28,6 +28,10 @@ a = Analysis(
         # i18n 翻译文件
         (str(PROJECT_ROOT / 'i18n' / 'app_zh_CN.qm'), 'i18n'),
         (str(PROJECT_ROOT / 'i18n' / 'app_en_US.qm'), 'i18n'),
+        # 运行时语言切换的反查表 (由 scripts/build_i18n_table.py 从 .ts 生成)。
+        # 必须随包发布: .ts 不进 EXE, 而 QTranslator 不提供反向映射,
+        # 没有它运行时切换只能单向刷新。
+        (str(PROJECT_ROOT / 'i18n' / 'trans_table.json'), 'i18n'),
         # 配置文件
         (str(PROJECT_ROOT / 'config' / 'bands.json'), 'config'),
         (str(PROJECT_ROOT / 'config' / 'templates.json'), 'config'),

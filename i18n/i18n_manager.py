@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Optional
@@ -30,6 +31,12 @@ class I18nManager:
     _translator: Optional[QTranslator] = None
     _current_lang: str = "zh_CN"
     _translations_dir: Path = Path(__file__).parent.parent / "i18n"
+
+    # 反查表索引 (由 _load_table 惰性构建; None = 尚未加载)
+    _table: Optional[dict] = None      # {context: {源串: 英文}}
+    _reverse: dict = {}                # {context: {英文: 源串}} — 精确, 无歧义
+    _reverse_flat: dict = {}           # {英文: [源串...]}       — 跨 context 兜底
+    _forward_flat: dict = {}           # {源串: 英文}            — 跨 context 兜底
 
     @classmethod
     def init(cls, app: QApplication, language: Optional[str] = None):
@@ -87,3 +94,79 @@ class I18nManager:
     @classmethod
     def current_language(cls) -> str:
         return cls._current_lang
+
+    # ==================================================================
+    # 反查表 (运行时语言切换用)
+    # ==================================================================
+
+    @classmethod
+    def _load_table(cls) -> bool:
+        """惰性加载 trans_table.json 并建索引。
+
+        缺文件/解析失败时降级返回 False 并置空表 —— 运行时切换退化为单向,
+        但绝不因为一个数据文件缺失而崩溃 (开发环境未跑生成脚本是常见情形)。
+        """
+        if cls._table is not None:
+            return bool(cls._table)
+        path = cls._translations_dir / "trans_table.json"
+        try:
+            cls._table = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            log.warning("反查表不可用, 运行时切换将只能单向刷新: %s", e)
+            cls._table = {}
+            return False
+
+        rev: dict = {}
+        rev_flat: dict = {}
+        fwd_flat: dict = {}
+        for ctx, entries in cls._table.items():
+            per_ctx: dict = {}
+            for src, en in entries.items():
+                # 同 context 内若两源串译成同一英文, 反查有歧义 (实测当前为 0,
+                # 这里是未来译文改动引入碰撞时的告警哨兵)
+                if en in per_ctx and per_ctx[en] != src:
+                    log.warning("同 context 内反向碰撞, 反查可能失准: [%s] %r <- %r / %r",
+                                ctx, en, per_ctx[en], src)
+                per_ctx.setdefault(en, src)
+                fwd_flat.setdefault(src, en)
+                bucket = rev_flat.setdefault(en, [])
+                if src not in bucket:
+                    bucket.append(src)
+            rev[ctx] = per_ctx
+        cls._reverse, cls._reverse_flat, cls._forward_flat = rev, rev_flat, fwd_flat
+        return True
+
+    @classmethod
+    def to_source(cls, text: str, context: str, from_lang: str):
+        """把「当前语言下的文本」还原成源串。无法唯一确定时返回 None。
+
+        消解顺序 (实测有效): ① zh_CN 恒等 → 文本即源串, 永不碰撞;
+        ② context 内反查 (实测同 context 无碰撞, 精确); ③ 跨 context 兜底,
+        仅当候选唯一才采用, ≥2 则放弃并 debug (宁可不动, 不可乱写)。
+        """
+        if not text:
+            return None
+        if from_lang == "zh_CN":       # 恒等翻译: 文本就是源串
+            return text
+        if not cls._load_table():
+            return None
+        hit = cls._reverse.get(context, {}).get(text)
+        if hit is not None:
+            return hit
+        cands = cls._reverse_flat.get(text)
+        if cands and len(cands) == 1:
+            return cands[0]
+        if cands:
+            log.debug("反查歧义, 跳过该控件: %r (候选 %s)", text, cands)
+        return None
+
+    @classmethod
+    def from_source(cls, source: str, context: str, to_lang: str) -> str:
+        """源串 → 目标语言文本。查不到回退源串 (zh_CN 下源串即译文)。"""
+        if not source or to_lang == "zh_CN":
+            return source
+        if not cls._load_table():
+            return source
+        return (cls._table.get(context, {}).get(source)
+                or cls._forward_flat.get(source)
+                or source)
