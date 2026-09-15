@@ -33,7 +33,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 UI_DIR = ROOT / "ui"
 
-LIT = re.compile(r'"(?:[^"\\]|\\.)*"')
+LIT = re.compile(
+    r'"(?:[^"\\]|\\.)*"'      # 双引号字面量
+    r"|'(?:[^'\\]|\\.)*'"    # 单引号字面量
+)
 CJK = re.compile(r"[一-鿿]")
 SKIP_LINE = re.compile(r"_log|logger|print\(|_btn_lang")
 

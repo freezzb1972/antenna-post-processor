@@ -244,6 +244,10 @@ class I18nManager:
 
         add(text)                                            # 精确
         add(cls._HTML_TAG_RE.sub("", text).strip())          # 去 HTML 标签
+        # 只剥行尾冒号 —— 必须排在激进剥离之前: 表单行标签是「源串 + ":"」,
+        # 而源串可能自带缩写点 (如 "Contract No."), 激进剥离会把 ".:" 一起去掉,
+        # 得到 "Contract No" 反而查不到。
+        add(text.rstrip(":：").rstrip())
         add(cls._EDGE_NONWORD_RE.sub("", text))              # 剥首尾 emoji/标点/空白
         m = cls._FIRST_CJK_RE.search(text)
         if m:

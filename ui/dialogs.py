@@ -46,7 +46,7 @@ class DataSourceDialog(QDialog):
     def __init__(self, parent: "MainWindow"):
         super().__init__(parent)
         self._mw = parent
-        self.setWindowTitle("数据源配置")
+        self.setWindowTitle(self.tr("数据源配置"))
         self.resize(750, 650)
         self._setup_ui()
         self._load_state()
@@ -60,31 +60,31 @@ class DataSourceDialog(QDialog):
 
     def _setup_ui(self):
         # 模板选择 — 厂商+模板搜索下拉, 选中后自动填入路径
-        grp_tpl = QGroupBox("选择预设模板")
+        grp_tpl = QGroupBox(self.tr("选择预设模板"))
         tpl_layout = QVBoxLayout(grp_tpl)
         preset_row = QHBoxLayout()
         self._cmb_tpl_mfr = QComboBox()
         self._cmb_tpl_mfr.setEditable(True)
         self._cmb_tpl_mfr.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_tpl_mfr.lineEdit().setPlaceholderText("搜索厂商...")
+        self._cmb_tpl_mfr.lineEdit().setPlaceholderText(self.tr("搜索厂商..."))
         self._cmb_tpl_mfr.addItem("")
         self._cmb_tpl_mfr.currentIndexChanged.connect(self._on_tpl_preset_changed)
         self._cmb_tpl = QComboBox()
         self._cmb_tpl.setEditable(True)
         self._cmb_tpl.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_tpl.lineEdit().setPlaceholderText("搜索模板...")
+        self._cmb_tpl.lineEdit().setPlaceholderText(self.tr("搜索模板..."))
         self._cmb_tpl.setMinimumWidth(130)
         self._cmb_tpl.currentIndexChanged.connect(self._on_tpl_item_selected)
         self._cmb_tpl.addItem("")
-        preset_row.addWidget(QLabel("厂商:"))
+        preset_row.addWidget(QLabel(self.tr("厂商:")))
         preset_row.addWidget(self._cmb_tpl_mfr, 1)
-        preset_row.addWidget(QLabel("模板:"))
+        preset_row.addWidget(QLabel(self.tr("模板:")))
         preset_row.addWidget(self._cmb_tpl, 2)
         tpl_layout.addLayout(preset_row)
         # 手动路径行 — 预设选中后自动填入, 也可手动浏览
         path_row = QHBoxLayout()
-        self._edit_template = QLineEdit(); self._edit_template.setPlaceholderText("选择模板 .xlsx ...")
-        btn_tpl = QPushButton("浏览..."); btn_tpl.clicked.connect(self._on_browse_template)
+        self._edit_template = QLineEdit(); self._edit_template.setPlaceholderText(self.tr("选择模板 .xlsx ..."))
+        btn_tpl = QPushButton(self.tr("浏览...")); btn_tpl.clicked.connect(self._on_browse_template)
         path_row.addWidget(self._edit_template); path_row.addWidget(btn_tpl)
         # 预览列映射按钮
         self._btn_preview_mapping = QPushButton(self.tr("🔍 预览列映射"))
@@ -93,12 +93,12 @@ class DataSourceDialog(QDialog):
         tpl_layout.addLayout(path_row)
 
         # 数据文件
-        grp_data = QGroupBox("数据文件")
+        grp_data = QGroupBox(self.tr("数据文件"))
         data_layout = QVBoxLayout(grp_data)
         btn_row = QHBoxLayout()
-        self._btn_add = QPushButton("📂 添加数据文件..."); self._btn_add.setMinimumHeight(32)
+        self._btn_add = QPushButton(self.tr("📂 添加数据文件...")); self._btn_add.setMinimumHeight(32)
         self._btn_add.clicked.connect(self._on_add_files)
-        btn_clear = QPushButton("清除"); btn_clear.setMinimumHeight(32)
+        btn_clear = QPushButton(self.tr("清除")); btn_clear.setMinimumHeight(32)
         btn_clear.clicked.connect(self._on_clear_files)
         btn_row.addWidget(self._btn_add); btn_row.addWidget(btn_clear); btn_row.addStretch()
         data_layout.addLayout(btn_row)
@@ -112,50 +112,50 @@ class DataSourceDialog(QDialog):
         data_layout.addWidget(self._file_list)
 
         self._match_table = QTableWidget(); self._match_table.setColumnCount(3)
-        self._match_table.setHorizontalHeaderLabels(["工作表", "数据文件", "状态"])
+        self._match_table.setHorizontalHeaderLabels([self.tr("工作表"), self.tr("数据文件"), self.tr("状态")])
         self._match_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self._match_table.setMaximumHeight(150)
         data_layout.addWidget(self._match_table)
 
         # 匹配状态提示 (自动匹配, 无需手动点击)
-        self._lbl_match_info = QLabel("添加数据文件后自动匹配工作表")
+        self._lbl_match_info = QLabel(self.tr("添加数据文件后自动匹配工作表"))
         self._lbl_match_info.setStyleSheet("color: #888; padding: 2px 0;")
         data_layout.addWidget(self._lbl_match_info)
 
         # 输出设置
-        grp_out = QGroupBox("输出设置")
+        grp_out = QGroupBox(self.tr("输出设置"))
         out_layout = QFormLayout(grp_out)
-        self._edit_dir = QLineEdit(); self._edit_dir.setPlaceholderText("默认: ./output")
-        btn_dir = QPushButton("浏览..."); btn_dir.clicked.connect(self._on_browse_dir)
+        self._edit_dir = QLineEdit(); self._edit_dir.setPlaceholderText(self.tr("默认: ./output"))
+        btn_dir = QPushButton(self.tr("浏览...")); btn_dir.clicked.connect(self._on_browse_dir)
         dir_row = QHBoxLayout(); dir_row.addWidget(self._edit_dir); dir_row.addWidget(btn_dir)
-        out_layout.addRow("输出目录:", dir_row)
+        out_layout.addRow(self.tr("输出目录:"), dir_row)
         self._edit_name = QLineEdit("antenna_report.xlsx")
-        out_layout.addRow("文件名:", self._edit_name)
-        self._check_full = QCheckBox("生成完整报告")
+        out_layout.addRow(self.tr("文件名:"), self._edit_name)
+        self._check_full = QCheckBox(self.tr("生成完整报告"))
         out_layout.addRow("", self._check_full)
-        self._edit_report = QLineEdit(); self._edit_report.setPlaceholderText("默认: ./output/full_report.xlsx")
-        btn_report = QPushButton("浏览..."); btn_report.clicked.connect(self._on_browse_report)
+        self._edit_report = QLineEdit(); self._edit_report.setPlaceholderText(self.tr("默认: ./output/full_report.xlsx"))
+        btn_report = QPushButton(self.tr("浏览...")); btn_report.clicked.connect(self._on_browse_report)
         rpt_row = QHBoxLayout(); rpt_row.addWidget(self._edit_report); rpt_row.addWidget(btn_report)
-        out_layout.addRow("报告路径:", rpt_row)
+        out_layout.addRow(self.tr("报告路径:"), rpt_row)
 
         # 图表选择
-        grp_chart = QGroupBox("输出图表")
+        grp_chart = QGroupBox(self.tr("输出图表"))
         ch_row = QHBoxLayout(grp_chart)
-        self._check_chart_eff = QCheckBox("效率曲线"); self._check_chart_eff.setChecked(True)
-        self._check_chart_lag = QCheckBox("增益曲线"); self._check_chart_lag.setChecked(True)
+        self._check_chart_eff = QCheckBox(self.tr("效率曲线")); self._check_chart_eff.setChecked(True)
+        self._check_chart_lag = QCheckBox(self.tr("增益曲线")); self._check_chart_lag.setChecked(True)
         ch_row.addWidget(self._check_chart_eff); ch_row.addWidget(self._check_chart_lag); ch_row.addStretch()
 
         # 工作表命名
-        grp_name = QGroupBox("工作表命名")
+        grp_name = QGroupBox(self.tr("工作表命名"))
         name_row = QHBoxLayout(grp_name)
-        name_row.addWidget(QLabel("多数据源时工作表命名方式:"))
+        name_row.addWidget(QLabel(self.tr("多数据源时工作表命名方式:")))
         self._cmb_naming_mode = QComboBox()
         self._cmb_naming_mode.setEditable(True)
         self._cmb_naming_mode.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_naming_mode.lineEdit().setPlaceholderText("搜索...")
-        self._cmb_naming_mode.addItem("保留原模板工作表名", 0)
-        self._cmb_naming_mode.addItem("用数据源文件名替换", 1)
-        self._cmb_naming_mode.setToolTip("保留模板原名 或 用数据源文件名命名工作表")
+        self._cmb_naming_mode.lineEdit().setPlaceholderText(self.tr("搜索..."))
+        self._cmb_naming_mode.addItem(self.tr("保留原模板工作表名"), 0)
+        self._cmb_naming_mode.addItem(self.tr("用数据源文件名替换"), 1)
+        self._cmb_naming_mode.setToolTip(self.tr("保留模板原名 或 用数据源文件名命名工作表"))
         name_row.addWidget(self._cmb_naming_mode)
         name_row.addStretch()
 
@@ -201,13 +201,13 @@ class DataSourceDialog(QDialog):
             if m.file_path:
                 combo.setCurrentIndex(0)
             self._match_table.setCellWidget(r, 1, combo)
-            status = "✓ 已匹配" if m.file_path else "✗ 未匹配"
+            status = self.tr("✓ 已匹配") if m.file_path else self.tr("✗ 未匹配")
             self._match_table.setItem(r, 2, QTableWidgetItem(status))
 
     def _on_browse_template(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择模板", "",
-            "所有支持格式 (*.xlsx *.xls *.csv *.docx);;Excel 新版 (*.xlsx);;Excel 旧版 (*.xls);;CSV (*.csv);;Word (*.docx);;所有文件 (*)")
+            self, self.tr("选择模板"), "",
+            self.tr("所有支持格式 (*.xlsx *.xls *.csv *.docx);;Excel 新版 (*.xlsx);;Excel 旧版 (*.xls);;CSV (*.csv);;Word (*.docx);;所有文件 (*)"))
         if path:
             self._edit_template.setText(path)
             self._run_auto_match()
@@ -295,8 +295,8 @@ class DataSourceDialog(QDialog):
         dlg.accept()
 
     def _on_add_files(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, "选择数据文件", "",
-            "所有支持格式 (*.csv *.xlsx *.xls);;CSV (*.csv);;Excel (*.xlsx *.xls)")
+        paths, _ = QFileDialog.getOpenFileNames(self, self.tr("选择数据文件"), "",
+            self.tr("所有支持格式 (*.csv *.xlsx *.xls);;CSV (*.csv);;Excel (*.xlsx *.xls)"))
         if paths:
             for p in paths:
                 self._file_list.addItem(p)
@@ -305,13 +305,13 @@ class DataSourceDialog(QDialog):
 
     def _on_clear_files(self):
         self._file_list.clear(); self._match_table.setRowCount(0)
-        self._lbl_match_info.setText("添加数据文件后自动匹配工作表")
+        self._lbl_match_info.setText(self.tr("添加数据文件后自动匹配工作表"))
 
     def _run_auto_match(self):
         """执行自动匹配并更新状态显示。"""
         n_files = self._file_list.count()
         if n_files == 0:
-            self._lbl_match_info.setText("添加数据文件后自动匹配工作表")
+            self._lbl_match_info.setText(self.tr("添加数据文件后自动匹配工作表"))
             return
         self._on_auto_match()
         matched = sum(1 for r in range(self._match_table.rowCount())
@@ -325,7 +325,7 @@ class DataSourceDialog(QDialog):
     def _on_auto_match(self):
         tpl = self._edit_template.text().strip()
         if not tpl:
-            QMessageBox.warning(self, "提示", "请先选择模板文件。"); return
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择模板文件。")); return
         from src.excel_reader import read_template
         from src.sheet_file_matcher import auto_match
         try:
@@ -341,19 +341,19 @@ class DataSourceDialog(QDialog):
                     idx = combo.findText(m.file_path)
                     if idx >= 0: combo.setCurrentIndex(idx)
                 self._match_table.setCellWidget(i, 1, combo)
-                status = "✓ 已匹配" if m.file_path else "未匹配"
+                status = self.tr("✓ 已匹配") if m.file_path else self.tr("未匹配")
                 self._match_table.setItem(i, 2, QTableWidgetItem(status))
             matched = sum(1 for m in matches if m.file_path is not None)
             self._lbl_match_info.setText(f"✓ {matched}/{len(matches)} 已匹配")
         except Exception as e:
-            QMessageBox.warning(self, "错误", f"读取模板失败: {e}")
+            QMessageBox.warning(self, self.tr("错误"), f"读取模板失败: {e}")
 
     def _on_browse_dir(self):
-        d = QFileDialog.getExistingDirectory(self, "选择输出目录", self._edit_dir.text() or ".")
+        d = QFileDialog.getExistingDirectory(self, self.tr("选择输出目录"), self._edit_dir.text() or ".")
         if d: self._edit_dir.setText(d)
 
     def _on_browse_report(self):
-        path, _ = QFileDialog.getSaveFileName(self, "完整报告路径", "full_report.xlsx", "Excel (*.xlsx)")
+        path, _ = QFileDialog.getSaveFileName(self, self.tr("完整报告路径"), "full_report.xlsx", "Excel (*.xlsx)")
         if path: self._edit_report.setText(path)
 
     def _on_accept(self):
@@ -520,7 +520,7 @@ class CalcParamsDialog(QDialog):
     def __init__(self, parent: "MainWindow"):
         super().__init__(parent)
         self._mw = parent
-        self.setWindowTitle("计算参数配置")
+        self.setWindowTitle(self.tr("计算参数配置"))
         self.resize(820, 680)
 
         # ── 状态 (每种测试模式独立存储) ──
@@ -579,11 +579,11 @@ class CalcParamsDialog(QDialog):
 
         # ── 测试模式选择 (outside scroll) ──
         mode_row = QHBoxLayout()
-        mode_row.addWidget(QLabel("<b>测试模式:</b>"))
+        mode_row.addWidget(QLabel(self.tr("<b>测试模式:</b>")))
         self._cmb_test_mode = QComboBox()
-        self._cmb_test_mode.addItem("📡 无源天线", 0)
-        self._cmb_test_mode.addItem("📶 有源发射 TRP", 1)
-        self._cmb_test_mode.addItem("📻 有源接收 TIS", 2)
+        self._cmb_test_mode.addItem(self.tr("📡 无源天线"), 0)
+        self._cmb_test_mode.addItem(self.tr("📶 有源发射 TRP"), 1)
+        self._cmb_test_mode.addItem(self.tr("📻 有源接收 TIS"), 2)
         self._cmb_test_mode.currentIndexChanged.connect(self._on_mode_changed)
         mode_row.addWidget(self._cmb_test_mode)
         mode_row.addStretch()
@@ -599,7 +599,7 @@ class CalcParamsDialog(QDialog):
         splitter.setSpacing(8)
 
         # 左列: 报告必需参数
-        left_grp = QGroupBox("报告必需参数（模板自动识别，可调整）")
+        left_grp = QGroupBox(self.tr("报告必需参数（模板自动识别，可调整）"))
         left_layout = QVBoxLayout(left_grp)
         self._left_scroll = QScrollArea()
         self._left_scroll.setWidgetResizable(True)
@@ -608,7 +608,7 @@ class CalcParamsDialog(QDialog):
         splitter.addWidget(left_grp, 1)
 
         # 右列: 额外报告
-        right_grp = QGroupBox("额外报告")
+        right_grp = QGroupBox(self.tr("额外报告"))
         right_layout = QVBoxLayout(right_grp)
         self._right_scroll = QScrollArea()
         self._right_scroll.setWidgetResizable(True)
@@ -619,19 +619,19 @@ class CalcParamsDialog(QDialog):
         param_layout.addLayout(splitter, 1)
 
         # ── 角度配置: Gain/AR 切换 ──
-        angle_grp = QGroupBox("角度配置 (已移至各参数组内)")
+        angle_grp = QGroupBox(self.tr("角度配置 (已移至各参数组内)"))
         angle_grp.setVisible(False)  # 角度设置已移至 Gain/AR 组内弹窗
         angle_outer = QVBoxLayout(angle_grp)
         angle_outer.setSpacing(4)
 
         # 切换按钮
         toggle_row = QHBoxLayout()
-        toggle_row.addWidget(QLabel("<b>当前编辑:</b>"))
-        self._btn_gain_angle = QPushButton("📡 Gain 角度")
+        toggle_row.addWidget(QLabel(self.tr("<b>当前编辑:</b>")))
+        self._btn_gain_angle = QPushButton(self.tr("📡 Gain 角度"))
         self._btn_gain_angle.setCheckable(True); self._btn_gain_angle.setChecked(True)
         self._btn_gain_angle.clicked.connect(lambda: self._on_angle_target_changed(0))
         toggle_row.addWidget(self._btn_gain_angle)
-        self._btn_ar_angle = QPushButton("🔄 AR 角度")
+        self._btn_ar_angle = QPushButton(self.tr("🔄 AR 角度"))
         self._btn_ar_angle.setCheckable(True)
         self._btn_ar_angle.clicked.connect(lambda: self._on_angle_target_changed(1))
         toggle_row.addWidget(self._btn_ar_angle)
@@ -644,12 +644,12 @@ class CalcParamsDialog(QDialog):
         angle_outer.addWidget(self._angle_ctrl_widget)
 
         # NHPRP/NHPIS 自定义角度 (TRP/TIS Tab 时显示)
-        self._grp_nh = QGroupBox("NHPRP / NHPIS 自定义角度")
+        self._grp_nh = QGroupBox(self.tr("NHPRP / NHPIS 自定义角度"))
         nh_layout = QHBoxLayout(self._grp_nh)
-        self._btn_nh_angle = QPushButton("⚙ 自定义角度...")
+        self._btn_nh_angle = QPushButton(self.tr("⚙ 自定义角度..."))
         self._btn_nh_angle.clicked.connect(self._show_nh_angle_popup)
         nh_layout.addWidget(self._btn_nh_angle)
-        self._lbl_nh_angles = QLabel("（默认 45°）")
+        self._lbl_nh_angles = QLabel(self.tr("（默认 45°）"))
         nh_layout.addWidget(self._lbl_nh_angles)
         nh_layout.addStretch()
         self._grp_nh.setVisible(False)
@@ -665,25 +665,25 @@ class CalcParamsDialog(QDialog):
         param_layout.addWidget(angle_grp)
 
         # ── 算法选项 ──
-        algo_grp = QGroupBox("算法选项")
+        algo_grp = QGroupBox(self.tr("算法选项"))
         algo_layout = QVBoxLayout(algo_grp)
         algo_layout.setSpacing(4)
 
         self._freq_widget = QWidget()
         freq_row = QHBoxLayout(self._freq_widget)
         freq_row.setContentsMargins(0, 0, 0, 0)
-        freq_row.addWidget(QLabel("频点来源:"))
+        freq_row.addWidget(QLabel(self.tr("频点来源:")))
         self._cmb_freq_src = QComboBox()
-        self._cmb_freq_src.addItem("新 sheet 频点: 数据源", "datasource")
-        self._cmb_freq_src.addItem("新 sheet 频点: 模板", "template")
+        self._cmb_freq_src.addItem(self.tr("新 sheet 频点: 数据源"), "datasource")
+        self._cmb_freq_src.addItem(self.tr("新 sheet 频点: 模板"), "template")
         self._cmb_freq_src.currentIndexChanged.connect(lambda: self._update_summary())
         freq_row.addWidget(self._cmb_freq_src)
-        freq_row.addWidget(QLabel("  去除频点: 前"))
+        freq_row.addWidget(QLabel(self.tr("  去除频点: 前")))
         self._spin_trim_start = QSpinBox()
         self._spin_trim_start.setRange(0, 50); self._spin_trim_start.setFixedWidth(50)
         self._spin_trim_start.valueChanged.connect(lambda: self._update_summary())
         freq_row.addWidget(self._spin_trim_start)
-        freq_row.addWidget(QLabel("后"))
+        freq_row.addWidget(QLabel(self.tr("后")))
         self._spin_trim_end = QSpinBox()
         self._spin_trim_end.setRange(0, 50); self._spin_trim_end.setFixedWidth(50)
         self._spin_trim_end.valueChanged.connect(lambda: self._update_summary())
@@ -692,17 +692,17 @@ class CalcParamsDialog(QDialog):
         algo_layout.addWidget(self._freq_widget)
 
         check_row = QHBoxLayout()
-        self._check_extrap = QCheckBox("Theta 外推到 180°")
+        self._check_extrap = QCheckBox(self.tr("Theta 外推到 180°"))
         self._check_extrap.toggled.connect(lambda: self._update_summary())
         check_row.addWidget(self._check_extrap)
-        self._check_robust = QCheckBox("Robust peak detection（替代 np.max）")
+        self._check_robust = QCheckBox(self.tr("Robust peak detection（替代 np.max）"))
         self._check_robust.toggled.connect(lambda: self._update_summary())
         check_row.addWidget(self._check_robust)
         self._cmb_ar_output = QComboBox()
-        self._cmb_ar_output.addItem("AR 输出 dB", True)
-        self._cmb_ar_output.addItem("AR 输出 线性", False)
+        self._cmb_ar_output.addItem(self.tr("AR 输出 dB"), True)
+        self._cmb_ar_output.addItem(self.tr("AR 输出 线性"), False)
         self._cmb_ar_output.setCurrentIndex(0)  # 默认 dB
-        self._cmb_ar_output.setToolTip("AR 输出单位: dB (20·log₁₀) 或线性比值")
+        self._cmb_ar_output.setToolTip(self.tr("AR 输出单位: dB (20·log₁₀) 或线性比值"))
         self._cmb_ar_output.currentIndexChanged.connect(lambda: self._update_summary())
         check_row.addWidget(self._cmb_ar_output)
         check_row.addStretch()
@@ -719,7 +719,7 @@ class CalcParamsDialog(QDialog):
         main_layout.addWidget(scroll, 1)
 
         # ── 已选参数概览 ──
-        self._summary_grp = QGroupBox("📋 已选参数概览")
+        self._summary_grp = QGroupBox(self.tr("📋 已选参数概览"))
         summary_layout = QVBoxLayout(self._summary_grp)
         self._summary_label = QLabel()
         self._summary_label.setWordWrap(True)
@@ -830,8 +830,11 @@ class CalcParamsDialog(QDialog):
         for grp_name, items in params:
             grp = QGroupBox(grp_name)
             gl = QVBoxLayout(grp); gl.setSpacing(2)
+            from i18n.i18n_manager import tr_shared
             for key, label in items:
-                cb = QCheckBox(label)
+                # 标签来自 class body 的 _COMMON_PARAMS 等 (中文源串), 只能在此翻译;
+                # 上面的 grp_name 是英文**键**(下方按 == "Gain" 比较), 不能翻
+                cb = QCheckBox(tr_shared(label, "CalcParamsDialog"))
                 cb.setChecked(key in self._template_params)
                 cb.toggled.connect(lambda checked, k=key: self._update_summary())
                 gl.addWidget(cb)
@@ -839,11 +842,11 @@ class CalcParamsDialog(QDialog):
                 self._right_checkboxes[key] = cb  # 统一管理
             # Gain / AR 组: 添加角度设置按钮
             if grp_name == "Gain":
-                btn_angle = QPushButton("📡 Gain 角度设置...")
+                btn_angle = QPushButton(self.tr("📡 Gain 角度设置..."))
                 btn_angle.clicked.connect(lambda: self._show_angle_popup("Gain"))
                 gl.addWidget(btn_angle)
             elif grp_name == "Axial Ratio":
-                btn_ar = QPushButton("🔄 AR 角度设置...")
+                btn_ar = QPushButton(self.tr("🔄 AR 角度设置..."))
                 btn_ar.clicked.connect(lambda: self._show_angle_popup("AR"))
                 gl.addWidget(btn_ar)
             vbox.addWidget(grp)
@@ -907,11 +910,11 @@ class CalcParamsDialog(QDialog):
                     fl.addWidget(tag)
                 scroll.setWidget(dw)
                 _display_layout.addWidget(scroll)
-                btn_clear = QPushButton("🗑 清空全部")
+                btn_clear = QPushButton(self.tr("🗑 清空全部"))
                 btn_clear.clicked.connect(lambda: (_singles.clear(), _ranges.clear(), _refresh_display()))
                 _display_layout.addWidget(btn_clear)
             else:
-                _display_layout.addWidget(QLabel("  (暂无配置)"))
+                _display_layout.addWidget(QLabel(self.tr("  (暂无配置)")))
             _display_grp.setTitle(f"已配置: {len(_singles)} 个单角度, {len(_ranges)} 个范围")
 
         # ── 顶部: 已配置项显示 ──
@@ -926,42 +929,42 @@ class CalcParamsDialog(QDialog):
         bottom_layout.setContentsMargins(0, 0, 0, 0)
 
         # 自定义
-        cust_grp = QGroupBox("自定义")
+        cust_grp = QGroupBox(self.tr("自定义"))
         cust_layout = QHBoxLayout(cust_grp)
         spin_custom = QDoubleSpinBox(); spin_custom.setRange(0, 180); spin_custom.setValue(45)
-        btn_add_custom = QPushButton("+ 添加")
+        btn_add_custom = QPushButton(self.tr("+ 添加"))
         btn_add_custom.clicked.connect(lambda: (
             _singles.append(spin_custom.value()) if spin_custom.value() not in _singles else None,
             _refresh_display()
         ))
-        cust_layout.addWidget(QLabel("角度:")); cust_layout.addWidget(spin_custom)
+        cust_layout.addWidget(QLabel(self.tr("角度:"))); cust_layout.addWidget(spin_custom)
         cust_layout.addWidget(btn_add_custom); cust_layout.addStretch()
         bottom_layout.addWidget(cust_grp)
 
         # 步进生成
-        step_grp = QGroupBox("步进批量生成")
+        step_grp = QGroupBox(self.tr("步进批量生成"))
         step_layout = QHBoxLayout(step_grp)
         spin_start = QDoubleSpinBox(); spin_start.setRange(0, 180); spin_start.setValue(0)
         spin_end = QDoubleSpinBox(); spin_end.setRange(0, 180); spin_end.setValue(90)
         spin_step = QDoubleSpinBox(); spin_step.setRange(1, 90); spin_step.setValue(10)
-        btn_gen = QPushButton("生成")
+        btn_gen = QPushButton(self.tr("生成"))
         btn_gen.clicked.connect(lambda: (
             [_singles.append(round(float(a), 6)) for a in np.linspace(spin_start.value(), spin_end.value(), int((spin_end.value()-spin_start.value())/spin_step.value()+1))
              if round(float(a), 6) not in _singles],
             _refresh_display()
         ))
-        step_layout.addWidget(QLabel("起:")); step_layout.addWidget(spin_start)
-        step_layout.addWidget(QLabel("止:")); step_layout.addWidget(spin_end)
-        step_layout.addWidget(QLabel("步:")); step_layout.addWidget(spin_step)
+        step_layout.addWidget(QLabel(self.tr("起:"))); step_layout.addWidget(spin_start)
+        step_layout.addWidget(QLabel(self.tr("止:"))); step_layout.addWidget(spin_end)
+        step_layout.addWidget(QLabel(self.tr("步:"))); step_layout.addWidget(spin_step)
         step_layout.addWidget(btn_gen)
         bottom_layout.addWidget(step_grp)
 
         # 范围
-        range_grp = QGroupBox("角度范围")
+        range_grp = QGroupBox(self.tr("角度范围"))
         range_layout = QHBoxLayout(range_grp)
         spin_rs = QDoubleSpinBox(); spin_rs.setRange(0, 180); spin_rs.setValue(0)
         spin_re = QDoubleSpinBox(); spin_re.setRange(0, 180); spin_re.setValue(90)
-        btn_add_range = QPushButton("添加范围")
+        btn_add_range = QPushButton(self.tr("添加范围"))
         def _add_range():
             lo, hi = spin_rs.value(), spin_re.value()
             key = (min(lo, hi), max(lo, hi))
@@ -969,8 +972,8 @@ class CalcParamsDialog(QDialog):
                 _ranges.append(key)
                 _refresh_display()
         btn_add_range.clicked.connect(_add_range)
-        range_layout.addWidget(QLabel("起:")); range_layout.addWidget(spin_rs)
-        range_layout.addWidget(QLabel("止:")); range_layout.addWidget(spin_re)
+        range_layout.addWidget(QLabel(self.tr("起:"))); range_layout.addWidget(spin_rs)
+        range_layout.addWidget(QLabel(self.tr("止:"))); range_layout.addWidget(spin_re)
         range_layout.addWidget(btn_add_range); range_layout.addStretch()
         bottom_layout.addWidget(range_grp)
 
@@ -1001,7 +1004,7 @@ class CalcParamsDialog(QDialog):
             angles_str = ", ".join(f"{a}°" for a in sorted(set(self._nh_custom_angles)))
             self._lbl_nh_angles.setText(angles_str)
         else:
-            self._lbl_nh_angles.setText("（默认 45°）")
+            self._lbl_nh_angles.setText(self.tr("（默认 45°）"))
 
     def _show_nh_angle_popup(self):
         """弹出 NHPRP/NHPIS 自定义地平线边界角度选择窗口。
@@ -1010,7 +1013,7 @@ class CalcParamsDialog(QDialog):
         仅支持单角度（NH 不需要范围），预置 Pi/N 快捷按钮。
         """
         dlg = QDialog(self)
-        dlg.setWindowTitle("NHPRP / NHPIS 自定义角度")
+        dlg.setWindowTitle(self.tr("NHPRP / NHPIS 自定义角度"))
         dlg.setMinimumSize(460, 380)
 
         import copy
@@ -1039,11 +1042,11 @@ class CalcParamsDialog(QDialog):
                     fl.addWidget(tag)
                 scroll.setWidget(dw)
                 _display_layout.addWidget(scroll)
-                btn_clear = QPushButton("🗑 清空全部")
+                btn_clear = QPushButton(self.tr("🗑 清空全部"))
                 btn_clear.clicked.connect(lambda: (_angles.clear(), _refresh_display()))
                 _display_layout.addWidget(btn_clear)
             else:
-                _display_layout.addWidget(QLabel("  (默认 45°，添加自定义角度可覆盖默认值)"))
+                _display_layout.addWidget(QLabel(self.tr("  (默认 45°，添加自定义角度可覆盖默认值)")))
             _display_grp.setTitle(f"已配置: {len(_angles)} 个角度")
 
         # ── 顶部: 已配置项 ──
@@ -1057,7 +1060,7 @@ class CalcParamsDialog(QDialog):
         bottom_layout.setContentsMargins(0, 0, 0, 0)
 
         # 快捷预置
-        quick_grp = QGroupBox("快捷预置")
+        quick_grp = QGroupBox(self.tr("快捷预置"))
         quick_layout = QHBoxLayout(quick_grp)
         presets = [
             ("22.5° (Pi/8)", 22.5), ("30° (Pi/6)", 30.0), ("45° (Pi/4)", 45.0),
@@ -1070,34 +1073,34 @@ class CalcParamsDialog(QDialog):
         bottom_layout.addWidget(quick_grp)
 
         # 自定义
-        cust_grp = QGroupBox("自定义")
+        cust_grp = QGroupBox(self.tr("自定义"))
         cust_layout = QHBoxLayout(cust_grp)
         spin_custom = QDoubleSpinBox(); spin_custom.setRange(0, 90); spin_custom.setValue(45)
         spin_custom.setSuffix("°"); spin_custom.setDecimals(1)
-        btn_add_custom = QPushButton("+ 添加")
+        btn_add_custom = QPushButton(self.tr("+ 添加"))
         btn_add_custom.clicked.connect(lambda: (
             _angles.append(spin_custom.value()) if spin_custom.value() not in _angles else None,
             _refresh_display()
         ))
-        cust_layout.addWidget(QLabel("角度:")); cust_layout.addWidget(spin_custom)
+        cust_layout.addWidget(QLabel(self.tr("角度:"))); cust_layout.addWidget(spin_custom)
         cust_layout.addWidget(btn_add_custom); cust_layout.addStretch()
         bottom_layout.addWidget(cust_grp)
 
         # 步进生成
-        step_grp = QGroupBox("步进批量生成")
+        step_grp = QGroupBox(self.tr("步进批量生成"))
         step_layout = QHBoxLayout(step_grp)
         spin_start = QDoubleSpinBox(); spin_start.setRange(0, 90); spin_start.setValue(0)
         spin_end = QDoubleSpinBox(); spin_end.setRange(0, 90); spin_end.setValue(90)
         spin_step = QDoubleSpinBox(); spin_step.setRange(1, 45); spin_step.setValue(15)
-        btn_gen = QPushButton("生成")
+        btn_gen = QPushButton(self.tr("生成"))
         btn_gen.clicked.connect(lambda: (
             [_angles.append(round(float(a), 6)) for a in np.linspace(spin_start.value(), spin_end.value(), int((spin_end.value()-spin_start.value())/spin_step.value()+1))
              if round(float(a), 6) not in _angles],
             _refresh_display()
         ))
-        step_layout.addWidget(QLabel("起:")); step_layout.addWidget(spin_start)
-        step_layout.addWidget(QLabel("止:")); step_layout.addWidget(spin_end)
-        step_layout.addWidget(QLabel("步:")); step_layout.addWidget(spin_step)
+        step_layout.addWidget(QLabel(self.tr("起:"))); step_layout.addWidget(spin_start)
+        step_layout.addWidget(QLabel(self.tr("止:"))); step_layout.addWidget(spin_end)
+        step_layout.addWidget(QLabel(self.tr("步:"))); step_layout.addWidget(spin_step)
         step_layout.addWidget(btn_gen)
         bottom_layout.addWidget(step_grp)
 
@@ -1148,7 +1151,7 @@ class CalcParamsDialog(QDialog):
 
         # 快捷按钮行
         quick_row = QHBoxLayout()
-        quick_row.addWidget(QLabel("预设:"))
+        quick_row.addWidget(QLabel(self.tr("预设:")))
         self._angle_buttons: Dict[float, QPushButton] = {}
         for a in [0, 10, 20, 30, 40, 50, 60, 70, 80, 90]:
             btn = QPushButton(f"{a}°")
@@ -1162,7 +1165,7 @@ class CalcParamsDialog(QDialog):
 
         # 自定义 + 步进行
         custom_row = QHBoxLayout()
-        custom_row.addWidget(QLabel("自定义:"))
+        custom_row.addWidget(QLabel(self.tr("自定义:")))
         self._spin_custom = QDoubleSpinBox()
         self._spin_custom.setRange(0, 180); self._spin_custom.setValue(0)
         self._spin_custom.setSuffix("°"); self._spin_custom.setFixedWidth(80)
@@ -1172,7 +1175,7 @@ class CalcParamsDialog(QDialog):
         btn_custom_add.clicked.connect(self._add_custom_angle)
         custom_row.addWidget(btn_custom_add)
         custom_row.addSpacing(12)
-        custom_row.addWidget(QLabel("步进:"))
+        custom_row.addWidget(QLabel(self.tr("步进:")))
         self._spin_step_start = QDoubleSpinBox()
         self._spin_step_start.setRange(0, 180); self._spin_step_start.setValue(0)
         self._spin_step_start.setSuffix("°"); self._spin_step_start.setFixedWidth(80)
@@ -1182,12 +1185,12 @@ class CalcParamsDialog(QDialog):
         self._spin_step_end.setRange(0, 180); self._spin_step_end.setValue(90)
         self._spin_step_end.setSuffix("°"); self._spin_step_end.setFixedWidth(80)
         custom_row.addWidget(self._spin_step_end)
-        custom_row.addWidget(QLabel("步长:"))
+        custom_row.addWidget(QLabel(self.tr("步长:")))
         self._spin_step_by = QDoubleSpinBox()
         self._spin_step_by.setRange(1, 90); self._spin_step_by.setValue(10)
         self._spin_step_by.setSuffix("°"); self._spin_step_by.setFixedWidth(70)
         custom_row.addWidget(self._spin_step_by)
-        btn_step_gen = QPushButton("生成")
+        btn_step_gen = QPushButton(self.tr("生成"))
         btn_step_gen.clicked.connect(self._on_step_generate)
         custom_row.addWidget(btn_step_gen)
         custom_row.addStretch()
@@ -1195,16 +1198,16 @@ class CalcParamsDialog(QDialog):
 
         # 范围行
         range_row = QHBoxLayout()
-        range_row.addWidget(QLabel("角度范围:"))
+        range_row.addWidget(QLabel(self.tr("角度范围:")))
         self._spin_range_start = QDoubleSpinBox()
         self._spin_range_start.setRange(0, 180); self._spin_range_start.setValue(0)
         self._spin_range_start.setSuffix("°"); self._spin_range_start.setFixedWidth(80)
-        range_row.addWidget(QLabel("起始:")); range_row.addWidget(self._spin_range_start)
+        range_row.addWidget(QLabel(self.tr("起始:"))); range_row.addWidget(self._spin_range_start)
         self._spin_range_end = QDoubleSpinBox()
         self._spin_range_end.setRange(0, 180); self._spin_range_end.setValue(90)
         self._spin_range_end.setSuffix("°"); self._spin_range_end.setFixedWidth(80)
-        range_row.addWidget(QLabel("结束:")); range_row.addWidget(self._spin_range_end)
-        btn_add_range = QPushButton("添加范围")
+        range_row.addWidget(QLabel(self.tr("结束:"))); range_row.addWidget(self._spin_range_end)
+        btn_add_range = QPushButton(self.tr("添加范围"))
         btn_add_range.clicked.connect(self._on_add_range)
         range_row.addWidget(btn_add_range)
         range_row.addStretch()
@@ -1294,7 +1297,7 @@ class CalcParamsDialog(QDialog):
         has_ar = ar_singles or ar_ranges
 
         if not has_gain and not has_ar:
-            lbl = QLabel("（未选择角度）")
+            lbl = QLabel(self.tr("（未选择角度）"))
             lbl.setStyleSheet("color: #888; padding: 4px;")
             layout.addWidget(lbl)
             return
@@ -1336,8 +1339,8 @@ class CalcParamsDialog(QDialog):
 
     def _update_summary(self):
         """刷新底部「已选参数概览」— 显示所有已配置内容的 HTML 概览。"""
-        mode_names = {0: "📡 无源天线", 1: "📶 有源发射 TRP", 2: "📻 有源接收 TIS"}
-        mode_str = mode_names.get(self._test_mode, "未知")
+        mode_names = {0: self.tr("📡 无源天线"), 1: self.tr("📶 有源发射 TRP"), 2: self.tr("📻 有源接收 TIS")}
+        mode_str = mode_names.get(self._test_mode, self.tr("未知"))
 
         lines = [f"<b>测试模式:</b> {mode_str}"]
 
@@ -1348,7 +1351,7 @@ class CalcParamsDialog(QDialog):
         if checked:
             lines.append(f"<b>计算参数 ({len(checked)}):</b> {', '.join(checked)}")
         else:
-            lines.append("<b>计算参数:</b> <span style='color:#888;'>(未选择)</span>")
+            lines.append(self.tr("<b>计算参数:</b> <span style='color:#888;'>(未选择)</span>"))
 
         # Gain 角度
         gain_singles = sorted(set(self._angle_singles))
@@ -1358,7 +1361,7 @@ class CalcParamsDialog(QDialog):
             parts += [f"({lo}°–{hi}°)" for lo, hi in gain_ranges]
             lines.append(f"<b>Gain 角度 ({len(parts)}):</b> {', '.join(parts)}")
         else:
-            lines.append("<b>Gain 角度:</b> <span style='color:#888;'>(未设置)</span>")
+            lines.append(self.tr("<b>Gain 角度:</b> <span style='color:#888;'>(未设置)</span>"))
 
         # AR 角度
         ar_singles = sorted(set(self._ar_angle_singles))
@@ -1368,17 +1371,17 @@ class CalcParamsDialog(QDialog):
             parts += [f"({lo}°–{hi}°)" for lo, hi in ar_ranges]
             lines.append(f"<b>AR 角度 ({len(parts)}):</b> {', '.join(parts)}")
         else:
-            lines.append("<b>AR 角度:</b> <span style='color:#888;'>(未设置)</span>")
+            lines.append(self.tr("<b>AR 角度:</b> <span style='color:#888;'>(未设置)</span>"))
 
         # 算法选项
         algo_parts = []
         if self._check_extrap.isChecked():
-            algo_parts.append("Theta 外推到 180°")
+            algo_parts.append(self.tr("Theta 外推到 180°"))
         if self._check_robust.isChecked():
             algo_parts.append("Robust peak detection")
         if not self._cmb_ar_output.currentData():
-            algo_parts.append("AR 输出线性")
-        algo_str = ", ".join(algo_parts) if algo_parts else "<span style='color:#888;'>(默认)</span>"
+            algo_parts.append(self.tr("AR 输出线性"))
+        algo_str = ", ".join(algo_parts) if algo_parts else self.tr("<span style='color:#888;'>(默认)</span>")
         lines.append(f"<b>算法选项:</b> {algo_str}")
 
         # 频点
@@ -1531,7 +1534,7 @@ class PlotConfigDialog(QDialog):
     def __init__(self, parent: "MainWindow"):
         super().__init__(parent)
         self._mw = parent
-        self.setWindowTitle("图形配置")
+        self.setWindowTitle(self.tr("图形配置"))
         self.resize(780, 620)
 
         # ── 状态 ──
@@ -1608,7 +1611,7 @@ class PlotConfigDialog(QDialog):
             row_layout.setSpacing(8)
 
             # 左列: 报告需要
-            left_box = QGroupBox("报告需要")
+            left_box = QGroupBox(self.tr("报告需要"))
             left_layout = QVBoxLayout(left_box)
             left_layout.setSpacing(3)
             for key in keys:
@@ -1618,13 +1621,13 @@ class PlotConfigDialog(QDialog):
                 self._chart_required[key] = cb
                 # Gain / AR 曲线 → 添加角度选择按钮
                 if key in ("chart_gain_freq", "chart_ar_freq"):
-                    btn = QPushButton("⚙ 角度...")
+                    btn = QPushButton(self.tr("⚙ 角度..."))
                     btn.setFixedWidth(80)
                     is_ar = (key == "chart_ar_freq")
                     btn.clicked.connect(lambda checked, k=key: self._show_chart_angle_popup(k, is_left=True))
                     row.addWidget(btn)
                 elif key == "chart_lag_freq":
-                    btn = QPushButton("⚙ 角度...")
+                    btn = QPushButton(self.tr("⚙ 角度..."))
                     btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked: self._show_chart_angle_popup("chart_lag_freq", is_left=True))
                     row.addWidget(btn)
@@ -1634,7 +1637,7 @@ class PlotConfigDialog(QDialog):
             row_layout.addWidget(left_box, 1)
 
             # 右列: 额外报告
-            right_box = QGroupBox("额外报告")
+            right_box = QGroupBox(self.tr("额外报告"))
             right_layout = QVBoxLayout(right_box)
             right_layout.setSpacing(3)
             for key in keys:
@@ -1643,12 +1646,12 @@ class PlotConfigDialog(QDialog):
                 row.addWidget(cb)
                 self._chart_extra[key] = cb
                 if key in ("chart_gain_freq", "chart_ar_freq"):
-                    btn = QPushButton("⚙ 角度...")
+                    btn = QPushButton(self.tr("⚙ 角度..."))
                     btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked, k=key: self._show_chart_angle_popup(k, is_left=False))
                     row.addWidget(btn)
                 elif key == "chart_lag_freq":
-                    btn = QPushButton("⚙ 角度...")
+                    btn = QPushButton(self.tr("⚙ 角度..."))
                     btn.setFixedWidth(80)
                     btn.clicked.connect(lambda checked: self._show_chart_angle_popup("chart_lag_freq", is_left=False))
                     row.addWidget(btn)
@@ -1669,14 +1672,14 @@ class PlotConfigDialog(QDialog):
             grp.toggled.connect(make_toggle(grp, content_widget, cat_name))
 
         # ── 视角参数 ──
-        view_grp = QGroupBox("视角参数")
+        view_grp = QGroupBox(self.tr("视角参数"))
         view_layout = QHBoxLayout(view_grp)
-        view_layout.addWidget(QLabel("仰角:"))
+        view_layout.addWidget(QLabel(self.tr("仰角:")))
         self._spin_elev = QDoubleSpinBox()
         self._spin_elev.setRange(-90, 90); self._spin_elev.setValue(30)
         self._spin_elev.setSuffix("°"); self._spin_elev.setFixedWidth(80)
         view_layout.addWidget(self._spin_elev)
-        view_layout.addWidget(QLabel("方位角:"))
+        view_layout.addWidget(QLabel(self.tr("方位角:")))
         self._spin_azim = QDoubleSpinBox()
         self._spin_azim.setRange(-180, 180); self._spin_azim.setValue(-60)
         self._spin_azim.setSuffix("°"); self._spin_azim.setFixedWidth(80)
@@ -1686,31 +1689,31 @@ class PlotConfigDialog(QDialog):
         self._spin_dpi.setRange(72, 300); self._spin_dpi.setValue(150)
         self._spin_dpi.setFixedWidth(70)
         view_layout.addWidget(self._spin_dpi)
-        view_layout.addWidget(QLabel("采样精度:"))
+        view_layout.addWidget(QLabel(self.tr("采样精度:")))
         self._spin_step = QSpinBox()
         self._spin_step.setRange(1, 30)
         self._spin_step.setValue(5)
         self._spin_step.setSuffix("°")
         self._spin_step.setFixedWidth(70)
         self._spin_step.setToolTip(
-            "3D 图形采样步进 (1°–30°):\n"
+            self.tr("3D 图形采样步进 (1°–30°):\n"
             "  1°=最精细(~40K点/频点,慢)\n"
             "  5°=标准(~1.7K点/频点)\n"
             "  30°=最快(~150点/频点)\n"
             "值越小图形越精细但计算越慢。\n"
             "此值将作为图形展示窗体的初始精度，\n"
-            "可在展示窗体中通过 ⚙ 图形设置 独立调整。"
+            "可在展示窗体中通过 ⚙ 图形设置 独立调整。")
         )
         view_layout.addWidget(self._spin_step)
         view_layout.addStretch()
         grp_list.append(view_grp)
 
         # ── 输出方式 ──
-        out_grp = QGroupBox("输出方式")
+        out_grp = QGroupBox(self.tr("输出方式"))
         out_layout = QHBoxLayout(out_grp)
-        self._check_embed = QCheckBox("嵌入 Excel")
+        self._check_embed = QCheckBox(self.tr("嵌入 Excel"))
         self._check_embed.setChecked(True)
-        self._check_png = QCheckBox("保存 PNG 文件夹")
+        self._check_png = QCheckBox(self.tr("保存 PNG 文件夹"))
         out_layout.addWidget(self._check_embed)
         out_layout.addWidget(self._check_png)
         out_layout.addStretch()
@@ -1861,11 +1864,11 @@ class PlotConfigDialog(QDialog):
                     fl.addWidget(tag)
                 scroll.setWidget(dw)
                 _display_layout.addWidget(scroll)
-                btn_clear = QPushButton("🗑 清空全部")
+                btn_clear = QPushButton(self.tr("🗑 清空全部"))
                 btn_clear.clicked.connect(lambda: (_singles.clear(), _ranges.clear(), _refresh_display()))
                 _display_layout.addWidget(btn_clear)
             else:
-                _display_layout.addWidget(QLabel("  (暂无选择 — 将自动使用默认值)"))
+                _display_layout.addWidget(QLabel(self.tr("  (暂无选择 — 将自动使用默认值)")))
 
         _display_grp = QGroupBox(f"已选: {len(_singles)} 个单角度, {len(_ranges)} 个范围")
         _display_layout = QVBoxLayout(_display_grp)
@@ -1887,36 +1890,36 @@ class PlotConfigDialog(QDialog):
         bottom_layout.addWidget(quick_grp)
 
         # 自定义
-        cust_grp = QGroupBox("自定义")
+        cust_grp = QGroupBox(self.tr("自定义"))
         cust_layout = QHBoxLayout(cust_grp)
         spin_custom = QDoubleSpinBox(); spin_custom.setRange(0, 180); spin_custom.setValue(45)
-        btn_add_custom = QPushButton("+ 添加")
+        btn_add_custom = QPushButton(self.tr("+ 添加"))
         btn_add_custom.clicked.connect(lambda: (_singles.append(spin_custom.value()) if spin_custom.value() not in _singles else None, _refresh_display()))
-        cust_layout.addWidget(QLabel("角度:")); cust_layout.addWidget(spin_custom)
+        cust_layout.addWidget(QLabel(self.tr("角度:"))); cust_layout.addWidget(spin_custom)
         cust_layout.addWidget(btn_add_custom); cust_layout.addStretch()
         bottom_layout.addWidget(cust_grp)
 
         # 步进
-        step_grp = QGroupBox("步进批量生成")
+        step_grp = QGroupBox(self.tr("步进批量生成"))
         step_layout = QHBoxLayout(step_grp)
         spin_start = QDoubleSpinBox(); spin_start.setRange(0, 180); spin_start.setValue(0)
         spin_end = QDoubleSpinBox(); spin_end.setRange(0, 180); spin_end.setValue(90)
         spin_step = QDoubleSpinBox(); spin_step.setRange(1, 90); spin_step.setValue(10)
         import numpy as np
-        btn_gen = QPushButton("生成")
+        btn_gen = QPushButton(self.tr("生成"))
         btn_gen.clicked.connect(lambda: (
             [_singles.append(round(float(a), 6)) for a in np.linspace(spin_start.value(), spin_end.value(), int((spin_end.value()-spin_start.value())/spin_step.value()+1))
              if round(float(a), 6) not in _singles],
             _refresh_display()
         ))
-        step_layout.addWidget(QLabel("起:")); step_layout.addWidget(spin_start)
-        step_layout.addWidget(QLabel("止:")); step_layout.addWidget(spin_end)
-        step_layout.addWidget(QLabel("步:")); step_layout.addWidget(spin_step)
+        step_layout.addWidget(QLabel(self.tr("起:"))); step_layout.addWidget(spin_start)
+        step_layout.addWidget(QLabel(self.tr("止:"))); step_layout.addWidget(spin_end)
+        step_layout.addWidget(QLabel(self.tr("步:"))); step_layout.addWidget(spin_step)
         step_layout.addWidget(btn_gen)
         bottom_layout.addWidget(step_grp)
 
         # 范围
-        range_grp = QGroupBox("角度范围")
+        range_grp = QGroupBox(self.tr("角度范围"))
         range_layout = QHBoxLayout(range_grp)
         spin_rs = QDoubleSpinBox(); spin_rs.setRange(0, 180); spin_rs.setValue(0)
         spin_re = QDoubleSpinBox(); spin_re.setRange(0, 180); spin_re.setValue(90)
@@ -1926,10 +1929,10 @@ class PlotConfigDialog(QDialog):
             if key not in _ranges:
                 _ranges.append(key)
                 _refresh_display()
-        btn_add_range = QPushButton("添加范围")
+        btn_add_range = QPushButton(self.tr("添加范围"))
         btn_add_range.clicked.connect(_add_range)
-        range_layout.addWidget(QLabel("起:")); range_layout.addWidget(spin_rs)
-        range_layout.addWidget(QLabel("止:")); range_layout.addWidget(spin_re)
+        range_layout.addWidget(QLabel(self.tr("起:"))); range_layout.addWidget(spin_rs)
+        range_layout.addWidget(QLabel(self.tr("止:"))); range_layout.addWidget(spin_re)
         range_layout.addWidget(btn_add_range); range_layout.addStretch()
         bottom_layout.addWidget(range_grp)
 
@@ -1959,7 +1962,7 @@ class HelpDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("帮助 — 天线参数后处理工具")
+        self.setWindowTitle(self.tr("帮助 — 天线参数后处理工具"))
         self.setMinimumSize(700, 550)
         self.resize(780, 620)
 
@@ -1980,11 +1983,11 @@ class HelpDialog(QDialog):
         search_widget = QWidget()
         search_row = QHBoxLayout(search_widget)
         self._edit_query = QLineEdit()
-        self._edit_query.setPlaceholderText("输入问题或关键词，如: LAG怎么配置、模板列头格式...")
+        self._edit_query.setPlaceholderText(self.tr("输入问题或关键词，如: LAG怎么配置、模板列头格式..."))
         self._edit_query.returnPressed.connect(self._on_search)
         search_row.addWidget(self._edit_query, 1)
 
-        btn_search = QPushButton("🔍 搜索")
+        btn_search = QPushButton(self.tr("🔍 搜索"))
         btn_search.clicked.connect(self._on_search)
         search_row.addWidget(btn_search)
         content_widgets.append(search_widget)
@@ -1996,7 +1999,7 @@ class HelpDialog(QDialog):
 
         # 左: 搜索结果列表
         left_panel = QVBoxLayout()
-        left_panel.addWidget(QLabel("<b>搜索结果</b>"))
+        left_panel.addWidget(QLabel(self.tr("<b>搜索结果</b>")))
 
         self._result_list = QListWidget()
         self._result_list.setAlternatingRowColors(True)
@@ -2004,8 +2007,8 @@ class HelpDialog(QDialog):
         left_panel.addWidget(self._result_list, 1)
 
         opt_row = QHBoxLayout()
-        self._check_semantic = QCheckBox("语义搜索")
-        self._check_semantic.setToolTip("启用语义搜索（需要安装 sentence-transformers + faiss）")
+        self._check_semantic = QCheckBox(self.tr("语义搜索"))
+        self._check_semantic.setToolTip(self.tr("启用语义搜索（需要安装 sentence-transformers + faiss）"))
         self._check_semantic.setChecked(True)
         opt_row.addWidget(self._check_semantic)
         opt_row.addStretch()
@@ -2020,14 +2023,14 @@ class HelpDialog(QDialog):
         # 右: RAG 回答
         right_panel = QVBoxLayout()
         right_header = QHBoxLayout()
-        right_header.addWidget(QLabel("<b>AI 回答</b>"))
-        self._btn_ask = QPushButton("🤖 提问 AI")
+        right_header.addWidget(QLabel(self.tr("<b>AI 回答</b>")))
+        self._btn_ask = QPushButton(self.tr("🤖 提问 AI"))
         self._btn_ask.clicked.connect(self._on_ask)
-        self._btn_ask.setToolTip("使用 LLM 对检索到的文档生成回答")
+        self._btn_ask.setToolTip(self.tr("使用 LLM 对检索到的文档生成回答"))
         right_header.addWidget(self._btn_ask)
         self._btn_settings = QPushButton("⚙")
         self._btn_settings.setFixedWidth(32)
-        self._btn_settings.setToolTip("LLM API 设置")
+        self._btn_settings.setToolTip(self.tr("LLM API 设置"))
         self._btn_settings.clicked.connect(self._on_rag_settings)
         right_header.addWidget(self._btn_settings)
         right_panel.addLayout(right_header)
@@ -2035,8 +2038,8 @@ class HelpDialog(QDialog):
         self._rag_answer = QPlainTextEdit()
         self._rag_answer.setReadOnly(True)
         self._rag_answer.setPlaceholderText(
-            "点击「🤖 提问 AI」使用 LLM 生成回答\n"
-            "首次使用请在 ⚙ 中配置 API Key")
+            self.tr("点击「🤖 提问 AI」使用 LLM 生成回答\n"
+            "首次使用请在 ⚙ 中配置 API Key"))
         right_panel.addWidget(self._rag_answer, 1)
 
         self._lbl_sources = QLabel("")
@@ -2057,7 +2060,7 @@ class HelpDialog(QDialog):
         self._lbl_status.setStyleSheet("color: #666;")
         bottom_row.addWidget(self._lbl_status)
         bottom_row.addStretch()
-        btn_open = QPushButton("📖 在浏览器中打开完整手册")
+        btn_open = QPushButton(self.tr("📖 在浏览器中打开完整手册"))
         btn_open.clicked.connect(self._on_open_browser)
         bottom_row.addWidget(btn_open)
         content_widgets.append(bottom_widget)
@@ -2073,7 +2076,7 @@ class HelpDialog(QDialog):
         if not query:
             return
         self._result_list.clear()
-        self._lbl_status.setText("搜索中...")
+        self._lbl_status.setText(self.tr("搜索中..."))
         use_sem = self._check_semantic.isChecked()
         results = self._engine.search(query, top_k=8, use_semantic=use_sem)
         self._latest_results = results
@@ -2096,7 +2099,7 @@ class HelpDialog(QDialog):
         query = self._edit_query.text().strip()
         if not query:
             return
-        self._rag_answer.setPlainText("正在请求 AI...")
+        self._rag_answer.setPlainText(self.tr("正在请求 AI..."))
         self._lbl_sources.setText("")
         QApplication.processEvents()
         result = self._engine.ask(query)
@@ -2105,7 +2108,7 @@ class HelpDialog(QDialog):
         else:
             self._rag_answer.setPlainText(result["answer"])
             if result["sources"]:
-                self._lbl_sources.setText("📚 参考: " + " | ".join(result["sources"]))
+                self._lbl_sources.setText(self.tr("📚 参考: ") + " | ".join(result["sources"]))
 
     def _on_rag_settings(self):
         dlg = RAGSettingsDialog(self._rag_settings, self)
@@ -2128,7 +2131,7 @@ class HelpDialog(QDialog):
         if os.path.exists(guide):
             webbrowser.open(f"file://{Path(guide).absolute()}")
         else:
-            QMessageBox.warning(self, "提示", "帮助文件未找到。请确认 USER_GUIDE.html 存在。")
+            QMessageBox.warning(self, self.tr("提示"), self.tr("帮助文件未找到。请确认 USER_GUIDE.html 存在。"))
 
     def _load_rag_settings(self):
         try:
@@ -2167,7 +2170,7 @@ class RAGSettingsDialog(QDialog):
 
     def __init__(self, settings, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("LLM API 设置")
+        self.setWindowTitle(self.tr("LLM API 设置"))
         self.setMinimumSize(450, 320)
         self.settings = settings
         self._setup_ui()
@@ -2179,23 +2182,23 @@ class RAGSettingsDialog(QDialog):
         fl = QFormLayout()
         fl.setSpacing(8)
 
-        self._check_enable = QCheckBox("启用 RAG AI 问答")
+        self._check_enable = QCheckBox(self.tr("启用 RAG AI 问答"))
         self._check_enable.setChecked(self.settings.enabled)
         fl.addRow("", self._check_enable)
 
         # 本地 Ollama 模式
-        self._check_local = QCheckBox("使用本地 Ollama 模型（免费、离线、无需 API Key）")
+        self._check_local = QCheckBox(self.tr("使用本地 Ollama 模型（免费、离线、无需 API Key）"))
         self._check_local.setChecked(self.settings.use_local)
         self._check_local.toggled.connect(self._on_local_toggled)
         fl.addRow("", self._check_local)
 
         self._edit_local_endpoint = QLineEdit(self.settings.local_endpoint)
         self._edit_local_endpoint.setPlaceholderText("http://localhost:11434")
-        fl.addRow("Ollama 地址:", self._edit_local_endpoint)
+        fl.addRow(self.tr("Ollama 地址:"), self._edit_local_endpoint)
 
         self._edit_local_model = QLineEdit(self.settings.local_model)
         self._edit_local_model.setPlaceholderText("qwen2.5:7b / llama3.2 / mistral")
-        fl.addRow("Ollama 模型:", self._edit_local_model)
+        fl.addRow(self.tr("Ollama 模型:"), self._edit_local_model)
 
         # 云 API 模式
         self._cloud_widgets = []
@@ -2205,13 +2208,13 @@ class RAGSettingsDialog(QDialog):
 
         self._edit_key = QLineEdit(self.settings.api_key)
         self._edit_key.setEchoMode(QLineEdit.Password)
-        self._edit_key.setPlaceholderText("sk-ant-... 或 sk-...")
+        self._edit_key.setPlaceholderText(self.tr("sk-ant-... 或 sk-..."))
         w2 = fl.addRow("API Key:", self._edit_key); self._cloud_widgets.append(w2)
 
         self._cmb_model = QComboBox()
         self._cmb_model.setEditable(True)
         self._cmb_model.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_model.lineEdit().setPlaceholderText("搜索...")
+        self._cmb_model.lineEdit().setPlaceholderText(self.tr("搜索..."))
         self._cmb_model.setEditable(True)
         for m in ["claude-sonnet-4-6", "claude-opus-4-8", "gpt-4o", "gpt-4o-mini", "deepseek-chat"]:
             self._cmb_model.addItem(m)
@@ -2226,8 +2229,8 @@ class RAGSettingsDialog(QDialog):
         layout.addLayout(fl)
 
         info = QLabel(
-            "本地 Ollama: 免费、离线、无需 API Key。需要先安装 Ollama 并拉取模型。\n"
-            "云 API: 支持 Anthropic / OpenAI 兼容接口。API Key 存储在本地 QSettings。")
+            self.tr("本地 Ollama: 免费、离线、无需 API Key。需要先安装 Ollama 并拉取模型。\n"
+            "云 API: 支持 Anthropic / OpenAI 兼容接口。API Key 存储在本地 QSettings。"))
         info.setStyleSheet("color: #888;")
         layout.addWidget(info)
 
@@ -2526,7 +2529,11 @@ class SystemSettingsDialog(QDialog):
         self._cmb_ai_mode.setEditable(True)
         self._cmb_ai_mode.setInsertPolicy(QComboBox.NoInsert)
         self._cmb_ai_mode.lineEdit().setPlaceholderText(self.tr("搜索..."))
-        self._cmb_ai_mode.addItems(["cloud", "local"])
+        # 显示名进 itemText, 模式标识进 itemData —— 下方按 currentData 消费。
+        # 原来 addItems(["cloud","local"]) 无 data 且按 currentText 查找/比较/
+        # 写入配置, 一旦给显示名包 tr() 就会把译文写进 cfg.ai.mode。
+        self._cmb_ai_mode.addItem(self.tr("云端 (cloud)"), "cloud")
+        self._cmb_ai_mode.addItem(self.tr("本地 (local)"), "local")
         self._cmb_ai_mode.currentIndexChanged.connect(self._on_ai_mode_changed)
         ai_layout.addRow(self.tr("AI 模式:"), self._cmb_ai_mode)
 
@@ -2615,7 +2622,7 @@ class SystemSettingsDialog(QDialog):
         # AI 辅助设置
         self._check_ai.setChecked(cfg.ai.enabled)
         mode = cfg.ai.mode
-        midx = self._cmb_ai_mode.findText(mode)
+        midx = self._cmb_ai_mode.findData(mode)
         if midx >= 0:
             self._cmb_ai_mode.setCurrentIndex(midx)
         self._edit_ai_api_base.setText(cfg.ai.api_base)
@@ -2812,7 +2819,7 @@ class SystemSettingsDialog(QDialog):
         self._mw.update()
 
     def _on_ai_mode_changed(self, idx):
-        is_cloud = self._cmb_ai_mode.currentText() == "cloud"
+        is_cloud = self._cmb_ai_mode.currentData() == "cloud"
         for w in self._ai_cloud_fields:
             w.setVisible(is_cloud)
         for w in self._ai_local_fields:
@@ -2861,7 +2868,9 @@ class SystemSettingsDialog(QDialog):
         mgr.config.llm.local_endpoint = self._edit_local_endpoint.text().strip()
         # AI 辅助设置
         mgr.config.ai.enabled = self._check_ai.isChecked()
-        mgr.config.ai.mode = self._cmb_ai_mode.currentText().strip()
+        # currentData 是模式标识; 可编辑框被手输时回退文本 (保持原行为)
+        mgr.config.ai.mode = (self._cmb_ai_mode.currentData()
+                              or self._cmb_ai_mode.currentText().strip())
         mgr.config.ai.api_base = self._edit_ai_api_base.text().strip()
         mgr.set_api_key("ai", self._edit_ai_api_key.text().strip())
         mgr.config.ai.model = self._edit_ai_model.text().strip()
@@ -3007,12 +3016,12 @@ class ReportMetadataDialog(QDialog):
         form1.setSpacing(6)
         self._fields = {}
         fields_tab1 = [
-            ('customer',       '客户名称'),
-            ('project',        '项目名称'),
-            ('contract_no',    '合同号'),
-            ('antenna_model',  '天线型号'),
-            ('report_no',      '报告编号'),
-            ('test_standard',  '测试标准'),
+            ('customer',       self.tr('客户名称')),
+            ('project',        self.tr('项目名称')),
+            ('contract_no',    self.tr('合同号')),
+            ('antenna_model',  self.tr('天线型号')),
+            ('report_no',      self.tr('报告编号')),
+            ('test_standard',  self.tr('测试标准')),
         ]
         for key, label in fields_tab1:
             edit = QLineEdit()
@@ -3026,14 +3035,14 @@ class ReportMetadataDialog(QDialog):
         form2 = QFormLayout(tab2)
         form2.setSpacing(6)
         fields_tab2 = [
-            ('test_lab',        '测试实验室'),
-            ('test_lab_addr',   '实验室地址'),
-            ('test_engineer',   '测试工程师'),
-            ('reviewer',        '审核人'),
-            ('test_start_date', '测试开始日期'),
-            ('test_end_date',   '测试结束日期'),
-            ('test_plan_no',    '测试计划编号'),
-            ('test_plan_ver',   '测试计划版本'),
+            ('test_lab',        self.tr('测试实验室')),
+            ('test_lab_addr',   self.tr('实验室地址')),
+            ('test_engineer',   self.tr('测试工程师')),
+            ('reviewer',        self.tr('审核人')),
+            ('test_start_date', self.tr('测试开始日期')),
+            ('test_end_date',   self.tr('测试结束日期')),
+            ('test_plan_no',    self.tr('测试计划编号')),
+            ('test_plan_ver',   self.tr('测试计划版本')),
         ]
         for key, label in fields_tab2:
             edit = QLineEdit()
@@ -3713,7 +3722,7 @@ class BatchCalibrateDialog(QDialog):
             if ok > 0:
                 summary += f"\n\n{self.tr('输出目录')}:\n{out_dir}"
             if fail > 0:
-                summary += "\n\n{self.tr('失败详情')}:\n"
+                summary += f"\n\n{self.tr('失败详情')}:\n"
                 summary += "\n".join(
                     f"  • {Path(f['source']).name}: {f['error']}" for f in result['failed'])
             QMessageBox.information(self, self.tr("完成"), summary)
@@ -4209,7 +4218,7 @@ class ActivationDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("软件激活")
+        self.setWindowTitle(self.tr("软件激活"))
         self.setMinimumWidth(480)
         self._activated = False
         self._setup_ui()
@@ -4228,9 +4237,9 @@ class ActivationDialog(QDialog):
 
         # 说明文字
         info_label = QLabel(
-            "<h3>🔑 软件激活</h3>"
+            self.tr("<h3>🔑 软件激活</h3>"
             "<p>请输入从供应商获取的激活码。<br>"
-            "激活需要网络连接以验证激活码并获取许可文件。</p>"
+            "激活需要网络连接以验证激活码并获取许可文件。</p>")
         )
         info_label.setWordWrap(True)
         layout.addWidget(info_label)

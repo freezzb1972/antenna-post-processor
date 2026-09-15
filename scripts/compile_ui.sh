@@ -8,6 +8,6 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
 echo "Compiling UI..."
-.venv/bin/pyside6-uic ui/designer/main_window.ui -o ui/compiled/ui_main_window.py
+pyside6-uic ui/designer/main_window.ui -o ui/compiled/ui_main_window.py
 
 echo "Done."

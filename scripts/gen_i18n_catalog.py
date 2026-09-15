@@ -36,7 +36,8 @@ sys.path.insert(0, str(ROOT))
 def collect() -> dict[str, set]:
     """返回 {context: {字面量, ...}}。"""
     result: dict[str, set] = {"ChartConfig": set(), "AntennaParamsPage": set(),
-                              "ThemeManager": set()}
+                              "ThemeManager": set(), "CalcParamsDialog": set(),
+                              "ReportMetadataDialog": set()}
 
     # ── 主题显示名 ──
     # ALL_THEMES 是 class body 数据, 不能在里面包 translate (import 期求值会冻结
@@ -59,18 +60,22 @@ def collect() -> dict[str, set]:
 
     # ── 参数类型标签 (class body 裸元组) ──
     from ui.pages import AntennaParamsPage
-
-    for attr in ("_COMMON_PARAMS", "_TRP_PARAMS", "_TIS_PARAMS"):
-        for entry in getattr(AntennaParamsPage, attr, []):
-            # 结构: (key, label, ...) 或 (group_name, [entries]) —— 两者都收
-            if isinstance(entry, (list, tuple)):
-                for item in entry:
-                    if isinstance(item, str):
-                        result["AntennaParamsPage"].add(item)
-                    elif isinstance(item, (list, tuple)):
-                        result["AntennaParamsPage"] |= {
-                            x for x in item if isinstance(x, str)
-                        }
+    from ui.dialogs import CalcParamsDialog
+    for owner in (AntennaParamsPage, CalcParamsDialog):
+        ctx = "AntennaParamsPage" if owner is AntennaParamsPage else "CalcParamsDialog"
+        for attr in ("_COMMON_PARAMS", "_TRP_PARAMS", "_TIS_PARAMS"):
+            for entry in getattr(owner, attr, []):
+                # 结构: (group_key, [(param_key, label), ...])
+                # **只收标签** —— group_key / param_key 是参与比较的内部键
+                # (如 `grp_name == "Axial Ratio"`), 翻译它们会破坏逻辑
+                if not (isinstance(entry, (list, tuple)) and len(entry) == 2):
+                    continue
+                pairs = entry[1]
+                if not isinstance(pairs, (list, tuple)):
+                    continue
+                for pair in pairs:
+                    if isinstance(pair, (list, tuple)) and len(pair) == 2:
+                        result[ctx].add(pair[1])
     return result
 
 
