@@ -250,7 +250,10 @@ class TestProcessOneFrequency:
 
     def test_extrapolation_triggers(self):
         """当 theta 不到 175° 且 do_extrapolate=True 时外推。"""
-        raw = self._make_raw()
+        # 角度数须与数据列数一致 (10 个 θ ↔ 10 列)。此前传 10 个角度却配
+        # 默认的 19 列数据, 外推时形状不匹配而报 broadcast 错误。
+        raw = self._make_raw(theta_lm=np.ones((36, 10)) * -5.0,
+                             phi_lm=np.ones((36, 10)) * -8.0)
         theta = np.linspace(0, 90, 10)  # only to 90°
         lag = LagConfig()
 
@@ -284,7 +287,9 @@ class TestProcessOneFrequency:
         theta = np.linspace(0, 180, 19)
         lag = LagConfig()
 
-        row = _process_one_frequency(raw, 699.0, theta, lag)
+        # _raw_data 是按需存储的 (store_matrices): 仅中间数据导出/3D 查看器需要,
+        # 报告生成不存 — 故必须显式传入该参数
+        row = _process_one_frequency(raw, 699.0, theta, lag, store_matrices=True)
         assert "_raw_data" in row
         assert "_theta_angles" in row
         assert "_phi_angles" in row

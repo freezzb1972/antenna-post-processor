@@ -1847,28 +1847,50 @@ class GraphDataTab(QWidget):
         ctrl = QHBoxLayout()
         ctrl.addWidget(QLabel("频点:"))
         self._cmb = QComboBox()
-        for f in sorted(self._gd.keys()):
-            self._cmb.addItem(f"{f:.1f} MHz", f)
         ctrl.addWidget(self._cmb)
         ctrl.addStretch()
-        ctrl.addWidget(QLabel(f"共 {len(self._gd)} 个频点, 步进 5°"))
+        self._lbl_freq_count = QLabel()
+        ctrl.addWidget(self._lbl_freq_count)
         layout.addLayout(ctrl)
 
-        if not self._gd:
-            # 数据为空时给出显式提示 — 否则整页空白且无任何说明 (静默失效)
-            _hint = QLabel(self.tr(
-                "未找到图形数据 — 请勾选「中间数据输出」或启用图表后重新处理"))
-            _hint.setWordWrap(True)
-            _hint.setStyleSheet("color: #d9534f; padding: 12px;")
-            layout.addWidget(_hint)
+        # 数据为空时给出显式提示 — 否则整页空白且无任何说明 (静默失效)
+        self._hint = QLabel(self.tr(
+            "未找到图形数据 — 请勾选「中间数据输出」或启用图表后重新处理"))
+        self._hint.setWordWrap(True)
+        self._hint.setStyleSheet("color: #d9534f; padding: 12px;")
+        layout.addWidget(self._hint)
 
         self._table = QTableWidget()
         self._table.setObjectName("graphDataTable")
         layout.addWidget(self._table)
 
         self._cmb.currentIndexChanged.connect(self._show_freq_data)
+        self._refresh_freq_list()
+
+    def load_data(self, results: dict):
+        """重新加载数据 (install_in 复用时调用)。
+
+        缺本方法时 install_in 会跳过刷新却仍选中旧标签页, 显示上一次的数据
+        (陈旧数据)。
+        """
+        from src.graph_data import extract_graph_data
+        self._gd = extract_graph_data(results)
+        self._refresh_freq_list()
+
+    def _refresh_freq_list(self):
+        """重建频点下拉并刷新显示 (初始化与重新加载共用)。"""
+        # blockSignals 防止 clear/addItem 期间的信号触发 _show_freq_data
+        self._cmb.blockSignals(True)
+        self._cmb.clear()
+        for f in sorted(self._gd.keys()):
+            self._cmb.addItem(f"{f:.1f} MHz", f)
+        self._cmb.blockSignals(False)
+        self._lbl_freq_count.setText(f"共 {len(self._gd)} 个频点, 步进 5°")
+        self._hint.setVisible(not self._gd)
         if self._cmb.count() > 0:
             self._show_freq_data(0)
+        else:
+            self._table.setRowCount(0)
 
     def _show_freq_data(self, freq_idx: int):
         freq = self._cmb.currentData()
