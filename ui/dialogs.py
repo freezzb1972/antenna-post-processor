@@ -2273,7 +2273,7 @@ class SystemSettingsDialog(QDialog):
     def __init__(self, parent: "MainWindow"):
         super().__init__(parent)
         self._mw = parent
-        self.setWindowTitle("系统设置")
+        self.setWindowTitle(self.tr("系统设置"))
         self._setup_ui()
         self._load_state()
         auto_size_dialog(self, 520, 620)
@@ -2288,7 +2288,7 @@ class SystemSettingsDialog(QDialog):
         layout.setSpacing(10)
 
         # ── 字体大小 ──
-        font_grp = QGroupBox("字体大小")
+        font_grp = QGroupBox(self.tr("字体大小"))
         font_layout = QHBoxLayout(font_grp)
         font_layout.addWidget(QLabel("A"))
         self._spin_font = QSpinBox()
@@ -2296,28 +2296,28 @@ class SystemSettingsDialog(QDialog):
         self._spin_font.setValue(13)
         self._spin_font.setSuffix(" px")
         font_layout.addWidget(self._spin_font)
-        font_layout.addWidget(QLabel("A 大"))
+        font_layout.addWidget(QLabel(self.tr("A 大")))
         font_layout.addStretch()
-        btn_font = QPushButton("应用字体")
+        btn_font = QPushButton(self.tr("应用字体"))
         btn_font.clicked.connect(self._on_apply_font)
         font_layout.addWidget(btn_font)
         layout.addWidget(font_grp)
 
         # ── 主题 ──
-        theme_grp = QGroupBox("主题")
+        theme_grp = QGroupBox(self.tr("主题"))
         theme_layout = QHBoxLayout(theme_grp)
         self._cmb_theme = QComboBox()
         self._cmb_theme.setEditable(True)
         self._cmb_theme.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_theme.lineEdit().setPlaceholderText("搜索...")
+        self._cmb_theme.lineEdit().setPlaceholderText(self.tr("搜索..."))
         self._cmb_theme.setMinimumWidth(200)
-        theme_layout.addWidget(QLabel("主题:"))
+        theme_layout.addWidget(QLabel(self.tr("主题:")))
         theme_layout.addWidget(self._cmb_theme)
         theme_layout.addStretch()
         layout.addWidget(theme_grp)
 
         # ── 语言 ──
-        lang_grp = QGroupBox("语言 / Language")
+        lang_grp = QGroupBox(self.tr("语言 / Language"))
         lang_layout = QHBoxLayout(lang_grp)
         self._btn_lang = QPushButton("中文 / English")
         self._btn_lang.clicked.connect(self._on_toggle_lang)
@@ -2326,47 +2326,47 @@ class SystemSettingsDialog(QDialog):
         layout.addWidget(lang_grp)
 
         # ── 模板预设管理 ──
-        tpl_grp = QGroupBox("模板预设管理")
+        tpl_grp = QGroupBox(self.tr("模板预设管理"))
         tpl_layout = QFormLayout(tpl_grp)
         tpl_layout.setSpacing(6)
 
         # 模板文件: 浏览选择
         tpl_path_row = QHBoxLayout()
         self._edit_tpl_path = QLineEdit()
-        self._edit_tpl_path.setPlaceholderText("选择模板文件 (.xlsx .xls .csv .docx)")
-        btn_browse_tpl = QPushButton("浏览...")
+        self._edit_tpl_path.setPlaceholderText(self.tr("选择模板文件 (.xlsx .xls .csv .docx)"))
+        btn_browse_tpl = QPushButton(self.tr("浏览..."))
         btn_browse_tpl.clicked.connect(self._on_browse_template_file)
         tpl_path_row.addWidget(self._edit_tpl_path)
         tpl_path_row.addWidget(btn_browse_tpl)
-        tpl_layout.addRow("模板文件:", tpl_path_row)
+        tpl_layout.addRow(self.tr("模板文件:"), tpl_path_row)
 
         # 厂商: 可搜索下拉
         self._cmb_mfr = QComboBox()
         self._cmb_mfr.setEditable(True)
         self._cmb_mfr.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_mfr.lineEdit().setPlaceholderText("搜索或输入新厂商...")
+        self._cmb_mfr.lineEdit().setPlaceholderText(self.tr("搜索或输入新厂商..."))
         self._cmb_mfr.addItem("", "")
         for mfr in self._mw._tm.manufacturers:
             self._cmb_mfr.addItem(mfr, mfr)
         self._cmb_mfr.currentIndexChanged.connect(self._on_tpl_mfr_changed)
-        tpl_layout.addRow("厂商:", self._cmb_mfr)
+        tpl_layout.addRow(self.tr("厂商:"), self._cmb_mfr)
 
         # 模板名: 可搜索下拉
         self._cmb_template = QComboBox()
         self._cmb_template.setEditable(True)
         self._cmb_template.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_template.lineEdit().setPlaceholderText("搜索模板...")
+        self._cmb_template.lineEdit().setPlaceholderText(self.tr("搜索模板..."))
         self._cmb_template.setMinimumWidth(150)
         self._cmb_template.addItem("", "")
         self._cmb_template.currentIndexChanged.connect(self._on_tpl_selected)
-        tpl_layout.addRow("模板名:", self._cmb_template)
+        tpl_layout.addRow(self.tr("模板名:"), self._cmb_template)
 
         self._edit_tpl_output_dir = QLineEdit()
-        self._edit_tpl_output_dir.setPlaceholderText("默认输出目录（可选）")
-        tpl_layout.addRow("输出目录:", self._edit_tpl_output_dir)
+        self._edit_tpl_output_dir.setPlaceholderText(self.tr("默认输出目录（可选）"))
+        tpl_layout.addRow(self.tr("输出目录:"), self._edit_tpl_output_dir)
 
         btn_row = QHBoxLayout()
-        self._btn_save_preset = QPushButton("💾 保存为预设")
+        self._btn_save_preset = QPushButton(self.tr("💾 保存为预设"))
         self._btn_save_preset.clicked.connect(self._on_tpl_save)
         btn_row.addWidget(self._btn_save_preset)
         btn_row.addStretch()
@@ -2375,30 +2375,30 @@ class SystemSettingsDialog(QDialog):
         layout.addWidget(tpl_grp)
 
         # ── RSP 校准预设管理 ──
-        rsp_grp = QGroupBox("RSP 校准预设管理")
+        rsp_grp = QGroupBox(self.tr("RSP 校准预设管理"))
         rsp_layout = QFormLayout(rsp_grp)
         rsp_layout.setSpacing(6)
 
         self._cmb_rsp_name = QComboBox()
         self._cmb_rsp_name.setEditable(True)
         self._cmb_rsp_name.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_rsp_name.lineEdit().setPlaceholderText("输入新预设名称或选择已有...")
+        self._cmb_rsp_name.lineEdit().setPlaceholderText(self.tr("输入新预设名称或选择已有..."))
         self._cmb_rsp_name.currentIndexChanged.connect(self._on_rsp_preset_selected)
-        rsp_layout.addRow("预设名称:", self._cmb_rsp_name)
+        rsp_layout.addRow(self.tr("预设名称:"), self._cmb_rsp_name)
 
         self._cmb_rsp_mode = QComboBox()
         self._cmb_rsp_mode.setEditable(True)
         self._cmb_rsp_mode.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_rsp_mode.lineEdit().setPlaceholderText("搜索...")
-        self._cmb_rsp_mode.addItem("通用 (任意模式)", -1)
-        self._cmb_rsp_mode.addItem("无源天线", 0)
-        self._cmb_rsp_mode.addItem("有源发射 TRP", 1)
-        self._cmb_rsp_mode.addItem("有源接收 TIS", 2)
-        rsp_layout.addRow("关联测试模式:", self._cmb_rsp_mode)
+        self._cmb_rsp_mode.lineEdit().setPlaceholderText(self.tr("搜索..."))
+        self._cmb_rsp_mode.addItem(self.tr("通用 (任意模式)"), -1)
+        self._cmb_rsp_mode.addItem(self.tr("无源天线"), 0)
+        self._cmb_rsp_mode.addItem(self.tr("有源发射 TRP"), 1)
+        self._cmb_rsp_mode.addItem(self.tr("有源接收 TIS"), 2)
+        rsp_layout.addRow(self.tr("关联测试模式:"), self._cmb_rsp_mode)
 
         self._edit_rsp_h = QLineEdit()
-        self._edit_rsp_h.setPlaceholderText("选择 H-pol RSP 校准文件 (Phi 分量)")
-        btn_browse_rsp_h = QPushButton("浏览...")
+        self._edit_rsp_h.setPlaceholderText(self.tr("选择 H-pol RSP 校准文件 (Phi 分量)"))
+        btn_browse_rsp_h = QPushButton(self.tr("浏览..."))
         btn_browse_rsp_h.clicked.connect(self._on_browse_rsp_h)
         h_row = QHBoxLayout()
         h_row.addWidget(self._edit_rsp_h)
@@ -2406,8 +2406,8 @@ class SystemSettingsDialog(QDialog):
         rsp_layout.addRow("H-pol RSP:", h_row)
 
         self._edit_rsp_v = QLineEdit()
-        self._edit_rsp_v.setPlaceholderText("选择 V-pol RSP 校准文件 (Theta 分量)")
-        btn_browse_rsp_v = QPushButton("浏览...")
+        self._edit_rsp_v.setPlaceholderText(self.tr("选择 V-pol RSP 校准文件 (Theta 分量)"))
+        btn_browse_rsp_v = QPushButton(self.tr("浏览..."))
         btn_browse_rsp_v.clicked.connect(self._on_browse_rsp_v)
         v_row = QHBoxLayout()
         v_row.addWidget(self._edit_rsp_v)
@@ -2415,46 +2415,46 @@ class SystemSettingsDialog(QDialog):
         rsp_layout.addRow("V-pol RSP:", v_row)
 
         self._edit_rsp_desc = QLineEdit()
-        self._edit_rsp_desc.setPlaceholderText("可选注释")
-        rsp_layout.addRow("描述:", self._edit_rsp_desc)
+        self._edit_rsp_desc.setPlaceholderText(self.tr("可选注释"))
+        rsp_layout.addRow(self.tr("描述:"), self._edit_rsp_desc)
 
         btn_rsp_row = QHBoxLayout()
-        self._btn_save_rsp = QPushButton("💾 保存 RSP 预设")
+        self._btn_save_rsp = QPushButton(self.tr("💾 保存 RSP 预设"))
         self._btn_save_rsp.clicked.connect(self._on_rsp_save)
         btn_rsp_row.addWidget(self._btn_save_rsp)
-        self._btn_delete_rsp = QPushButton("🗑 删除预设")
+        self._btn_delete_rsp = QPushButton(self.tr("🗑 删除预设"))
         self._btn_delete_rsp.clicked.connect(self._on_rsp_delete)
         btn_rsp_row.addWidget(self._btn_delete_rsp)
         btn_rsp_row.addStretch()
         rsp_layout.addRow("", btn_rsp_row)
 
         # ── 当前默认值 ──
-        defaults_grp = QGroupBox("当前默认值 (工具自动匹配)")
+        defaults_grp = QGroupBox(self.tr("当前默认值 (工具自动匹配)"))
         defaults_layout = QFormLayout(defaults_grp)
         defaults_layout.setSpacing(4)
 
         self._cmb_default_passive = QComboBox()
         self._cmb_default_passive.setEditable(True)
         self._cmb_default_passive.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_default_passive.lineEdit().setPlaceholderText("搜索...")
-        self._cmb_default_passive.addItem("(未设置)", "")
-        defaults_layout.addRow("无源天线:", self._cmb_default_passive)
+        self._cmb_default_passive.lineEdit().setPlaceholderText(self.tr("搜索..."))
+        self._cmb_default_passive.addItem(self.tr("(未设置)"), "")
+        defaults_layout.addRow(self.tr("无源天线:"), self._cmb_default_passive)
 
         self._cmb_default_trp = QComboBox()
         self._cmb_default_trp.setEditable(True)
         self._cmb_default_trp.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_default_trp.lineEdit().setPlaceholderText("搜索...")
-        self._cmb_default_trp.addItem("(未设置)", "")
-        defaults_layout.addRow("有源 TRP:", self._cmb_default_trp)
+        self._cmb_default_trp.lineEdit().setPlaceholderText(self.tr("搜索..."))
+        self._cmb_default_trp.addItem(self.tr("(未设置)"), "")
+        defaults_layout.addRow(self.tr("有源 TRP:"), self._cmb_default_trp)
 
         self._cmb_default_tis = QComboBox()
         self._cmb_default_tis.setEditable(True)
         self._cmb_default_tis.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_default_tis.lineEdit().setPlaceholderText("搜索...")
-        self._cmb_default_tis.addItem("(未设置)", "")
-        defaults_layout.addRow("有源 TIS:", self._cmb_default_tis)
+        self._cmb_default_tis.lineEdit().setPlaceholderText(self.tr("搜索..."))
+        self._cmb_default_tis.addItem(self.tr("(未设置)"), "")
+        defaults_layout.addRow(self.tr("有源 TIS:"), self._cmb_default_tis)
 
-        btn_set_defaults = QPushButton("应用默认值")
+        btn_set_defaults = QPushButton(self.tr("应用默认值"))
         btn_set_defaults.clicked.connect(self._on_rsp_set_defaults)
         defaults_layout.addRow("", btn_set_defaults)
 
@@ -2462,20 +2462,20 @@ class SystemSettingsDialog(QDialog):
         layout.addWidget(rsp_grp)
 
         # ── 默认保存目录 ──
-        dirs_grp = QGroupBox("默认保存目录")
+        dirs_grp = QGroupBox(self.tr("默认保存目录"))
         dirs_layout = QFormLayout(dirs_grp)
         dirs_layout.setSpacing(4)
-        btn_default_dirs = QPushButton("设置默认保存目录...")
+        btn_default_dirs = QPushButton(self.tr("设置默认保存目录..."))
         btn_default_dirs.clicked.connect(self._show_default_dirs)
         dirs_layout.addRow(btn_default_dirs)
         layout.addWidget(dirs_grp)
 
         # ── LLM API ──
-        llm_grp = QGroupBox("LLM API (RAG 问答)")
+        llm_grp = QGroupBox(self.tr("LLM API (RAG 问答)"))
         llm_layout = QFormLayout(llm_grp)
         llm_layout.setSpacing(6)
 
-        self._check_llm = QCheckBox("启用 RAG AI 问答")
+        self._check_llm = QCheckBox(self.tr("启用 RAG AI 问答"))
         llm_layout.addRow("", self._check_llm)
 
         self._edit_api_base = QLineEdit()
@@ -2485,7 +2485,7 @@ class SystemSettingsDialog(QDialog):
 
         self._edit_api_key = QLineEdit()
         self._edit_api_key.setEchoMode(QLineEdit.Password)
-        self._edit_api_key.setPlaceholderText("sk-ant-... 或 sk-...")
+        self._edit_api_key.setPlaceholderText(self.tr("sk-ant-... 或 sk-..."))
         # setMinimumWidth 在 setStyleSheet 后会被重置，在 _on_accept 后
         # 由主窗口的 _apply_minimum_sizes 重新补充。此处保留一份调用。
         self._edit_api_key.setMinimumWidth(340)
@@ -2494,41 +2494,41 @@ class SystemSettingsDialog(QDialog):
         self._cmb_model = QComboBox()
         self._cmb_model.setEditable(True)
         self._cmb_model.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_model.lineEdit().setPlaceholderText("搜索...")
+        self._cmb_model.lineEdit().setPlaceholderText(self.tr("搜索..."))
         self._cmb_model.setEditable(True)
         for m in ["claude-sonnet-4-6", "claude-opus-4-8", "gpt-4o", "gpt-4o-mini", "deepseek-chat"]:
             self._cmb_model.addItem(m)
-        llm_layout.addRow("Model:", self._cmb_model)
+        llm_layout.addRow(self.tr("模型:"), self._cmb_model)
 
-        self._check_local = QCheckBox("使用本地 Ollama 模型（免费、离线、无需 API Key）")
+        self._check_local = QCheckBox(self.tr("使用本地 Ollama 模型（免费、离线、无需 API Key）"))
         self._check_local.toggled.connect(self._on_local_toggled)
         llm_layout.addRow("", self._check_local)
 
         self._edit_local_model = QLineEdit()
         self._edit_local_model.setPlaceholderText("llama3:8b")
-        llm_layout.addRow("本地模型名:", self._edit_local_model)
+        llm_layout.addRow(self.tr("本地模型名:"), self._edit_local_model)
 
         self._edit_local_endpoint = QLineEdit()
         self._edit_local_endpoint.setPlaceholderText("http://localhost:11434/v1")
-        llm_layout.addRow("本地端点:", self._edit_local_endpoint)
+        llm_layout.addRow(self.tr("本地端点:"), self._edit_local_endpoint)
 
         layout.addWidget(llm_grp)
 
         # ── 智能识别 LLM (独立于 RAG 问答, 可配置不同模型) ──
-        self._ai_grp = QGroupBox("智能识别 (AI 辅助) — 模板识别/数据源匹配/参数检测")
+        self._ai_grp = QGroupBox(self.tr("智能识别 (AI 辅助) — 模板识别/数据源匹配/参数检测"))
         ai_layout = QFormLayout(self._ai_grp)
         ai_layout.setSpacing(6)
 
-        self._check_ai = QCheckBox("启用 AI 辅助识别（规则匹配失败时的兜底方案）")
+        self._check_ai = QCheckBox(self.tr("启用 AI 辅助识别（规则匹配失败时的兜底方案）"))
         ai_layout.addRow("", self._check_ai)
 
         self._cmb_ai_mode = QComboBox()
         self._cmb_ai_mode.setEditable(True)
         self._cmb_ai_mode.setInsertPolicy(QComboBox.NoInsert)
-        self._cmb_ai_mode.lineEdit().setPlaceholderText("搜索...")
+        self._cmb_ai_mode.lineEdit().setPlaceholderText(self.tr("搜索..."))
         self._cmb_ai_mode.addItems(["cloud", "local"])
         self._cmb_ai_mode.currentIndexChanged.connect(self._on_ai_mode_changed)
-        ai_layout.addRow("AI 模式:", self._cmb_ai_mode)
+        ai_layout.addRow(self.tr("AI 模式:"), self._cmb_ai_mode)
 
         self._edit_ai_api_base = QLineEdit()
         self._edit_ai_api_base.setPlaceholderText("https://api.anthropic.com/v1/messages")
@@ -2536,16 +2536,16 @@ class SystemSettingsDialog(QDialog):
 
         self._edit_ai_api_key = QLineEdit()
         self._edit_ai_api_key.setEchoMode(QLineEdit.Password)
-        self._edit_ai_api_key.setPlaceholderText("sk-ant-... 或 sk-...")
+        self._edit_ai_api_key.setPlaceholderText(self.tr("sk-ant-... 或 sk-..."))
         ai_layout.addRow("API Key:", self._edit_ai_api_key)
 
         self._edit_ai_model = QLineEdit()
-        self._edit_ai_model.setPlaceholderText("claude-sonnet-4-6 (云) / qwen2.5:7b (本地)")
-        ai_layout.addRow("模型:", self._edit_ai_model)
+        self._edit_ai_model.setPlaceholderText(self.tr("claude-sonnet-4-6 (云) / qwen2.5:7b (本地)"))
+        ai_layout.addRow(self.tr("模型:"), self._edit_ai_model)
 
         self._edit_ai_local_endpoint = QLineEdit()
         self._edit_ai_local_endpoint.setPlaceholderText("http://localhost:11434")
-        ai_layout.addRow("本地地址:", self._edit_ai_local_endpoint)
+        ai_layout.addRow(self.tr("本地地址:"), self._edit_ai_local_endpoint)
 
         self._ai_cloud_fields = [self._edit_ai_api_base, self._edit_ai_api_key]
         self._ai_local_fields = [self._edit_ai_local_endpoint]
@@ -2627,8 +2627,8 @@ class SystemSettingsDialog(QDialog):
 
     def _on_browse_template_file(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择模板文件", "",
-            "所有支持格式 (*.xlsx *.xls *.csv *.docx);;Excel (*.xlsx *.xls);;CSV (*.csv);;Word (*.docx);;所有文件 (*)")
+            self, self.tr("选择模板文件"), "",
+            self.tr("所有支持格式 (*.xlsx *.xls *.csv *.docx);;Excel (*.xlsx *.xls);;CSV (*.csv);;Word (*.docx);;所有文件 (*)"))
         if path:
             self._edit_tpl_path.setText(path)
 
@@ -2653,13 +2653,13 @@ class SystemSettingsDialog(QDialog):
         tpl_name = self._cmb_template.currentText().strip()
         output_dir = self._edit_tpl_output_dir.text().strip()
         if not path:
-            QMessageBox.warning(self, "保存预设", "请先选择模板文件。")
+            QMessageBox.warning(self, self.tr("保存预设"), self.tr("请先选择模板文件。"))
             return
         if not mfr:
-            QMessageBox.warning(self, "保存预设", "请输入或选择厂商名称。")
+            QMessageBox.warning(self, self.tr("保存预设"), self.tr("请输入或选择厂商名称。"))
             return
         if not tpl_name:
-            QMessageBox.warning(self, "保存预设", "请输入模板名称。")
+            QMessageBox.warning(self, self.tr("保存预设"), self.tr("请输入模板名称。"))
             return
         self._mw._tm.add_template(mfr, tpl_name, path, output_dir)
         self._refresh_tpl_lists()
@@ -2674,7 +2674,7 @@ class SystemSettingsDialog(QDialog):
         cur_mfr = self._cmb_mfr.currentData()
         self._cmb_mfr.blockSignals(True)
         self._cmb_mfr.clear()
-        self._cmb_mfr.addItem("(所有厂商)", "")
+        self._cmb_mfr.addItem(self.tr("(所有厂商)"), "")
         for mfr in self._mw._tm.manufacturers:
             self._cmb_mfr.addItem(mfr, mfr)
         idx = self._cmb_mfr.findData(cur_mfr)
@@ -2686,15 +2686,15 @@ class SystemSettingsDialog(QDialog):
 
     def _on_browse_rsp_h(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择 H-pol RSP 校准文件", "",
-            "CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)")
+            self, self.tr("选择 H-pol RSP 校准文件"), "",
+            self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
         if path:
             self._edit_rsp_h.setText(path)
 
     def _on_browse_rsp_v(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择 V-pol RSP 校准文件", "",
-            "CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)")
+            self, self.tr("选择 V-pol RSP 校准文件"), "",
+            self.tr("CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)"))
         if path:
             self._edit_rsp_v.setText(path)
 
@@ -2719,14 +2719,14 @@ class SystemSettingsDialog(QDialog):
         from src.rsp_preset_manager import RspPresetManager, RspPreset
         name = self._cmb_rsp_name.currentText().strip()
         if not name:
-            QMessageBox.warning(self, "保存预设", "请输入预设名称。")
+            QMessageBox.warning(self, self.tr("保存预设"), self.tr("请输入预设名称。"))
             return
         test_mode = self._cmb_rsp_mode.currentData()
         rsp_h = self._edit_rsp_h.text().strip()
         rsp_v = self._edit_rsp_v.text().strip()
         desc = self._edit_rsp_desc.text().strip()
         if not rsp_h and not rsp_v:
-            QMessageBox.warning(self, "保存预设", "请至少选择一个 RSP 校准文件。")
+            QMessageBox.warning(self, self.tr("保存预设"), self.tr("请至少选择一个 RSP 校准文件。"))
             return
         mgr = RspPresetManager()
         preset = RspPreset(
@@ -2743,8 +2743,8 @@ class SystemSettingsDialog(QDialog):
         if not name:
             return
         reply = QMessageBox.question(
-            self, "删除预设",
-            f"确定删除 RSP 预设「{name}」？\n（关联的默认值将同时清除）",
+            self, self.tr("删除预设"),
+            self.tr("确定删除 RSP 预设「{0}」？\n（关联的默认值将同时清除）").format(name),
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply != QMessageBox.Yes:
             return
@@ -2784,7 +2784,7 @@ class SystemSettingsDialog(QDialog):
                             (2, self._cmb_default_tis)]:
             combo.blockSignals(True)
             combo.clear()
-            combo.addItem("(未设置)", "")
+            combo.addItem(self.tr("(未设置)"), "")
             for preset in mgr.presets:
                 if preset.test_mode in (mode, -1):
                     combo.addItem(preset.name, preset.name)
