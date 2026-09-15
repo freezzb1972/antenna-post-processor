@@ -966,15 +966,15 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             integrity = verify_data_integrity(meta)
             modified = [k for k, v in integrity.items() if v == "modified"]
             missing = [k for k, v in integrity.items() if v == "missing"]
-            msg = [self.tr(f"任务: {meta.get('task_name', '?')}"),
-                   self.tr(f"创建: {meta.get('created', '?')}")]
+            msg = [self.tr("任务: {0}").format(meta.get('task_name', '?')),
+                   self.tr("创建: {0}").format(meta.get('created', '?'))]
             if modified:
-                msg.append(self.tr(f"\n⚠ {len(modified)} 个数据文件已修改，建议重新计算。"))
+                msg.append(self.tr("\n⚠ {0} 个数据文件已修改，建议重新计算。").format(len(modified)))
             if missing:
-                msg.append(self.tr(f"\n❌ {len(missing)} 个数据文件已移动。"))
+                msg.append(self.tr("\n❌ {0} 个数据文件已移动。").format(len(missing)))
             QMessageBox.information(self, self.tr("任务包信息"), "\n".join(msg))
         except Exception as e:
-            QMessageBox.warning(self, self.tr("打开失败"), self.tr(f"无法打开任务包:\n{e}"))
+            QMessageBox.warning(self, self.tr("打开失败"), self.tr("无法打开任务包:\n{0}").format(e))
 
     def _on_save_task_package(self):
         """快速保存任务包（自动命名，覆盖已存在）。"""
@@ -1439,10 +1439,10 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                         status_lbl.setText(m), QApplication.processEvents()
                     ))
                 sz = os.path.getsize(out_path)/1024/1024
-                status_lbl.setText(self.tr(f"✅ 完成 ({sz:.0f} MB, {time.time()-t0:.0f}s)"))
+                status_lbl.setText(self.tr("✅ 完成 ({0:.0f} MB, {1:.0f}s)").format(sz, time.time() - t0))
                 prog.setMaximum(1); prog.setValue(1)
             except Exception as e:
-                status_lbl.setText(self.tr(f"❌ 失败: {e}"))
+                status_lbl.setText(self.tr("❌ 失败: {0}").format(e))
             finally:
                 ok_btn.setEnabled(True)
 
@@ -1945,7 +1945,8 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self._lag_config.add_single(a)
         self._sync_quick_buttons()
         self._update_lag_display()
-        self._log(self.tr(f"步进生成: {start}° → {end}°, step={step}° → {len(gen.single_angles)} 个角度"))
+        self._log(self.tr("步进生成: {0}° → {1}°, step={2}° → {3} 个角度").format(
+            start, end, step, len(gen.single_angles)))
 
     def _on_add_range(self):
         lo = self.ui.spinRStart.value()
@@ -2138,7 +2139,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 else:
                     self._log("模板中未检测到 LAG 列")
         except Exception as e:
-            QMessageBox.critical(self, self.tr("错误"), self.tr(f"读取模板失败: {e}"))
+            QMessageBox.critical(self, self.tr("错误"), self.tr("读取模板失败: {0}").format(e))
 
     def _on_clear_config(self):
         self._lag_config.clear()
@@ -2167,7 +2168,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 self._update_lag_display()
                 self._log(f"预设已加载: {path}")
             except Exception as e:
-                QMessageBox.critical(self, self.tr("错误"), self.tr(f"加载预设失败: {e}"))
+                QMessageBox.critical(self, self.tr("错误"), self.tr("加载预设失败: {0}").format(e))
 
     def _sync_quick_buttons(self):
         """同步快捷按钮选中状态。"""
@@ -2491,7 +2492,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             if template_ext in (".csv", ".docx"):
                 self._restore_start_button()
                 QMessageBox.warning(self, self.tr("不支持的模板格式"),
-                    self.tr(f"{template_ext} 模板格式当前仅支持存储预设，处理功能尚未实现。\n\n请使用 .xlsx 或 .xls 格式的模板文件。"))
+                    self.tr("{0} 模板格式当前仅支持存储预设，处理功能尚未实现。\n\n请使用 .xlsx 或 .xls 格式的模板文件。").format(template_ext))
                 return
 
         os.makedirs(output_dir, exist_ok=True)
@@ -2720,11 +2721,11 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
             self.ui.btnStop.setEnabled(False)
             return
 
-        self._log(self.tr(f"▶ 开始处理 (命名模式={self._worksheet_naming_mode}, 0=模板原名, 1=数据源名)"))
-        self._log(self.tr(f"  模板: {template_path}"))
-        self._log(self.tr(f"  输出: {output_path}"))
+        self._log(self.tr("▶ 开始处理 (命名模式={0}, 0=模板原名, 1=数据源名)").format(self._worksheet_naming_mode))
+        self._log(self.tr("  模板: {0}").format(template_path))
+        self._log(self.tr("  输出: {0}").format(output_path))
         if full_report_path:
-            self._log(self.tr(f"  完整报告: {full_report_path}"))
+            self._log(self.tr("  完整报告: {0}").format(full_report_path))
 
     def _on_stop(self):
         """停止处理。"""
@@ -3213,7 +3214,7 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
                 table.setItem(ri, ci, item)
 
         vtab.addWidget(table)
-        self._log(self.tr(f"📊 参数表格已更新: {len(keys)} 列 × {len(first_sheet)} 行"))
+        self._log(self.tr("📊 参数表格已更新: {0} 列 × {1} 行").format(len(keys), len(first_sheet)))
 
     def _show_antenna_results(self, antenna_name: str):
         """切换显示指定天线的计算结果。"""

@@ -291,7 +291,7 @@ class DataSourceDialog(QDialog):
             column_mappings=updated)
         save_preset(preset)
         QMessageBox.information(dlg, self.tr("保存成功"),
-            self.tr(f"模板预设已保存: {name}"))
+            self.tr("模板预设已保存: {0}").format(name))
         dlg.accept()
 
     def _on_add_files(self):
@@ -1342,14 +1342,15 @@ class CalcParamsDialog(QDialog):
         mode_names = {0: self.tr("📡 无源天线"), 1: self.tr("📶 有源发射 TRP"), 2: self.tr("📻 有源接收 TIS")}
         mode_str = mode_names.get(self._test_mode, self.tr("未知"))
 
-        lines = [f"<b>测试模式:</b> {mode_str}"]
+        lines = [self.tr("<b>测试模式:</b> {0}").format(mode_str)]
 
         # 已选参数
         checked = sorted(set(
             cb.text() for cb in self._left_checkboxes.values() if cb.isChecked()
         ))
         if checked:
-            lines.append(f"<b>计算参数 ({len(checked)}):</b> {', '.join(checked)}")
+            lines.append(self.tr("<b>计算参数 ({0}):</b> {1}").format(
+                len(checked), ', '.join(checked)))
         else:
             lines.append(self.tr("<b>计算参数:</b> <span style='color:#888;'>(未选择)</span>"))
 
@@ -1359,7 +1360,8 @@ class CalcParamsDialog(QDialog):
         if gain_singles or gain_ranges:
             parts = [f"{a}°" for a in gain_singles]
             parts += [f"({lo}°–{hi}°)" for lo, hi in gain_ranges]
-            lines.append(f"<b>Gain 角度 ({len(parts)}):</b> {', '.join(parts)}")
+            lines.append(self.tr("<b>Gain 角度 ({0}):</b> {1}").format(
+                len(parts), ', '.join(parts)))
         else:
             lines.append(self.tr("<b>Gain 角度:</b> <span style='color:#888;'>(未设置)</span>"))
 
@@ -1369,7 +1371,8 @@ class CalcParamsDialog(QDialog):
         if ar_singles or ar_ranges:
             parts = [f"{a}°" for a in ar_singles]
             parts += [f"({lo}°–{hi}°)" for lo, hi in ar_ranges]
-            lines.append(f"<b>AR 角度 ({len(parts)}):</b> {', '.join(parts)}")
+            lines.append(self.tr("<b>AR 角度 ({0}):</b> {1}").format(
+                len(parts), ', '.join(parts)))
         else:
             lines.append(self.tr("<b>AR 角度:</b> <span style='color:#888;'>(未设置)</span>"))
 
@@ -1382,12 +1385,13 @@ class CalcParamsDialog(QDialog):
         if not self._cmb_ar_output.currentData():
             algo_parts.append(self.tr("AR 输出线性"))
         algo_str = ", ".join(algo_parts) if algo_parts else self.tr("<span style='color:#888;'>(默认)</span>")
-        lines.append(f"<b>算法选项:</b> {algo_str}")
+        lines.append(self.tr("<b>算法选项:</b> {0}").format(algo_str))
 
         # 频点
         freq_src = self._cmb_freq_src.currentText()
-        trim = f"去除: 前 {self._spin_trim_start.value()} / 后 {self._spin_trim_end.value()}"
-        lines.append(f"<b>频点:</b> {freq_src} | {trim}")
+        trim = self.tr("去除: 前 {0} / 后 {1}").format(
+            self._spin_trim_start.value(), self._spin_trim_end.value())
+        lines.append(self.tr("<b>频点:</b> {0} | {1}").format(freq_src, trim))
 
         self._summary_label.setText("<br>".join(lines))
 
@@ -1974,7 +1978,20 @@ class HelpDialog(QDialog):
         self._load_rag_settings()
         self._setup_ui()
         auto_size_dialog(self, 700, 550)
-        self._lbl_status.setText(f"帮助引擎已就绪 — {self._engine.chunk_count} 个章节")
+        self._lbl_status.setText(
+            self.tr("帮助引擎已就绪 — {0} 个章节").format(self._engine.chunk_count))
+
+    def _on_language_changed(self):
+        """语言切换钩子 (由 I18nManager._refresh_all 调用)。
+
+        这两处文案含内插值(章节数), 控件文本 != 源串, 反查表还原不出来,
+        只能重新执行产生它们的表达式。
+        """
+        if getattr(self, '_engine', None) is None:
+            return
+        n = self._engine.chunk_count
+        self._lbl_status.setText(self.tr("帮助引擎已就绪 — {0} 个章节").format(n))
+        self._lbl_chunk_count.setText(self.tr("共 {0} 章节").format(n))
 
     def _setup_ui(self):
         content_widgets = []
@@ -2012,7 +2029,10 @@ class HelpDialog(QDialog):
         self._check_semantic.setChecked(True)
         opt_row.addWidget(self._check_semantic)
         opt_row.addStretch()
-        opt_row.addWidget(QLabel(f"共 {self._engine.chunk_count} 章节"))
+        # 存引用: 含内插值, 反查表还原不出源串, 语言切换时需重算
+        self._lbl_chunk_count = QLabel(
+            self.tr("共 {0} 章节").format(self._engine.chunk_count))
+        opt_row.addWidget(self._lbl_chunk_count)
         left_panel.addLayout(opt_row)
 
         # 把 left_panel 装进 QWidget 放入 main_split
@@ -4193,7 +4213,7 @@ class RepairDialog(QDialog):
                 self.accept()
         except Exception as e:
             QMessageBox.critical(self, self.tr("错误"),
-                self.tr(f"修复失败: {e}"))
+                self.tr("修复失败: {0}").format(e))
         finally:
             self._btn_run.setText(self.tr("▶ 执行修复"))
 
@@ -4330,7 +4350,7 @@ class ActivationDialog(QDialog):
         if ok:
             self._lbl_status.setStyleSheet("color: #2e7d32; font-weight: bold;")
             self._lbl_status.setText(
-                self.tr(f"✅ 激活成功！\n许可已保存到: {result}")
+                self.tr("✅ 激活成功！\n许可已保存到: {0}").format(result)
             )
             self._activated = True
             QMessageBox.information(
@@ -4340,7 +4360,7 @@ class ActivationDialog(QDialog):
             self.accept()
         else:
             self._lbl_status.setStyleSheet("color: #c62828; font-weight: bold;")
-            self._lbl_status.setText(self.tr(f"❌ 激活失败: {result}"))
+            self._lbl_status.setText(self.tr("❌ 激活失败: {0}").format(result))
             self._btn_activate.setEnabled(True)
             self._edit_code.setEnabled(True)
 

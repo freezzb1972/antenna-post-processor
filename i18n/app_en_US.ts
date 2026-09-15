@@ -4,66 +4,76 @@
 <context>
     <name>ActivationDialog</name>
     <message>
-        <location filename="../ui/dialogs.py" line="4221"/>
+        <location filename="../ui/dialogs.py" line="4241"/>
         <source>软件激活</source>
         <translation>Software Activation</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4240"/>
+        <location filename="../ui/dialogs.py" line="4260"/>
         <source>&lt;h3&gt;🔑 软件激活&lt;/h3&gt;&lt;p&gt;请输入从供应商获取的激活码。&lt;br&gt;激活需要网络连接以验证激活码并获取许可文件。&lt;/p&gt;</source>
         <translation>&lt;h3&gt;🔑 Software Activation&lt;/h3&gt;&lt;p&gt;Enter the activation code provided by your vendor.&lt;br&gt;Activation requires a network connection to verify the code and retrieve the license file.&lt;/p&gt;</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4253"/>
+        <location filename="../ui/dialogs.py" line="4273"/>
         <source>激活码:</source>
         <translation>Activation Code:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4257"/>
+        <location filename="../ui/dialogs.py" line="4277"/>
         <source>激活服务器设置（高级）</source>
         <translation>Activation Server Settings (Advanced)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4268"/>
+        <location filename="../ui/dialogs.py" line="4288"/>
         <source>服务器 URL:</source>
         <translation>Server URL:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4274"/>
+        <location filename="../ui/dialogs.py" line="4294"/>
         <source>⚙ 服务器设置...</source>
         <translation>⚙ Server Settings...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4295"/>
+        <location filename="../ui/dialogs.py" line="4315"/>
         <source>🔓 激活</source>
         <translation>🔓 Activate</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4322"/>
+        <location filename="../ui/dialogs.py" line="4342"/>
         <source>正在连接激活服务器...</source>
         <translation>Connecting to activation server...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4333"/>
+        <location filename="../ui/dialogs.py" line="4353"/>
+        <source>✅ 激活成功！
+许可已保存到: {0}</source>
+        <translation>✅ Activation successful!
+License saved to: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs.py" line="4363"/>
+        <source>❌ 激活失败: {0}</source>
+        <translation>❌ Activation failed: {0}</translation>
+    </message>
+    <message>
         <source>✅ 激活成功！
 许可已保存到: {result}</source>
-        <translation>✅ Activation successful!
+        <translation type="vanished">✅ Activation successful!
 License saved to: {result}</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4337"/>
+        <location filename="../ui/dialogs.py" line="4357"/>
         <source>激活成功</source>
         <translation>Activation Successful</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4338"/>
+        <location filename="../ui/dialogs.py" line="4358"/>
         <source>许可已安装。程序将在重新启动后生效。</source>
         <translation>License installed. Will take effect after restart.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4343"/>
         <source>❌ 激活失败: {result}</source>
-        <translation>❌ Activation failed: {result}</translation>
+        <translation type="vanished">❌ Activation failed: {result}</translation>
     </message>
 </context>
 <context>
@@ -897,153 +907,153 @@ License saved to: {result}</translation>
 <context>
     <name>BatchCalibrateDialog</name>
     <message>
-        <location filename="../ui/dialogs.py" line="3517"/>
+        <location filename="../ui/dialogs.py" line="3537"/>
         <source>数据检查与转换</source>
         <translation>Data check &amp; convert</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3527"/>
+        <location filename="../ui/dialogs.py" line="3547"/>
         <source>待检查的 CSV 文件</source>
         <translation>CSV files to check</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3530"/>
+        <location filename="../ui/dialogs.py" line="3550"/>
         <source>📂 添加文件...</source>
         <translation>📂 Add files...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3533"/>
+        <location filename="../ui/dialogs.py" line="3553"/>
         <source>清除</source>
         <translation>Clear</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3544"/>
+        <location filename="../ui/dialogs.py" line="3564"/>
         <source>文件名</source>
         <translation>File name</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3544"/>
+        <location filename="../ui/dialogs.py" line="3564"/>
         <source>格式</source>
         <translation>Format</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3544"/>
+        <location filename="../ui/dialogs.py" line="3564"/>
         <source>状态</source>
         <translation>Status</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3552"/>
+        <location filename="../ui/dialogs.py" line="3572"/>
         <source>RSP 路径损耗校准 (可选 — 仅对实部/虚部文件生效)</source>
         <translation>RSP path-loss calibration (optional — only for Real/Imag files)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3558"/>
+        <location filename="../ui/dialogs.py" line="3578"/>
         <source>H-pol RSP CSV...</source>
         <translation>H-pol RSP CSV...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3560"/>
-        <location filename="../ui/dialogs.py" line="3569"/>
-        <location filename="../ui/dialogs.py" line="3581"/>
+        <location filename="../ui/dialogs.py" line="3580"/>
+        <location filename="../ui/dialogs.py" line="3589"/>
+        <location filename="../ui/dialogs.py" line="3601"/>
         <source>浏览...</source>
         <translation>Browse...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3567"/>
+        <location filename="../ui/dialogs.py" line="3587"/>
         <source>V-pol RSP CSV...</source>
         <translation>V-pol RSP CSV...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3576"/>
+        <location filename="../ui/dialogs.py" line="3596"/>
         <source>输出目录</source>
         <translation>Output directory</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3579"/>
+        <location filename="../ui/dialogs.py" line="3599"/>
         <source>默认: 源文件所在目录</source>
         <translation>Default: source file directory</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3590"/>
+        <location filename="../ui/dialogs.py" line="3610"/>
         <source>🔍 扫描格式</source>
         <translation>🔍 Scan format</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3593"/>
-        <location filename="../ui/dialogs.py" line="3733"/>
+        <location filename="../ui/dialogs.py" line="3613"/>
+        <location filename="../ui/dialogs.py" line="3753"/>
         <source>▶ 开始转换</source>
         <translation>▶ Start convert</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3599"/>
+        <location filename="../ui/dialogs.py" line="3619"/>
         <source>关闭</source>
         <translation>Close</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3608"/>
+        <location filename="../ui/dialogs.py" line="3628"/>
         <source>选择要检查的 CSV 文件 (可多选)</source>
         <translation>Select CSV files to check (multi-select)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3609"/>
-        <location filename="../ui/dialogs.py" line="3667"/>
+        <location filename="../ui/dialogs.py" line="3629"/>
+        <location filename="../ui/dialogs.py" line="3687"/>
         <source>CSV 文件 (*.csv);;所有文件 (*)</source>
         <translation>CSV files (*.csv);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3635"/>
+        <location filename="../ui/dialogs.py" line="3655"/>
         <source>对数域 (LogMag/Phase)</source>
         <translation>Log domain (LogMag/Phase)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3640"/>
+        <location filename="../ui/dialogs.py" line="3660"/>
         <source>实部/虚部 (Real/Imag)</source>
         <translation>Real/Imag</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3642"/>
+        <location filename="../ui/dialogs.py" line="3662"/>
         <source>⚠ 需转换</source>
         <translation>⚠ Needs convert</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3645"/>
+        <location filename="../ui/dialogs.py" line="3665"/>
         <source>未知</source>
         <translation>Unknown</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3650"/>
+        <location filename="../ui/dialogs.py" line="3670"/>
         <source>读取失败</source>
         <translation>Read failed</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3666"/>
+        <location filename="../ui/dialogs.py" line="3686"/>
         <source>选择 RSP 校准文件</source>
         <translation>Select RSP calibration file</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3675"/>
+        <location filename="../ui/dialogs.py" line="3695"/>
         <source>选择输出目录</source>
         <translation>Select output directory</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3684"/>
+        <location filename="../ui/dialogs.py" line="3704"/>
         <source>提示</source>
         <translation>Notice</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3685"/>
+        <location filename="../ui/dialogs.py" line="3705"/>
         <source>没有需要转换的文件 (全部已是标准格式)。</source>
         <translation>No files need conversion (all are already standard format).</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3703"/>
+        <location filename="../ui/dialogs.py" line="3723"/>
         <source>RSP 频率范围不足:
 </source>
         <translation>RSP frequency range insufficient:
 </translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3706"/>
+        <location filename="../ui/dialogs.py" line="3726"/>
         <source>
 
 继续使用边界值外推？</source>
@@ -1052,22 +1062,22 @@ License saved to: {result}</translation>
 Continue with boundary-value extrapolation?</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3707"/>
+        <location filename="../ui/dialogs.py" line="3727"/>
         <source>⚠ RSP 频率范围不足</source>
         <translation>⚠ RSP frequency range insufficient</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3712"/>
+        <location filename="../ui/dialogs.py" line="3732"/>
         <source>⏳ 转换中...</source>
         <translation>⏳ Converting...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3728"/>
+        <location filename="../ui/dialogs.py" line="3748"/>
         <source>完成</source>
         <translation>Done</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3731"/>
+        <location filename="../ui/dialogs.py" line="3751"/>
         <source>错误</source>
         <translation>Error</translation>
     </message>
@@ -1181,7 +1191,7 @@ Continue with boundary-value extrapolation?</translation>
     </message>
     <message>
         <location filename="../ui/dialogs.py" line="695"/>
-        <location filename="../ui/dialogs.py" line="1379"/>
+        <location filename="../ui/dialogs.py" line="1382"/>
         <source>Theta 外推到 180°</source>
         <translation>Extrapolate Theta to 180°</translation>
     </message>
@@ -1349,29 +1359,64 @@ Continue with boundary-value extrapolation?</translation>
         <translation>Unknown</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1354"/>
+        <location filename="../ui/dialogs.py" line="1345"/>
+        <source>&lt;b&gt;测试模式:&lt;/b&gt; {0}</source>
+        <translation>&lt;b&gt;Test mode:&lt;/b&gt; {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs.py" line="1352"/>
+        <source>&lt;b&gt;计算参数 ({0}):&lt;/b&gt; {1}</source>
+        <translation>&lt;b&gt;Parameters ({0}):&lt;/b&gt; {1}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs.py" line="1355"/>
         <source>&lt;b&gt;计算参数:&lt;/b&gt; &lt;span style=&apos;color:#888;&apos;&gt;(未选择)&lt;/span&gt;</source>
         <translation>&lt;b&gt;Calculation parameters:&lt;/b&gt; &lt;span style=&apos;color:#888;&apos;&gt;(none selected)&lt;/span&gt;</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1364"/>
+        <location filename="../ui/dialogs.py" line="1363"/>
+        <source>&lt;b&gt;Gain 角度 ({0}):&lt;/b&gt; {1}</source>
+        <translation>&lt;b&gt;Gain angles ({0}):&lt;/b&gt; {1}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs.py" line="1366"/>
         <source>&lt;b&gt;Gain 角度:&lt;/b&gt; &lt;span style=&apos;color:#888;&apos;&gt;(未设置)&lt;/span&gt;</source>
         <translation>&lt;b&gt;Gain angles:&lt;/b&gt; &lt;span style=&apos;color:#888;&apos;&gt;(not set)&lt;/span&gt;</translation>
     </message>
     <message>
         <location filename="../ui/dialogs.py" line="1374"/>
+        <source>&lt;b&gt;AR 角度 ({0}):&lt;/b&gt; {1}</source>
+        <translation>&lt;b&gt;AR angles ({0}):&lt;/b&gt; {1}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs.py" line="1377"/>
         <source>&lt;b&gt;AR 角度:&lt;/b&gt; &lt;span style=&apos;color:#888;&apos;&gt;(未设置)&lt;/span&gt;</source>
         <translation>&lt;b&gt;AR angles:&lt;/b&gt; &lt;span style=&apos;color:#888;&apos;&gt;(not set)&lt;/span&gt;</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1383"/>
+        <location filename="../ui/dialogs.py" line="1386"/>
         <source>AR 输出线性</source>
         <translation>AR output linear</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1384"/>
+        <location filename="../ui/dialogs.py" line="1387"/>
         <source>&lt;span style=&apos;color:#888;&apos;&gt;(默认)&lt;/span&gt;</source>
         <translation>&lt;span style=&apos;color:#888;&apos;&gt;(default)&lt;/span&gt;</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs.py" line="1388"/>
+        <source>&lt;b&gt;算法选项:&lt;/b&gt; {0}</source>
+        <translation>&lt;b&gt;Algorithm options:&lt;/b&gt; {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs.py" line="1392"/>
+        <source>去除: 前 {0} / 后 {1}</source>
+        <translation>Trim: first {0} / last {1}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs.py" line="1394"/>
+        <source>&lt;b&gt;频点:&lt;/b&gt; {0} | {1}</source>
+        <translation>&lt;b&gt;Frequencies:&lt;/b&gt; {0} | {1}</translation>
     </message>
     <message>
         <source>Directivity</source>
@@ -2722,8 +2767,12 @@ Go back and change it?</translation>
     </message>
     <message>
         <location filename="../ui/dialogs.py" line="294"/>
+        <source>模板预设已保存: {0}</source>
+        <translation>Template preset saved: {0}</translation>
+    </message>
+    <message>
         <source>模板预设已保存: {name}</source>
-        <translation>Template preset saved: {name}</translation>
+        <translation type="vanished">Template preset saved: {name}</translation>
     </message>
     <message>
         <location filename="../ui/dialogs.py" line="298"/>
@@ -2759,52 +2808,52 @@ Go back and change it?</translation>
 <context>
     <name>DefaultDirsDialog</name>
     <message>
-        <location filename="../ui/dialogs.py" line="2906"/>
+        <location filename="../ui/dialogs.py" line="2926"/>
         <source>默认保存目录</source>
         <translation>Default save directories</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2917"/>
+        <location filename="../ui/dialogs.py" line="2937"/>
         <source>以下目录将作为各类文件的默认保存位置。
 新建任务时自动使用此处设置的目录，可随时在界面中临时修改。</source>
         <translation>These directories are default save locations for each file type.
 New tasks use them by default; you can override them anytime in the UI.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2927"/>
-        <location filename="../ui/dialogs.py" line="2932"/>
-        <location filename="../ui/dialogs.py" line="2937"/>
-        <location filename="../ui/dialogs.py" line="2942"/>
+        <location filename="../ui/dialogs.py" line="2947"/>
+        <location filename="../ui/dialogs.py" line="2952"/>
+        <location filename="../ui/dialogs.py" line="2957"/>
+        <location filename="../ui/dialogs.py" line="2962"/>
         <source>默认: 源文件目录</source>
         <translation>Default: source file directory</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2928"/>
+        <location filename="../ui/dialogs.py" line="2948"/>
         <source>天线参数报告 (.xlsx):</source>
         <translation>Antenna parameter report (.xlsx):</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2933"/>
+        <location filename="../ui/dialogs.py" line="2953"/>
         <source>Word 图表报告 (.docx):</source>
         <translation>Word chart report (.docx):</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2938"/>
+        <location filename="../ui/dialogs.py" line="2958"/>
         <source>中间数据 (.xlsx):</source>
         <translation>Intermediate data (.xlsx):</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2943"/>
+        <location filename="../ui/dialogs.py" line="2963"/>
         <source>任务包 (.ant):</source>
         <translation>Task bundle (.ant):</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2956"/>
+        <location filename="../ui/dialogs.py" line="2976"/>
         <source>浏览...</source>
         <translation>Browse...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2963"/>
+        <location filename="../ui/dialogs.py" line="2983"/>
         <source>选择目录</source>
         <translation>Select directory</translation>
     </message>
@@ -4243,89 +4292,101 @@ Includes {len(col_mappings)} column mappings</translation>
 <context>
     <name>HelpDialog</name>
     <message>
-        <location filename="../ui/dialogs.py" line="1965"/>
+        <location filename="../ui/dialogs.py" line="1969"/>
         <source>帮助 — 天线参数后处理工具</source>
         <translation>Help — Antenna Post-Processor</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1986"/>
+        <location filename="../ui/dialogs.py" line="1982"/>
+        <location filename="../ui/dialogs.py" line="1993"/>
+        <source>帮助引擎已就绪 — {0} 个章节</source>
+        <translation>Help engine ready — {0} sections</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs.py" line="1994"/>
+        <location filename="../ui/dialogs.py" line="2034"/>
+        <source>共 {0} 章节</source>
+        <translation>{0} sections</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs.py" line="2003"/>
         <source>输入问题或关键词，如: LAG怎么配置、模板列头格式...</source>
         <translation>Type a question or keyword, e.g. how to configure LAG, template header format...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1990"/>
+        <location filename="../ui/dialogs.py" line="2007"/>
         <source>🔍 搜索</source>
         <translation>🔍 Search</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2002"/>
+        <location filename="../ui/dialogs.py" line="2019"/>
         <source>&lt;b&gt;搜索结果&lt;/b&gt;</source>
         <translation>&lt;b&gt;Search results&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2010"/>
+        <location filename="../ui/dialogs.py" line="2027"/>
         <source>语义搜索</source>
         <translation>Semantic search</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2011"/>
+        <location filename="../ui/dialogs.py" line="2028"/>
         <source>启用语义搜索（需要安装 sentence-transformers + faiss）</source>
         <translation>Enable semantic search (requires sentence-transformers + faiss)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2026"/>
+        <location filename="../ui/dialogs.py" line="2046"/>
         <source>&lt;b&gt;AI 回答&lt;/b&gt;</source>
         <translation>&lt;b&gt;AI answer&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2027"/>
+        <location filename="../ui/dialogs.py" line="2047"/>
         <source>🤖 提问 AI</source>
         <translation>🤖 Ask AI</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2029"/>
+        <location filename="../ui/dialogs.py" line="2049"/>
         <source>使用 LLM 对检索到的文档生成回答</source>
         <translation>Use an LLM to answer from the retrieved documents</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2033"/>
+        <location filename="../ui/dialogs.py" line="2053"/>
         <source>LLM API 设置</source>
         <translation>LLM API settings</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2041"/>
+        <location filename="../ui/dialogs.py" line="2061"/>
         <source>点击「🤖 提问 AI」使用 LLM 生成回答
 首次使用请在 ⚙ 中配置 API Key</source>
         <translation>Click &quot;🤖 Ask AI&quot; to generate an answer with an LLM
 On first use, configure the API key in ⚙</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2063"/>
+        <location filename="../ui/dialogs.py" line="2083"/>
         <source>📖 在浏览器中打开完整手册</source>
         <translation>📖 Open the full manual in a browser</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2079"/>
+        <location filename="../ui/dialogs.py" line="2099"/>
         <source>搜索中...</source>
         <translation>Searching...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2102"/>
+        <location filename="../ui/dialogs.py" line="2122"/>
         <source>正在请求 AI...</source>
         <translation>Requesting AI...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2111"/>
+        <location filename="../ui/dialogs.py" line="2131"/>
         <source>📚 参考: </source>
         <translation>📚 References: </translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2134"/>
+        <location filename="../ui/dialogs.py" line="2154"/>
         <source>提示</source>
         <translation>Notice</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2134"/>
+        <location filename="../ui/dialogs.py" line="2154"/>
         <source>帮助文件未找到。请确认 USER_GUIDE.html 存在。</source>
         <translation>Help file not found. Please make sure USER_GUIDE.html exists.</translation>
     </message>
@@ -4436,148 +4497,148 @@ On first use, configure the API key in ⚙</translation>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="281"/>
+        <location filename="../ui/main_window.py" line="291"/>
         <source>模板文件</source>
         <translation>Template File</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="346"/>
+        <location filename="../ui/main_window.py" line="356"/>
         <source>频点设置</source>
         <translation>Frequency Settings</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="351"/>
+        <location filename="../ui/main_window.py" line="361"/>
         <source>新 sheet 频点: 数据源</source>
         <translation>New sheet frequencies: data source</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="352"/>
+        <location filename="../ui/main_window.py" line="362"/>
         <source>新 sheet 频点: 模板</source>
         <translation>New sheet frequencies: template</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="353"/>
+        <location filename="../ui/main_window.py" line="363"/>
         <source>频点来源:</source>
         <translation>Frequency source:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="356"/>
+        <location filename="../ui/main_window.py" line="366"/>
         <source>前</source>
         <translation>Front</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="357"/>
+        <location filename="../ui/main_window.py" line="367"/>
         <source>去除数据前 N 个频点</source>
         <translation>Remove first N frequencies</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="359"/>
+        <location filename="../ui/main_window.py" line="369"/>
         <source>后</source>
         <translation>last</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="360"/>
+        <location filename="../ui/main_window.py" line="370"/>
         <source>去除数据后 N 个频点</source>
         <translation>Remove last N frequencies</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="362"/>
+        <location filename="../ui/main_window.py" line="372"/>
         <source>去除频点:</source>
         <translation>Remove Freqs:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="366"/>
+        <location filename="../ui/main_window.py" line="376"/>
         <source>计算算法</source>
         <translation>Algorithm</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="385"/>
+        <location filename="../ui/main_window.py" line="395"/>
         <source>Robust peak detection (替代 np.max)</source>
         <translation>Robust peak detection (instead of np.max)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="388"/>
+        <location filename="../ui/main_window.py" line="398"/>
         <source>启用后使用鲁棒峰值检测。适用于存在异常值的数据。默认关闭（IEEE 149 np.max）。</source>
         <translation>Enable robust peak detection for data with outliers. Default: off (IEEE 149 np.max).</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="773"/>
+        <location filename="../ui/main_window.py" line="792"/>
         <source>&amp;文件</source>
         <translation>&amp;File</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="774"/>
-        <location filename="../ui/main_window.py" line="795"/>
+        <location filename="../ui/main_window.py" line="793"/>
+        <location filename="../ui/main_window.py" line="814"/>
         <source>新建窗口</source>
         <translation>New Window</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="782"/>
+        <location filename="../ui/main_window.py" line="801"/>
         <source>系统设置...</source>
         <translation>System Settings...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="784"/>
+        <location filename="../ui/main_window.py" line="803"/>
         <source>退出</source>
         <translation>Exit</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="794"/>
+        <location filename="../ui/main_window.py" line="813"/>
         <source>&amp;窗口</source>
         <translation>&amp;Window</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="800"/>
+        <location filename="../ui/main_window.py" line="819"/>
         <source>&amp;工具</source>
         <translation>&amp;Tools</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="803"/>
+        <location filename="../ui/main_window.py" line="822"/>
         <source>数据检查与转换...</source>
         <translation>Data Check &amp; Convert...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="804"/>
+        <location filename="../ui/main_window.py" line="823"/>
         <source>路径损耗补偿...</source>
         <translation>Path Loss Compensation...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="805"/>
+        <location filename="../ui/main_window.py" line="824"/>
         <source>数据合并 (多段拼接)...</source>
         <translation>Data Merge (Multi-segment)...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="806"/>
+        <location filename="../ui/main_window.py" line="825"/>
         <source>步进重采样...</source>
         <translation>Step Resample...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="809"/>
+        <location filename="../ui/main_window.py" line="828"/>
         <source>EMQuest 数据导出...</source>
         <translation>EMQuest Data Export...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="820"/>
+        <location filename="../ui/main_window.py" line="839"/>
         <source>&amp;帮助</source>
         <translation>&amp;Help</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="821"/>
+        <location filename="../ui/main_window.py" line="840"/>
         <source>使用说明</source>
         <translation>User Guide</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="823"/>
+        <location filename="../ui/main_window.py" line="842"/>
         <source>许可管理...</source>
         <translation>License Management...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="824"/>
+        <location filename="../ui/main_window.py" line="843"/>
         <source>关于...</source>
         <translation>About...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="889"/>
+        <location filename="../ui/main_window.py" line="908"/>
         <source>模板文件异常</source>
         <translation>Template File Warning</translation>
     </message>
@@ -4598,260 +4659,260 @@ parsing may take a long time.
 Use this file as template anyway?</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="921"/>
+        <location filename="../ui/main_window.py" line="940"/>
         <source>未命名窗口</source>
         <translation>Untitled</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1254"/>
-        <location filename="../ui/main_window.py" line="1394"/>
-        <location filename="../ui/main_window.py" line="1793"/>
+        <location filename="../ui/main_window.py" line="1273"/>
+        <location filename="../ui/main_window.py" line="1413"/>
+        <location filename="../ui/main_window.py" line="1812"/>
         <source>选择输出目录</source>
         <translation>Select output directory</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1330"/>
+        <location filename="../ui/main_window.py" line="1349"/>
         <source>完成</source>
         <translation>Done</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1496"/>
-        <location filename="../ui/main_window.py" line="1499"/>
+        <location filename="../ui/main_window.py" line="1515"/>
+        <location filename="../ui/main_window.py" line="1518"/>
         <source>提示</source>
         <translation>Notice</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="98"/>
+        <location filename="../ui/main_window.py" line="99"/>
         <source>天线参数后处理</source>
         <translation>Antenna Post-Processor</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="293"/>
+        <location filename="../ui/main_window.py" line="303"/>
         <source>启用图表查看</source>
         <translation>Enable chart viewing</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="295"/>
+        <location filename="../ui/main_window.py" line="305"/>
         <source>关闭可跳过图表查看数据准备，加速出报告</source>
         <translation>Disable to skip chart-view data prep and speed up report generation</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="371"/>
+        <location filename="../ui/main_window.py" line="381"/>
         <source>Theta 外推:</source>
         <translation>Theta extrapolation:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="373"/>
+        <location filename="../ui/main_window.py" line="383"/>
         <source>不外推</source>
         <translation>No extrapolation</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="374"/>
+        <location filename="../ui/main_window.py" line="384"/>
         <source>线性</source>
         <translation>Linear</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="375"/>
+        <location filename="../ui/main_window.py" line="385"/>
         <source>常数</source>
         <translation>Constant</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="376"/>
+        <location filename="../ui/main_window.py" line="386"/>
         <source>镜像</source>
         <translation>Mirror</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="378"/>
+        <location filename="../ui/main_window.py" line="388"/>
         <source>除 Directivity 外所有参数的 Theta 外推算法</source>
         <translation>Theta extrapolation method for all parameters except Directivity</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="430"/>
-        <location filename="../ui/main_window.py" line="3117"/>
+        <location filename="../ui/main_window.py" line="440"/>
+        <location filename="../ui/main_window.py" line="3137"/>
         <source>天线:</source>
         <translation>Antenna:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="433"/>
+        <location filename="../ui/main_window.py" line="443"/>
         <source>选择要配置的天线</source>
         <translation>Select the antenna to configure</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="463"/>
+        <location filename="../ui/main_window.py" line="473"/>
         <source>输入输出</source>
         <translation>Input/Output</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="463"/>
+        <location filename="../ui/main_window.py" line="473"/>
         <source>添加数据文件、选择模板、配置输出路径</source>
         <translation>Add data files, choose template, configure output paths</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="464"/>
+        <location filename="../ui/main_window.py" line="474"/>
         <source>天线参数</source>
         <translation>Antenna parameters</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="464"/>
+        <location filename="../ui/main_window.py" line="474"/>
         <source>配置 LAG/AR 角度、计算参数、预览结果</source>
         <translation>Configure LAG/AR angles, compute parameters, preview results</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="465"/>
+        <location filename="../ui/main_window.py" line="475"/>
         <source>图表配置</source>
         <translation>Chart settings</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="465"/>
+        <location filename="../ui/main_window.py" line="475"/>
         <source>3D方向图、2D切面、频点曲线图表设置</source>
         <translation>3D pattern, 2D cut, frequency-curve chart settings</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="509"/>
+        <location filename="../ui/main_window.py" line="519"/>
         <source>📂 读取数据</source>
         <translation>📂 Read data</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="509"/>
+        <location filename="../ui/main_window.py" line="519"/>
         <source>🧮 计算参数</source>
         <translation>🧮 Compute</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="509"/>
+        <location filename="../ui/main_window.py" line="519"/>
         <source>🎨 渲染图表</source>
         <translation>🎨 Render charts</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="510"/>
+        <location filename="../ui/main_window.py" line="520"/>
         <source>📊 Excel输出</source>
         <translation>📊 Excel output</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="510"/>
+        <location filename="../ui/main_window.py" line="520"/>
         <source>📄 Word输出</source>
         <translation>📄 Word output</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="545"/>
-        <location filename="../ui/main_window.py" line="2285"/>
+        <location filename="../ui/main_window.py" line="564"/>
+        <location filename="../ui/main_window.py" line="2305"/>
         <source>📄 出报告</source>
         <translation>📄 Generate report</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="551"/>
+        <location filename="../ui/main_window.py" line="570"/>
         <source>🚀 一键出报告</source>
         <translation>🚀 One-click report</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="566"/>
-        <location filename="../ui/main_window.py" line="2279"/>
-        <location filename="../ui/main_window.py" line="2284"/>
-        <location filename="../ui/main_window.py" line="2778"/>
+        <location filename="../ui/main_window.py" line="585"/>
+        <location filename="../ui/main_window.py" line="2299"/>
+        <location filename="../ui/main_window.py" line="2304"/>
+        <location filename="../ui/main_window.py" line="2798"/>
         <source>👁 预览</source>
         <translation>👁 Preview</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="775"/>
+        <location filename="../ui/main_window.py" line="794"/>
         <source>打开任务包...</source>
         <translation>Open task bundle...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="777"/>
+        <location filename="../ui/main_window.py" line="796"/>
         <source>保存任务包</source>
         <translation>Save task bundle</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="778"/>
+        <location filename="../ui/main_window.py" line="797"/>
         <source>另存任务包...</source>
         <translation>Save task bundle as...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="780"/>
+        <location filename="../ui/main_window.py" line="799"/>
         <source>打印...</source>
         <translation>Print...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="787"/>
+        <location filename="../ui/main_window.py" line="806"/>
         <source>项目(&amp;P)</source>
         <translation>Project(&amp;P)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="788"/>
+        <location filename="../ui/main_window.py" line="807"/>
         <source>📂 打开项目管理...</source>
         <translation>📂 Open project manager...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="789"/>
+        <location filename="../ui/main_window.py" line="808"/>
         <source>📋 从 JSON 导入...</source>
         <translation>📋 Import from JSON...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="790"/>
+        <location filename="../ui/main_window.py" line="809"/>
         <source>📄 最近项目</source>
         <translation>📄 Recent projects</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="802"/>
+        <location filename="../ui/main_window.py" line="821"/>
         <source>数据处理</source>
         <translation>Data processing</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="807"/>
+        <location filename="../ui/main_window.py" line="826"/>
         <source>数据修复 (插值)...</source>
         <translation>Data repair (interpolation)...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="810"/>
+        <location filename="../ui/main_window.py" line="829"/>
         <source>FinalSummary 转 CSV...</source>
         <translation>FinalSummary to CSV...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="812"/>
+        <location filename="../ui/main_window.py" line="831"/>
         <source>模板预设管理...</source>
         <translation>Template preset manager...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="813"/>
+        <location filename="../ui/main_window.py" line="832"/>
         <source>Docx SDT 工具箱...</source>
         <translation>Docx SDT toolbox...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="814"/>
+        <location filename="../ui/main_window.py" line="833"/>
         <source>报告元数据...</source>
         <translation>Report metadata...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="815"/>
+        <location filename="../ui/main_window.py" line="834"/>
         <source>列识别规则...</source>
         <translation>Column recognition rules...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="817"/>
+        <location filename="../ui/main_window.py" line="836"/>
         <source>校准预设管理...</source>
         <translation>Calibration preset manager...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="822"/>
+        <location filename="../ui/main_window.py" line="841"/>
         <source>发送反馈...</source>
         <translation>Send feedback...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="853"/>
+        <location filename="../ui/main_window.py" line="872"/>
         <source>📐 处理设置</source>
         <translation>📐 Processing settings</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="854"/>
+        <location filename="../ui/main_window.py" line="873"/>
         <source>📊 计算结果</source>
         <translation>📊 Results</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="855"/>
+        <location filename="../ui/main_window.py" line="874"/>
         <source>📈 图表查看</source>
         <translation>📈 Chart view</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="890"/>
+        <location filename="../ui/main_window.py" line="909"/>
         <source>选择的模板文件大小为 {0:.0f} MB，
 通常模板文件不超过 1 MB。
 
@@ -4868,173 +4929,168 @@ Parsing may take a long time.
 Use this file as the template anyway?</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="940"/>
+        <location filename="../ui/main_window.py" line="959"/>
         <source>打开任务包</source>
         <translation>Open task bundle</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="941"/>
-        <location filename="../ui/main_window.py" line="990"/>
+        <location filename="../ui/main_window.py" line="960"/>
+        <location filename="../ui/main_window.py" line="1009"/>
         <source>任务包 (*.ant);;所有文件 (*)</source>
         <translation>Task bundle (*.ant);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="950"/>
         <source>任务: {meta.get(&apos;task_name&apos;, &apos;?&apos;)}</source>
-        <translation>Task: {meta.get(&apos;task_name&apos;, &apos;?&apos;)}</translation>
+        <translation type="vanished">Task: {meta.get(&apos;task_name&apos;, &apos;?&apos;)}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="951"/>
         <source>创建: {meta.get(&apos;created&apos;, &apos;?&apos;)}</source>
-        <translation>Created: {meta.get(&apos;created&apos;, &apos;?&apos;)}</translation>
+        <translation type="vanished">Created: {meta.get(&apos;created&apos;, &apos;?&apos;)}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="953"/>
         <source>
 ⚠ {len(modified)} 个数据文件已修改，建议重新计算。</source>
-        <translation>
+        <translation type="vanished">
 ⚠ {len(modified)} data files modified; recompute recommended.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="955"/>
         <source>
 ❌ {len(missing)} 个数据文件已移动。</source>
-        <translation>
+        <translation type="vanished">
 ❌ {len(missing)} data files moved.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="956"/>
+        <location filename="../ui/main_window.py" line="975"/>
         <source>任务包信息</source>
         <translation>Task bundle info</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="958"/>
+        <location filename="../ui/main_window.py" line="977"/>
         <source>打开失败</source>
         <translation>Open failed</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="958"/>
         <source>无法打开任务包:
 {e}</source>
-        <translation>Cannot open task bundle:
+        <translation type="vanished">Cannot open task bundle:
 {e}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="989"/>
+        <location filename="../ui/main_window.py" line="1008"/>
         <source>另存任务包</source>
         <translation>Save task bundle as</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1018"/>
+        <location filename="../ui/main_window.py" line="1037"/>
         <source>打印</source>
         <translation>Print</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1067"/>
+        <location filename="../ui/main_window.py" line="1086"/>
         <source>选择 EMQuest JSON 文件</source>
         <translation>Select EMQuest JSON file</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1080"/>
+        <location filename="../ui/main_window.py" line="1099"/>
         <source>(无)</source>
         <translation>(none)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1087"/>
+        <location filename="../ui/main_window.py" line="1106"/>
         <source>(数据库不可用)</source>
         <translation>(database unavailable)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1173"/>
+        <location filename="../ui/main_window.py" line="1192"/>
         <source>EMQuest 数据导出</source>
         <translation>EMQuest Data Export</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1178"/>
+        <location filename="../ui/main_window.py" line="1197"/>
         <source>导出格式</source>
         <translation>Export Format</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1181"/>
+        <location filename="../ui/main_window.py" line="1200"/>
         <source>CSV (数据)</source>
         <translation>CSV (data)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1181"/>
+        <location filename="../ui/main_window.py" line="1200"/>
         <source>Excel (数据)</source>
         <translation>Excel (data)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1181"/>
+        <location filename="../ui/main_window.py" line="1200"/>
         <source>JSON (数据+参数)</source>
         <translation>JSON (data + parameters)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1183"/>
+        <location filename="../ui/main_window.py" line="1202"/>
         <source>格式:</source>
         <translation>Format:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1189"/>
-        <location filename="../ui/main_window.py" line="1348"/>
+        <location filename="../ui/main_window.py" line="1208"/>
+        <location filename="../ui/main_window.py" line="1367"/>
         <source>源文件</source>
         <translation>Source File</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1192"/>
-        <location filename="../ui/main_window.py" line="1237"/>
+        <location filename="../ui/main_window.py" line="1211"/>
+        <location filename="../ui/main_window.py" line="1256"/>
         <source>选择 .raw 文件</source>
         <translation>Select .raw File</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1193"/>
+        <location filename="../ui/main_window.py" line="1212"/>
         <source>选择文件夹 (递归扫描 .raw)</source>
         <translation>Select Folder (recursive .raw scan)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1209"/>
+        <location filename="../ui/main_window.py" line="1228"/>
         <source>输出目录</source>
         <translation>Output Directory</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1214"/>
-        <location filename="../ui/main_window.py" line="1364"/>
+        <location filename="../ui/main_window.py" line="1233"/>
+        <location filename="../ui/main_window.py" line="1383"/>
         <source>输出到:</source>
         <translation>Output To:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1225"/>
+        <location filename="../ui/main_window.py" line="1244"/>
         <source>开始导出</source>
         <translation>Start Export</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1226"/>
-        <location filename="../ui/main_window.py" line="1379"/>
+        <location filename="../ui/main_window.py" line="1245"/>
+        <location filename="../ui/main_window.py" line="1398"/>
         <source>取消</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1238"/>
+        <location filename="../ui/main_window.py" line="1257"/>
         <source>Raw 文件 (*.raw);;所有文件 (*)</source>
         <translation>Raw Files (*.raw);;All Files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1245"/>
+        <location filename="../ui/main_window.py" line="1264"/>
         <source>选择包含 .raw 文件的文件夹</source>
         <translation>Select folder containing .raw files</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1263"/>
+        <location filename="../ui/main_window.py" line="1282"/>
         <source>⚠ 请先选择 .raw 文件</source>
         <translation>⚠ Please select .raw files first</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1266"/>
+        <location filename="../ui/main_window.py" line="1285"/>
         <source>⚠ 请选择输出目录</source>
         <translation>⚠ Please select an output directory</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1284"/>
+        <location filename="../ui/main_window.py" line="1303"/>
         <source>检测到大文件 (EMQuest 为 32 位，内存上限约 4GB):
 
 </source>
@@ -5043,17 +5099,17 @@ Use this file as the template anyway?</translation>
 </translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1292"/>
+        <location filename="../ui/main_window.py" line="1311"/>
         <source>⚠ 大文件警告</source>
         <translation>⚠ Large File Warning</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1308"/>
+        <location filename="../ui/main_window.py" line="1327"/>
         <source>⏳ EMQuest 导出中...</source>
         <translation>⏳ EMQuest exporting...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1327"/>
+        <location filename="../ui/main_window.py" line="1346"/>
         <source>
 
 失败详情:
@@ -5064,62 +5120,60 @@ Failure details:
 </translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1343"/>
+        <location filename="../ui/main_window.py" line="1362"/>
         <source>FinalSummary 转 CSV</source>
         <translation>FinalSummary to CSV</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1352"/>
+        <location filename="../ui/main_window.py" line="1371"/>
         <source>选择 FinalSummary .xlsx 文件</source>
         <translation>Select FinalSummary .xlsx file</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1378"/>
+        <location filename="../ui/main_window.py" line="1397"/>
         <source>开始转换</source>
         <translation>Start convert</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1386"/>
+        <location filename="../ui/main_window.py" line="1405"/>
         <source>选择 FinalSummary .xlsx</source>
         <translation>Select FinalSummary .xlsx</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1387"/>
+        <location filename="../ui/main_window.py" line="1406"/>
         <source>Excel (*.xlsx *.xls)</source>
         <translation>Excel (*.xlsx *.xls)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1404"/>
+        <location filename="../ui/main_window.py" line="1423"/>
         <source>请选择源文件和输出目录</source>
         <translation>Please select source file and output directory</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1411"/>
+        <location filename="../ui/main_window.py" line="1430"/>
         <source>转换中...</source>
         <translation>Converting...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1423"/>
         <source>✅ 完成 ({sz:.0f} MB, {time.time()-t0:.0f}s)</source>
-        <translation>✅ Done ({sz:.0f} MB, {time.time()-t0:.0f}s)</translation>
+        <translation type="vanished">✅ Done ({sz:.0f} MB, {time.time()-t0:.0f}s)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1426"/>
         <source>❌ 失败: {e}</source>
-        <translation>❌ Failed: {e}</translation>
+        <translation type="vanished">❌ Failed: {e}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1444"/>
+        <location filename="../ui/main_window.py" line="1463"/>
         <source>许可管理</source>
         <translation>License management</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1447"/>
+        <location filename="../ui/main_window.py" line="1466"/>
         <source>关于</source>
         <translation>About</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1448"/>
+        <location filename="../ui/main_window.py" line="1467"/>
         <source>天线参数后处理工具 v2.0
 
 从 EMQuest 数据计算天线参数
@@ -5130,191 +5184,280 @@ Antenna parameter calculation from EMQuest data
 GitHub: freezzb1972/antenna-post-processor</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1690"/>
+        <location filename="../ui/main_window.py" line="1709"/>
         <location filename="../ui/designer/main_window.ui" line="49"/>
         <source>选择模板 .xlsx ...</source>
         <translation>Select template .xlsx ...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1698"/>
+        <location filename="../ui/main_window.py" line="1717"/>
         <source>清除天线参数模板</source>
         <translation>Clear antenna parameter template</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1714"/>
+        <location filename="../ui/main_window.py" line="1733"/>
         <source>模板文件:</source>
         <translation>Template file:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2535"/>
+        <location filename="../ui/main_window.py" line="1948"/>
+        <source>步进生成: {0}° → {1}°, step={2}° → {3} 个角度</source>
+        <translation>Step generation: {0}° → {1}°, step={2}° → {3} angles</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="2142"/>
+        <source>读取模板失败: {0}</source>
+        <translation>Failed to read template: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="2171"/>
+        <source>加载预设失败: {0}</source>
+        <translation>Failed to load preset: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="2495"/>
+        <source>{0} 模板格式当前仅支持存储预设，处理功能尚未实现。
+
+请使用 .xlsx 或 .xls 格式的模板文件。</source>
+        <translation>{0} templates are currently supported for saving presets only; processing is not implemented yet.
+
+Please use a .xlsx or .xls template file.</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="2555"/>
         <source>✅ 复用已加载数据</source>
         <translation>✅ Reuse loaded data</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2541"/>
+        <location filename="../ui/main_window.py" line="2561"/>
         <source>正在打开数据文件...</source>
         <translation>Opening data file...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2752"/>
+        <location filename="../ui/main_window.py" line="2724"/>
+        <source>▶ 开始处理 (命名模式={0}, 0=模板原名, 1=数据源名)</source>
+        <translation>▶ Starting (naming mode={0}, 0=template names, 1=data source names)</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="2725"/>
+        <source>  模板: {0}</source>
+        <translation>  Template: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="2726"/>
+        <source>  输出: {0}</source>
+        <translation>  Output: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="2728"/>
+        <source>  完整报告: {0}</source>
+        <translation>  Full report: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="2772"/>
         <source>⚠ 正在完成当前步骤后停止…</source>
         <translation>⚠ Stopping after the current step completes…</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2826"/>
+        <location filename="../ui/main_window.py" line="2846"/>
         <source>✅ 完成</source>
         <translation>✅ Done</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2894"/>
+        <location filename="../ui/main_window.py" line="2914"/>
         <source>默认天线</source>
         <translation>Default antenna</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3299"/>
+        <location filename="../ui/main_window.py" line="3217"/>
+        <source>📊 参数表格已更新: {0} 列 × {1} 行</source>
+        <translation>📊 Parameter table updated: {0} columns × {1} rows</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="3319"/>
         <source>📡 无源</source>
         <translation>📡 Passive</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3331"/>
+        <location filename="../ui/main_window.py" line="3351"/>
         <source>&lt;b&gt;参数:&lt;/b&gt; &lt;span style=&apos;color:#888;&apos;&gt;(未选择)&lt;/span&gt;</source>
         <translation>&lt;b&gt;Parameters:&lt;/b&gt; &lt;span style=&apos;color:#888;&apos;&gt;(none selected)&lt;/span&gt;</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3346"/>
+        <location filename="../ui/main_window.py" line="3366"/>
         <source>外推</source>
         <translation>Extrapolation</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3400"/>
+        <location filename="../ui/main_window.py" line="3420"/>
         <source>确认退出</source>
         <translation>Confirm exit</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3401"/>
+        <location filename="../ui/main_window.py" line="3421"/>
         <source>正在处理中，确定要退出吗？</source>
         <translation>Processing is in progress. Are you sure you want to exit?</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1496"/>
+        <location filename="../ui/main_window.py" line="1515"/>
         <source>请先选择模板文件。</source>
         <translation>Please select a template file first.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1499"/>
+        <location filename="../ui/main_window.py" line="969"/>
+        <source>任务: {0}</source>
+        <translation>Task: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="970"/>
+        <source>创建: {0}</source>
+        <translation>Created: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="972"/>
+        <source>
+⚠ {0} 个数据文件已修改，建议重新计算。</source>
+        <translation>
+⚠ {0} data file(s) have changed; re-running is recommended.</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="974"/>
+        <source>
+❌ {0} 个数据文件已移动。</source>
+        <translation>
+❌ {0} data file(s) have moved.</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="977"/>
+        <source>无法打开任务包:
+{0}</source>
+        <translation>Cannot open task package:
+{0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="1442"/>
+        <source>✅ 完成 ({0:.0f} MB, {1:.0f}s)</source>
+        <translation>✅ Done ({0:.0f} MB, {1:.0f}s)</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="1445"/>
+        <source>❌ 失败: {0}</source>
+        <translation>❌ Failed: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="1518"/>
         <source>请先添加数据文件。</source>
         <translation>Please add data files first.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1746"/>
+        <location filename="../ui/main_window.py" line="1765"/>
         <source>选择模板文件</source>
         <translation>Select template file</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1748"/>
+        <location filename="../ui/main_window.py" line="1767"/>
         <source>所有支持格式 (*.xlsx *.xls *.csv *.docx);;Excel 新版 (*.xlsx);;Excel 旧版 (*.xls);;CSV (*.csv);;Word (*.docx);;所有文件 (*)</source>
         <translation>All supported (*.xlsx *.xls *.csv *.docx);;Excel new (*.xlsx);;Excel legacy (*.xls);;CSV (*.csv);;Word (*.docx);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1752"/>
+        <location filename="../ui/main_window.py" line="1771"/>
         <source>格式不支持</source>
         <translation>Unsupported format</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1753"/>
+        <location filename="../ui/main_window.py" line="1772"/>
         <source>不支持 .doc 格式。
 请用 Word 打开该文件，另存为 .docx 后再使用。</source>
         <translation>.doc format is not supported.
 Open the file in Word and save as .docx first.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1808"/>
+        <location filename="../ui/main_window.py" line="1827"/>
         <source>保存完整报告</source>
         <translation>Save Full Report</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1810"/>
+        <location filename="../ui/main_window.py" line="1829"/>
         <source>Excel 文件 (*.xlsx)</source>
         <translation>Excel File (*.xlsx)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1848"/>
+        <location filename="../ui/main_window.py" line="1867"/>
         <source>保存模板预设</source>
         <translation>Save Template Preset</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1862"/>
+        <location filename="../ui/main_window.py" line="1881"/>
         <source>厂商:</source>
         <translation>Manufacturer:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1863"/>
+        <location filename="../ui/main_window.py" line="1882"/>
         <source>模板名:</source>
         <translation>Template name:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1873"/>
+        <location filename="../ui/main_window.py" line="1892"/>
         <source>Word 模板:</source>
         <translation>Word template:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1929"/>
         <source>步进生成: {start}° → {end}°, step={step}° → {len(gen.single_angles)} 个角度</source>
-        <translation>Step gen: {start}° → {end}°, step={step}° → {len(gen.single_angles)} angles</translation>
+        <translation type="vanished">Step gen: {start}° → {end}°, step={step}° → {len(gen.single_angles)} angles</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2209"/>
+        <location filename="../ui/main_window.py" line="2229"/>
         <source>移除此角度</source>
         <translation>Remove This Angle</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2233"/>
+        <location filename="../ui/main_window.py" line="2253"/>
         <source>移除此范围</source>
         <translation>Remove This Range</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2270"/>
+        <location filename="../ui/main_window.py" line="2290"/>
         <source>⏳ 预览中...</source>
         <translation>⏳ Previewing...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2274"/>
+        <location filename="../ui/main_window.py" line="2294"/>
         <source>⏳ 报告中...</source>
         <translation>⏳ Reporting...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2306"/>
+        <location filename="../ui/main_window.py" line="2326"/>
         <source>请先预览</source>
         <translation>Preview first</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2307"/>
+        <location filename="../ui/main_window.py" line="2327"/>
         <source>请先点击「预览」确认计算结果，再出报告。</source>
         <translation>Click &apos;Preview&apos; to confirm results before generating the report.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2371"/>
+        <location filename="../ui/main_window.py" line="2391"/>
         <source>⚠ 处理已在运行中，请等待完成</source>
         <translation>⚠ Processing in progress, please wait</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2376"/>
-        <location filename="../ui/main_window.py" line="2769"/>
+        <location filename="../ui/main_window.py" line="2396"/>
+        <location filename="../ui/main_window.py" line="2789"/>
         <source>⏳ 处理中...</source>
         <translation>⏳ Processing...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2382"/>
+        <location filename="../ui/main_window.py" line="2402"/>
         <source>请先通过「设置→数据源配置」添加数据文件并执行自动匹配。</source>
         <translation>Please add data files via &quot;Settings→Data Source Config&quot; and run auto-match.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2392"/>
+        <location filename="../ui/main_window.py" line="2412"/>
         <source>自动匹配失败</source>
         <translation>Auto Match Failed</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2393"/>
+        <location filename="../ui/main_window.py" line="2413"/>
         <source>无法自动匹配工作表与数据文件。
 请通过「设置→数据源配置」手动进行匹配。
 
@@ -5325,231 +5468,223 @@ Please manually match via &quot;Settings→Data Source Config&quot;.
 Error details: </translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2441"/>
+        <location filename="../ui/main_window.py" line="2461"/>
         <source>请至少选择一种输出类型 (天线参数/图表/中间数据)。</source>
         <translation>Select at least one output type (antenna parameters / charts / intermediate data).</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2458"/>
+        <location filename="../ui/main_window.py" line="2478"/>
         <source>请选择模板 Excel 文件。</source>
         <translation>Please select a template Excel file.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2463"/>
+        <location filename="../ui/main_window.py" line="2483"/>
         <source>模板文件不存在</source>
         <translation>Template file not found</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2470"/>
+        <location filename="../ui/main_window.py" line="2490"/>
         <source>不支持的模板文件格式。支持: .xlsx .xls .csv .docx</source>
         <translation>Unsupported template format. Supported: .xlsx .xls .csv .docx</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2474"/>
+        <location filename="../ui/main_window.py" line="2494"/>
         <source>不支持的模板格式</source>
         <translation>Unsupported Template Format</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2475"/>
         <source>{template_ext} 模板格式当前仅支持存储预设，处理功能尚未实现。
 
 请使用 .xlsx 或 .xls 格式的模板文件。</source>
-        <translation>{template_ext} template format currently only supports preset storage.
+        <translation type="vanished">{template_ext} template format currently only supports preset storage.
 
 Please use .xlsx or .xls format templates.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2562"/>
+        <location filename="../ui/main_window.py" line="2582"/>
         <source>没有有效的工作表↔文件匹配，请先执行自动匹配。</source>
         <translation>No valid sheet↔file match. Please run auto-match first.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2644"/>
+        <location filename="../ui/main_window.py" line="2664"/>
         <source>步进校验</source>
         <translation>Step validation</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2645"/>
+        <location filename="../ui/main_window.py" line="2665"/>
         <source>选中的步进 {0} 不是原始步进 {1}° 的整数倍。
 请修改后重新选择。</source>
         <translation>The selected step {0} is not a multiple of the original step {1}°.
 Please change it and select again.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2698"/>
+        <location filename="../ui/main_window.py" line="2718"/>
         <source>启动失败</source>
         <translation>Startup failed</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2699"/>
+        <location filename="../ui/main_window.py" line="2719"/>
         <source>处理管线启动异常: </source>
         <translation>Pipeline failed to start: </translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2704"/>
         <source>▶ 开始处理 (命名模式={self._worksheet_naming_mode}, 0=模板原名, 1=数据源名)</source>
-        <translation>▶ Start (naming mode={self._worksheet_naming_mode}, 0=template name, 1=data source name)</translation>
+        <translation type="vanished">▶ Start (naming mode={self._worksheet_naming_mode}, 0=template name, 1=data source name)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2708"/>
         <source>  完整报告: {full_report_path}</source>
-        <translation>  Full report: {full_report_path}</translation>
+        <translation type="vanished">  Full report: {full_report_path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2845"/>
+        <location filename="../ui/main_window.py" line="2865"/>
         <source>📦 正在打包任务包...</source>
         <translation>📦 Packing task bundle...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2913"/>
+        <location filename="../ui/main_window.py" line="2933"/>
         <source>📝 正在填充 Word 模板...</source>
         <translation>📝 Filling Word template...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3130"/>
+        <location filename="../ui/main_window.py" line="3150"/>
         <source>  数据层:</source>
         <translation>  Data layer:</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3132"/>
+        <location filename="../ui/main_window.py" line="3152"/>
         <source>最终参数</source>
         <translation>Final parameters</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3133"/>
+        <location filename="../ui/main_window.py" line="3153"/>
         <source>中间数据</source>
         <translation>Intermediate data</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3134"/>
+        <location filename="../ui/main_window.py" line="3154"/>
         <source>原始数据 (TODO)</source>
         <translation>Raw data (TODO)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3137"/>
+        <location filename="../ui/main_window.py" line="3157"/>
         <source>☑ 联动</source>
         <translation>☑ Linked</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3139"/>
+        <location filename="../ui/main_window.py" line="3159"/>
         <source>跟随主天线选择器</source>
         <translation>Follow the main antenna selector</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3149"/>
+        <location filename="../ui/main_window.py" line="3169"/>
         <source>  (暂无计算结果 — 请先预览)</source>
         <translation>  (no results yet — preview first)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3154"/>
+        <location filename="../ui/main_window.py" line="3174"/>
         <source>  (无数据)</source>
         <translation>  (no data)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3197"/>
         <source>📊 参数表格已更新: {len(keys)} 列 × {len(first_sheet)} 行</source>
-        <translation>📊 Parameter table updated: {len(keys)} cols × {len(first_sheet)} rows</translation>
+        <translation type="vanished">📊 Parameter table updated: {len(keys)} cols × {len(first_sheet)} rows</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2098"/>
-        <location filename="../ui/main_window.py" line="2381"/>
-        <location filename="../ui/main_window.py" line="2440"/>
-        <location filename="../ui/main_window.py" line="2457"/>
-        <location filename="../ui/main_window.py" line="2462"/>
-        <location filename="../ui/main_window.py" line="2469"/>
-        <location filename="../ui/main_window.py" line="2561"/>
+        <location filename="../ui/main_window.py" line="2118"/>
+        <location filename="../ui/main_window.py" line="2401"/>
+        <location filename="../ui/main_window.py" line="2460"/>
+        <location filename="../ui/main_window.py" line="2477"/>
+        <location filename="../ui/main_window.py" line="2482"/>
+        <location filename="../ui/main_window.py" line="2489"/>
+        <location filename="../ui/main_window.py" line="2581"/>
         <source>警告</source>
         <translation>Warning</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2098"/>
+        <location filename="../ui/main_window.py" line="2118"/>
         <source>请先选择模板 Excel 文件。</source>
         <translation>Please select a template Excel file first.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1333"/>
-        <location filename="../ui/main_window.py" line="2122"/>
-        <location filename="../ui/main_window.py" line="2151"/>
+        <location filename="../ui/main_window.py" line="1352"/>
+        <location filename="../ui/main_window.py" line="2142"/>
+        <location filename="../ui/main_window.py" line="2171"/>
         <source>错误</source>
         <translation>Error</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2122"/>
         <source>读取模板失败: {e}</source>
-        <translation>Failed to read template: {e}</translation>
+        <translation type="vanished">Failed to read template: {e}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2132"/>
+        <location filename="../ui/main_window.py" line="2152"/>
         <source>保存 LAG 预设</source>
         <translation>Save LAG Preset</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1068"/>
-        <location filename="../ui/main_window.py" line="2133"/>
+        <location filename="../ui/main_window.py" line="1087"/>
+        <location filename="../ui/main_window.py" line="2153"/>
         <source>JSON 文件 (*.json)</source>
         <translation>JSON Files (*.json)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2141"/>
+        <location filename="../ui/main_window.py" line="2161"/>
         <source>加载 LAG 预设</source>
         <translation>Load LAG Preset</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2142"/>
+        <location filename="../ui/main_window.py" line="2162"/>
         <source>JSON 文件 (*.json);;所有文件 (*)</source>
         <translation>JSON Files (*.json);;All Files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2151"/>
         <source>加载预设失败: {e}</source>
-        <translation>Failed to load preset: {e}</translation>
+        <translation type="vanished">Failed to load preset: {e}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2188"/>
+        <location filename="../ui/main_window.py" line="2208"/>
         <source>—</source>
         <translation>—</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2195"/>
+        <location filename="../ui/main_window.py" line="2215"/>
         <source>单角度：</source>
         <translation>Single Angles: </translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2219"/>
+        <location filename="../ui/main_window.py" line="2239"/>
         <source>角度范围：</source>
         <translation>Angle Ranges: </translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2584"/>
+        <location filename="../ui/main_window.py" line="2604"/>
         <source>启动中...</source>
         <translation>Starting...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2705"/>
         <source>  模板: {template_path}</source>
-        <translation>  Template: {template_path}</translation>
+        <translation type="vanished">  Template: {template_path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2706"/>
         <source>  输出: {output_path}</source>
-        <translation>  Output: {output_path}</translation>
+        <translation type="vanished">  Output: {output_path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="2891"/>
+        <location filename="../ui/main_window.py" line="2911"/>
         <source>✓ 处理完成</source>
         <translation>✓ Complete</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="3239"/>
+        <location filename="../ui/main_window.py" line="3259"/>
         <source>处理错误</source>
         <translation>Processing Error</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1202"/>
-        <location filename="../ui/main_window.py" line="1213"/>
-        <location filename="../ui/main_window.py" line="1353"/>
-        <location filename="../ui/main_window.py" line="1363"/>
-        <location filename="../ui/main_window.py" line="1693"/>
+        <location filename="../ui/main_window.py" line="1221"/>
+        <location filename="../ui/main_window.py" line="1232"/>
+        <location filename="../ui/main_window.py" line="1372"/>
+        <location filename="../ui/main_window.py" line="1382"/>
+        <location filename="../ui/main_window.py" line="1712"/>
         <location filename="../ui/designer/main_window.ui" line="47"/>
         <location filename="../ui/designer/main_window.ui" line="49"/>
         <location filename="../ui/designer/main_window.ui" line="58"/>
@@ -5558,7 +5693,7 @@ Please change it and select again.</translation>
         <translation>Browse...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1359"/>
+        <location filename="../ui/main_window.py" line="1378"/>
         <location filename="../ui/designer/main_window.ui" line="55"/>
         <source>输出</source>
         <translation>Output</translation>
@@ -5871,134 +6006,134 @@ Please change it and select again.</translation>
 <context>
     <name>MergeDialog</name>
     <message>
-        <location filename="../ui/dialogs.py" line="3754"/>
+        <location filename="../ui/dialogs.py" line="3774"/>
         <source>数据合并 (多段拼接)</source>
         <translation>Data merge (multi-segment)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3766"/>
+        <location filename="../ui/dialogs.py" line="3786"/>
         <source>要合并的 CSV 文件 (至少2个)</source>
         <translation>CSV files to merge (at least 2)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3769"/>
+        <location filename="../ui/dialogs.py" line="3789"/>
         <source>📂 添加文件...</source>
         <translation>📂 Add files...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3772"/>
+        <location filename="../ui/dialogs.py" line="3792"/>
         <source>清除</source>
         <translation>Clear</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3785"/>
+        <location filename="../ui/dialogs.py" line="3805"/>
         <source>RSP 路径损耗校准 (可选)</source>
         <translation>RSP path-loss calibration (optional)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3791"/>
+        <location filename="../ui/dialogs.py" line="3811"/>
         <source>H-pol RSP CSV...</source>
         <translation>H-pol RSP CSV...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3793"/>
-        <location filename="../ui/dialogs.py" line="3805"/>
+        <location filename="../ui/dialogs.py" line="3813"/>
         <location filename="../ui/dialogs.py" line="3825"/>
+        <location filename="../ui/dialogs.py" line="3845"/>
         <source>浏览...</source>
         <translation>Browse...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3796"/>
-        <location filename="../ui/dialogs.py" line="3808"/>
+        <location filename="../ui/dialogs.py" line="3816"/>
+        <location filename="../ui/dialogs.py" line="3828"/>
         <source>从预设选择...</source>
         <translation>Select from preset...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3803"/>
+        <location filename="../ui/dialogs.py" line="3823"/>
         <source>V-pol RSP CSV...</source>
         <translation>V-pol RSP CSV...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3814"/>
+        <location filename="../ui/dialogs.py" line="3834"/>
         <source>校准仅对实部/虚部格式文件生效。对数域文件不需要。</source>
         <translation>Calibration only applies to Real/Imag files. Not needed for log-domain files.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3820"/>
+        <location filename="../ui/dialogs.py" line="3840"/>
         <source>输出文件</source>
         <translation>Output file</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3823"/>
+        <location filename="../ui/dialogs.py" line="3843"/>
         <source>默认: 首个文件所在目录/merged.csv</source>
         <translation>Default: first file&apos;s directory/merged.csv</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3839"/>
-        <location filename="../ui/dialogs.py" line="3979"/>
+        <location filename="../ui/dialogs.py" line="3859"/>
+        <location filename="../ui/dialogs.py" line="3999"/>
         <source>▶ 开始合并</source>
         <translation>▶ Start merge</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3845"/>
+        <location filename="../ui/dialogs.py" line="3865"/>
         <source>关闭</source>
         <translation>Close</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3854"/>
+        <location filename="../ui/dialogs.py" line="3874"/>
         <source>选择要合并的 CSV 文件 (可多选)</source>
         <translation>Select CSV files to merge (multi-select)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3855"/>
-        <location filename="../ui/dialogs.py" line="3879"/>
+        <location filename="../ui/dialogs.py" line="3875"/>
+        <location filename="../ui/dialogs.py" line="3899"/>
         <source>CSV 文件 (*.csv);;所有文件 (*)</source>
         <translation>CSV files (*.csv);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3878"/>
+        <location filename="../ui/dialogs.py" line="3898"/>
         <source>选择 RSP 校准文件</source>
         <translation>Select RSP calibration file</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3903"/>
+        <location filename="../ui/dialogs.py" line="3923"/>
         <source>保存合并结果</source>
         <translation>Save merged result</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3904"/>
+        <location filename="../ui/dialogs.py" line="3924"/>
         <source>CSV 文件 (*.csv)</source>
         <translation>CSV file (*.csv)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3922"/>
+        <location filename="../ui/dialogs.py" line="3942"/>
         <source>⚠ 检测到实部/虚部格式文件。建议加载 RSP 路径损耗校准文件。</source>
         <translation>⚠ Real/Imag files detected. Loading an RSP path-loss calibration file is recommended.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3925"/>
+        <location filename="../ui/dialogs.py" line="3945"/>
         <source>✓ 全部为对数域格式文件，无需 RSP 校准。</source>
         <translation>✓ All files are log-domain; no RSP calibration needed.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3934"/>
+        <location filename="../ui/dialogs.py" line="3954"/>
         <source>提示</source>
         <translation>Notice</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3934"/>
+        <location filename="../ui/dialogs.py" line="3954"/>
         <source>请至少选择2个文件。</source>
         <translation>Please select at least 2 files.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3953"/>
+        <location filename="../ui/dialogs.py" line="3973"/>
         <source>RSP 频率范围不足:
 </source>
         <translation>RSP frequency range insufficient:
 </translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3957"/>
+        <location filename="../ui/dialogs.py" line="3977"/>
         <source>
 
 继续使用边界值外推？</source>
@@ -6007,22 +6142,22 @@ Please change it and select again.</translation>
 Continue with boundary-value extrapolation?</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3960"/>
+        <location filename="../ui/dialogs.py" line="3980"/>
         <source>⚠ RSP 频率范围不足</source>
         <translation>⚠ RSP frequency range insufficient</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3966"/>
+        <location filename="../ui/dialogs.py" line="3986"/>
         <source>⏳ 合并中...</source>
         <translation>⏳ Merging...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3973"/>
+        <location filename="../ui/dialogs.py" line="3993"/>
         <source>完成</source>
         <translation>Done</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3977"/>
+        <location filename="../ui/dialogs.py" line="3997"/>
         <source>错误</source>
         <translation>Error</translation>
     </message>
@@ -6278,178 +6413,178 @@ Continue with boundary-value extrapolation?</translation>
 <context>
     <name>PathLossDialog</name>
     <message>
-        <location filename="../ui/dialogs.py" line="4356"/>
+        <location filename="../ui/dialogs.py" line="4376"/>
         <source>路径损耗补偿</source>
         <translation>Path-loss compensation</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4366"/>
+        <location filename="../ui/dialogs.py" line="4386"/>
         <source>CSV 数据文件</source>
         <translation>CSV data files</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4369"/>
+        <location filename="../ui/dialogs.py" line="4389"/>
         <source>📂 添加文件...</source>
         <translation>📂 Add files...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4372"/>
+        <location filename="../ui/dialogs.py" line="4392"/>
         <source>清除</source>
         <translation>Clear</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4382"/>
+        <location filename="../ui/dialogs.py" line="4402"/>
         <source>文件名</source>
         <translation>File name</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4382"/>
+        <location filename="../ui/dialogs.py" line="4402"/>
         <source>格式</source>
         <translation>Format</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4382"/>
+        <location filename="../ui/dialogs.py" line="4402"/>
         <source>状态</source>
         <translation>Status</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4390"/>
+        <location filename="../ui/dialogs.py" line="4410"/>
         <source>RSP 路径损耗校准</source>
         <translation>RSP path-loss calibration</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4396"/>
+        <location filename="../ui/dialogs.py" line="4416"/>
         <source>选择 H-pol RSP 校准文件...</source>
         <translation>Select H-pol RSP calibration file...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4398"/>
-        <location filename="../ui/dialogs.py" line="4410"/>
-        <location filename="../ui/dialogs.py" line="4438"/>
+        <location filename="../ui/dialogs.py" line="4418"/>
+        <location filename="../ui/dialogs.py" line="4430"/>
+        <location filename="../ui/dialogs.py" line="4458"/>
         <source>浏览...</source>
         <translation>Browse...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4401"/>
-        <location filename="../ui/dialogs.py" line="4413"/>
+        <location filename="../ui/dialogs.py" line="4421"/>
+        <location filename="../ui/dialogs.py" line="4433"/>
         <source>从预设选择...</source>
         <translation>Select from preset...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4408"/>
+        <location filename="../ui/dialogs.py" line="4428"/>
         <source>选择 V-pol RSP 校准文件...</source>
         <translation>Select V-pol RSP calibration file...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4421"/>
+        <location filename="../ui/dialogs.py" line="4441"/>
         <source>处理选项</source>
         <translation>Processing options</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4424"/>
+        <location filename="../ui/dialogs.py" line="4444"/>
         <source>自动转换实部/虚部文件（必须先转换为对数域）</source>
         <translation>Auto convert Real/Imag files (must convert to log-domain first)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4427"/>
+        <location filename="../ui/dialogs.py" line="4447"/>
         <source>应用路径损耗补偿</source>
         <translation>Apply path-loss compensation</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4434"/>
+        <location filename="../ui/dialogs.py" line="4454"/>
         <source>输出目录:</source>
         <translation>Output directory:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4436"/>
+        <location filename="../ui/dialogs.py" line="4456"/>
         <source>默认: 源文件目录</source>
         <translation>Default: source file directory</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4445"/>
+        <location filename="../ui/dialogs.py" line="4465"/>
         <source>🔍 检查兼容性</source>
         <translation>🔍 Check compatibility</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4449"/>
+        <location filename="../ui/dialogs.py" line="4469"/>
         <source>▶ 执行</source>
         <translation>▶ Run</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4454"/>
+        <location filename="../ui/dialogs.py" line="4474"/>
         <source>关闭</source>
         <translation>Close</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4461"/>
+        <location filename="../ui/dialogs.py" line="4481"/>
         <source>选择 CSV 文件</source>
         <translation>Select CSV files</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4462"/>
-        <location filename="../ui/dialogs.py" line="4514"/>
+        <location filename="../ui/dialogs.py" line="4482"/>
+        <location filename="../ui/dialogs.py" line="4534"/>
         <source>CSV 文件 (*.csv);;所有文件 (*)</source>
         <translation>CSV files (*.csv);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4488"/>
+        <location filename="../ui/dialogs.py" line="4508"/>
         <source>对数域 (LogMag/Phase)</source>
         <translation>Log domain (LogMag/Phase)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4493"/>
+        <location filename="../ui/dialogs.py" line="4513"/>
         <source>实部/虚部 (Real/Imag)</source>
         <translation>Real/Imag</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4495"/>
+        <location filename="../ui/dialogs.py" line="4515"/>
         <source>⚠ 需转换</source>
         <translation>⚠ Needs convert</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4497"/>
+        <location filename="../ui/dialogs.py" line="4517"/>
         <source>未知</source>
         <translation>Unknown</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4501"/>
+        <location filename="../ui/dialogs.py" line="4521"/>
         <source>读取失败</source>
         <translation>Read failed</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4513"/>
+        <location filename="../ui/dialogs.py" line="4533"/>
         <source>选择 RSP 校准文件</source>
         <translation>Select RSP calibration file</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4531"/>
+        <location filename="../ui/dialogs.py" line="4551"/>
         <source>选择输出目录</source>
         <translation>Select output directory</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4538"/>
+        <location filename="../ui/dialogs.py" line="4558"/>
         <source>提示</source>
         <translation>Notice</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4538"/>
+        <location filename="../ui/dialogs.py" line="4558"/>
         <source>请先添加文件。</source>
         <translation>Please add files first.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4589"/>
+        <location filename="../ui/dialogs.py" line="4609"/>
         <source>处理完成: {} 成功, {} 失败</source>
         <translation>Processing complete: {} succeeded, {} failed</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4591"/>
+        <location filename="../ui/dialogs.py" line="4611"/>
         <source>错误详情:
 </source>
         <translation>Error details:
 </translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4592"/>
+        <location filename="../ui/dialogs.py" line="4612"/>
         <source>完成</source>
         <translation>Done</translation>
     </message>
@@ -6561,60 +6696,60 @@ Auto-reloaded after saving; takes effect on next template load.</translation>
 <context>
     <name>PlotConfigDialog</name>
     <message>
-        <location filename="../ui/dialogs.py" line="1537"/>
+        <location filename="../ui/dialogs.py" line="1541"/>
         <source>图形配置</source>
         <translation>Plot Configuration</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1594"/>
+        <location filename="../ui/dialogs.py" line="1598"/>
         <source>全选</source>
         <translation>Select all</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1596"/>
+        <location filename="../ui/dialogs.py" line="1600"/>
         <source>取消全选</source>
         <translation>Deselect All</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1614"/>
+        <location filename="../ui/dialogs.py" line="1618"/>
         <source>报告需要</source>
         <translation>Required by report</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1624"/>
-        <location filename="../ui/dialogs.py" line="1630"/>
-        <location filename="../ui/dialogs.py" line="1649"/>
-        <location filename="../ui/dialogs.py" line="1654"/>
+        <location filename="../ui/dialogs.py" line="1628"/>
+        <location filename="../ui/dialogs.py" line="1634"/>
+        <location filename="../ui/dialogs.py" line="1653"/>
+        <location filename="../ui/dialogs.py" line="1658"/>
         <source>⚙ 角度...</source>
         <translation>⚙ Angles...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1640"/>
+        <location filename="../ui/dialogs.py" line="1644"/>
         <source>额外报告</source>
         <translation>Extra reports</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1675"/>
+        <location filename="../ui/dialogs.py" line="1679"/>
         <source>视角参数</source>
         <translation>View parameters</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1677"/>
+        <location filename="../ui/dialogs.py" line="1681"/>
         <source>仰角:</source>
         <translation>Elevation:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1682"/>
+        <location filename="../ui/dialogs.py" line="1686"/>
         <source>方位角:</source>
         <translation>Azimuth:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1692"/>
+        <location filename="../ui/dialogs.py" line="1696"/>
         <source>采样精度:</source>
         <translation>Sampling resolution:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1699"/>
+        <location filename="../ui/dialogs.py" line="1703"/>
         <source>3D 图形采样步进 (1°–30°):
   1°=最精细(~40K点/频点,慢)
   5°=标准(~1.7K点/频点)
@@ -6631,79 +6766,79 @@ This value is the initial resolution of the plot viewer;
 it can be adjusted independently in the viewer via ⚙ Plot Settings.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1712"/>
+        <location filename="../ui/dialogs.py" line="1716"/>
         <source>输出方式</source>
         <translation>Output method</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1714"/>
+        <location filename="../ui/dialogs.py" line="1718"/>
         <source>嵌入 Excel</source>
         <translation>Embed in Excel</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1716"/>
+        <location filename="../ui/dialogs.py" line="1720"/>
         <source>保存 PNG 文件夹</source>
         <translation>Save to PNG folder</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1867"/>
+        <location filename="../ui/dialogs.py" line="1871"/>
         <source>🗑 清空全部</source>
         <translation>🗑 Clear all</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1871"/>
+        <location filename="../ui/dialogs.py" line="1875"/>
         <source>  (暂无选择 — 将自动使用默认值)</source>
         <translation>  (nothing selected — defaults will be used)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1893"/>
+        <location filename="../ui/dialogs.py" line="1897"/>
         <source>自定义</source>
         <translation>Custom</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1896"/>
+        <location filename="../ui/dialogs.py" line="1900"/>
         <source>+ 添加</source>
         <translation>+ Add</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1898"/>
+        <location filename="../ui/dialogs.py" line="1902"/>
         <source>角度:</source>
         <translation>Angle:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1903"/>
+        <location filename="../ui/dialogs.py" line="1907"/>
         <source>步进批量生成</source>
         <translation>Batch generate by step</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1909"/>
+        <location filename="../ui/dialogs.py" line="1913"/>
         <source>生成</source>
         <translation>Generate</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1915"/>
-        <location filename="../ui/dialogs.py" line="1934"/>
+        <location filename="../ui/dialogs.py" line="1919"/>
+        <location filename="../ui/dialogs.py" line="1938"/>
         <source>起:</source>
         <translation>From:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1916"/>
-        <location filename="../ui/dialogs.py" line="1935"/>
+        <location filename="../ui/dialogs.py" line="1920"/>
+        <location filename="../ui/dialogs.py" line="1939"/>
         <source>止:</source>
         <translation>To:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1917"/>
+        <location filename="../ui/dialogs.py" line="1921"/>
         <source>步:</source>
         <translation>By:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1922"/>
+        <location filename="../ui/dialogs.py" line="1926"/>
         <source>角度范围</source>
         <translation>Angle range</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="1932"/>
+        <location filename="../ui/dialogs.py" line="1936"/>
         <source>添加范围</source>
         <translation>Add range</translation>
     </message>
@@ -7078,42 +7213,42 @@ it can be adjusted independently in the viewer via ⚙ Plot Settings.</translati
 <context>
     <name>RAGSettingsDialog</name>
     <message>
-        <location filename="../ui/dialogs.py" line="2173"/>
+        <location filename="../ui/dialogs.py" line="2193"/>
         <source>LLM API 设置</source>
         <translation>LLM API settings</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2185"/>
+        <location filename="../ui/dialogs.py" line="2205"/>
         <source>启用 RAG AI 问答</source>
         <translation>Enable RAG AI Q&amp;A</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2190"/>
+        <location filename="../ui/dialogs.py" line="2210"/>
         <source>使用本地 Ollama 模型（免费、离线、无需 API Key）</source>
         <translation>Use a local Ollama model (free, offline, no API key)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2197"/>
+        <location filename="../ui/dialogs.py" line="2217"/>
         <source>Ollama 地址:</source>
         <translation>Ollama address:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2201"/>
+        <location filename="../ui/dialogs.py" line="2221"/>
         <source>Ollama 模型:</source>
         <translation>Ollama model:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2211"/>
+        <location filename="../ui/dialogs.py" line="2231"/>
         <source>sk-ant-... 或 sk-...</source>
         <translation>sk-ant-... or sk-...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2217"/>
+        <location filename="../ui/dialogs.py" line="2237"/>
         <source>搜索...</source>
         <translation>Search...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2232"/>
+        <location filename="../ui/dialogs.py" line="2252"/>
         <source>本地 Ollama: 免费、离线、无需 API Key。需要先安装 Ollama 并拉取模型。
 云 API: 支持 Anthropic / OpenAI 兼容接口。API Key 存储在本地 QSettings。</source>
         <translation>Local Ollama: free, offline, no API key. Requires Ollama installed and the model pulled.
@@ -7123,353 +7258,357 @@ Cloud API: supports Anthropic / OpenAI-compatible endpoints. The API key is stor
 <context>
     <name>RepairDialog</name>
     <message>
-        <location filename="../ui/dialogs.py" line="3992"/>
+        <location filename="../ui/dialogs.py" line="4012"/>
         <source>数据修复</source>
         <translation>Data repair</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4003"/>
+        <location filename="../ui/dialogs.py" line="4023"/>
         <source>待修复的 CSV 文件</source>
         <translation>CSV files to repair</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4006"/>
+        <location filename="../ui/dialogs.py" line="4026"/>
         <source>📂 添加文件...</source>
         <translation>📂 Add files...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4009"/>
+        <location filename="../ui/dialogs.py" line="4029"/>
         <source>清除</source>
         <translation>Clear</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4015"/>
+        <location filename="../ui/dialogs.py" line="4035"/>
         <source>🔍 扫描数据质量</source>
         <translation>🔍 Scan data quality</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4025"/>
+        <location filename="../ui/dialogs.py" line="4045"/>
         <source>文件</source>
         <translation>File</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4025"/>
+        <location filename="../ui/dialogs.py" line="4045"/>
         <source>格式</source>
         <translation>Format</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4025"/>
+        <location filename="../ui/dialogs.py" line="4045"/>
         <source>坏点数</source>
         <translation>Bad points</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4026"/>
+        <location filename="../ui/dialogs.py" line="4046"/>
         <source>坏点位置</source>
         <translation>Bad point positions</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4026"/>
+        <location filename="../ui/dialogs.py" line="4046"/>
         <source>建议方法</source>
         <translation>Suggested method</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4035"/>
+        <location filename="../ui/dialogs.py" line="4055"/>
         <source>修复方法</source>
         <translation>Repair method</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4038"/>
+        <location filename="../ui/dialogs.py" line="4058"/>
         <source>MAD 异常检测 — 中位数绝对偏差，适合标准格式</source>
         <translation>MAD outlier detection — median absolute deviation, for standard format</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4042"/>
+        <location filename="../ui/dialogs.py" line="4062"/>
         <source>Q25 比率检测 — 四分位数比率，适合异常终止格式</source>
         <translation>Q25 ratio detection — quartile ratio, for abnormally-terminated format</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4045"/>
+        <location filename="../ui/dialogs.py" line="4065"/>
         <source>KNN 插值修复 — 逆距离加权 K 近邻插值，通用</source>
         <translation>KNN interpolation — inverse-distance weighted K-nearest, general</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4048"/>
+        <location filename="../ui/dialogs.py" line="4068"/>
         <source>手动指定 phi — 直接输入需修复的 phi 索引</source>
         <translation>Manual phi — enter phi indices to repair directly</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4051"/>
+        <location filename="../ui/dialogs.py" line="4071"/>
         <source>如: 5, 7, 9 (逗号分隔, 0-based)</source>
         <translation>e.g. 5, 7, 9 (comma separated, 0-based)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4059"/>
+        <location filename="../ui/dialogs.py" line="4079"/>
         <source>输出目录:</source>
         <translation>Output directory:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4061"/>
+        <location filename="../ui/dialogs.py" line="4081"/>
         <source>默认: 源文件目录 (文件名 _repaired.csv)</source>
         <translation>Default: source directory (name _repaired.csv)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4063"/>
+        <location filename="../ui/dialogs.py" line="4083"/>
         <source>浏览...</source>
         <translation>Browse...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4076"/>
-        <location filename="../ui/dialogs.py" line="4198"/>
+        <location filename="../ui/dialogs.py" line="4096"/>
+        <location filename="../ui/dialogs.py" line="4218"/>
         <source>▶ 执行修复</source>
         <translation>▶ Run repair</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4081"/>
+        <location filename="../ui/dialogs.py" line="4101"/>
         <source>关闭</source>
         <translation>Close</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4088"/>
+        <location filename="../ui/dialogs.py" line="4108"/>
         <source>选择要修复的 CSV 文件</source>
         <translation>Select CSV files to repair</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4089"/>
+        <location filename="../ui/dialogs.py" line="4109"/>
         <source>CSV 文件 (*.csv);;所有文件 (*)</source>
         <translation>CSV files (*.csv);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4107"/>
+        <location filename="../ui/dialogs.py" line="4127"/>
         <source>提示</source>
         <translation>Notice</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4107"/>
+        <location filename="../ui/dialogs.py" line="4127"/>
         <source>请先添加文件。</source>
         <translation>Please add files first.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4150"/>
+        <location filename="../ui/dialogs.py" line="4170"/>
         <source>选择输出目录</source>
         <translation>Select output directory</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4170"/>
+        <location filename="../ui/dialogs.py" line="4190"/>
         <source>输入错误</source>
         <translation>Input error</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4171"/>
+        <location filename="../ui/dialogs.py" line="4191"/>
         <source>手动 phi 格式无效，请用逗号分隔数字。</source>
         <translation>Invalid manual phi format; use comma-separated numbers.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4175"/>
+        <location filename="../ui/dialogs.py" line="4195"/>
         <source>⏳ 修复中...</source>
         <translation>⏳ Repairing...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4190"/>
+        <location filename="../ui/dialogs.py" line="4210"/>
         <source>修复完成: {} 成功, {} 失败</source>
         <translation>Repair complete: {} succeeded, {} failed</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4191"/>
+        <location filename="../ui/dialogs.py" line="4211"/>
         <source>完成</source>
         <translation>Done</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4195"/>
+        <location filename="../ui/dialogs.py" line="4215"/>
         <source>错误</source>
         <translation>Error</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="4196"/>
+        <location filename="../ui/dialogs.py" line="4216"/>
+        <source>修复失败: {0}</source>
+        <translation>Repair failed: {0}</translation>
+    </message>
+    <message>
         <source>修复失败: {e}</source>
-        <translation>Repair failed: {e}</translation>
+        <translation type="vanished">Repair failed: {e}</translation>
     </message>
 </context>
 <context>
     <name>ReportMetadataDialog</name>
     <message>
-        <location filename="../ui/dialogs.py" line="2996"/>
+        <location filename="../ui/dialogs.py" line="3016"/>
         <source>报告元数据</source>
         <translation>Report metadata</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3007"/>
+        <location filename="../ui/dialogs.py" line="3027"/>
         <source>以下信息将填入 Word 测试报告模板的 SDT Tag 中。</source>
         <translation>The following info fills the SDT tags in the Word test report template.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3019"/>
+        <location filename="../ui/dialogs.py" line="3039"/>
         <source>客户名称</source>
         <translation>Customer</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3020"/>
+        <location filename="../ui/dialogs.py" line="3040"/>
         <source>项目名称</source>
         <translation>Project</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3021"/>
+        <location filename="../ui/dialogs.py" line="3041"/>
         <source>合同号</source>
         <translation>Contract No.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3022"/>
+        <location filename="../ui/dialogs.py" line="3042"/>
         <source>天线型号</source>
         <translation>Antenna model</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3023"/>
+        <location filename="../ui/dialogs.py" line="3043"/>
         <source>报告编号</source>
         <translation>Report No.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3024"/>
+        <location filename="../ui/dialogs.py" line="3044"/>
         <source>测试标准</source>
         <translation>Test Standard</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3031"/>
+        <location filename="../ui/dialogs.py" line="3051"/>
         <source>项目信息</source>
         <translation>Project info</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3038"/>
+        <location filename="../ui/dialogs.py" line="3058"/>
         <source>测试实验室</source>
         <translation>Test Laboratory</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3039"/>
+        <location filename="../ui/dialogs.py" line="3059"/>
         <source>实验室地址</source>
         <translation>Laboratory Address</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3040"/>
+        <location filename="../ui/dialogs.py" line="3060"/>
         <source>测试工程师</source>
         <translation>Test Engineer</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3041"/>
+        <location filename="../ui/dialogs.py" line="3061"/>
         <source>审核人</source>
         <translation>Reviewer</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3042"/>
+        <location filename="../ui/dialogs.py" line="3062"/>
         <source>测试开始日期</source>
         <translation>Test Start Date</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3043"/>
+        <location filename="../ui/dialogs.py" line="3063"/>
         <source>测试结束日期</source>
         <translation>Test End Date</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3044"/>
+        <location filename="../ui/dialogs.py" line="3064"/>
         <source>测试计划编号</source>
         <translation>Test Plan No.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3045"/>
+        <location filename="../ui/dialogs.py" line="3065"/>
         <source>测试计划版本</source>
         <translation>Test Plan Version</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3052"/>
+        <location filename="../ui/dialogs.py" line="3072"/>
         <source>测试信息</source>
         <translation>Test info</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3058"/>
+        <location filename="../ui/dialogs.py" line="3078"/>
         <source>备注信息（可选）</source>
         <translation>Notes (optional)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3060"/>
+        <location filename="../ui/dialogs.py" line="3080"/>
         <source>备注</source>
         <translation>Notes</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3066"/>
+        <location filename="../ui/dialogs.py" line="3086"/>
         <source>🔍 从数据源提取</source>
         <translation>🔍 Extract from data source</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3067"/>
+        <location filename="../ui/dialogs.py" line="3087"/>
         <source>从当前加载的 JSON/CSV 数据源中自动提取元数据</source>
         <translation>Auto-extract metadata from currently loaded JSON/CSV data sources</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3070"/>
+        <location filename="../ui/dialogs.py" line="3090"/>
         <source>📥 从 Excel 导入...</source>
         <translation>📥 Import from Excel...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3110"/>
+        <location filename="../ui/dialogs.py" line="3130"/>
         <source>无数据源</source>
         <translation>No data source</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3110"/>
+        <location filename="../ui/dialogs.py" line="3130"/>
         <source>请先在系统设置中添加数据文件。</source>
         <translation>Please add data files in settings first.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3116"/>
+        <location filename="../ui/dialogs.py" line="3136"/>
         <source>无 JSON 数据源</source>
         <translation>No JSON data source</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3117"/>
+        <location filename="../ui/dialogs.py" line="3137"/>
         <source>当前数据源中无 JSON 文件。
 JSON 文件由 EMQuest 导出，包含被测件型号、操作员、测试时间等元数据。</source>
         <translation>No JSON file in current data sources.
 JSON files exported by EMQuest contain metadata such as DUT model, operator, and test time.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3128"/>
+        <location filename="../ui/dialogs.py" line="3148"/>
         <source>已从 {n} 个 JSON 提取</source>
         <translation>Extracted from {n} JSON files</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3134"/>
+        <location filename="../ui/dialogs.py" line="3154"/>
         <source>提取失败</source>
         <translation>Extraction failed</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3134"/>
+        <location filename="../ui/dialogs.py" line="3154"/>
         <source>无法从 JSON 文件中提取元数据。</source>
         <translation>Cannot extract metadata from JSON file.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3171"/>
+        <location filename="../ui/dialogs.py" line="3191"/>
         <source>已提取 {f} 项</source>
         <translation>Extracted {f} items</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3176"/>
+        <location filename="../ui/dialogs.py" line="3196"/>
         <source>选择元数据 Excel</source>
         <translation>Select metadata Excel</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3177"/>
+        <location filename="../ui/dialogs.py" line="3197"/>
         <source>Excel 文件 (*.xlsx *.xls)</source>
         <translation>Excel files (*.xlsx *.xls)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3204"/>
+        <location filename="../ui/dialogs.py" line="3224"/>
         <source>导入完成</source>
         <translation>Import complete</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3204"/>
+        <location filename="../ui/dialogs.py" line="3224"/>
         <source>元数据已从 Excel 导入。</source>
         <translation>Metadata imported from Excel.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3206"/>
+        <location filename="../ui/dialogs.py" line="3226"/>
         <source>导入失败</source>
         <translation>Import failed</translation>
     </message>
@@ -7477,158 +7616,158 @@ JSON files exported by EMQuest contain metadata such as DUT model, operator, and
 <context>
     <name>ResampleDialog</name>
     <message>
-        <location filename="../ui/dialogs.py" line="3221"/>
+        <location filename="../ui/dialogs.py" line="3241"/>
         <source>多步进数据提取</source>
         <translation>Multi-step data extraction</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3230"/>
+        <location filename="../ui/dialogs.py" line="3250"/>
         <source>源文件</source>
         <translation>Source file</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3233"/>
+        <location filename="../ui/dialogs.py" line="3253"/>
         <source>选择 merged CSV 文件...</source>
         <translation>Select merged CSV file...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3235"/>
-        <location filename="../ui/dialogs.py" line="3283"/>
+        <location filename="../ui/dialogs.py" line="3255"/>
+        <location filename="../ui/dialogs.py" line="3303"/>
         <source>浏览...</source>
         <translation>Browse...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3246"/>
+        <location filename="../ui/dialogs.py" line="3266"/>
         <source>目标步进（度）— 可多选</source>
         <translation>Target steps (deg) — multi-select</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3264"/>
+        <location filename="../ui/dialogs.py" line="3284"/>
         <source>自定义:</source>
         <translation>Custom:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3266"/>
+        <location filename="../ui/dialogs.py" line="3286"/>
         <source>如: 3, 8, 25 (逗号分隔)</source>
         <translation>e.g. 3, 8, 25 (comma separated)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3274"/>
+        <location filename="../ui/dialogs.py" line="3294"/>
         <source>输出设置</source>
         <translation>Output settings</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3279"/>
+        <location filename="../ui/dialogs.py" line="3299"/>
         <source>输出目录:</source>
         <translation>Output directory:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3281"/>
+        <location filename="../ui/dialogs.py" line="3301"/>
         <source>默认: 源文件所在目录</source>
         <translation>Default: source file directory</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3290"/>
+        <location filename="../ui/dialogs.py" line="3310"/>
         <source>命名规则:</source>
         <translation>Naming rule:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3291"/>
+        <location filename="../ui/dialogs.py" line="3311"/>
         <source>源文件名_step{步进}deg.csv</source>
         <translation>sourcename_step{步进}deg.csv</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3300"/>
+        <location filename="../ui/dialogs.py" line="3320"/>
         <source>输出预览</source>
         <translation>Output preview</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3305"/>
+        <location filename="../ui/dialogs.py" line="3325"/>
         <source>步进</source>
         <translation>Step</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3305"/>
+        <location filename="../ui/dialogs.py" line="3325"/>
         <source>θ点数</source>
         <translation>θ points</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3305"/>
+        <location filename="../ui/dialogs.py" line="3325"/>
         <source>φ点数</source>
         <translation>φ points</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3305"/>
+        <location filename="../ui/dialogs.py" line="3325"/>
         <source>输出文件名</source>
         <translation>Output file name</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3314"/>
-        <location filename="../ui/dialogs.py" line="3481"/>
-        <location filename="../ui/dialogs.py" line="3487"/>
+        <location filename="../ui/dialogs.py" line="3334"/>
+        <location filename="../ui/dialogs.py" line="3501"/>
+        <location filename="../ui/dialogs.py" line="3507"/>
         <source>▶ 开始批量导出</source>
         <translation>▶ Start batch export</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3320"/>
+        <location filename="../ui/dialogs.py" line="3340"/>
         <source>关闭</source>
         <translation>Close</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3362"/>
+        <location filename="../ui/dialogs.py" line="3382"/>
         <source>选择源 CSV 文件</source>
         <translation>Select source CSV file</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3363"/>
+        <location filename="../ui/dialogs.py" line="3383"/>
         <source>CSV 文件 (*.csv);;所有文件 (*)</source>
         <translation>CSV files (*.csv);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3368"/>
+        <location filename="../ui/dialogs.py" line="3388"/>
         <source>选择输出目录</source>
         <translation>Select output directory</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3441"/>
-        <location filename="../ui/dialogs.py" line="3446"/>
+        <location filename="../ui/dialogs.py" line="3461"/>
+        <location filename="../ui/dialogs.py" line="3466"/>
         <source>提示</source>
         <translation>Notice</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3441"/>
+        <location filename="../ui/dialogs.py" line="3461"/>
         <source>请选择有效的源 CSV 文件。</source>
         <translation>Please select a valid source CSV file.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3446"/>
+        <location filename="../ui/dialogs.py" line="3466"/>
         <source>请选择目标步进值。</source>
         <translation>Please select target step values.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3461"/>
+        <location filename="../ui/dialogs.py" line="3481"/>
         <source>步进校验</source>
         <translation>Step validation</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3462"/>
+        <location filename="../ui/dialogs.py" line="3482"/>
         <source>选中的步进 {0} 不是原始步进 {1}° 的整数倍。
 请修改后重新选择。</source>
         <translation>The selected step {0} is not a multiple of the original step {1}°.
 Please change it and select again.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3476"/>
+        <location filename="../ui/dialogs.py" line="3496"/>
         <source>处理中...</source>
         <translation>Processing...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3483"/>
+        <location filename="../ui/dialogs.py" line="3503"/>
         <source>完成</source>
         <translation>Done</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="3489"/>
+        <location filename="../ui/dialogs.py" line="3509"/>
         <source>错误</source>
         <translation>Error</translation>
     </message>
@@ -7841,365 +7980,365 @@ Please change it and select again.</translation>
 <context>
     <name>SystemSettingsDialog</name>
     <message>
-        <location filename="../ui/dialogs.py" line="2279"/>
+        <location filename="../ui/dialogs.py" line="2299"/>
         <source>系统设置</source>
         <translation>System Settings</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2294"/>
+        <location filename="../ui/dialogs.py" line="2314"/>
         <source>字体大小</source>
         <translation>Font size</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2302"/>
+        <location filename="../ui/dialogs.py" line="2322"/>
         <source>A 大</source>
         <translation>A Large</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2304"/>
+        <location filename="../ui/dialogs.py" line="2324"/>
         <source>应用字体</source>
         <translation>Apply font</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2310"/>
+        <location filename="../ui/dialogs.py" line="2330"/>
         <source>主题</source>
         <translation>Theme</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2315"/>
-        <location filename="../ui/dialogs.py" line="2395"/>
-        <location filename="../ui/dialogs.py" line="2442"/>
-        <location filename="../ui/dialogs.py" line="2449"/>
-        <location filename="../ui/dialogs.py" line="2456"/>
-        <location filename="../ui/dialogs.py" line="2500"/>
-        <location filename="../ui/dialogs.py" line="2531"/>
+        <location filename="../ui/dialogs.py" line="2335"/>
+        <location filename="../ui/dialogs.py" line="2415"/>
+        <location filename="../ui/dialogs.py" line="2462"/>
+        <location filename="../ui/dialogs.py" line="2469"/>
+        <location filename="../ui/dialogs.py" line="2476"/>
+        <location filename="../ui/dialogs.py" line="2520"/>
+        <location filename="../ui/dialogs.py" line="2551"/>
         <source>搜索...</source>
         <translation>Search...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2317"/>
+        <location filename="../ui/dialogs.py" line="2337"/>
         <source>主题:</source>
         <translation>Theme:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2323"/>
+        <location filename="../ui/dialogs.py" line="2343"/>
         <source>语言 / Language</source>
         <translation>Language / 语言</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2332"/>
+        <location filename="../ui/dialogs.py" line="2352"/>
         <source>模板预设管理</source>
         <translation>Template preset management</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2339"/>
+        <location filename="../ui/dialogs.py" line="2359"/>
         <source>选择模板文件 (.xlsx .xls .csv .docx)</source>
         <translation>Select template file (.xlsx .xls .csv .docx)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2340"/>
-        <location filename="../ui/dialogs.py" line="2404"/>
-        <location filename="../ui/dialogs.py" line="2413"/>
+        <location filename="../ui/dialogs.py" line="2360"/>
+        <location filename="../ui/dialogs.py" line="2424"/>
+        <location filename="../ui/dialogs.py" line="2433"/>
         <source>浏览...</source>
         <translation>Browse...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2344"/>
+        <location filename="../ui/dialogs.py" line="2364"/>
         <source>模板文件:</source>
         <translation>Template file:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2350"/>
+        <location filename="../ui/dialogs.py" line="2370"/>
         <source>搜索或输入新厂商...</source>
         <translation>Search or enter a new manufacturer...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2355"/>
+        <location filename="../ui/dialogs.py" line="2375"/>
         <source>厂商:</source>
         <translation>Manufacturer:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2361"/>
+        <location filename="../ui/dialogs.py" line="2381"/>
         <source>搜索模板...</source>
         <translation>Search templates...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2365"/>
+        <location filename="../ui/dialogs.py" line="2385"/>
         <source>模板名:</source>
         <translation>Template name:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2368"/>
+        <location filename="../ui/dialogs.py" line="2388"/>
         <source>默认输出目录（可选）</source>
         <translation>Default output directory (optional)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2369"/>
+        <location filename="../ui/dialogs.py" line="2389"/>
         <source>输出目录:</source>
         <translation>Output directory:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2372"/>
+        <location filename="../ui/dialogs.py" line="2392"/>
         <source>💾 保存为预设</source>
         <translation>💾 Save as preset</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2381"/>
+        <location filename="../ui/dialogs.py" line="2401"/>
         <source>RSP 校准预设管理</source>
         <translation>RSP calibration preset management</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2388"/>
+        <location filename="../ui/dialogs.py" line="2408"/>
         <source>输入新预设名称或选择已有...</source>
         <translation>Enter a new preset name or pick an existing one...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2390"/>
+        <location filename="../ui/dialogs.py" line="2410"/>
         <source>预设名称:</source>
         <translation>Preset name:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2396"/>
+        <location filename="../ui/dialogs.py" line="2416"/>
         <source>通用 (任意模式)</source>
         <translation>Generic (any mode)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2397"/>
+        <location filename="../ui/dialogs.py" line="2417"/>
         <source>无源天线</source>
         <translation>Passive antenna</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2398"/>
+        <location filename="../ui/dialogs.py" line="2418"/>
         <source>有源发射 TRP</source>
         <translation>Active transmit TRP</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2399"/>
+        <location filename="../ui/dialogs.py" line="2419"/>
         <source>有源接收 TIS</source>
         <translation>Active receive TIS</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2400"/>
+        <location filename="../ui/dialogs.py" line="2420"/>
         <source>关联测试模式:</source>
         <translation>Linked test mode:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2403"/>
+        <location filename="../ui/dialogs.py" line="2423"/>
         <source>选择 H-pol RSP 校准文件 (Phi 分量)</source>
         <translation>Select H-pol RSP calibration file (Phi component)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2412"/>
+        <location filename="../ui/dialogs.py" line="2432"/>
         <source>选择 V-pol RSP 校准文件 (Theta 分量)</source>
         <translation>Select V-pol RSP calibration file (Theta component)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2421"/>
+        <location filename="../ui/dialogs.py" line="2441"/>
         <source>可选注释</source>
         <translation>Optional note</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2422"/>
+        <location filename="../ui/dialogs.py" line="2442"/>
         <source>描述:</source>
         <translation>Description:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2425"/>
+        <location filename="../ui/dialogs.py" line="2445"/>
         <source>💾 保存 RSP 预设</source>
         <translation>💾 Save RSP preset</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2428"/>
+        <location filename="../ui/dialogs.py" line="2448"/>
         <source>🗑 删除预设</source>
         <translation>🗑 Delete preset</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2435"/>
+        <location filename="../ui/dialogs.py" line="2455"/>
         <source>当前默认值 (工具自动匹配)</source>
         <translation>Current defaults (auto-matched by tool)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2443"/>
-        <location filename="../ui/dialogs.py" line="2450"/>
-        <location filename="../ui/dialogs.py" line="2457"/>
-        <location filename="../ui/dialogs.py" line="2798"/>
+        <location filename="../ui/dialogs.py" line="2463"/>
+        <location filename="../ui/dialogs.py" line="2470"/>
+        <location filename="../ui/dialogs.py" line="2477"/>
+        <location filename="../ui/dialogs.py" line="2818"/>
         <source>(未设置)</source>
         <translation>(not set)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2444"/>
+        <location filename="../ui/dialogs.py" line="2464"/>
         <source>无源天线:</source>
         <translation>Passive antenna:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2451"/>
+        <location filename="../ui/dialogs.py" line="2471"/>
         <source>有源 TRP:</source>
         <translation>Active TRP:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2458"/>
+        <location filename="../ui/dialogs.py" line="2478"/>
         <source>有源 TIS:</source>
         <translation>Active TIS:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2460"/>
+        <location filename="../ui/dialogs.py" line="2480"/>
         <source>应用默认值</source>
         <translation>Apply defaults</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2468"/>
+        <location filename="../ui/dialogs.py" line="2488"/>
         <source>默认保存目录</source>
         <translation>Default save directories</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2471"/>
+        <location filename="../ui/dialogs.py" line="2491"/>
         <source>设置默认保存目录...</source>
         <translation>Set default save directories...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2477"/>
+        <location filename="../ui/dialogs.py" line="2497"/>
         <source>LLM API (RAG 问答)</source>
         <translation>LLM API (RAG Q&amp;A)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2481"/>
+        <location filename="../ui/dialogs.py" line="2501"/>
         <source>启用 RAG AI 问答</source>
         <translation>Enable RAG AI Q&amp;A</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2491"/>
-        <location filename="../ui/dialogs.py" line="2546"/>
+        <location filename="../ui/dialogs.py" line="2511"/>
+        <location filename="../ui/dialogs.py" line="2566"/>
         <source>sk-ant-... 或 sk-...</source>
         <translation>sk-ant-... or sk-...</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2506"/>
+        <location filename="../ui/dialogs.py" line="2526"/>
         <source>使用本地 Ollama 模型（免费、离线、无需 API Key）</source>
         <translation>Use a local Ollama model (free, offline, no API key)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2512"/>
+        <location filename="../ui/dialogs.py" line="2532"/>
         <source>本地模型名:</source>
         <translation>Local model name:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2516"/>
+        <location filename="../ui/dialogs.py" line="2536"/>
         <source>本地端点:</source>
         <translation>Local endpoint:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2521"/>
+        <location filename="../ui/dialogs.py" line="2541"/>
         <source>智能识别 (AI 辅助) — 模板识别/数据源匹配/参数检测</source>
         <translation>Smart recognition (AI-assisted) — template / data-source / parameter detection</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2525"/>
+        <location filename="../ui/dialogs.py" line="2545"/>
         <source>启用 AI 辅助识别（规则匹配失败时的兜底方案）</source>
         <translation>Enable AI-assisted recognition (fallback when rule matching fails)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2535"/>
+        <location filename="../ui/dialogs.py" line="2555"/>
         <source>云端 (cloud)</source>
         <translation>Cloud (cloud)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2536"/>
+        <location filename="../ui/dialogs.py" line="2556"/>
         <source>本地 (local)</source>
         <translation>Local (local)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2538"/>
+        <location filename="../ui/dialogs.py" line="2558"/>
         <source>AI 模式:</source>
         <translation>AI mode:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2550"/>
+        <location filename="../ui/dialogs.py" line="2570"/>
         <source>claude-sonnet-4-6 (云) / qwen2.5:7b (本地)</source>
         <translation>claude-sonnet-4-6 (cloud) / qwen2.5:7b (local)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2504"/>
-        <location filename="../ui/dialogs.py" line="2551"/>
+        <location filename="../ui/dialogs.py" line="2524"/>
+        <location filename="../ui/dialogs.py" line="2571"/>
         <source>模型:</source>
         <translation>Model:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2555"/>
+        <location filename="../ui/dialogs.py" line="2575"/>
         <source>本地地址:</source>
         <translation>Local address:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2641"/>
+        <location filename="../ui/dialogs.py" line="2661"/>
         <source>选择模板文件</source>
         <translation>Select template file</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2642"/>
+        <location filename="../ui/dialogs.py" line="2662"/>
         <source>所有支持格式 (*.xlsx *.xls *.csv *.docx);;Excel (*.xlsx *.xls);;CSV (*.csv);;Word (*.docx);;所有文件 (*)</source>
         <translation>All supported (*.xlsx *.xls *.csv *.docx);;Excel (*.xlsx *.xls);;CSV (*.csv);;Word (*.docx);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2667"/>
-        <location filename="../ui/dialogs.py" line="2670"/>
-        <location filename="../ui/dialogs.py" line="2673"/>
-        <location filename="../ui/dialogs.py" line="2733"/>
-        <location filename="../ui/dialogs.py" line="2740"/>
+        <location filename="../ui/dialogs.py" line="2687"/>
+        <location filename="../ui/dialogs.py" line="2690"/>
+        <location filename="../ui/dialogs.py" line="2693"/>
+        <location filename="../ui/dialogs.py" line="2753"/>
+        <location filename="../ui/dialogs.py" line="2760"/>
         <source>保存预设</source>
         <translation>Save preset</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2667"/>
+        <location filename="../ui/dialogs.py" line="2687"/>
         <source>请先选择模板文件。</source>
         <translation>Please select a template file first.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2670"/>
+        <location filename="../ui/dialogs.py" line="2690"/>
         <source>请输入或选择厂商名称。</source>
         <translation>Please enter or select a manufacturer name.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2673"/>
+        <location filename="../ui/dialogs.py" line="2693"/>
         <source>请输入模板名称。</source>
         <translation>Please enter a template name.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2688"/>
+        <location filename="../ui/dialogs.py" line="2708"/>
         <source>(所有厂商)</source>
         <translation>(All manufacturers)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2700"/>
+        <location filename="../ui/dialogs.py" line="2720"/>
         <source>选择 H-pol RSP 校准文件</source>
         <translation>Select H-pol RSP calibration file</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2701"/>
-        <location filename="../ui/dialogs.py" line="2708"/>
+        <location filename="../ui/dialogs.py" line="2721"/>
+        <location filename="../ui/dialogs.py" line="2728"/>
         <source>CSV/Excel 文件 (*.csv *.xlsx *.xls);;所有文件 (*)</source>
         <translation>CSV/Excel files (*.csv *.xlsx *.xls);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2707"/>
+        <location filename="../ui/dialogs.py" line="2727"/>
         <source>选择 V-pol RSP 校准文件</source>
         <translation>Select V-pol RSP calibration file</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2733"/>
+        <location filename="../ui/dialogs.py" line="2753"/>
         <source>请输入预设名称。</source>
         <translation>Please enter a preset name.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2740"/>
+        <location filename="../ui/dialogs.py" line="2760"/>
         <source>请至少选择一个 RSP 校准文件。</source>
         <translation>Please select at least one RSP calibration file.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2757"/>
+        <location filename="../ui/dialogs.py" line="2777"/>
         <source>删除预设</source>
         <translation>Delete preset</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs.py" line="2758"/>
+        <location filename="../ui/dialogs.py" line="2778"/>
         <source>确定删除 RSP 预设「{0}」？
 （关联的默认值将同时清除）</source>
         <translation>Delete RSP preset &quot;{0}&quot;?
