@@ -59,3 +59,12 @@ class SplashScreen:
     def finish(self, window):
         """关闭闪屏。"""
         self._splash.finish(window)
+
+    def close(self):
+        """直接关闭闪屏 (无主窗口可移交时用)。
+
+        main.py 在许可校验失败时调用 splash.close() 转激活流程 —
+        包装类必须代理底层 QSplashScreen 的 close, 缺此方法会使
+        EXE 启动即 AttributeError 崩溃 (开发模式免许可放行掩盖了该路径)。
+        """
+        self._splash.close()
