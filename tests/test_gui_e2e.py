@@ -46,62 +46,19 @@ def window(qapp, monkeypatch, qtbot):
 # LAG Display Visibility
 # =========================================================================
 
-class TestLagDisplayVisibility:
-    """Bug: LAG 已配置项和输入框在暗色主题下看不清"""
+class TestGlobalStyleSheet:
+    """全局 QSS 样式表加载检查。
 
-    def test_config_items_text_visible(self, window):
-        """每个已配置项 label 有显式 styleSheet 颜色设置（暗色主题兼容）。"""
-        window._update_lag_display()
-        layout = window.ui.configItemsWidget.layout()
-        assert layout is not None, "configItemsWidget has no layout"
-        # 获取当前主题的期望颜色
-        expected_color = window.palette().color(QPalette.WindowText).name()
+    本类原为 TestLagDisplayVisibility, 另含 3 个用例:
+      test_config_items_text_visible  —— configItemsWidget 里 label 的 styleSheet
+      test_spinboxes_have_readable_text — tabLag 里 6 个 QDoubleSpinBox 的对比度
+      test_quick_buttons_have_readable_text — _QUICK_ANGLES 对应按钮的对比度
+    这 3 个测的控件全在 _hide_settings_tabs() 移除的 tabLag 里, 永不显示
+    (详见 CURRENT_STATE.md A-5 / F-1), 故随其产品调用点一并删除。
 
-        for i in range(layout.count()):
-            item = layout.itemAt(i)
-            if not item or not item.widget():
-                continue
-            w = item.widget()
-            if not hasattr(w, 'text'):
-                continue
-            text = w.text()
-            if not text or text == '—':
-                continue
-            ss = w.styleSheet().lower()
-            # Check has either explicit color OR font-weight (theme handles text color via palette)
-            has_style = "color" in ss or "font-weight" in ss or "font-size" in ss
-            assert has_style, (
-                f"Config item '{text}' missing style (ss='{w.styleSheet()}')"
-            )
-
-    def test_spinboxes_have_readable_text(self, window):
-        """所有 LAG 设置区的 QDoubleSpinBox 文字可见。"""
-        spin_names = [
-            "spinCustomAngle", "spinStepStart", "spinStepEnd",
-            "spinStepBy", "spinRStart", "spinREnd",
-        ]
-        for name in spin_names:
-            w = getattr(window.ui, name)
-            fg = w.palette().color(QPalette.Text)
-            bg = w.palette().color(QPalette.Base)
-            fg_lum = 0.299 * fg.red() + 0.587 * fg.green() + 0.114 * fg.blue()
-            bg_lum = 0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue()
-            contrast = abs(fg_lum - bg_lum)
-            assert contrast > 50, (
-                f"{name}: text={fg.name()} bg={bg.name()} contrast={contrast:.0f} — too low"
-            )
-
-    def test_quick_buttons_have_readable_text(self, window):
-        """快捷角度按钮文字可见。"""
-        for angle, attr in window._QUICK_ANGLES.items():
-            btn = getattr(window.ui, attr)
-            text_c = btn.palette().color(QPalette.ButtonText)
-            bg_c = btn.palette().color(QPalette.Button)
-            contrast = abs(
-                (0.299 * text_c.red() + 0.587 * text_c.green() + 0.114 * text_c.blue()) -
-                (0.299 * bg_c.red() + 0.587 * bg_c.green() + 0.114 * bg_c.blue())
-            )
-            assert contrast > 30, f"{attr}: button text/bg contrast={contrast:.0f}"
+    若日后要为**新界面**补「暗色主题可见性」覆盖, 应针对
+    AntennaParamsPage 的角度 widget 与 _show_angle_popup 弹窗, 而不是本类。
+    """
 
     def test_custom_qss_applied(self, window):
         """自定义 QSS 样式表已加载。"""

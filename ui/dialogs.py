@@ -1456,8 +1456,9 @@ class CalcParamsDialog(QDialog):
                 mw._lag_config.add_single(a)
             for lo, hi in sorted(set(self._angle_ranges)):
                 mw._lag_config.add_range(lo, hi)
-            mw._sync_quick_buttons()
-            mw._update_lag_display()
+            # 原此处调 mw._sync_quick_buttons() / mw._update_lag_display() ——
+            # 二者只操作 tabLag(已随 _hide_settings_tabs 移除) 里的不可见控件,
+            # 上面的 _lag_config 同步才是真实逻辑, 故仅移除这两行。
         # 同步 AR 角度
         if not hasattr(mw, '_ar_lag_config'):
             from src.lag_config import LagConfig

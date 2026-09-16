@@ -1048,10 +1048,10 @@ class FileSettingsPage(QWidget):
                             cfg.add_single(float(v.strip()))
                 except ValueError:
                     pass
-                if hasattr(self._mw, '_sync_quick_buttons'):
-                    self._mw._sync_quick_buttons()
-                if hasattr(self._mw, '_update_lag_display'):
-                    self._mw._update_lag_display()
+                # 原此处调 _sync_quick_buttons() / _update_lag_display() ——
+                # 二者只操作 tabLag(已随 MainWindow._hide_settings_tabs 移除) 里的
+                # 控件, 那些控件永不显示。保留调用只会空转, 且 _sync_quick_buttons
+                # 用 `getattr(self.ui, btn_attr)` 无默认值, 是隐患。故移除。
                 self._mw._log(f"✓ 已应用: {new_type} = {param_val}")
                 break
 
@@ -2528,7 +2528,11 @@ class AntennaParamsPage(QWidget):
         mw._test_mode = self._test_mode
 
         # 同步 Gain / AR 角度 widget → MainWindow
-        def _sync_widget(widget, cfg_attr, has_ui=False):
+        # 注: 原先 has_ui=True 时还会调 mw._sync_quick_buttons() /
+        # mw._update_lag_display()。二者只操作 tabLag(已随 _hide_settings_tabs
+        # 移除) 里的不可见控件 —— 每次 _sync_to_mw() 都白跑一趟, 且
+        # _sync_quick_buttons 的 getattr 无默认值留下隐患, 故一并移除。
+        def _sync_widget(widget, cfg_attr):
             if widget is None:
                 return
             if not hasattr(mw, cfg_attr):
@@ -2540,11 +2544,8 @@ class AntennaParamsPage(QWidget):
                 dest.add_single(a)
             for lo, hi in sorted(set(cfg.ranges)):
                 dest.add_range(lo, hi)
-            if has_ui:
-                mw._sync_quick_buttons()
-                mw._update_lag_display()
 
-        _sync_widget(self._gain_angle_widget, '_lag_config', has_ui=True)
+        _sync_widget(self._gain_angle_widget, '_lag_config')
         _sync_widget(self._ar_angle_widget, '_ar_lag_config')
         _sync_widget(self._rhcp_angle_widget, '_rhcp_lag_config')
         _sync_widget(self._cpxpi_angle_widget, '_cpxpi_lag_config')
