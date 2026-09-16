@@ -47,10 +47,13 @@ main.py → ui/main_window.py (PySide6 GUI)
 ### 关键规则
 
 1. `ui/compiled/ui_main_window.py` **禁止手动编辑** — 用 Qt Designer 改 `.ui` 后重新编译
-   > ⚠️ **但当前 `.ui` 与 `compiled/` 已不同步，先别重编译**：用当前
-   > `pyside6-uic` 重编译会把 `hButtons` 挂到 `rootVBox`（编译产物里是
-   > `vTabFile`），`_extract_execution_bar()` 随即抛 `QLayout already has a
-   > parent`，**`MainWindow` 构造直接失败**。需先比对两者结构差异并修正。
+   > ✅ **2026-09-16 已恢复同步**（commit `157a2d8`）。实测：
+   > `pyside6-uic ui/designer/main_window.ui` 的产物与 `compiled/ui_main_window.py`
+   > **逐字节一致**，可正常重编译。
+   > 历史问题（已解决，留作前车之鉴）：曾因两者结构不一致——`hButtons`
+   > 的父容器在 `.ui` 与编译产物中不同——导致重编译后 `_extract_execution_bar()`
+   > 抛「QLayout already has a parent」，**`MainWindow` 构造直接失败**。
+   > **改 `.ui` 后务必重编译并跑一次 `python3 gui_integrity_check.py` 验证。**
 2. 模板列头识别用**正则**不用 LLM — 命名准则见 `USER_GUIDE.html` 第 6.1 节
 3. `DataSource.from_path()` 工厂支持 `.csv`/`.xlsx`/`.xls`
 4. 频点匹配用最近邻 (容差 ±5 MHz)
@@ -187,7 +190,33 @@ DESIGN → PLAN → DEVELOP → VERIFY → COMMIT → MANAGE
 | `ui/compiled/ui_main_window.py` | `/gui-check` | `python3 gui_integrity_check.py` |
 | `*.spec` | `/size-gate` | `python3 build_size_gate.py --spec-only` |
 | PyInstaller 构建后 | `/size-gate` | `python3 build_size_gate.py` |
-| 任何 `.py` 变更 | E2E | `python3 _e2e_verify.py` |
+
+**验证范围按影响面裁剪**（全局规则 12），不按"改了 `.py`"一刀切：
+
+| 改动触及 | 验证动作 |
+|---------|---------|
+| 共享基类/接口（如 `DataSource`）、多方消费的数据格式（merged CSV / 报告 Excel）、跨模块契约 | **全量**（分块跑）+ 触及 UI 时加 `gui_integrity_check.py` |
+| 单一模块内部，消费者可 `grep` 枚举 | 该模块测试 + 所有消费者测试 |
+| 纯注释 / 文档 / 测试自身 | 对应测试 |
+
+判定影响面时**查测试实际执行了什么，不是看它的文件名** ——
+例：`test_e2e_features.py` 名字叫 e2e，但其 4 处 `from_path` 全指向 CSV，
+对 xlsx reader 改动**零覆盖**；其"全链路"测试用的是不存在的假路径 +
+`try/except: pass`，到不了 pipeline。
+
+**E2E 入口**：`_e2e_verify.py` **不存在**，勿引用。用「验证命令」节的 `run_pipeline` 片段。
+
+**全量套件在本机跑不完** —— 实测三次（含后台）均被超时/中断，必须分块：
+
+| 分块 | 耗时 |
+|------|------|
+| 核心（排除下列） | ~50s |
+| `test_pipeline.py` | ~3.5 min |
+| `test_e2e_features.py` | ~5.5 min |
+| `test_gui*.py` | 需图形环境 |
+
+**跑不完不许静默略过** —— 必须在汇报里写明"哪部分没跑、为什么"。
+只报"N 个测试通过"而不交代覆盖面，等于没报。
 
 ### Agent 自动行为规则（本会话生效，跨会话 CLAUDE.md 加载后生效）
 
@@ -199,8 +228,8 @@ DESIGN → PLAN → DEVELOP → VERIFY → COMMIT → MANAGE
 | 触发条件 | 自动执行 |
 |---------|---------|
 | 修改了 `ui/*.py` 或 `ui/dialogs.py` | `python3 gui_integrity_check.py` |
-| 修改了任何 `.py` 文件 | `python3 -m pytest tests/ -q -x` (后台运行) |
-| 修改了 `src/pipeline.py` | `python3 -m pytest tests/ -q -x -k "e2e or pipeline"` |
+| 修改了任何 `.py` 文件 | 按上方「验证范围按影响面裁剪」定档 —— **不要**无条件全量跑 |
+| 修改了 `src/pipeline.py` | `python3 -m pytest tests/test_pipeline.py -q`（~3.5min）；`test_e2e_features` 里也有 `run_pipeline` 测试，但被前者更彻底覆盖 |
 | 新增/修改 UI 控件 | `/gui-audit` — 检查控件是否可见/被裁剪/布局正确 |
 
 #### B. 自动开发流程
@@ -324,8 +353,14 @@ python3 ~/.claude/global-skills/python/size-gate/build_size_gate.py --spec-only
 ### 验证命令
 
 ```bash
-# 测试
-python3 -m pytest tests/ -q
+# 测试 —— 全量一次跑不完, 必须分块 (见「质量门禁」节)
+# 核心 (~50s)
+python3 -m pytest tests/ -q --ignore=tests/test_pipeline.py --ignore=tests/test_e2e_features.py \
+    --ignore=tests/test_gui.py --ignore=tests/test_gui_e2e.py \
+    --ignore=tests/test_gui_health.py --ignore=tests/test_gui_smoke.py
+# 慢速块
+python3 -m pytest tests/test_pipeline.py -q       # ~3.5min
+python3 -m pytest tests/test_e2e_features.py -q   # ~5.5min
 
 # GUI 完整性
 python3 gui_integrity_check.py
