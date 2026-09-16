@@ -43,6 +43,14 @@ def window(qapp, monkeypatch, qtbot):
     monkeypatch.setattr(QMessageBox, "critical", MagicMock(return_value=QMessageBox.Ok))
     monkeypatch.setattr(QMessageBox, "information", MagicMock(return_value=QMessageBox.Ok))
     monkeypatch.setattr(QMessageBox, "question", MagicMock(return_value=QMessageBox.Yes))
+    # QMessageBox.about 也是**静态模态** —— 上面这几个没覆盖到它。
+    # 实测 test_menu_action_no_crash[&帮助-关于...] 因此挂死。
+    monkeypatch.setattr(QMessageBox, "about", MagicMock(return_value=None))
+    # QDialog.exec() 会**模态阻塞**在嵌套事件循环里 —— offscreen 下无人点击关闭,
+    # 测试永远走不到后面那句「关闭可能弹出的对话框」的清理代码。
+    # 实测 test_menu_action_no_crash[&文件-系统设置...] 因此挂死 20 分钟(CPU 0%)。
+    # 打桩为立即返回 0, 相当于用户直接关掉对话框。
+    monkeypatch.setattr(QDialog, "exec", lambda self, *a, **k: 0)
 
     # Clean QSettings
     settings = QSettings("AntennaPP", "AntennaPostProcessor")
@@ -59,37 +67,107 @@ def window(qapp, monkeypatch, qtbot):
 
 # ── 辅助 ─────────────────────────────────────────────────────────────
 
-def _click_menu_action(window, menu_text: str, action_text: str, qtbot):
-    """点击指定菜单的指定 action, 返回该 action 对象。"""
-    mb = window.menuBar()
-    for a in mb.actions():
-        if a.text().replace("&", "") == menu_text.replace("&", ""):
-            sub = a.menu()
-            if sub:
-                for sa in sub.actions():
-                    if sa.isSeparator():
-                        continue
-                    if sa.text() == action_text:
-                        sub.close()  # 先关闭菜单避免悬空
-                        sa.trigger()
-                        qtbot.wait(100)
-                        return sa
+def _find_in_menu(menu, action_text: str):
+    """在 menu 中**递归**查找文本完全匹配的 action, 不触发。
+
+    同样必须保持 `actions()` 列表的引用(见 _top_menu): 临时列表被 GC 时
+    PySide 会连带销毁 C++ 的 QAction -> 递归进子菜单或返回后访问都会抛
+    "Internal C++ object (QAction) already deleted"。
+    实测: 工具子菜单的 6 个项全因此失败。
+    """
+    actions = menu.actions()
+    _MENU_ACTION_REFS.append(actions)
+    if len(_MENU_ACTION_REFS) > 64:
+        del _MENU_ACTION_REFS[:-32]
+    for sa in actions:
+        if sa.isSeparator():
+            continue
+        if sa.text() == action_text:
+            return sa
+        sub = sa.menu()
+        if sub is not None:
+            hit = _find_in_menu(sub, action_text)
+            if hit is not None:
+                return hit
     return None
+
+
+# 保持 QAction 包装器的引用 —— 见 _top_menu 的说明。
+_MENU_ACTION_REFS: list = []
+
+
+def _top_menu(window, menu_text: str):
+    """按文本找到顶层菜单 (忽略 & 助记符)。
+
+    ⚠️ **必须把 actions 列表存下来**, 不能写成 `for a in window.menuBar().actions()`:
+    `actions()` 返回的是 PySide 包装器列表, 该临时列表被 GC 时 PySide 会**连带
+    销毁 C++ 的 QAction**(它认为自己拥有), 进而销毁其子 QMenu —— 于是本函数
+    返回的 QMenu 在调用方手里已经是死对象, 访问即抛
+    "Internal C++ object (QMenu) already deleted"。
+    实测: 临时列表写法必失败, 保持引用则正常(11 个 action)。
+    生产代码无此问题: window_manager.py 用的是 `actions = menu.actions()`(赋给
+    局部变量), 菜单也由 `window._menu_window` 长期持有。
+    """
+    actions = window.menuBar().actions()
+    _MENU_ACTION_REFS.append(actions)
+    if len(_MENU_ACTION_REFS) > 64:
+        del _MENU_ACTION_REFS[:-32]
+    for a in actions:
+        if a.text().replace("&", "") == menu_text.replace("&", ""):
+            return a.menu()
+    return None
+
+
+def _click_menu_action(window, menu_text: str, action_text: str, qtbot):
+    """点击指定菜单(可含子菜单)的指定 action, 返回该 action 对象。
+
+    必须是**递归**的: 工具类菜单已改为两级 ——
+    `&工具 → 数据处理 → 数据检查与转换...`。只扫一层会找不到这些项。
+    """
+    sub = _top_menu(window, menu_text)
+    if sub is None:
+        return None
+    sa = _find_in_menu(sub, action_text)
+    if sa is None:
+        return None
+    sub.close()          # 先关闭菜单避免悬空
+    sa.trigger()
+    qtbot.wait(100)
+    return sa
+
+
+def _click_menu_action_strict(window, menu_text: str, action_text: str, qtbot):
+    """同 _click_menu_action, 但找不到时**断言失败**。
+
+    原版找不到时静默返回 None, 而调用方不看返回值 -> 用例「什么都没点却通过」,
+    菜单项改名/移动后测试不会报警。实测 [&文件-导出报告...] 就是这样空过的。
+    """
+    sa = _click_menu_action(window, menu_text, action_text, qtbot)
+    assert sa is not None, f"菜单项不存在: {menu_text} → {action_text}"
+    return sa
+
+
+def _all_menu_texts(menu) -> set:
+    """递归收集菜单项文本。
+
+    菜单已改为**两级**(如 &工具 → 数据处理 → 数据检查与转换等 7 个工具),
+    只遍历一层会漏掉整个子菜单 —— 实测 test_tools_menu_structure_complete
+    因此误报 7 个工具全部缺失。
+    """
+    out = set()
+    for a in menu.actions():
+        if a.isSeparator():
+            continue
+        out.add(a.text())
+        if a.menu() is not None:
+            out |= _all_menu_texts(a.menu())
+    return out
 
 
 def _find_menu_action(window, menu_text: str, action_text: str):
-    """查找菜单 action, 不触发。"""
-    mb = window.menuBar()
-    for a in mb.actions():
-        if a.text().replace("&", "") == menu_text.replace("&", ""):
-            sub = a.menu()
-            if sub:
-                for sa in sub.actions():
-                    if sa.isSeparator():
-                        continue
-                    if sa.text() == action_text:
-                        return sa
-    return None
+    """查找菜单 action (递归, 含子菜单), 不触发。"""
+    sub = _top_menu(window, menu_text)
+    return None if sub is None else _find_in_menu(sub, action_text)
 
 
 def _switch_tab_by_text(window, text_fragment: str, qtbot):
@@ -133,7 +211,6 @@ class TestAllMenuActions:
         ("&文件", "打开任务包..."),
         ("&文件", "保存任务包"),
         ("&文件", "另存任务包..."),
-        ("&文件", "导出报告..."),
         ("&文件", "系统设置..."),
         # Window
         ("&窗口", "新建窗口"),
@@ -142,7 +219,7 @@ class TestAllMenuActions:
         ("&工具", "路径损耗补偿..."),
         ("&工具", "数据合并 (多段拼接)..."),
         ("&工具", "步进重采样..."),
-        ("&工具", "数据修复 (插值)"),
+        ("&工具", "数据修复 (插值)..."),
         ("&工具", "模板预设管理..."),
         ("&工具", "校准预设管理..."),
         ("&工具", "EMQuest 数据导出..."),
@@ -154,7 +231,7 @@ class TestAllMenuActions:
     ])
     def test_menu_action_no_crash(self, window, qtbot, menu, action):
         """菜单 action 点击后应用不崩溃。"""
-        _click_menu_action(window, menu, action, qtbot)
+        _click_menu_action_strict(window, menu, action, qtbot)
         # 关闭可能弹出的对话框
         for dlg in window.findChildren(QDialog):
             if dlg.isVisible():
@@ -172,8 +249,11 @@ class TestAllMenuActions:
 
     def test_file_menu_structure_complete(self, window):
         """文件菜单结构完整 (所有预期项都存在)。"""
+        # 注: 原期望含 "导出报告", 但该 action 在 main_window.py 中并不存在
+        # (导出已移到执行栏的「📄 出报告」按钮)。参数化用例之所以"通过",
+        # 是因为 _click_menu_action 找不到时静默返回 None 而调用方未断言。
         expected = {"新建窗口", "打开任务包", "保存任务包", "另存任务包",
-                     "打印", "导出报告", "系统设置", "退出"}
+                     "打印", "系统设置", "退出"}
         mb = window.menuBar()
         file_menu = None
         for a in mb.actions():
@@ -181,7 +261,7 @@ class TestAllMenuActions:
                 file_menu = a.menu()
                 break
         assert file_menu is not None, "File menu not found"
-        found = {sa.text() for sa in file_menu.actions() if not sa.isSeparator()}
+        found = _all_menu_texts(file_menu)
         for e in expected:
             assert any(e in f for f in found), f"Menu item '{e}' missing from File menu"
 
@@ -196,7 +276,7 @@ class TestAllMenuActions:
                 tools_menu = a.menu()
                 break
         assert tools_menu is not None, "Tools menu not found"
-        found = {sa.text() for sa in tools_menu.actions() if not sa.isSeparator()}
+        found = _all_menu_texts(tools_menu)
         for kw in expected_keywords:
             assert any(kw in f for f in found), f"Tool '{kw}' missing from Tools menu"
 
@@ -521,7 +601,10 @@ class TestAllDialogs:
 
     def test_rag_settings_dialog_creates(self, window, qtbot):
         from ui.dialogs import RAGSettingsDialog
-        dlg = RAGSettingsDialog(window)
+        from ui.dialogs import RAGSettings
+        # 签名是 (settings, parent=None) —— 原来传单参数会把 MainWindow
+        # 当成 settings, 随后 self.settings.enabled 抛 AttributeError。
+        dlg = RAGSettingsDialog(RAGSettings(), window)
         qtbot.addWidget(dlg)
         assert dlg is not None
         dlg.close()

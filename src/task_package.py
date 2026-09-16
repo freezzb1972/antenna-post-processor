@@ -48,7 +48,7 @@ def save_task_package(
         data_files_info = []
         for fp in data_file_paths:
             f = Path(fp)
-            if f.exists():
+            if f.is_file():
                 data_files_info.append({
                     "original_path": str(f.resolve()),
                     "filename": f.name,
@@ -62,10 +62,13 @@ def save_task_package(
             "created": datetime.now().isoformat(),
             "task_name": task_name,
             "data_files": data_files_info,
+            # 用 is_file() 而非 exists(): 目录也满足 exists(), 会把 _file_hash
+            # 送到 open(目录) 上 -> IsADirectoryError 抛进 Qt 事件循环。
+            # 实测: 模板路径为空时 Path("") == Path("."), 保存任务包即崩。
             "template": {
-                "original_path": str(tpl.resolve()) if tpl.exists() else "",
-                "filename": tpl.name if tpl.exists() else "",
-                "sha256": _file_hash(tpl) if tpl.exists() else "",
+                "original_path": str(tpl.resolve()) if tpl.is_file() else "",
+                "filename": tpl.name if tpl.is_file() else "",
+                "sha256": _file_hash(tpl) if tpl.is_file() else "",
             },
             "config_snapshot": config_snapshot,
             "results": results or {},
@@ -83,17 +86,18 @@ def save_task_package(
         data_dir.mkdir()
         for fp in data_file_paths:
             f = Path(fp)
-            if f.exists():
+            if f.is_file():
                 shutil.copy2(str(f), str(data_dir / f.name))
 
-        # 复制模板
-        if tpl.exists():
+        # 复制模板 —— 同样必须用 is_file(): 目录也满足 exists(), 会让
+        # shutil.copy2 去 open(目录) 而抛 IsADirectoryError。
+        if tpl.is_file():
             tpl_dir = tmp / "template"
             tpl_dir.mkdir()
             shutil.copy2(str(tpl), str(tpl_dir / tpl.name))
 
         # 打包
-        if p.exists():
+        if p.is_file():
             p.unlink()
         with zipfile.ZipFile(str(p), "w", zipfile.ZIP_DEFLATED) as zf:
             for fpath in tmp.rglob("*"):
@@ -107,7 +111,7 @@ def save_task_package(
 def load_task_package(path: str) -> dict[str, Any]:
     """加载 .ant 任务包，返回 task.json 内容。"""
     p = Path(path)
-    if not p.exists() or p.suffix.lower() != TASK_PACKAGE_EXT:
+    if not p.is_file() or p.suffix.lower() != TASK_PACKAGE_EXT:
         raise ValueError(f"不是有效的任务包: {path}")
 
     with zipfile.ZipFile(str(p), "r") as zf:
@@ -125,7 +129,7 @@ def verify_data_integrity(task_meta: dict[str, Any]) -> dict[str, str]:
     result = {}
     for fi in task_meta.get("data_files", []):
         orig = fi.get("original_path", "")
-        if not orig or not Path(orig).exists():
+        if not orig or not Path(orig).is_file():
             result[orig] = "missing"
         else:
             current_hash = _file_hash(Path(orig))
@@ -137,7 +141,9 @@ def verify_data_integrity(task_meta: dict[str, Any]) -> dict[str, str]:
 
 
 def _file_hash(path: Path) -> str:
-    """计算文件 SHA256。"""
+    """计算文件 SHA256。非普通文件(目录/不存在)返回空串 —— 不抛异常。"""
+    if not path.is_file():
+        return ""
     h = hashlib.sha256()
     with open(str(path), "rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):

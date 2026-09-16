@@ -64,19 +64,45 @@ class WindowManager:
 
     def _on_window_destroyed(self, window: "WorkWindow") -> None:  # type: ignore[name-defined]
         """窗口关闭后从列表移除并更新菜单。"""
-        if window in self._windows:
-            self._windows.remove(window)
+        # 按**身份**移除, 不用 `in` / `remove`: 它们走 __eq__, 而对已销毁的
+        # PySide 对象做相等比较会抛 RuntimeError -> 移除被跳过 -> 窗口永久留在
+        # _windows 里。后果有二:
+        #   ① 内存不释放(每个 MainWindow 及其整棵控件树)
+        #   ② _update_all_window_menus 每次遍历全部历史窗口 -> O(n^2),
+        #      实测 GUI 测试套件越跑越慢(10 分钟才 18 个用例)
+        # 身份比较不触碰 C++ 对象, 始终安全。
+        self._windows = [w for w in self._windows if w is not window]
         self._update_all_window_menus()
 
     # ── 菜单更新 ──
 
     def _update_all_window_menus(self) -> None:
-        """同步所有窗口的「窗口」菜单内容。"""
-        for win in self._windows:
+        """同步所有窗口的「窗口」菜单内容。
+
+        迭代**副本**: 刷新过程中若有窗口销毁, _windows 会被改动, 直接迭代会抛
+        "list changed size during iteration"。
+        """
+        for win in list(self._windows):
             self._refresh_window_menu(win)
 
     def _refresh_window_menu(self, window: "WorkWindow") -> None:  # type: ignore[name-defined]
-        """重建某个窗口的「窗口」菜单（窗口列表部分）。"""
+        """重建某个窗口的「窗口」菜单（窗口列表部分）。
+
+        ⚠ 必须防御**已销毁窗口**: WindowManager 是单例, _windows 持有 Python
+        包装器, 而窗口的 C++ 对象可能已被 Qt 回收 —— destroyed 信号送达与列表
+        清理之间存在窗口期, 且销毁过程中菜单会被多次刷新。此时访问其
+        _menu_window / 调用 window_title() 都会抛
+        RuntimeError: "Internal C++ object already deleted"。
+        实测: tests/test_gui_smoke.py 每个用例新建 MainWindow, 累计 83 个
+        setup error 全由此而来 —— 生产环境下「关一个窗口再开新窗口」同理会崩。
+        """
+        try:
+            self._do_refresh_window_menu(window)
+        except RuntimeError:
+            return          # 窗口或其子菜单已销毁 — 跳过, 不是错误
+
+    def _do_refresh_window_menu(self, window: "WorkWindow") -> None:  # type: ignore[name-defined]
+        """_refresh_window_menu 的实际实现 (调用方负责 RuntimeError 防御)。"""
         menu = getattr(window, '_menu_window', None)
         if menu is None:
             return
@@ -96,8 +122,11 @@ class WindowManager:
                 menu.removeAction(action)
 
         # 重新添加窗口列表（每个带关闭按钮）
-        for win in self._windows:
-            title = win.window_title()
+        for win in list(self._windows):
+            try:
+                title = win.window_title()
+            except RuntimeError:
+                continue        # 该窗口已销毁
             wa = QWidgetAction(menu)
             wgt = QWidget()
             hl = QHBoxLayout(wgt)

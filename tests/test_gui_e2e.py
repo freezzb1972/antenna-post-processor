@@ -136,7 +136,10 @@ class TestFileInput:
         def capture_filter(*args, **kwargs):
             if len(args) >= 4:
                 filters_captured.append(args[3])
-            return ("/tmp/test.csv", "")
+            # 必须返回 (list[str], str) —— getOpenFileNames 的契约。
+            # 原来返回 ("/tmp/test.csv", "") 会让调用方解包出**字符串**,
+            # 随后逐字符当路径处理 -> PermissionError: '/output'。
+            return (["/tmp/test.csv"], "")
 
         monkeypatch.setattr(QFileDialog, "getOpenFileNames", capture_filter)
         window._on_add_data_files()
@@ -166,6 +169,12 @@ class TestFileInput:
     def test_template_not_excel_shows_warning(self, window, monkeypatch):
         """模板不是 Excel 格式时弹窗警告。"""
         from pathlib import Path
+        # _on_start 现在**先去**校验输出类型, 不勾选会提前 return 并弹
+        # "请至少选择一种输出类型..." —— 走不到模板格式检查。
+        # (门禁 G6 早已为此加过同样的勾选)
+        _fp = getattr(window, '_file_settings_page', None)
+        if _fp is not None and hasattr(_fp, '_check_out_excel'):
+            _fp._check_out_excel.setChecked(True)
         window._data_file_paths = ["/tmp/test.csv"]
         from src.sheet_file_matcher import MatchResult
         window._last_matches = [MatchResult(sheet_name="Sheet1", file_path="/tmp/test.csv", confidence=1.0)]
@@ -295,7 +304,8 @@ class TestProgressBar:
         window._on_progress(5, 100, "处理中...")
         assert window.ui.progressBar.maximum() == 100
         assert window.ui.progressBar.value() == 5
-        assert window.ui.lblProgressMsg.text() == "处理中..."
+        # 标签现在带 [N%] 前缀 (如 "[5%] 处理中..."), 见 _on_progress
+        assert "处理中..." in window.ui.lblProgressMsg.text()
 
     def test_progress_bar_complete(self, window):
         """完成时 progressBar 到达最大值。"""
@@ -305,7 +315,9 @@ class TestProgressBar:
     def test_progress_zero(self, window):
         """初始进度 0 不异常。"""
         window._on_progress(0, 0, "📂 加载数据 0%")
-        assert window.ui.progressBar.maximum() == 0
+        # _on_progress 已改为**百分比制**: 恒定 setMaximum(100),
+        # 故 total=0 时 maximum 仍是 100, 只有 value 为 0。
+        assert window.ui.progressBar.maximum() == 100
         assert window.ui.progressBar.value() == 0
 
 
