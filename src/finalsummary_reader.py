@@ -75,7 +75,11 @@ class FinalSummarySource(DataSource):
 
     def __init__(self, path: str):
         self._path = path
-        self._wb = openpyxl.load_workbook(path, data_only=True, read_only=False)
+        # read_only=True: 流式惰性解析, 只解析实际访问到的 sheet。
+        # read_only=False 会把**全部** sheet 一次性读进内存 —— 实测 118MB/105 sheet
+        # 的文件耗时 179s、内存 +4.9GB; 583MB/139 sheet 的文件推算约 15min / 24GB,
+        # 足以打爆内存并冻结界面。本类全部读取均走 iter_rows() 流式接口, 兼容该模式。
+        self._wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
 
         # ---- 频点列表（数字命名的 sheet，排除 Cplx/AxR/Original 等汇总 sheet） ----
         self._freqs: list[float] = []

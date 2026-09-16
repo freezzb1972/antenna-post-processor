@@ -4476,12 +4476,12 @@ class ChartSettingsPage(QWidget):
         self._sync_to_mw()
 
 
-    def _add_frequency_picker(self, layout: QVBoxLayout, cat: str = "a"):
-        """构建频点选择组件 — 下级弹窗模式。返回 picker adapter。"""
-        freq_grp = QGroupBox(self.tr("频点选择"))
-        freq_lo = QVBoxLayout(freq_grp)
+    def _load_all_frequencies(self) -> list[float]:
+        """收集全部频点 — 优先用已缓存的数据源, 无缓存才解析数据文件。
 
-        # 加载全部频点
+        仅在用户主动选择频点时调用 (点「选择频点...」), 避免打开参数弹窗
+        就同步解析数据文件 (500MB xlsx 走 openpyxl 全量入内存) 冻结界面。
+        """
         all_freqs = set()
         ds_map = getattr(self._mw, '_cached_datasource_map', None) if self._mw else None
         if ds_map:
@@ -4497,7 +4497,14 @@ class ChartSettingsPage(QWidget):
                         all_freqs.update(ds.frequencies)
                 except Exception:
                     pass
-        all_freqs = sorted(all_freqs)
+        return sorted(all_freqs)
+
+    def _add_frequency_picker(self, layout: QVBoxLayout, cat: str = "a"):
+        """构建频点选择组件 — 下级弹窗模式。返回 picker adapter。"""
+        freq_grp = QGroupBox(self.tr("频点选择"))
+        freq_lo = QVBoxLayout(freq_grp)
+
+        # 频点列表延迟加载 — 见 _load_all_frequencies(), 点「选择频点...」时才读文件
 
         # 已选频点
         cfg = getattr(self._mw, '_chart_config_required', None) if self._mw else None
@@ -4512,6 +4519,10 @@ class ChartSettingsPage(QWidget):
         btn_open = QPushButton(self.tr("选择频点..."))
         def _open_dialog():
             from ui.widgets import FrequencyPickerDialog
+            all_freqs = self._load_all_frequencies()
+            if not all_freqs:
+                QMessageBox.information(self, self.tr("提示"), self.tr("请先加载数据源文件"))
+                return
             dlg = FrequencyPickerDialog(all_freqs, _selected, parent=self)
             if dlg.exec() == QDialog.Accepted:
                 _selected.clear()
