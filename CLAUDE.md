@@ -206,7 +206,8 @@ DESIGN → PLAN → DEVELOP → VERIFY → COMMIT → MANAGE
 
 **E2E 入口**：`_e2e_verify.py` **不存在**，勿引用。用「验证命令」节的 `run_pipeline` 片段。
 
-**全量套件在本机跑不完** —— 实测三次（含后台）均被超时/中断，必须分块：
+**全量套件一次跑完需 ~2h52m**（实测 10304s → 332 passed / 1 failed / 1 skipped），
+日常不可用，必须分块：
 
 | 分块 | 耗时 |
 |------|------|
@@ -215,7 +216,12 @@ DESIGN → PLAN → DEVELOP → VERIFY → COMMIT → MANAGE
 | `test_e2e_features.py` | ~5.5 min |
 | `test_gui*.py` | 需图形环境 |
 
-**跑不完不许静默略过** —— 必须在汇报里写明"哪部分没跑、为什么"。
+> ⚠ `test_gui_health.py::TestPerformanceBaseline::test_mainwindow_creation_time`
+> 是**挂钟计时断言**（`assert elapsed < 5.0`）—— 机器有负载时会**假失败**
+> （实测：并发跑基准时 failed，空闲时单跑 passed）。看到它失败先看 `uptime`，
+> 不要当回归处理。
+
+**没跑的块必须在汇报里说明"哪部分没跑、为什么"**。
 只报"N 个测试通过"而不交代覆盖面，等于没报。
 
 ### Agent 自动行为规则（本会话生效，跨会话 CLAUDE.md 加载后生效）
