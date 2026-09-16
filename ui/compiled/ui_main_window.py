@@ -252,11 +252,6 @@ class Ui_MainWindow(object):
 
         self.hQuickSingle.addWidget(self.spinCustomAngle)
 
-        self.btnAddCustomAngle = QPushButton(self.groupQuickSingle)
-        self.btnAddCustomAngle.setObjectName(u"btnAddCustomAngle")
-
-        self.hQuickSingle.addWidget(self.btnAddCustomAngle)
-
 
         self.vTabLag.addWidget(self.groupQuickSingle)
 
@@ -301,11 +296,6 @@ class Ui_MainWindow(object):
 
         self.hStepGen.addWidget(self.spinStepBy)
 
-        self.btnStepGenerate = QPushButton(self.groupStepGen)
-        self.btnStepGenerate.setObjectName(u"btnStepGenerate")
-
-        self.hStepGen.addWidget(self.btnStepGenerate)
-
 
         self.vTabLag.addWidget(self.groupStepGen)
 
@@ -337,11 +327,6 @@ class Ui_MainWindow(object):
 
         self.hRange.addWidget(self.spinREnd)
 
-        self.btnAddRange = QPushButton(self.groupRange)
-        self.btnAddRange.setObjectName(u"btnAddRange")
-
-        self.hRange.addWidget(self.btnAddRange)
-
         self.spRange = QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.hRange.addItem(self.spRange)
@@ -366,26 +351,6 @@ class Ui_MainWindow(object):
 
         self.hConfigButtons = QHBoxLayout()
         self.hConfigButtons.setObjectName(u"hConfigButtons")
-        self.btnLoadFromTemplate = QPushButton(self.groupConfigured)
-        self.btnLoadFromTemplate.setObjectName(u"btnLoadFromTemplate")
-
-        self.hConfigButtons.addWidget(self.btnLoadFromTemplate)
-
-        self.btnClearConfig = QPushButton(self.groupConfigured)
-        self.btnClearConfig.setObjectName(u"btnClearConfig")
-
-        self.hConfigButtons.addWidget(self.btnClearConfig)
-
-        self.btnSavePreset = QPushButton(self.groupConfigured)
-        self.btnSavePreset.setObjectName(u"btnSavePreset")
-
-        self.hConfigButtons.addWidget(self.btnSavePreset)
-
-        self.btnLoadPreset = QPushButton(self.groupConfigured)
-        self.btnLoadPreset.setObjectName(u"btnLoadPreset")
-
-        self.hConfigButtons.addWidget(self.btnLoadPreset)
-
         self.spConfig = QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.hConfigButtons.addItem(self.spConfig)
@@ -590,7 +555,6 @@ class Ui_MainWindow(object):
         self.btnQuick90.setText(QCoreApplication.translate("MainWindow", u"90\u00b0", None))
         self.lblCustomAngle.setText(QCoreApplication.translate("MainWindow", u"\u81ea\u5b9a\u4e49\uff1a", None))
         self.spinCustomAngle.setSuffix(QCoreApplication.translate("MainWindow", u"\u00b0", None))
-        self.btnAddCustomAngle.setText(QCoreApplication.translate("MainWindow", u"+", None))
         self.groupStepGen.setTitle(QCoreApplication.translate("MainWindow", u"\u6b65\u8fdb\u6279\u91cf\u751f\u6210", None))
         self.lblStepStart.setText(QCoreApplication.translate("MainWindow", u"\u8d77\u59cb\uff1a", None))
         self.spinStepStart.setSuffix(QCoreApplication.translate("MainWindow", u"\u00b0", None))
@@ -598,18 +562,12 @@ class Ui_MainWindow(object):
         self.spinStepEnd.setSuffix(QCoreApplication.translate("MainWindow", u"\u00b0", None))
         self.lblStepBy.setText(QCoreApplication.translate("MainWindow", u"\u6b65\u8fdb\uff1a", None))
         self.spinStepBy.setSuffix(QCoreApplication.translate("MainWindow", u"\u00b0", None))
-        self.btnStepGenerate.setText(QCoreApplication.translate("MainWindow", u"\u751f\u6210 >>", None))
         self.groupRange.setTitle(QCoreApplication.translate("MainWindow", u"\u6dfb\u52a0\u89d2\u5ea6\u8303\u56f4 LAG\uff08\u53d6\u8303\u56f4\u5185\u6240\u6709 \u03b8 \u7684 LAG \u5747\u503c\uff09", None))
         self.lblRStart.setText(QCoreApplication.translate("MainWindow", u"\u8d77\u59cb\uff1a", None))
         self.spinRStart.setSuffix(QCoreApplication.translate("MainWindow", u"\u00b0", None))
         self.lblREnd.setText(QCoreApplication.translate("MainWindow", u"\u7ed3\u675f\uff1a", None))
         self.spinREnd.setSuffix(QCoreApplication.translate("MainWindow", u"\u00b0", None))
-        self.btnAddRange.setText(QCoreApplication.translate("MainWindow", u"\u6dfb\u52a0\u8303\u56f4", None))
         self.groupConfigured.setTitle(QCoreApplication.translate("MainWindow", u"\u5df2\u914d\u7f6e\u9879", None))
-        self.btnLoadFromTemplate.setText(QCoreApplication.translate("MainWindow", u"\U0001f4e5 \U00004ece\U00006a21\U0000677f\U000052a0\U00008f7d", None))
-        self.btnClearConfig.setText(QCoreApplication.translate("MainWindow", u"\U0001f5d1 \U00006e05\U00007a7a", None))
-        self.btnSavePreset.setText(QCoreApplication.translate("MainWindow", u"\U0001f4be \U00004fdd\U00005b58\U00009884\U00008bbe", None))
-        self.btnLoadPreset.setText(QCoreApplication.translate("MainWindow", u"\U0001f4c2 \U000052a0\U00008f7d\U00009884\U00008bbe", None))
         self.tabConfig.setTabText(self.tabConfig.indexOf(self.tabLag), QCoreApplication.translate("MainWindow", u"\U0001f4d0 \U00005904\U00007406\U000053c2\U00006570\U0000914d\U00007f6e", None))
         self.groupGenImg.setTitle(QCoreApplication.translate("MainWindow", u"\u751f\u6210\u9009\u9879", None))
         self.checkEmbedExcel.setText(QCoreApplication.translate("MainWindow", u"\u5d4c\u5165 Excel \u5de5\u4f5c\u8868", None))

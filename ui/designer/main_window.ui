@@ -85,7 +85,6 @@
            <item><spacer name="spQuick"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
            <item><widget class="QLabel" name="lblCustomAngle"><property name="text"><string>自定义：</string></property></widget></item>
            <item><widget class="QDoubleSpinBox" name="spinCustomAngle"><property name="value"><double>0.00</double></property><property name="maximum"><double>180.00</double></property><property name="suffix"><string>°</string></property></widget></item>
-           <item><widget class="QPushButton" name="btnAddCustomAngle"><property name="text"><string>+</string></property></widget></item>
           </layout>
          </widget>
         </item>
@@ -99,7 +98,6 @@
            <item><widget class="QDoubleSpinBox" name="spinStepEnd"><property name="value"><double>90.00</double></property><property name="maximum"><double>180.00</double></property><property name="suffix"><string>°</string></property></widget></item>
            <item><widget class="QLabel" name="lblStepBy"><property name="text"><string>步进：</string></property></widget></item>
            <item><widget class="QDoubleSpinBox" name="spinStepBy"><property name="value"><double>10.00</double></property><property name="minimum"><double>0.50</double></property><property name="maximum"><double>90.00</double></property><property name="suffix"><string>°</string></property></widget></item>
-           <item><widget class="QPushButton" name="btnStepGenerate"><property name="text"><string>生成 &gt;&gt;</string></property></widget></item>
           </layout>
          </widget>
         </item>
@@ -111,7 +109,6 @@
            <item><widget class="QDoubleSpinBox" name="spinRStart"><property name="value"><double>0.00</double></property><property name="maximum"><double>180.00</double></property><property name="suffix"><string>°</string></property></widget></item>
            <item><widget class="QLabel" name="lblREnd"><property name="text"><string>结束：</string></property></widget></item>
            <item><widget class="QDoubleSpinBox" name="spinREnd"><property name="value"><double>90.00</double></property><property name="maximum"><double>180.00</double></property><property name="suffix"><string>°</string></property></widget></item>
-           <item><widget class="QPushButton" name="btnAddRange"><property name="text"><string>添加范围</string></property></widget></item>
            <item><spacer name="spRange"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
           </layout>
          </widget>
@@ -122,10 +119,6 @@
           <layout class="QVBoxLayout" name="vConfigured"><property name="spacing"><number>6</number></property>
            <item><widget class="QWidget" name="configItemsWidget" native="true"><property name="sizePolicy"><sizepolicy hsizetype="Preferred" vsizetype="MinimumExpanding"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property></widget></item>
            <item><layout class="QHBoxLayout" name="hConfigButtons">
-            <item><widget class="QPushButton" name="btnLoadFromTemplate"><property name="text"><string>📥 从模板加载</string></property></widget></item>
-            <item><widget class="QPushButton" name="btnClearConfig"><property name="text"><string>🗑 清空</string></property></widget></item>
-            <item><widget class="QPushButton" name="btnSavePreset"><property name="text"><string>💾 保存预设</string></property></widget></item>
-            <item><widget class="QPushButton" name="btnLoadPreset"><property name="text"><string>📂 加载预设</string></property></widget></item>
             <item><spacer name="spConfig"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
            </layout></item>
           </layout>

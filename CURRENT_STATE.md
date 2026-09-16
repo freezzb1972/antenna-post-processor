@@ -227,21 +227,49 @@ cd /mnt/d/cc/antenna-post-processor && \
    **实测开销**：`_sync_quick_buttons` **0.01ms/次**、`_update_lag_display`
    **0.13ms/次** —— 性能影响可忽略；功能上当前不报错、无副作用传播。
 
-   > ⚠ **原本是定时炸弹 —— 已在 `a25fe83` 拆除**：`_sync_quick_buttons` 里是
-   > `getattr(self.ui, btn_attr)`，**无默认值**，而调用挂在真实路径上
-   > （`_sync_to_mw()` 被 10+ 处信号连接）。若先删控件属性，就会抛
-   > `AttributeError` 并中断图表配置同步。
-   > a25fe83 已把 **3 处调用点**全部移除（`pages.py` ×2、`dialogs.py` ×1 ——
-   > 第三处是 grep 复查时才发现的），顺带删掉 `_sync_widget` 的 `has_ui` 参数
-   > （它唯一用途就是这对死调用）。**两个函数现已无任何调用方，隐患消失。**
+   > ⚠ **定时炸弹仍在 —— 此处我曾误判，特此更正**：`_sync_quick_buttons` 里是
+   > `getattr(self.ui, btn_attr)`，**无默认值**。`a25fe83` 只移除了 `mw.` 前缀的
+   > 3 处**跨对象**调用（`pages.py` ×2、`dialogs.py` ×1），**漏了 `self.` 前缀的
+   > 类内调用** —— `ui/main_window.py` 里还有 **13 处**，其中多处是活的：
+   >
+   > | 调用点所在方法 | 状态 |
+   > |---|---|
+   > | `__init__` (:180) | ✅ 活 |
+   > | `_auto_update_angle_config_from_template` (:1984) | ✅ **活 —— 7 处调用点**（模板变更时触发） |
+   > | `_remove_single` / `_remove_range` (:2266 / :2271) | ✅ 活（`_update_lag_display` 内部创建的删除按钮所连接） |
+   > | `_on_language_changed` (:3287) | ✅ 活（I18nManager 调用） |
+   > | `_on_load_from_template` / `_on_clear_config` / `_on_load_preset` | ❌ 死（0 调用点） |
+   > | `_toggle_quick_angle` / `_add_custom_angle` / `_on_step_generate` / `_on_add_range` | ❌ 死（0 外部调用者） |
+   >
+   > **教训**：grep 调用点必须同时查 `mw.` 与 `self.` 两种前缀，
+   > 只查前者会漏掉全部类内调用 —— 这就是我误判「隐患已消失」的原因。
 
    **剩余待做**（真正的死代码本体，非紧急）：
    - 两个方法本体：`_sync_quick_buttons()` / `_update_lag_display()`
    - `compiled/ui_main_window.py` 里那 49 个控件定义与 4 个 groupbox
 
-   > ⚠ 删控件定义**必须改 `.ui` 后重编译**，而 `.ui` / `compiled` 目前**不同步**
-   > （重编译会让 `MainWindow` 构造直接失败，见 D-11）。所以这项**卡在 `.ui` 上，
-   > 不是卡在风险上** —— 解决 `.ui` 同步后，那 7 个零引用按钮是最先可删的。
+   > ✅ **无阻塞，可以做了**。曾以为「删控件定义必须改 `.ui` 重编译，而 `.ui` 与
+   > `compiled` 不同步」——**该判断有误，已实测推翻**：`157a2d8`（2026-09-16 04:20）
+   > 已恢复同步，重编译产物与现有 `compiled/` **逐字节一致**（`CLAUDE.md` 里那段
+   > 「先别重编译」的警告当时已过时，现已同步更正）。
+   > 仍须遵守：改 `.ui` → `pyside6-uic` 重编译 → 跑 `gui_integrity_check.py` 验证。
+
+   **清理进度**：
+   - ✅ **7 个零引用按钮已删除** —— `btnAddCustomAngle` / `btnStepGenerate` /
+     `btnAddRange` / `btnLoadFromTemplate` / `btnClearConfig` / `btnSavePreset` /
+     `btnLoadPreset`。做法：从 `.ui` 删定义行 → `pyside6-uic` 重编译。
+     验证：MainWindow 构造正常 · 7 个按钮已从 `ui` 对象消失 · 保留控件
+     （`configItemsWidget` / `spinCustomAngle` / `btnQuick0` / `groupConfigured`）
+     完好 · `gui_integrity_check.py` 12 项全过 · tabConfig 仍是 3 个 tab。
+   - ⏳ **其余 42 个控件**（`btnQuick*` ×10 / 6 数值框 / 9 标签 / 4 分组 / 其他）
+     —— 与 `_QUICK_ANGLES`、两个方法本体绑定，**必须与 Python 侧同批删**
+     （含上面那 13 处 `self.` 调用点）。
+   - ⚠ **4 个 groupbox 不能单独删**：它们内部还有**有引用**的子控件 ——
+     `groupConfigured` 含 `configItemsWidget`，`groupQuickSingle` / `groupStepGen` /
+     `groupRange` 各含 spinbox。只能连子控件一并处理。
+   - ⚠ 另注：`_init_quick_angle_buttons()`（`ui/main_window.py:208`）会**动态创建**
+     `btnQuick10/20/40/50` 四个按钮（不在 `.ui` 里），且**创建后不连接任何槽** ——
+     它们同样是纯装饰，清理时极易漏掉。
 
    **Blocker? No**
 
