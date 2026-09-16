@@ -13,6 +13,7 @@ FinalSummary.xlsx 直接读取器 (v3)
 
 from __future__ import annotations
 
+import re
 from collections import OrderedDict
 
 import numpy as np
@@ -39,6 +40,11 @@ class _LRUDict(OrderedDict):
         value = super().__getitem__(key)
         self.move_to_end(key)
         return value
+
+
+# 段标签匹配 —— 一律用词边界, 避免 lhcpPhase / rhcpLogMag 之类的段名误命中
+_RE_PHASE = re.compile(r'\bphase\b')
+_RE_PHI_POL = re.compile(r'\bpolar\w*\b.*\bphi\b|\bphi\b.*\bpolar\w*\b')
 
 
 def _is_numeric(v) -> bool:
@@ -93,215 +99,180 @@ class FinalSummarySource(DataSource):
             raise ValueError(f"在 {self._path} 中未找到数字命名的频点 Sheet")
         self._freqs.sort()
 
-        # ---- 从第一个频率 sheet 探测结构（只读前 20 行） ----
+        # ---- 结构扫描: 一次遍历定位表头与各 section 的数据行 ----
+        # 不假设行连续、不限制描述行数、不依赖「标签行号 + 固定偏移」——
+        # 详见 _scan_layout()。旧实现会在描述行 >30 / 表头后有空行 / 块内有空行 /
+        # 标签文本有差异 / 表头有列缺口 时**静默**读空或读错。
         sn0 = _freq_sheet_name(self._freqs[0])
         ws0 = self._wb[sn0]
+        layout = self._scan_layout(ws0)
 
-        self._theta_header_row, self._theta_start_row, self._n_phi, self._n_theta, self._data_type = \
-            self._probe_structure(ws0)
+        self._section_rows: dict[str, list[int]] = layout['sections']
+        self._theta_header_row = layout['header_row'] or 0
+        self._n_theta = layout['n_theta']
+        self._theta: list[float] = layout['theta_angles']
+        self._detection_notes: list[str] = layout['notes']
 
-        # ---- 读 theta 角度（流式，仅 header 行） ----
-        self._theta: list[float] = []
-        for row in ws0.iter_rows(min_row=self._theta_header_row, max_row=self._theta_header_row,
-                                  values_only=True):
-            for v in row[1:]:
-                if v is not None:
-                    try:
-                        self._theta.append(float(v))
-                    except (ValueError, TypeError):
-                        pass
+        theta_rows = self._section_rows['theta']
+        if not theta_rows:
+            self._wb.close()
+            raise ValueError(
+                f"{self._path} 的 sheet '{sn0}' 中未定位到 Theta 幅度数据块 "
+                f"(表头行={layout['header_row']}, 列数={self._n_theta})"
+            )
+        self._n_phi = len(theta_rows)
 
-        # ---- 读 phi 角度（从数据区列 A，流式） ----
+        # ---- 兼容属性: section 起始行 (0 = 该段不存在) ----
+        # 注意: 段内可能含空行, 起始行不再是「连续 n_phi 行」的起点;
+        #       真正驱动读取的是 _section_rows 的行号列表。
+        self._theta_start_row = theta_rows[0]
+        self._theta_phase_start = (self._section_rows['theta_phase'] or [0])[0]
+        self._phi_pol_start = (self._section_rows['phi'] or [0])[0]
+        self._phi_phase_start = (self._section_rows['phi_phase'] or [0])[0]
+        self._has_phase = bool(self._section_rows['theta_phase'])
+        self._has_phi_pol = bool(self._section_rows['phi'])
+
+        # ---- phi 角度: theta 段各数据行的列 A (非数值时退化为序号) ----
         self._phi: list[float] = []
-        for row in ws0.iter_rows(min_row=self._theta_start_row,
-                                 max_row=self._theta_start_row + self._n_phi - 1,
-                                 min_col=1, max_col=1, values_only=True):
-            v = row[0]
-            if v is not None:
-                try:
-                    self._phi.append(float(v))
-                except (ValueError, TypeError):
-                    self._phi.append(float(len(self._phi)))
+        for r in theta_rows:
+            v = layout['col_a'].get(r)
+            self._phi.append(v if v is not None else float(len(self._phi)))
 
-        # ---- 动态探测节结构：扫描标签行定位各 section ----
-        self._has_phase = False
-        self._theta_phase_start = 0
-        self._has_phi_pol = False
-        self._phi_pol_start = 0
-        self._phi_phase_start = 0
-
-        # 扫描列 A，收集所有节标签行号
-        section_labels = self._scan_section_labels(ws0)
-
-        # Theta Phase: Theta 振幅段后第一个 "Phase" 标签 → 数据从 label+2 开始
-        after_amp = self._theta_start_row + self._n_phi
-        theta_phase_label = section_labels.get('theta_phase_label')
-        if theta_phase_label is not None:
-            self._has_phase = True
-            self._theta_phase_start = theta_phase_label + 2
-
-        # Phi Power: "Phi Polarization" 标签 → 数据从 label+3 开始
-        # (label → Power sub-label → Theta/Phi header → data)
-        phi_pol_label = section_labels.get('phi_pol_label')
-        if phi_pol_label is not None:
-            self._has_phi_pol = True
-            self._phi_pol_start = phi_pol_label + 3
-
-        # Phi Phase: Phi 段后第二个 "Phase" 标签 → 数据从 label+2 开始
-        phi_phase_label = section_labels.get('phi_phase_label')
-        if phi_phase_label is not None:
-            self._phi_phase_start = phi_phase_label + 2
-
-        # ---- 探测诊断 (供上层提示; src/ 层不直接打日志) ----
-        self._detection_notes: list[str] = []
-        if not self._has_phase and section_labels.get('phase_labels_found'):
+        # ---- 各段行数不一致 = 文件结构异常, 必须显式提示 ----
+        _counts = {k: len(v) for k, v in self._section_rows.items() if v}
+        if len(set(_counts.values())) > 1:
             self._detection_notes.append(
-                f"发现 {section_labels['phase_labels_found']} 处 'Phase' 标签, "
-                f"但均未落在 Theta 振幅段 (结束于第 {after_amp - 1} 行) 之后, "
-                f"相位段未定位"
+                "各段数据行数不一致 (" +
+                ", ".join(f"{k}={n}" for k, n in _counts.items()) + ")"
             )
 
         # ---- 缓存 (LRU: 最多缓存 512 个频点，覆盖宽频测试场景) ----
         self._cache: _LRUDict = _LRUDict(maxsize=512)
 
     @staticmethod
-    def _probe_structure(ws) -> tuple:
-        """只读前 20 行，探测工作表结构。
+    def _scan_layout(ws) -> dict:
+        """一次遍历定位表头与各 section 的数据行 (不依赖相邻行/固定偏移)。
 
-        不使用 ws.cell() — 全用 iter_rows() 流式读。
-        不硬编码任何数字。
+        行分类规则 (只依赖单个行的内容, 与前后行无关):
+          数据行 = 列 A 为数值或空, 且 B 列起有数值
+          表头行 = 列 A 为文本、B 列起有数值, 且是遇到的**第一个**这种行
+                   (判据: 列 A 含 'theta', 或数值列数 >= 3)
+          标签行 = 其余所有「列 A 为文本」的行 —— 含各段自己的 'Theta/Phi'
+                   表头行 (分类不中 → 不改变当前段) 与 'Power'/'Total' 等
+          空行   = 列 A 为空且 B 列起无数值 → 一律忽略
+
+        段归属由「最近一次见到的标签」决定。因此:
+          - 描述行数不受限 (不设扫描窗口)
+          - 表头与数据之间的空行、数据块**内部**的空行都不影响行号列表
+          - 标签文本按关键字匹配 (大小写/前后缀/多余空格均容忍)
+          - n_theta 取表头行最后一个数值列的位置, 不被中间缺口截断
+
+        读取端按行号列表逐行取值 (`_read_matrices_by_rows`), 不假设行连续。
 
         Returns:
-            (theta_header_row, theta_start_row, n_phi, n_theta, data_type)
+            {'header_row': int|None, 'n_theta': int, 'theta_angles': list[float],
+             'sections': {段名: [行号]}, 'col_a': {行号: phi 角度|None},
+             'notes': [str]}
         """
-        # 一次性读前 30 行
-        preview_rows = []
-        theta_header_row = 3
-        theta_col_count = 0
-        data_type = "logmag"
-
-        for row_idx, row in enumerate(
-            ws.iter_rows(min_row=1, max_row=30, values_only=True), start=1
-        ):
-            preview_rows.append(row)
-            col_a = row[0] if len(row) > 0 else None
-
-            # 记录描述文本（用于数据类型判断）
-            if col_a and isinstance(col_a, str):
-                vl = col_a.lower()
-                if "complex" in vl:
-                    data_type = "complex"
-
-            # Theta 表头行：col A 含 "theta/phi" 且后续列有连续数值
-            if col_a is not None and isinstance(col_a, str) and "theta" in col_a.lower():
-                # 跳过可能为空的 col B/C，找到第一个数值开始的位置
-                numeric_count = 0
-                for v in row[1:]:
-                    if v is not None and _is_numeric(v):
-                        numeric_count += 1
-                    elif numeric_count > 0:
-                        # 已经在数值序列中遇到非数值 → 停止
-                        break
-                    # 开头遇到 None/空值 → 继续（可能是格式占位列）
-                if numeric_count >= 2:
-                    theta_header_row = row_idx
-                    theta_col_count = numeric_count
-                    break
-
-        theta_start_row = theta_header_row + 1
-
-        # ---- 探测 n_phi —— 找振幅段真实边界（遇到空行/标签行停止） ----
         max_r = ws.max_row or 2000
-        preview_phi_count = 0
-        for row in ws.iter_rows(min_row=theta_start_row, max_row=min(theta_start_row + 9, max_r),
-                                values_only=True):
-            has_data = any(v is not None and _is_numeric(v) for v in row[1:])
-            if has_data:
-                preview_phi_count += 1
-            elif preview_phi_count > 0:
-                break
-        if preview_phi_count >= 5:
-            # 扫描找真实边界：第一个空行/标签行出现的位置
-            phi_count = 0
-            for row in ws.iter_rows(min_row=theta_start_row, max_row=max_r, values_only=True):
-                col_a = row[0] if len(row) > 0 else None
-                # 列 A 为非数值文本 (如 "Linear Avg Gain") → 标签行，非数据行
-                if col_a is not None and isinstance(col_a, str) and not _is_numeric(col_a):
-                    break
-                has_data = any(v is not None and _is_numeric(v) for v in row[1:])
-                if has_data:
-                    phi_count += 1
-                else:
-                    break  # 空行或标签行 = 节边界
-        else:
-            phi_count = preview_phi_count
-
-        # 确定 n_theta：从 header 行的非空列数
-        if theta_col_count == 0:
-            # fallback: 检查 header 行的列数
-            header_row_data = preview_rows[theta_header_row - 1]
-            theta_col_count = sum(1 for v in header_row_data[1:] if v is not None)
-
-        return theta_header_row, theta_start_row, int(phi_count), int(theta_col_count), data_type
-
-    def _scan_section_labels(self, ws) -> dict:
-        """动态扫描列 A，定位各 section 标签行号。
-
-        兼容任意行数/列数的 FinalSummary 类文件，不依赖硬编码偏移。
-        探测以下节标签：
-          - theta_phase_label: 第一个 "Phase" (Theta 振幅段之后)
-          - phi_pol_label:     "Phi Polarization"
-          - phi_phase_label:   第二个 "Phase" (Phi 振幅段之后)
-
-        Returns:
-            dict with keys: theta_phase_label, phi_pol_label, phi_phase_label
-            (values 为 int 行号或 None)
-        """
-        result = {
-            'theta_phase_label': None,
-            'phi_pol_label': None,
-            'phi_phase_label': None,
-            'phase_labels_found': 0,   # 列 A 中 'Phase' 标签的总数 (诊断用)
+        notes: list[str] = []
+        sections: dict[str, list[int]] = {
+            'theta': [], 'theta_phase': [], 'phi': [], 'phi_phase': [],
         }
-        phase_labels_found = []
+        col_a_map: dict[int, float | None] = {}
 
-        after_amp = self._theta_start_row + self._n_phi
-        max_r = ws.max_row or 2000
+        header_row: int | None = None
+        n_theta = 0
+        angle_slots: list[float | None] = []
+
+        current = 'theta'          # 段归属; 表头之前的数据不存在
+        phi_pol_seen = False
+        data_started = False
+        ignored: list[tuple[int, str]] = []
 
         for row_idx, row in enumerate(
-            ws.iter_rows(min_row=1, max_row=max_r, min_col=1, max_col=1, values_only=True),
-            start=1
+            ws.iter_rows(min_row=1, max_row=max_r, values_only=True), start=1
         ):
-            val = row[0]
-            if val is None or not isinstance(val, str):
+            col_a = row[0] if len(row) > 0 else None
+            a_numeric = _is_numeric(col_a)
+            nums = [(i, v) for i, v in enumerate(row[1:])
+                    if v is not None and _is_numeric(v)]
+
+            # ── 列 A 是文本 → 表头行 (仅第一个) 或 标签行 ──
+            if isinstance(col_a, str) and col_a.strip() and not a_numeric:
+                norm = col_a.strip().lower()
+
+                # 表头只认第一个: 判据是列 A 含 'theta' (或右侧数值足够多)。
+                # 各段自己的 "Theta/Phi" 表头行、以及形如 'Phase' 的段标签,
+                # 都会落到下面的标签分支, 不会被误当成表头。
+                if header_row is None and nums:
+                    strong = 'theta' in norm
+                    if strong or len(nums) >= 3:
+                        header_row = row_idx
+                        n_theta = nums[-1][0] + 1
+                        angle_slots = [None] * n_theta
+                        for i, v in nums:
+                            if 0 <= i < n_theta:
+                                angle_slots[i] = float(v)
+                        if not strong:
+                            notes.append(
+                                f"表头行 (第 {row_idx} 行) 列 A 为 '{col_a.strip()}', "
+                                f"不含 'theta' 关键字, 已按表头处理"
+                            )
+                        continue
+
+                # 标签行。**当前段已收到数据 → 该标签宣告本段结束**,
+                # 这一点至关重要: 真实文件在 Phi Phase 之后还有 'Total' 段
+                # (行 1462 'Total' → 'Power' → 'Theta/Phi' → 数据)。若不让标签
+                # 关闭当前段, Total 的数据会被并进 phi_phase, 该段行数直接翻倍。
+                if current and sections[current]:
+                    current = None
+
+                # 用**词边界**匹配, 不用子串 —— 真实文件里还有 lhcpPhase /
+                # rhcpPhase 等段 (圆极化), 子串匹配会把它们误当成相位段,
+                # 其 360 行数据会被并进 phi_phase。
+                if _RE_PHI_POL.search(norm):
+                    phi_pol_seen = True
+                    current = 'phi'
+                elif _RE_PHASE.search(norm):
+                    if data_started:
+                        # Phi Polarization 之前的 Phase = theta 相位; 之后 = phi 相位
+                        current = 'phi_phase' if phi_pol_seen else 'theta_phase'
+                    else:
+                        # 出现在任何数据块之前 → 不是段标签 (如描述行里的字样)
+                        ignored.append((row_idx, col_a.strip()))
+                # 其它标签 (如 'Power'/'Total') → current 保持 None, 其后数据不被收集
                 continue
-            vl = val.strip().lower()
 
-            # "Phase" 标签
-            if vl == 'phase':
-                phase_labels_found.append(row_idx)
-                # 第一个 Theta 振幅段之后(含紧邻行)的 Phase → theta_phase_label
-                #
-                # 必须用 >= 而非 >: 标签可能紧贴振幅段最后一行 (中间无空行),
-                # 此时 row_idx == after_amp。用 > 会拒绝它, 扫描继续向下,
-                # 把 **Phi 相位段** 的 "Phase" 标签误判为 Theta 相位段 ——
-                # theta_phase 静默读到 phi_phase 的数据, AR 用错相位算出错值。
-                if result['theta_phase_label'] is None and row_idx >= after_amp:
-                    result['theta_phase_label'] = row_idx
+            # ── 数据行 (列 A 为空或数值, B+ 有数值) ──
+            if nums:
+                if header_row is None or current is None:
+                    continue        # 表头之前, 或位于未被识别的段中
+                sections[current].append(row_idx)
+                data_started = True
+                col_a_map[row_idx] = float(col_a) if a_numeric else None
+            # ── 空行: 忽略 ──
 
-            # "Phi Polarization" 标签
-            if 'phi' in vl and 'polar' in vl:
-                result['phi_pol_label'] = row_idx
+        if header_row is None:
+            notes.append("未定位到 Theta 表头行 (列 A 含 'theta' 且右侧有数值的行)")
+        else:
+            missing = sum(1 for v in angle_slots if v is None)
+            if missing:
+                notes.append(
+                    f"表头行 (第 {header_row} 行) 有 {missing} 个空缺列, theta 角度不完整"
+                )
 
-        # Phi phase label: 在 Phi 段之后的第一个 Phase 标签
-        if result['phi_pol_label'] is not None:
-            for pr in phase_labels_found:
-                if pr > result['phi_pol_label']:
-                    result['phi_phase_label'] = pr
-                    break
+        for r, txt in ignored:
+            notes.append(f"第 {r} 行的 '{txt}' 标签出现在任何数据块之前, 已忽略")
 
-        result['phase_labels_found'] = len(phase_labels_found)
-        return result
+        return {
+            'header_row': header_row,
+            'n_theta': n_theta,
+            'theta_angles': [v for v in angle_slots if v is not None],
+            'sections': sections,
+            'col_a': col_a_map,
+            'notes': notes,
+        }
 
     @property
     def detection_notes(self) -> list[str]:
@@ -361,24 +332,11 @@ class FinalSummarySource(DataSource):
         self._cache[freq] = (tl, pl, tp_data, pp_data)
         return tl, pl, tp_data, pp_data
 
-    def _section_ranges(self) -> dict:
-        """各 section 起始行 (None = 该 section 不存在) — 单一真源。
-
-        集中在此避免多处判定条件漂移。
-        """
-        has_phase = self._has_phase
-        return {
-            'theta': self._theta_start_row,
-            'theta_phase': self._theta_phase_start if has_phase and self._theta_phase_start > 0 else None,
-            'phi': self._phi_pol_start if self._has_phi_pol and self._phi_pol_start > 0 else None,
-            'phi_phase': self._phi_phase_start if has_phase and self._phi_phase_start > 0 else None,
-        }
-
     def _read_freq_matrices(self, ws) -> tuple:
         """单趟 iter_rows 读取该频点 sheet 的全部 section。
 
-        旧实现逐 section 调 _read_matrix() —— 每次 iter_rows() 都从第 1 行重新
-        解析 XML, 4 段共解析约 2.5 倍行数。改为单趟见 _read_matrices_single_pass()。
+        按 _section_rows 的行号列表单趟读取 (见 _read_matrices_by_rows) ——
+        既不重复解析 XML, 也不假设行连续。
 
         不做 clipping — CTIA/EMQuest 标准无此要求。
 
@@ -386,9 +344,7 @@ class FinalSummarySource(DataSource):
             (theta_logmag, phi_logmag, theta_phase, phi_phase)
             phase 段缺失 → None; phi 幅度段缺失 → 全 NaN 矩阵 (与旧行为一致)。
         """
-        mats = _read_matrices_single_pass(
-            ws, self._section_ranges(), self._n_phi, self._n_theta
-        )
+        mats = _read_matrices_by_rows(ws, self._section_rows, self._n_theta)
         tl = mats['theta']
         pl = mats['phi']
         if pl is None:
@@ -426,40 +382,42 @@ def _freq_sheet_name(freq: float) -> str:
     return str(int(freq)) if freq == int(freq) else str(freq)
 
 
-def _read_matrices_single_pass(ws, ranges: dict, n_rows: int, n_cols: int) -> dict:
-    """单趟 iter_rows 同时填充多个 section 矩阵。
+def _read_matrices_by_rows(ws, rows_by_section: dict, n_cols: int) -> dict:
+    """按**行号列表**读取各 section —— 不假设行连续, 因此容忍块内空行。
 
-    openpyxl 的 iter_rows() 每次调用都从第 1 行重新解析 XML —— read_only 下
-    ReadOnlyWorksheet._cells_by_row 用 iterparse 顺序拉取, 无法 seek 到 min_row。
-    FinalSummary 一个频点 sheet 含 4 个 section, 逐段各调一次 = 4 趟解析:
-    实测 data/AFN/NO2-FinalSummary_1195-1224.xlsx (266MB / 30 sheet) 累计解析
-    3648 行耗时 56.2s, 单趟只需 1459 行 22.2s —— 2.5x。
+    openpyxl 的 iter_rows() 每次调用都从第 1 行重新解析 XML, 故本函数一次遍历
+    同时填充全部 section (旧实现逐段各解析一遍, 实测 2.46x 差距)。
+
+    行号来自 FinalSummarySource._scan_layout()。矩阵第 k 行取自该段行号列表的
+    第 k 个元素, 与数值实际所在行号解耦 —— 因此段内空行不会造成行错位。
 
     多线程在此无效 (实测反而慢 1.1~1.4x): 解析全程持 GIL, 且所有 sheet 共享
-    同一个 zipfile 句柄 (ReadOnlyWorksheet._get_source → parent._archive.open),
-    zipfile._SharedFile 内部有锁 → 底层读取被串行化并产生竞争开销。
+    同一个 zipfile 句柄 (ReadOnlyWorksheet._get_source → parent._archive.open,
+    zipfile._SharedFile 内部有锁) → 底层读取被串行化并产生竞争开销。
 
     Args:
-        ws:     openpyxl worksheet (read_only 或普通), 行/列索引均从 1 开始
-        ranges: {section 名: 起始行 or None}; None 表示该 section 不存在
-        n_rows: 每个 section 的行数 (nphi)
-        n_cols: 每个 section 的列数 (ntheta, 自 B 列起算)
+        ws:              openpyxl worksheet (read_only 或普通), 行号自 1 开始
+        rows_by_section: {段名: [行号]}; 空列表表示该段不存在
+        n_cols:          每段的列数 (ntheta, 自 B 列起算)
 
     Returns:
-        {section 名: (n_rows, n_cols) float64 ndarray 或 None}
-        空单元格 / 非数值 → NaN, 越界行同理 —— 与逐段读取语义一致。
+        {段名: (len(行号), n_cols) float64 ndarray 或 None}
+        空单元格 / 非数值 → NaN —— 与逐段读取语义一致。
     """
-    out: dict = {k: None for k in ranges}
-    valid = {k: r for k, r in ranges.items() if r}
+    out: dict = {k: None for k in rows_by_section}
+    valid = {k: r for k, r in rows_by_section.items() if r}
     if not valid:
         return out
 
-    for k in valid:
-        out[k] = np.full((n_rows, n_cols), float('nan'), dtype=np.float64)
+    for k, rows in valid.items():
+        out[k] = np.full((len(rows), n_cols), float('nan'), dtype=np.float64)
 
-    row_lo = min(valid.values())
-    row_hi = max(r + n_rows - 1 for r in valid.values())
+    target: dict[int, tuple[str, int]] = {}
+    for k, rows in valid.items():
+        for pos, r in enumerate(rows):
+            target[r] = (k, pos)
 
+    row_lo, row_hi = min(target), max(target)
     # iter_rows(min_row=row_lo) 的首行即 row_lo 且逐行连续:
     #   read_only → _cells_by_row 对缺失行补空行
     #   普通 Worksheet → range(min_row, max_row+1) 逐行取 cell
@@ -468,28 +426,25 @@ def _read_matrices_single_pass(ws, ranges: dict, n_rows: int, n_cols: int) -> di
                      min_col=2, max_col=1 + n_cols, values_only=True),
         start=row_lo,
     ):
-        if row_idx > row_hi:
-            break
-        for name, start in valid.items():
-            pi = row_idx - start
-            if 0 <= pi < n_rows:
-                mat = out[name]
-                for ti, v in enumerate(row[:n_cols]):
-                    if v is None:
-                        continue
-                    try:
-                        mat[pi, ti] = float(v)
-                    except (ValueError, TypeError):
-                        pass
+        hit = target.get(row_idx)
+        if hit is None:
+            continue
+        mat = out[hit[0]]
+        pos = hit[1]
+        for ti, v in enumerate(row[:n_cols]):
+            if v is None:
+                continue
+            try:
+                mat[pos, ti] = float(v)
+            except (ValueError, TypeError):
+                pass
     return out
 
 
 def _read_matrix(ws, start_row: int, n_rows: int, n_cols: int) -> np.ndarray:
-    """读取单个 n_rows × n_cols 矩阵 (自 B 列起算)。
+    """读取单个连续的 n_rows × n_cols 矩阵 (自 B 列起算)。
 
-    单 section 场景的薄封装, 保留原签名。多 section 请直接调
-    _read_matrices_single_pass(), 否则每个 section 都要重解析一遍 XML。
+    保留原签名。多段场景请用 _read_matrices_by_rows(), 否则每段都要重解析 XML。
     """
-    return _read_matrices_single_pass(ws, {'m': start_row}, n_rows, n_cols)['m']
-
-
+    rows = list(range(start_row, start_row + n_rows))
+    return _read_matrices_by_rows(ws, {'m': rows}, n_cols)['m']

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "antenna-post-processor",
-  "last_verified": "2026-09-15",
+  "last_verified": "2026-09-17",
   "ui": {
     "compiled_widgets": [
       "btnAddCustomAngle",
@@ -528,10 +528,13 @@
         "finalsummary_reader.py",
         "datasource.py"
       ],
-      "tests": [],
+      "tests": [
+        "test_finalsummary_reader.py",
+        "test_finalsummary_layouts.py"
+      ],
       "e2e_verified": true,
       "status": "verified",
-      "_verified_note": "Clipping removed per CTIA/EMQuest standards, AR calculation matches Excel AxR 98.9%"
+      "_verified_note": "结构扫描重构 (2026-09-17): 放弃「遇不符合即停 + 标签行号固定偏移」, 改为「按行分类识别段 + 按行号列表读取」。修复 5 类静默失效: 描述行>30 读空、表头后有空行读空、数据块内空行截断、标签文本差异致 theta_phase 读到 phi_phase 数据、表头列缺口截断列数。另修复真实 bug: 5G1FinalSummary 的 Phi 段因旧代码硬编码 label+3 偏移(该布局无 'Power' 子行) 整体错位一行且末行全 NaN, 已逐格比对原始表确认为修复。标签匹配改用词边界, 避免 lhcpPhase/rhcpPhase 等段被误判为相位段。验证: 新增 tests/test_finalsummary_layouts.py 布局矩阵 27 变体 (含 583MB 真实文件出现的 尾部 Total/AR/Tilt/圆极化段); 6 个 AFN 真实文件新旧对拍 IDENTICAL; 583MB Ralab 文件 4 段逐格比对原始表一致; 全量 236 个非 GUI 测试通过。 Clipping removed per CTIA/EMQuest standards, AR calculation matches Excel AxR 98.9%"
     },
     {
       "id": "font-scaling",
