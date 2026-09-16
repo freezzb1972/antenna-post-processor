@@ -29,9 +29,12 @@ _READ_WORKERS_MIN_TASKS = 4
 def auto_read_workers(n_tasks: int) -> int:
     """按**本机**能力决定并行读取的进程数 (运行时计算, 不写死常数)。
 
-    实测 (16 核 / 267MB 30-sheet xlsx / fork 启动):
-        W=1 25.4s(1.00x) | W=2 1.67x | W=3 2.00x | W=4 2.58x
-        W=6 2.80x        | W=8 3.07x(峰值) | W=12 2.89x(回落)
+    实测 (16 核 / 267MB 30-sheet xlsx):
+        WSL(fork):  W=1 25.4s | W=2 1.67x | W=4 2.58x | W=8 3.07x(峰值) | W=12 2.89x(回落)
+        Windows(spawn, 即 EXE 的启动方式, 见 scripts/win_mp_probe.py):
+                    W=1 18.4s | W=2 1.59x | W=4 2.39x | W=8 2.70x
+                   池启动开销 fork 1.57s / spawn 2.16s —— spawn 只多 0.6s,
+                   相对多秒级的读取可忽略, 故加速比在部署平台上依然成立。
 
     故:
       - 主控 = CPU 核数 - 1 (留一核给 GUI 主线程, 与 worker.py 的多步进并行同策略)
