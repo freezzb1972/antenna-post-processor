@@ -300,48 +300,17 @@ class FinalSummarySource(DataSource):
         return list(self._phi)
 
     def read_batch(self, freq_indices: list[int]) -> dict[float, dict[str, np.ndarray | None]]:
-        """批量读取多个频点数据 — 复用打开的 workbook, 避免重复 XML 解析。
+        """批量读取多个频点数据 — 复用打开的 workbook 与 LRU 缓存。
 
-        逐频点调用 read_sections() 每次都要 ws = wb[sn] 触发 XML 解析,
-        139 频点 → 139 次独立解析 → 3.2s×139≈7.5min。
-        批量读取复用同一个 worksheet 迭代器, 大幅减少开销。
+        与 read_sections() 的区别: 缺失的频点 sheet 直接跳过, 不抛异常。
         """
         result: dict[float, dict[str, np.ndarray | None]] = {}
-        ntheta = self._n_theta
-        nphi = self._n_phi
-
         for idx in freq_indices:
             freq = self._freqs[idx]
-            if freq in self._cache:
-                tl, pl, tp_data, pp_data = self._cache[freq]
-            else:
-                sn = _freq_sheet_name(freq)
-                if sn not in self._wb.sheetnames:
-                    continue
-                ws = self._wb[sn]
-
-                tl = _read_matrix(ws, self._theta_start_row, nphi, ntheta)
-                tp_data = None
-                if self._has_phase and self._theta_phase_start > 0:
-                    try:
-                        tp_data = _read_matrix(ws, self._theta_phase_start, nphi, ntheta)
-                    except Exception:
-                        tp_data = None
-
-                if self._has_phi_pol and self._phi_pol_start > 0:
-                    pl = _read_matrix(ws, self._phi_pol_start, nphi, ntheta)
-                else:
-                    pl = np.full_like(tl, float('nan'))
-
-                pp_data = None
-                if self._has_phase and self._phi_phase_start > 0:
-                    try:
-                        pp_data = _read_matrix(ws, self._phi_phase_start, nphi, ntheta)
-                    except Exception:
-                        pp_data = None
-
-                self._cache[freq] = (tl, pl, tp_data, pp_data)
-
+            try:
+                tl, pl, tp_data, pp_data = self._read_freq(freq)
+            except KeyError:
+                continue
             result[freq] = {
                 "theta_logmag": tl,
                 "theta_phase": tp_data,
@@ -350,47 +319,64 @@ class FinalSummarySource(DataSource):
             }
         return result
 
+    def _read_freq(self, freq: float) -> tuple:
+        """取一个频点的 4 个矩阵 (命中 LRU 缓存则直接返回)。
+
+        read_sections() / read_batch() 共用, 保证两条路径读取行为一致。
+
+        Returns:
+            (theta_logmag, phi_logmag, theta_phase, phi_phase)
+        Raises:
+            KeyError: 该频点 sheet 不存在
+        """
+        if freq in self._cache:
+            return self._cache[freq]
+
+        sn = _freq_sheet_name(freq)
+        if sn not in self._wb.sheetnames:
+            raise KeyError(f"Frequency {freq} MHz not found in {self._path}")
+
+        tl, pl, tp_data, pp_data = self._read_freq_matrices(self._wb[sn])
+        self._cache[freq] = (tl, pl, tp_data, pp_data)
+        return tl, pl, tp_data, pp_data
+
+    def _section_ranges(self) -> dict:
+        """各 section 起始行 (None = 该 section 不存在) — 单一真源。
+
+        集中在此避免多处判定条件漂移。
+        """
+        has_phase = self._has_phase
+        return {
+            'theta': self._theta_start_row,
+            'theta_phase': self._theta_phase_start if has_phase and self._theta_phase_start > 0 else None,
+            'phi': self._phi_pol_start if self._has_phi_pol and self._phi_pol_start > 0 else None,
+            'phi_phase': self._phi_phase_start if has_phase and self._phi_phase_start > 0 else None,
+        }
+
+    def _read_freq_matrices(self, ws) -> tuple:
+        """单趟 iter_rows 读取该频点 sheet 的全部 section。
+
+        旧实现逐 section 调 _read_matrix() —— 每次 iter_rows() 都从第 1 行重新
+        解析 XML, 4 段共解析约 2.5 倍行数。改为单趟见 _read_matrices_single_pass()。
+
+        不做 clipping — CTIA/EMQuest 标准无此要求。
+
+        Returns:
+            (theta_logmag, phi_logmag, theta_phase, phi_phase)
+            phase 段缺失 → None; phi 幅度段缺失 → 全 NaN 矩阵 (与旧行为一致)。
+        """
+        mats = _read_matrices_single_pass(
+            ws, self._section_ranges(), self._n_phi, self._n_theta
+        )
+        tl = mats['theta']
+        pl = mats['phi']
+        if pl is None:
+            pl = np.full_like(tl, float('nan'))
+        return tl, pl, mats['theta_phase'], mats['phi_phase']
+
     def read_sections(self, freq_index: int) -> dict[str, np.ndarray | None]:
         freq = self._freqs[freq_index]
-
-        if freq in self._cache:
-            tl, pl, tp_data, pp_data = self._cache[freq]
-        else:
-            sn = _freq_sheet_name(freq)
-            if sn not in self._wb.sheetnames:
-                raise KeyError(f"Frequency {freq} MHz not found in {self._path}")
-
-            ws = self._wb[sn]
-            ntheta = self._n_theta
-            nphi = self._n_phi
-
-            # 读 Theta Pol 幅度（不做 clipping — CTIA/EMQuest 标准无此要求）
-            tl = _read_matrix(ws, self._theta_start_row, nphi, ntheta)
-
-            # 读 Theta Pol 相位（如有 Phase 段）
-            tp_data = None
-            if self._has_phase and self._theta_phase_start > 0:
-                try:
-                    tp_data = _read_matrix(ws, self._theta_phase_start, nphi, ntheta)
-                except Exception:
-                    tp_data = None
-
-            # 读 Phi Pol 幅度（不做 clipping）
-            if self._has_phi_pol and self._phi_pol_start > 0:
-                pl = _read_matrix(ws, self._phi_pol_start, nphi, ntheta)
-            else:
-                pl = np.full_like(tl, float('nan'))
-
-            # 读 Phi Pol 相位（如有 Phase 段）
-            pp_data = None
-            if self._has_phase and self._phi_phase_start > 0:
-                try:
-                    pp_data = _read_matrix(ws, self._phi_phase_start, nphi, ntheta)
-                except Exception:
-                    pp_data = None
-
-            self._cache[freq] = (tl, pl, tp_data, pp_data)
-
+        tl, pl, tp_data, pp_data = self._read_freq(freq)
         return {
             "theta_logmag": tl,
             "theta_phase": tp_data,
@@ -419,68 +405,70 @@ def _freq_sheet_name(freq: float) -> str:
     return str(int(freq)) if freq == int(freq) else str(freq)
 
 
-def _read_matrix_pandas(ws, start_row: int, n_rows: int, n_cols: int) -> np.ndarray:
-    """Pandas 快速通道: 批量 numpy 转换代替逐值 float()。"""
-    import pandas as pd
+def _read_matrices_single_pass(ws, ranges: dict, n_rows: int, n_cols: int) -> dict:
+    """单趟 iter_rows 同时填充多个 section 矩阵。
 
-    rows_data = []
-    end_row = start_row + n_rows - 1
-    for row in ws.iter_rows(min_row=start_row, max_row=end_row,
-                             min_col=2, max_col=1 + n_cols, values_only=True):
-        rows_data.append(list(row[:n_cols]) if row else [None] * n_cols)
-        if len(rows_data) >= n_rows:
+    openpyxl 的 iter_rows() 每次调用都从第 1 行重新解析 XML —— read_only 下
+    ReadOnlyWorksheet._cells_by_row 用 iterparse 顺序拉取, 无法 seek 到 min_row。
+    FinalSummary 一个频点 sheet 含 4 个 section, 逐段各调一次 = 4 趟解析:
+    实测 data/AFN/NO2-FinalSummary_1195-1224.xlsx (266MB / 30 sheet) 累计解析
+    3648 行耗时 56.2s, 单趟只需 1459 行 22.2s —— 2.5x。
+
+    多线程在此无效 (实测反而慢 1.1~1.4x): 解析全程持 GIL, 且所有 sheet 共享
+    同一个 zipfile 句柄 (ReadOnlyWorksheet._get_source → parent._archive.open),
+    zipfile._SharedFile 内部有锁 → 底层读取被串行化并产生竞争开销。
+
+    Args:
+        ws:     openpyxl worksheet (read_only 或普通), 行/列索引均从 1 开始
+        ranges: {section 名: 起始行 or None}; None 表示该 section 不存在
+        n_rows: 每个 section 的行数 (nphi)
+        n_cols: 每个 section 的列数 (ntheta, 自 B 列起算)
+
+    Returns:
+        {section 名: (n_rows, n_cols) float64 ndarray 或 None}
+        空单元格 / 非数值 → NaN, 越界行同理 —— 与逐段读取语义一致。
+    """
+    out: dict = {k: None for k in ranges}
+    valid = {k: r for k, r in ranges.items() if r}
+    if not valid:
+        return out
+
+    for k in valid:
+        out[k] = np.full((n_rows, n_cols), float('nan'), dtype=np.float64)
+
+    row_lo = min(valid.values())
+    row_hi = max(r + n_rows - 1 for r in valid.values())
+
+    # iter_rows(min_row=row_lo) 的首行即 row_lo 且逐行连续:
+    #   read_only → _cells_by_row 对缺失行补空行
+    #   普通 Worksheet → range(min_row, max_row+1) 逐行取 cell
+    for row_idx, row in enumerate(
+        ws.iter_rows(min_row=row_lo, max_row=row_hi,
+                     min_col=2, max_col=1 + n_cols, values_only=True),
+        start=row_lo,
+    ):
+        if row_idx > row_hi:
             break
-
-    if not rows_data:
-        return np.full((n_rows, n_cols), float('nan'), dtype=np.float64)
-
-    # pandas to_numpy 批量转换 (C 级别, 比 Python float() 快 3-5x)
-    return pd.DataFrame(rows_data).to_numpy(dtype=np.float64, na_value=float('nan'))[:n_rows, :n_cols]
+        for name, start in valid.items():
+            pi = row_idx - start
+            if 0 <= pi < n_rows:
+                mat = out[name]
+                for ti, v in enumerate(row[:n_cols]):
+                    if v is None:
+                        continue
+                    try:
+                        mat[pi, ti] = float(v)
+                    except (ValueError, TypeError):
+                        pass
+    return out
 
 
 def _read_matrix(ws, start_row: int, n_rows: int, n_cols: int) -> np.ndarray:
-    """流式读取 n_rows × n_cols 矩阵，自动选择最快路径。"""
-    # 小矩阵直接用 openpyxl（pandas 导入有开销）
-    if n_rows * n_cols < 1000:
-        data = np.full((n_rows, n_cols), float('nan'), dtype=np.float64)
-        rows = ws.iter_rows(min_row=start_row, max_row=start_row + n_rows - 1,
-                             min_col=2, max_col=1 + n_cols, values_only=True)
-        for pi, row in enumerate(rows):
-            if pi >= n_rows:
-                break
-            for ti, v in enumerate(row):
-                if ti >= n_cols:
-                    break
-                if v is None:
-                    continue
-                try:
-                    data[pi, ti] = float(v)
-                except (ValueError, TypeError):
-                    pass
-        return data
+    """读取单个 n_rows × n_cols 矩阵 (自 B 列起算)。
 
-    # 大矩阵使用 pandas 批量读取
-    try:
-        return _read_matrix_pandas(ws, start_row, n_rows, n_cols)
-    except Exception:
-        pass
-
-    # Fallback
-    data = np.full((n_rows, n_cols), float('nan'), dtype=np.float64)
-    rows = ws.iter_rows(min_row=start_row, max_row=start_row + n_rows - 1,
-                         min_col=2, max_col=1 + n_cols, values_only=True)
-    for pi, row in enumerate(rows):
-        if pi >= n_rows:
-            break
-        for ti, v in enumerate(row):
-            if ti >= n_cols:
-                break
-            if v is None:
-                continue
-            try:
-                data[pi, ti] = float(v)
-            except (ValueError, TypeError):
-                pass
-    return data
+    单 section 场景的薄封装, 保留原签名。多 section 请直接调
+    _read_matrices_single_pass(), 否则每个 section 都要重解析一遍 XML。
+    """
+    return _read_matrices_single_pass(ws, {'m': start_row}, n_rows, n_cols)['m']
 
 
