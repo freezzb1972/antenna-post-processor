@@ -11,6 +11,7 @@ import pytest
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import (
     QApplication, QFileDialog, QMessageBox, QMenu, QDialog, QToolBar,
+    QGroupBox, QPushButton, QDialogButtonBox,
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -399,85 +400,112 @@ class TestFileSettingsPageButtons:
 # 4. 配置 Tab 的按钮 (需先切换到包含它们的 Tab)
 # =========================================================================
 
-class TestConfigTabButtons:
+class TestAnglePopupButtons:
+    """角度配置弹窗 (AntennaParamsPage._show_angle_popup) 的按钮测试。
 
-    @pytest.fixture(autouse=True)
-    def ensure_visible(self, window, qtbot):
-        """尝试让 Quick 角度按钮可见 (切换 Nav+Tab)。"""
-        # Nav 切换到「天线参数」
-        nav = getattr(window, '_nav_list', None)
-        if nav and nav.count() >= 2:
-            nav.setCurrentRow(1)
-            qtbot.wait(50)
-        # Tab 切换
-        for i in range(window.ui.tabConfig.count()):
-            window.ui.tabConfig.setCurrentIndex(i)
-            qtbot.wait(30)
+    本类替换原来的 TestConfigTabButtons。后者测的是 tabLag 页里的
+    btnQuick0/30/60/90 / btnAddCustomAngle / btnAddRange / btnStepGenerate /
+    btnClearConfig / btnLoadFromTemplate / btnLoadPreset / btnSavePreset。
+    但 tabLag 已随 MainWindow._hide_settings_tabs() 的重构被 removeTab 移除
+    —— 这些控件对象虽然还活着, 却不在任何 tab 中 (实测
+    tabConfig.indexOf(该页) == -1), 永不显示。于是原类 21 个用例里:
+      * 4 个 `pytest.skip(f"{attr} not visible")` 型用例永远跳过;
+      * 其余用 `if btn.isVisible() and btn.isEnabled(): btn.click()` 的用例
+        静默略过点击、且无任何断言 —— 函数跑完即 PASSED。
+    即没有一个真正验证过行为 (假绿)。重构后的等价功能在本弹窗内, 故改为覆盖它。
 
-    @pytest.mark.parametrize("angle,attr_name", [
-        (0, "btnQuick0"), (10, "btnQuick10"), (20, "btnQuick20"),
-        (30, "btnQuick30"), (40, "btnQuick40"), (50, "btnQuick50"),
-        (60, "btnQuick60"), (70, "btnQuick70"), (80, "btnQuick80"),
-        (90, "btnQuick90"),
-    ])
-    def test_quick_angle_button_exists(self, window, angle, attr_name):
-        btn = getattr(window.ui, attr_name, None)
-        assert btn is not None, f"Missing button: {attr_name}"
-        assert btn.text() == f"{angle}°", f"{attr_name} text='{btn.text()}' expected '{angle}°'"
+    弹窗实际结构 (实测, 非按源码猜测):
+      汇总组 "已配置: N 个单角度, M 个范围"
+      「添加单角度」→ "+ 添加"   「步进批量生成」→ "生成"
+      「角度范围」  → "添加范围"  顶层 → "确定" / "取消"
+    """
 
-    @pytest.mark.parametrize("angle,attr_name", [
-        (0, "btnQuick0"), (30, "btnQuick30"), (60, "btnQuick60"), (90, "btnQuick90"),
-    ])
-    def test_quick_angle_click_no_crash(self, window, qtbot, angle, attr_name):
-        btn = getattr(window.ui, attr_name, None)
-        if btn is None or not btn.isVisible():
-            pytest.skip(f"{attr_name} not visible")
-        if btn.isEnabled():
-            btn.click()
-            qtbot.wait(50)
+    @pytest.fixture
+    def popup(self, window, qtbot, monkeypatch):
+        """打开 Gain 角度弹窗并返回该 QDialog。
 
-    def test_add_custom_angle_click_no_crash(self, window, qtbot):
-        btn = window.ui.btnAddCustomAngle
-        if btn.isVisible() and btn.isEnabled():
-            btn.click()
-            qtbot.wait(50)
+        弹窗以 dlg.exec() 模态阻塞, offscreen 下无人点击关闭。打桩 exec 使其
+        立即返回, 并在打桩函数内捕获 dialog 对象 —— 它是 _show_angle_popup 的
+        局部变量, 函数返回后便失去引用。
+        """
+        page = getattr(window, '_antenna_params_page', None)
+        if page is None:
+            pytest.skip("No _antenna_params_page")
+        captured = []
 
-    def test_add_range_click_no_crash(self, window, qtbot):
-        btn = window.ui.btnAddRange
-        if btn.isVisible() and btn.isEnabled():
-            btn.click()
-            qtbot.wait(50)
+        def fake_exec(self, *a, **k):
+            captured.append(self)
+            return 0          # 相当于用户直接关闭
 
-    def test_step_generate_click_no_crash(self, window, qtbot):
-        btn = window.ui.btnStepGenerate
-        if btn.isVisible() and btn.isEnabled():
-            btn.click()
-            qtbot.wait(50)
+        monkeypatch.setattr(QDialog, "exec", fake_exec)
+        page._show_angle_popup("gain")
+        assert captured, "_show_angle_popup 未创建 QDialog"
+        dlg = captured[0]
+        qtbot.addWidget(dlg)
+        dlg.show()            # 可见性断言需要真实显示
+        qtbot.wait(30)
+        return dlg
 
-    def test_clear_config_click_no_crash(self, window, qtbot):
-        btn = window.ui.btnClearConfig
-        if btn.isVisible() and btn.isEnabled():
-            btn.click()
-            qtbot.wait(50)
+    @staticmethod
+    def _group(dlg, title):
+        """按标题取 QGroupBox。"""
+        for g in dlg.findChildren(QGroupBox):
+            if g.title() == title:
+                return g
+        return None
 
-    def test_load_from_template_click_no_crash(self, window, qtbot):
-        btn = window.ui.btnLoadFromTemplate
-        if btn.isVisible() and btn.isEnabled():
-            btn.click()
-            qtbot.wait(50)
+    @staticmethod
+    def _btn(root, text):
+        """按文本取 QPushButton (在 root 子树内)。"""
+        for b in root.findChildren(QPushButton):
+            if b.text() == text:
+                return b
+        return None
 
-    def test_load_preset_click_no_crash(self, window, qtbot):
-        btn = window.ui.btnLoadPreset
-        if btn.isVisible() and btn.isEnabled():
-            btn.click()
-            qtbot.wait(50)
+    def test_popup_structure(self, popup):
+        """弹窗应含汇总组 + 三个操作组 + 确定/取消。"""
+        titles = [g.title() for g in popup.findChildren(QGroupBox)]
+        assert any(t.startswith("已配置") for t in titles), f"缺少汇总组: {titles}"
+        for t in ("添加单角度", "步进批量生成", "角度范围"):
+            assert t in titles, f"缺少按钮组 {t!r} (实得 {titles})"
+        for t in ("确定", "取消"):
+            assert self._btn(popup, t) is not None, f"缺少按钮 {t!r}"
 
-    def test_save_preset_click_no_crash(self, window, qtbot):
-        btn = window.ui.btnSavePreset
-        if btn.isVisible() and btn.isEnabled():
-            btn.click()
-            qtbot.wait(50)
+    def test_add_single_angle_click_no_crash(self, popup, qtbot):
+        """「添加单角度」的 + 添加 按钮点击不崩溃。"""
+        grp = self._group(popup, "添加单角度")
+        assert grp is not None, "未找到「添加单角度」组"
+        btn = self._btn(grp, "+ 添加")
+        got = [b.text() for b in grp.findChildren(QPushButton)]
+        assert btn is not None, f"组内未找到「+ 添加」, 实得 {got}"
+        assert btn.isVisible(), "+ 添加 应可见 (弹窗已 show)"
+        btn.click()
+        qtbot.wait(20)
 
+    def test_step_generate_click_no_crash(self, popup, qtbot):
+        """「步进批量生成」的 生成 按钮点击不崩溃。"""
+        grp = self._group(popup, "步进批量生成")
+        assert grp is not None, "未找到「步进批量生成」组"
+        btn = self._btn(grp, "生成")
+        assert btn is not None, "缺少「生成」按钮"
+        btn.click()
+        qtbot.wait(20)
+
+    def test_add_range_click_no_crash(self, popup, qtbot):
+        """「角度范围」的 添加范围 按钮点击不崩溃。"""
+        grp = self._group(popup, "角度范围")
+        assert grp is not None, "未找到「角度范围」组"
+        btn = self._btn(grp, "添加范围")
+        assert btn is not None, "缺少「添加范围」按钮"
+        btn.click()
+        qtbot.wait(20)
+
+    def test_cancel_button_no_crash(self, popup, qtbot):
+        """取消按钮点击不崩溃。"""
+        btn = self._btn(popup, "取消")
+        assert btn is not None, "缺少「取消」按钮"
+        btn.click()
+        qtbot.wait(20)
 
 # =========================================================================
 # 5. Nav 列表 — 每个 Nav item 可切换
