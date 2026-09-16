@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from abc import ABC, abstractmethod
 from typing import Callable
 
@@ -18,6 +19,29 @@ class PipelineCancelled(Exception):
     frequencies 会返回**不完整的频点表** —— 后续照样能算出一份"看起来合理
     但是错的"结果, 比直接报错更危险。
     """
+
+
+# 并行读取的进程数上限与最小任务数 —— 依据实测, 见 auto_read_workers()
+_READ_WORKERS_CAP = 8
+_READ_WORKERS_MIN_TASKS = 4
+
+
+def auto_read_workers(n_tasks: int) -> int:
+    """按**本机**能力决定并行读取的进程数 (运行时计算, 不写死常数)。
+
+    实测 (16 核 / 267MB 30-sheet xlsx / fork 启动):
+        W=1 25.4s(1.00x) | W=2 1.67x | W=3 2.00x | W=4 2.58x
+        W=6 2.80x        | W=8 3.07x(峰值) | W=12 2.89x(回落)
+
+    故:
+      - 主控 = CPU 核数 - 1 (留一核给 GUI 主线程, 与 worker.py 的多步进并行同策略)
+      - **封顶 8** —— 再多则各 worker 争抢同一文件的读取, 收益反而回落
+      - 任务太少时进程池启动开销 (实测 ~1.6s) 盖过收益 → 返回 1, 调用方走串行
+    """
+    if n_tasks < _READ_WORKERS_MIN_TASKS:
+        return 1
+    cpu = os.cpu_count() or 1
+    return max(1, min(cpu - 1, _READ_WORKERS_CAP, n_tasks))
 
 
 class DataSource(ABC):
@@ -80,6 +104,33 @@ class DataSource(ABC):
             }
         """
         ...
+
+    def read_many(self, freq_indices: list[int], workers: int | None = None,
+                  on_result=None, cancel_callback=None) -> dict[int, dict]:
+        """批量读取多个频点。
+
+        默认**串行** —— CSV/JSON 解析开销小, 并行不划算。解析昂贵的子类可覆写
+        (见 FinalSummarySource: xlsx 的 XML 解析是纯 Python, 受 GIL 限制, 必须用
+        进程; 线程实测反而慢 1.1~1.4x)。
+
+        Args:
+            freq_indices:    频点索引列表
+            workers:         并行进程数; None = auto_read_workers(len(freq_indices))
+            on_result:       (idx, sections) → None, 每完成一个频点调用一次 (进度用)
+            cancel_callback: () → bool, 返回 True 时停止读取
+
+        Returns:
+            {freq_index: sections}  (取消时可能少于请求数)
+        """
+        out: dict[int, dict] = {}
+        for i in freq_indices:
+            if cancel_callback is not None and cancel_callback():
+                break
+            sec = self.read_sections(i)
+            out[i] = sec
+            if on_result is not None:
+                on_result(i, sec)
+        return out
 
     def close(self):
         """释放资源（子类可覆盖）。"""
@@ -159,6 +210,22 @@ class ResampledDataSource(DataSource):
                 out[key] = arr[::self._phi_stride, ::self._theta_stride]
             else:
                 out[key] = arr
+        return out
+
+    def read_many(self, freq_indices, workers=None, on_result=None,
+                  cancel_callback=None) -> dict[int, dict]:
+        """委托被包装的数据源并行读取原文, 再抽稀 —— 保住并行收益。"""
+        raw = self._base.read_many(freq_indices, workers=workers,
+                                   on_result=None, cancel_callback=cancel_callback)
+        out = {}
+        for i, data in raw.items():
+            sec = {}
+            for key, arr in data.items():
+                sec[key] = (arr[::self._phi_stride, ::self._theta_stride]
+                            if arr is not None and arr.ndim == 2 else arr)
+            out[i] = sec
+            if on_result is not None:
+                on_result(i, sec)
         return out
 
     @property

@@ -858,10 +858,36 @@ def _load_and_compute(
     _phi_warned = False
     _phase_warned_ds: set[int] = set()
     _notes_shown_ds: set[int] = set()
+
+    # ── 预读: 按数据源并行读取全部频点 ──
+    # 把读取从「逐频点穿插在下面循环里」提出来: xlsx 的 XML 解析是纯 Python, 受 GIL
+    # 限制, 必须用进程 (线程实测更慢) —— 详见 DataSource.read_many。
+    # 各数据源并行度由 auto_read_workers() 按本机核数自动定档; 降级/取消都在
+    # read_many 内部处理, 这里只负责组装与进度。
+    _read_done = 0
+
+    def _on_read(_idx, _sec):
+        nonlocal _read_done
+        _read_done += 1
+        _report(progress_callback, _read_done, progress_max,
+                f"[📂] 读取源文件 {_read_done}/{total}")
+
+    prefetched: dict[tuple[int, int], dict] = {}
+    _seen: dict[int, object] = {}
+    for _t in tasks:
+        _seen.setdefault(id(_t[4]), _t[4])
+    for _ds in _seen.values():
+        _idxs = [t[2] for t in tasks if t[4] is _ds]
+        for _i, _sec in _ds.read_many(_idxs, on_result=_on_read,
+                                      cancel_callback=cancel_callback).items():
+            prefetched[(id(_ds), _i)] = _sec
+
     for i, (sheet_name, freq, csv_idx, lag_cfg, task_ds, needed_params) in enumerate(tasks):
         if cancel_callback and cancel_callback():
             break
-        raw = task_ds.read_sections(csv_idx)
+        raw = prefetched.get((id(task_ds), csv_idx))
+        if raw is None:
+            break          # 读取被取消 → 未取到的频点不再处理
 
         # 结构探测告警 (每个数据源提示一次, 与「是否缺相位」「是否请求 AR」无关)。
         # reader 只产出 notes 数据, 由这里决定是否呈现 —— src/ 层不依赖日志设施。
@@ -904,7 +930,6 @@ def _load_and_compute(
                          f"(应≈360°), Directivity/AR/LAG 可能偏小")
         ar_cfg = ar_lag_config if ar_lag_config is not None and not ar_lag_config.is_empty() else sheet_ar_configs.get(sheet_name, LagConfig())
         compute_tasks.append((sheet_name, freq, raw, lag_cfg, theta_list, theta_extrap_method, robust_peak, needed_params, extra_params, chart_config, ar_cfg, nh_custom_angles, ar_output_db, output_config, compute_only, store_matrices, chart_instances, dir_extrap_method))
-        _report(progress_callback, i + 1, progress_max, f"[📂] 读取源文件 {i+1}/{total}")
 
     data_done = _load_w
     _report(progress_callback, data_done, progress_max, f"[🧮] 计算参数 0/{len(compute_tasks)}")

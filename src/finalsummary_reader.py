@@ -20,7 +20,7 @@ from collections import OrderedDict
 import numpy as np
 import openpyxl
 
-from .datasource import DataSource
+from .datasource import DataSource, auto_read_workers
 
 
 class _LRUDict(OrderedDict):
@@ -378,6 +378,52 @@ class FinalSummarySource(DataSource):
             "phi_phase": pp_data,
         }
 
+    def read_many(self, freq_indices, workers=None, on_result=None,
+                  cancel_callback=None) -> dict[int, dict]:
+        """覆写: 用**进程池**并行读取多个频点。
+
+        为什么必须进程而不是线程: 下面的解析走标准库 xml.etree.ElementTree.iterparse
+        (openpyxl 即使装了 lxml 也从标准库导入它), 全程持 GIL; 且所有 sheet 共享
+        同一个 zipfile 句柄 (_SharedFile 内部有 RLock) → 底层读取被串行化。
+        实测线程池反而慢 1.1~1.4x, 进程池 W=8 得 3.07x (见 auto_read_workers)。
+
+        子进程各开一份 workbook (read_only=True, 每个仅 +7MB), 互不干扰。
+        """
+        out: dict[int, dict] = {}
+        n = len(freq_indices)
+        if n == 0:
+            return out
+
+        w = auto_read_workers(n) if workers is None else max(1, int(workers))
+        if w < 2:
+            return super().read_many(freq_indices, on_result=on_result,
+                                     cancel_callback=cancel_callback)
+
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+        try:
+            with ProcessPoolExecutor(max_workers=w, initializer=_read_worker_init,
+                                     initargs=(self._path,)) as ex:
+                futs = [ex.submit(_read_worker, (self._path, i)) for i in freq_indices]
+                for fut in as_completed(futs):
+                    if cancel_callback is not None and cancel_callback():
+                        for f in futs:
+                            f.cancel()
+                        break
+                    idx, sec = fut.result()
+                    out[idx] = sec
+                    if on_result is not None:
+                        on_result(idx, sec)
+        except (PermissionError, OSError, RuntimeError, ImportError) as e:
+            # 并行引擎不可用 (权限/资源/打包环境) → 降级串行, 不能让出报告失败。
+            # 但必须留下提示 —— 否则用户只会觉得"怎么还是这么慢"。
+            # 措辞与 pipeline.py 里并行计算的降级提示保持一致。
+            self._detection_notes.append(
+                f"并行读取不可用 ({type(e).__name__}: {e}), 已降级为串行")
+            rest = [i for i in freq_indices if i not in out]
+            out.update(super().read_many(rest, on_result=on_result,
+                                         cancel_callback=cancel_callback))
+        return out
+
     def close(self):
         if self._wb:
             self._wb.close()
@@ -456,6 +502,27 @@ def _read_matrices_by_rows(ws, rows_by_section: dict, n_cols: int) -> dict:
             except (ValueError, TypeError):
                 pass
     return out
+
+
+# ── 并行读取的进程池 worker ────────────────────────────────────────
+# 必须是模块级函数: Windows 用 spawn, 子进程要凭模块路径重新 import 并查找它。
+
+_READER_CACHE: dict = {}
+
+
+def _read_worker_init(path: str) -> None:
+    """子进程初始化: 自己开一份 workbook。
+
+    **不能**依赖 fork 继承父进程的句柄 —— 打包成 EXE 后 Windows 走 spawn,
+    必须能凭 path 重建。cache_size=1: 每个频点只读一次, 不留缓存副本。
+    """
+    _READER_CACHE[path] = FinalSummarySource(path, cache_size=1)
+
+
+def _read_worker(args: tuple) -> tuple:
+    """子进程任务: 读一个频点。只回数据, 告警/进度由父进程统一处理。"""
+    path, idx = args
+    return idx, _READER_CACHE[path].read_sections(idx)
 
 
 def _read_matrix(ws, start_row: int, n_rows: int, n_cols: int) -> np.ndarray:
