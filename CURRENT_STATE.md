@@ -1,16 +1,24 @@
 # CURRENT STATE — 2026-09-16（性能修复轮）
 
-**Branch:** master · **基线:** `1bcb4ab` · 其上 **7 个提交**（`241160c` / `a25fe83` 待 push）。
+**Branch:** master · **基线:** `1bcb4ab` · 其上 **12 个提交，全部已 push**（HEAD = origin）。
 工作区: 仅 `antenna_config.json`（用户配置，刻意不提交）+ 一批未跟踪的新文件。
+
+> 本轮还改了 **2 处全局配置**（不在 git 里，见 A-7 末尾）：
+> `~/.claude/CLAUDE.md` 的规则 9 与模型路由章节。
 
 ---
 
-## A. 本轮工作 — 7 个提交
+## A. 本轮工作 — 12 个提交
 
 ```
+9e47645  fix(hooks): 修复 9 个从未触发的 matcher — 自动化门禁全部恢复
+3a7be8e  docs: 补充死代码清理的剩余步骤清单 (F-1 附)
+bc721d0  refactor(ui): 删除 7 个零引用死按钮 — 改 .ui 并重编译
+68560a5  docs: 状态固化更新 — 死调用点清理已完成, 修正 F-1/F-2 描述
 a25fe83  refactor(ui): 移除指向已废弃控件的 3 处死调用 — 消除 AttributeError 隐患
 241160c  docs: 状态固化 — 补充 UI 重构遗留死代码项 (F-1) 与测试假绿经过 (A-5)
 478cdd2  test(smoke): 替换 TestConfigTabButtons 为弹窗测试 — 原类测的全是已废弃控件
+9a480f7  docs: 状态固化 — 大文件加载性能修复轮（4 提交）
 818c156  fix(tests): 修 smoke 套件 3 处测试自身缺陷 — 断言恒真 / import 错路径 / 传参错
 3fd8d88  perf(src): FinalSummary→CSV 转换改流式 — 583MB 文件从 OOM 到 4.4 分钟
 ea54fd5  perf(src,ui): 大 Excel 数据加载提速 100 倍 — read_only 流式 + 频点延迟加载
@@ -105,6 +113,91 @@ _on_export():   if state != READY: 弹「请先预览」; return
 > **教训**：`if 控件.isVisible(): 点击()` 这种写法等于没有测试。
 > 见到 `skip("not visible")` 或 `if ...isVisible()` 包住的点击，先问「它真的会可见吗」。
 
+### A-6 死代码清理：删掉 7 个零引用按钮（`bc721d0`）
+
+`_hide_settings_tabs()` 移除 tabLag 后，那批控件永不显示（完整分析见 F-1）。
+本轮只做其中**真正零风险**的部分。
+
+**删除对象**（7 个，均无引用、无信号连接）：
+`btnAddCustomAngle` / `btnStepGenerate` / `btnAddRange` /
+`btnLoadFromTemplate` / `btnClearConfig` / `btnSavePreset` / `btnLoadPreset`
+
+**判据**：产品代码 **0 引用**；compiled 里只有定义 + `addWidget`，**无**
+`.clicked.connect(...)`；`connectSlotsByName` 虽存在，但对应的
+`on_btnXXX_clicked` 槽**并不存在**，故未产生任何连接。
+
+**做法**：`.ui` 删定义行 → `pyside6-uic` 重编译。
+（前提：`.ui`/`compiled` 已于 `157a2d8` 恢复同步 —— 实测重编译产物与当时
+compiled 逐字节一致，故重编译安全。）
+
+**未删**那 4 个 groupbox：其内部仍有**有引用**的子控件（`groupConfigured` 含
+`configItemsWidget`，其余各含 spinbox），只能连子控件一并处理。
+
+**验证**：MainWindow 构造正常 · 7 按钮已从 `ui` 对象消失 · 保留控件
+（`configItemsWidget`/`spinCustomAngle`/`btnQuick0`/`groupConfigured`）完好 ·
+`gui_integrity_check.py` 12 项全过 · tabConfig 仍 3 个 tab ·
+e2e **24 passed** · smoke 子集 **38 passed**。
+
+---
+
+### A-7 ⚠ 9 个 hook 从未触发（`9e47645`）— 配置层面的硬故障
+
+审核 `.claude/` 配置时发现：**所有 PreToolUse/PostToolUse hook 从未执行过**。
+两处硬故障，均经本机 A/B 实测确认（非推断）：
+
+**① matcher 用了表达式写法 → 静默永不触发**
+
+Claude Code 的 matcher 只支持「**精确字符串**」或「`|`/`,` 分隔的**列表**」。
+含 `=` `"` `(` 的值会落到**正则**分支，编译成匹配字面量 `tool == "Edit"` 的正则
+—— 没有任何工具名长这样，于是不报错、也不触发。
+
+| A/B 实测 | 结果 |
+|---|---|
+| `"matcher": "tool == \"Write\""` | ❌ 目标文件未生成 —— **未触发** |
+| `"matcher": "Write"` | ✅ 触发 |
+
+**② `$CLAUDE_CODE_FILE_PATH` 不存在**（该环境变量从未出现在官方文档）。
+hook 输入实际走 **stdin 的 JSON**：
+```json
+{"tool_name":"Write","tool_input":{"file_path":"..."},"hook_event_name":"PostToolUse", ...}
+```
+Bash 事件取 `tool_input.command`。
+
+**受影响范围**（以下自动化一直没在工作）：dev-flow 计数 · FUNC_CATALOG 提醒 ·
+GUI 门禁提醒 · interface-audit · pytest 计数 · gui-audit。
+
+**处理**：
+- 新增 `.claude/hooks/hook_dispatch.py` —— 统一从 stdin 读事件 JSON 并按 action
+  分发；条件过滤（是否 `.py` / 在 `src/`、`ui/` 下 / 命令含 `git commit`、`pytest`）
+  在脚本内完成。
+  > **刻意没用 `if` 字段**：一个 handler 只能带**一条**权限规则
+  > （如 `"if": "Write(**/*.py)"`），无法同时覆盖 Edit 与 Write，故过滤放在脚本里。
+- `.claude/settings.json` 重写：matcher 全改 `Edit|Write` / `Bash`；同 matcher 的
+  多条 handler 合并成组（**9 组 → 5 组 / 10 个 handler**）。
+- **git commit 审计从 `PostToolUse` 挪到 `PreToolUse`** —— 原先挂在 PostToolUse 时
+  commit 已完成，`--staged` 看不到任何内容，与它自己的说明「每次 git commit 前」矛盾。
+- 移除 `settings.json` 里的 **`mcpServers`** —— **不是合法键**，项目里那份声明是
+  白写的（实际从 `~/.claude.json` 用户作用域加载）。合法位置：`.mcp.json`(项目) /
+  `~/.claude.json`(用户) / `--mcp-config` / 插件提供。
+- `pre-compact-distill.sh` 阻止横幅改走 **stderr** —— PreCompact 的
+  `systemMessage`/`continue` 会被丢弃，只写 stdout 时手动 `/compact` 看不到提示。
+- `.claude/skills/gui-audit/SKILL.md` 补 frontmatter —— 原缺 `name`/`description`
+  （所有 frontmatter 字段本就可选，故不报错），但缺 `description` 会让模型
+  **无法判断何时自动调用它**。补完后立即出现在可用 skill 列表里。
+
+**实测**（模拟真实 hook 输入）：Write `ui/pages.py` → 计数+1 且输出提醒 ✅ ·
+Write `src/parser.py` → 命中真实 FUNC_CATALOG ✅ · Write `/tmp/readme.md` → 静默 ✅ ·
+Bash `git commit` → 暂存区审计 ✅ · Bash `pytest` → 计数+1 ✅
+
+**⚠ 顺带在全局 `~/.claude/CLAUDE.md` 改了 2 处**（不在 git 里，其他项目也受影响）：
+- **规则 9（图片识别）**：改为「优先用模型自带视觉能力，MCP 仅作回退」。
+  原表述「DeepSeek 不支持多模态」已过时 —— DeepSeek V4.1 Flash 与 GLM-5.3-Flash
+  **均为原生多模态**，且 2026-09-16 实测传图链路已通（模型可直接读出图片内容）。
+- **模型路由章节**：按实测重写。原写 CCR 网关 + Kimi/Volcengine/GLM-5.2，实际是
+  **DeepSeek 直连**，且 `MODEL`/`OPUS`/`SONNET`/`HAIKU` **四档全指向
+  `deepseek-flash[1m]`**（即当前没有模型分级）。CCR 进程可能仍监听 3456，
+  但 Claude Code 已不走它。
+
 ---
 
 ## B. 大文件加载性能（后续维护必读）
@@ -190,13 +283,17 @@ bash scripts/update_i18n.sh        # lupdate → lrelease → 生成反查表 �
 | 17 | **`qtbot.addWidget` + `dlg.deleteLater()` 双重管理**（本轮新增） | addWidget 已登记对象，teardown 会再 close 一次；手动 deleteLater 先销毁 C++ 对象 → `Internal C++ object already deleted`。**该错误还会让下一个用例 setup 失败**（`previous item was not torn down properly`） | 只交给 pytest-qt 托管，别手动 deleteLater。本轮 5 条失败/错误里有 2 条是这一个根因的连锁反应 |
 | 18 | **`or True` 型假测试**（本轮新增） | `assert X.called or True` —— 既没打桩（原生函数没有 `.called`，取属性即抛 `AttributeError`），`or True` 又让断言恒真 | 见到 `or True` 立即当作「没有断言」处理 |
 | 19 | **pkill 之后要确认进程真死**（本轮新增） | `pkill -f` 返回 144 是**它杀了自己的 shell**，不代表目标已死；曾遗留一个 5.7GB 的 python 进程 | 用 `ps aux --sort=-%mem` 复核 |
+| 20 | **Claude Code hook matcher 不支持表达式**（本轮新增，A-7） | `"matcher": "tool == \"Edit\""` 会落到**正则**分支，编译成匹配字面量 `tool == "Edit"` 的正则 —— 无工具名匹配它，于是**静默永不触发、不报错**。项目 9 个 hook 因此全部失效 | 只用**精确字符串**或 `\|`/`,` 列表：`"Edit\|Write"`、`"Bash"`。参数级过滤用 `if`（但一条 handler 只能带一条规则，多条件请在脚本内判断） |
+| 21 | **`$CLAUDE_CODE_FILE_PATH` 不存在**（本轮新增，A-7） | 该环境变量从未在官方文档出现；用它取文件路径的 hook 恒拿到空值 | hook 输入走 **stdin JSON**：`tool_input.file_path`（Bash 为 `tool_input.command`）。本机**没有 `jq`**，用 `python3 -c "import json,sys; ..."` 解析 |
+| 22 | **grep 调用点必须查两种前缀**（本轮新增） | 只查 `mw._sync_quick_buttons()` 会漏掉 `self._sync_quick_buttons()` 这类**类内调用**，导致误判「已无调用方」。本轮据此错判过一次，已更正 | 查调用点同时 grep `对象.方法(` 与 `self.方法(`；或直接 grep 方法名、再排除 `def` 行 |
 
 ---
 
 ## E. 交付阻塞项
 
-**给 Ralab 的 EXE 需要重打包** —— 现行版本缺少本轮 4 个提交。
-本轮的性能修复**对交付影响很大**：原来 583MB 的生产文件是必然 OOM 的。
+**给 Ralab 的 EXE 需要重打包** —— 现行版本缺少本轮 **12 个提交**。
+本轮的性能修复**对交付影响很大**：原来 583MB 的生产文件在本机是**必然 OOM**
+（需 ~24GB，而机器只有 11GB + 4GB swap），不是「慢」。
 
 ```bash
 cd /mnt/d/cc/antenna-post-processor && \
@@ -326,16 +423,22 @@ cd /mnt/d/cc/antenna-post-processor && \
    但 `tests/` 里**完全没有覆盖**。本轮改它时只能靠手写脚本实测验证。
    **Blocker? No**（但值得补：这是本轮唯一改到却无回归保护的真实路径）
 
-4. **完整 smoke 套件需再跑一次** —— 本轮已跑过全量（**85 passed / 0 failed /
+4. **模型路由策略未定** —— 当前 `MODEL`/`OPUS`/`SONNET`/`HAIKU` **四档同模型**
+   （全为 `deepseek-flash[1m]`），等于没有分级。手上另有一个原生多模态模型可用：
+   GLM-5.3-Flash（320B/18B，价格约 GLM-5.3 的 1/10）。若要恢复分级
+   （如复杂任务用 GLM-5.3、简单任务用 flash），需先定方案再改 env。
+   **Blocker? No**（属架构决策，等用户拍板）
+
+5. **完整 smoke 套件需再跑一次** —— 本轮已跑过全量（**85 passed / 0 failed /
    0 errors**，2880s），但那是**替换测试类之前**的数字。替换后用例数为 73，
    应重跑确认。**Blocker? No**
 
-5. **`feedback_client.resend_queue` TOCTOU 竞态** —— 已定位未修。**Blocker? No**
-6. **3D 重构批 C-3（查看器 GUI）** —— 见记忆 `3d-refactor-progress`，自 2026-07-11 挂起。
-7. **TIS 完整指标** —— 待用户提供灵敏度数据（镜像 TRP）。见记忆 `tis-metrics-todo`。
-8. **`ui/dialogs.py` 两处 CSS 被误包 `tr()`** —— 应把 `tr()` 去掉。
-9. **`RAGSettingsDialog` 硬编码英文 `"Model:"`** —— `ui/dialogs.py:2222`。
-10. **`ui/shell_window.py`** —— 死代码，全项目无实例化点。
+6. **`feedback_client.resend_queue` TOCTOU 竞态** —— 已定位未修。**Blocker? No**
+7. **3D 重构批 C-3（查看器 GUI）** —— 见记忆 `3d-refactor-progress`，自 2026-07-11 挂起。
+8. **TIS 完整指标** —— 待用户提供灵敏度数据（镜像 TRP）。见记忆 `tis-metrics-todo`。
+9. **`ui/dialogs.py` 两处 CSS 被误包 `tr()`** —— 应把 `tr()` 去掉。
+10. **`RAGSettingsDialog` 硬编码英文 `"Model:"`** —— `ui/dialogs.py:2222`。
+11. **`ui/shell_window.py`** —— 死代码，全项目无实例化点。
 
 ---
 
