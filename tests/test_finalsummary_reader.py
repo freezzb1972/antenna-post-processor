@@ -255,6 +255,58 @@ class TestFinalSummarySourceSynthetic:
         finally:
             os.unlink(path)
 
+    def test_phase_label_adjacent_to_amplitude_block(self):
+        """回归: 'Phase' 标签紧贴振幅段 (中间无空行) 时仍须定位到 Theta 相位段。
+
+        夹具恰为此布局 —— 标签在第 6 行, 而 theta_start_row + n_phi = 6。
+        旧实现判据为 `row_idx > after_amp`, 会拒绝该标签且扫描不停止,
+        继续向下把 **Phi 相位段的 'Phase' 标签**误判为 Theta 相位段,
+        于是 theta_phase 静默读到 phi_phase 的数据, AR 用错相位算出错值。
+        """
+        path = _make_finalsummary_xlsx(with_phase=True)
+        try:
+            ds = FinalSummarySource(path)
+            assert ds._theta_start_row + ds._n_phi == 6, "夹具布局变了, 本回归测试前提不成立"
+            assert ds._has_phase
+            assert ds._theta_phase_start == 8      # 标签 6 + 2
+            assert ds._phi_phase_start == 17       # 标签 15 + 2
+
+            r = ds.read_sections(0)
+            assert list(r["theta_phase"][0]) == [10.0, 20.0, 30.0, 40.0]
+            assert list(r["phi_phase"][0]) == [100.0, 110.0, 120.0, 130.0]
+            # 错位时二者会完全相同 —— 这才是本测试真正要防的
+            assert not np.array_equal(r["theta_phase"], r["phi_phase"])
+            ds.close()
+        finally:
+            os.unlink(path)
+
+    def test_detection_notes_empty_for_normal_file(self):
+        """正常文件不应产生探测告警。"""
+        path = _make_finalsummary_xlsx(with_phase=True)
+        try:
+            ds = FinalSummarySource(path)
+            assert ds.detection_notes == []
+            ds.close()
+        finally:
+            os.unlink(path)
+
+    def test_detection_notes_when_phase_labels_all_rejected(self):
+        """列 A 中存在 'Phase' 但均落在振幅段之前时, 应记录探测告警而不静默。"""
+        path = _make_finalsummary_xlsx(with_phase=False, with_phi=True)
+        wb = openpyxl.load_workbook(path)
+        ws = wb[wb.sheetnames[0]]
+        ws.cell(1, 1, "Phase")          # 描述行里的杂散 'Phase', 位于振幅段之前
+        wb.save(path)
+        wb.close()
+        try:
+            ds = FinalSummarySource(path)
+            assert not ds._has_phase
+            assert len(ds.detection_notes) == 1
+            assert "Phase" in ds.detection_notes[0]
+            ds.close()
+        finally:
+            os.unlink(path)
+
     def test_read_sections_no_phase(self):
         path = _make_finalsummary_xlsx(with_phase=False)
         try:

@@ -85,6 +85,14 @@ class DataSource(ABC):
         """释放资源（子类可覆盖）。"""
         pass
 
+    @property
+    def detection_notes(self) -> list[str]:
+        """结构/格式探测中的异常提示; 空列表表示一切正常。
+
+        只产出数据, 不直接打日志 —— 由上层 (pipeline → GUI) 决定是否提示。
+        """
+        return []
+
     @staticmethod
     def from_path(path: str) -> DataSource:
         """根据文件扩展名自动创建合适的 DataSource。
@@ -144,6 +152,10 @@ class ResampledDataSource(DataSource):
             else:
                 out[key] = arr
         return out
+
+    @property
+    def detection_notes(self) -> list[str]:
+        return self._base.detection_notes
 
     def close(self):
         self._cached = None

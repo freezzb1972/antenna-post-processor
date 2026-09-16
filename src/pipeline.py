@@ -137,6 +137,10 @@ def extrapolate_theta(
 # 单频点处理
 # ---------------------------------------------------------------------------
 
+# 需要相位数据的计算参数 —— AR 系列 (见 _process_one_frequency)
+AR_PARAM_KEYS = frozenset({"axial_ratio", "ar_single", "ar_range"})
+
+
 def _process_one_frequency(
     raw: dict[str, np.ndarray | None],
     freq: float,
@@ -322,7 +326,7 @@ def _process_one_frequency(
 
     # Axial Ratio (仅当有 Phase 数据且需要 AR 列)
     # 若 output_config 要求 AR 方位面图，强制计算 AR
-    ar_need = compute_set & {"axial_ratio", "ar_single", "ar_range"}
+    ar_need = compute_set & AR_PARAM_KEYS
     az_force_ar = (output_config is not None and False)
     if ar_need or az_force_ar or not need:
         tp = raw.get("theta_phase"); pp = raw.get("phi_phase")
@@ -852,10 +856,22 @@ def _load_and_compute(
     _report(progress_callback, 0, progress_max, f"[📂] 读取源文件 0/{len(tasks)}")
     compute_tasks = []
     _phi_warned = False
+    _phase_warned_ds: set[int] = set()
     for i, (sheet_name, freq, csv_idx, lag_cfg, task_ds, needed_params) in enumerate(tasks):
         if cancel_callback and cancel_callback():
             break
         raw = task_ds.read_sections(csv_idx)
+
+        # 相位段缺失 (每个数据源提示一次): 请求了 AR 却没有相位数据时,
+        # _process_one_frequency 会静默跳过 AR —— 用户只看到报告里少了几列。
+        if (raw.get("theta_phase") is None
+                and id(task_ds) not in _phase_warned_ds
+                and (needed_params or set()) & AR_PARAM_KEYS):
+            _phase_warned_ds.add(id(task_ds))
+            _notes = task_ds.detection_notes
+            _log(log_callback,
+                 "⚠ 未检测到相位段 → Axial Ratio 不会计算"
+                 + (f"; {_notes[0]}" if _notes else ""))
         theta_list = list(task_ds.theta_angles)
         phi_list = list(task_ds.phi_angles) if hasattr(task_ds, 'phi_angles') else []
         raw["_phi_angles"] = phi_list if phi_list else None

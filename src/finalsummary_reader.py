@@ -152,6 +152,15 @@ class FinalSummarySource(DataSource):
         if phi_phase_label is not None:
             self._phi_phase_start = phi_phase_label + 2
 
+        # ---- 探测诊断 (供上层提示; src/ 层不直接打日志) ----
+        self._detection_notes: list[str] = []
+        if not self._has_phase and section_labels.get('phase_labels_found'):
+            self._detection_notes.append(
+                f"发现 {section_labels['phase_labels_found']} 处 'Phase' 标签, "
+                f"但均未落在 Theta 振幅段 (结束于第 {after_amp - 1} 行) 之后, "
+                f"相位段未定位"
+            )
+
         # ---- 缓存 (LRU: 最多缓存 512 个频点，覆盖宽频测试场景) ----
         self._cache: _LRUDict = _LRUDict(maxsize=512)
 
@@ -252,6 +261,7 @@ class FinalSummarySource(DataSource):
             'theta_phase_label': None,
             'phi_pol_label': None,
             'phi_phase_label': None,
+            'phase_labels_found': 0,   # 列 A 中 'Phase' 标签的总数 (诊断用)
         }
         phase_labels_found = []
 
@@ -270,8 +280,13 @@ class FinalSummarySource(DataSource):
             # "Phase" 标签
             if vl == 'phase':
                 phase_labels_found.append(row_idx)
-                # 第一个 Theta 振幅段之后的 Phase → theta_phase_label
-                if result['theta_phase_label'] is None and row_idx > after_amp:
+                # 第一个 Theta 振幅段之后(含紧邻行)的 Phase → theta_phase_label
+                #
+                # 必须用 >= 而非 >: 标签可能紧贴振幅段最后一行 (中间无空行),
+                # 此时 row_idx == after_amp。用 > 会拒绝它, 扫描继续向下,
+                # 把 **Phi 相位段** 的 "Phase" 标签误判为 Theta 相位段 ——
+                # theta_phase 静默读到 phi_phase 的数据, AR 用错相位算出错值。
+                if result['theta_phase_label'] is None and row_idx >= after_amp:
                     result['theta_phase_label'] = row_idx
 
             # "Phi Polarization" 标签
@@ -285,7 +300,13 @@ class FinalSummarySource(DataSource):
                     result['phi_phase_label'] = pr
                     break
 
+        result['phase_labels_found'] = len(phase_labels_found)
         return result
+
+    @property
+    def detection_notes(self) -> list[str]:
+        """结构探测中的异常提示; 空列表 = 一切正常 (见 DataSource.detection_notes)。"""
+        return list(self._detection_notes)
 
     @property
     def frequencies(self) -> list[float]:
