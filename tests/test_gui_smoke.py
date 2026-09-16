@@ -334,14 +334,20 @@ class TestFileSettingsPageButtons:
         assert btn.isVisible(), "_btn_add_files not visible"
         assert "添加" in btn.text() or "Add" in btn.text()
 
-    def test_add_files_click_opens_dialog(self, window, qtbot):
+    def test_add_files_click_opens_dialog(self, window, qtbot, monkeypatch):
         page = getattr(window, '_file_settings_page', None)
         if page is None:
             pytest.skip("No _file_settings_page")
+        # 打桩并记录调用。原断言 `QFileDialog.getOpenFileNames.called or True`
+        # 有两处问题: 既没打桩 (原生函数没有 .called 属性, 取属性直接抛
+        # AttributeError), 又用 `or True` 让断言恒真 —— 等于什么都没验证。
+        # 返回空列表 = 用户取消了选择。
+        calls = []
+        monkeypatch.setattr(QFileDialog, "getOpenFileNames",
+                            lambda *a, **k: (calls.append(a), ([], ""))[1])
         page._btn_add_files.click()
         qtbot.wait(100)
-        # getOpenFileNames should have been called
-        assert QFileDialog.getOpenFileNames.called or True  # mock verifies silently
+        assert calls, "点击「添加数据文件」未调用 QFileDialog.getOpenFileNames"
 
     def test_auto_match_button_exists(self, window, qtbot):
         page = getattr(window, '_file_settings_page', None)
@@ -601,7 +607,7 @@ class TestAllDialogs:
 
     def test_rag_settings_dialog_creates(self, window, qtbot):
         from ui.dialogs import RAGSettingsDialog
-        from ui.dialogs import RAGSettings
+        from src.help_engine import RAGSettings   # 不在 ui.dialogs, 而是 src.help_engine
         # 签名是 (settings, parent=None) —— 原来传单参数会把 MainWindow
         # 当成 settings, 随后 self.settings.enabled 抛 AttributeError。
         dlg = RAGSettingsDialog(RAGSettings(), window)
@@ -660,31 +666,38 @@ class TestAllDialogs:
 
     def test_all_dialogs_close_cleanly(self, window, qtbot):
         """所有对话框 close 后不残留 widget。"""
-        import gc
         from ui import dialogs as dlg_module
-        dialog_classes = [
-            dlg_module.DataSourceDialog,
-            dlg_module.CalcParamsDialog,
-            dlg_module.PlotConfigDialog,
-            dlg_module.HelpDialog,
-            dlg_module.RAGSettingsDialog,
-            dlg_module.SystemSettingsDialog,
-            dlg_module.ResampleDialog,
-            dlg_module.BatchCalibrateDialog,
-            dlg_module.MergeDialog,
-            dlg_module.RepairDialog,
-            dlg_module.ActivationDialog,
-            dlg_module.PathLossDialog,
+        from src.help_engine import RAGSettings
+        # 用工厂而非裸类: RAGSettingsDialog 的签名是 (settings, parent=None),
+        # 与其余 (parent) 不同 —— 统一写 `cls(window)` 会把 MainWindow 当作
+        # settings, 在 self.settings.enabled 抛 AttributeError。
+        factories = [
+            lambda: dlg_module.DataSourceDialog(window),
+            lambda: dlg_module.CalcParamsDialog(window),
+            lambda: dlg_module.PlotConfigDialog(window),
+            lambda: dlg_module.HelpDialog(window),
+            lambda: dlg_module.RAGSettingsDialog(RAGSettings(), window),
+            lambda: dlg_module.SystemSettingsDialog(window),
+            lambda: dlg_module.ResampleDialog(window),
+            lambda: dlg_module.BatchCalibrateDialog(window),
+            lambda: dlg_module.MergeDialog(window),
+            lambda: dlg_module.RepairDialog(window),
+            lambda: dlg_module.ActivationDialog(window),
+            lambda: dlg_module.PathLossDialog(window),
         ]
-        for cls in dialog_classes:
-            dlg = cls(window)
+        for make in factories:
+            dlg = make()
+            # 只交给 pytest-qt 托管, **不要**再手动 dlg.deleteLater():
+            # addWidget 已登记该对象, teardown 时 _close_widgets 会对它再
+            # close 一次; 手动 deleteLater 先销毁了 C++ 对象, teardown 随即抛
+            # "Internal C++ object (X) already deleted" —— 该错误还会让下一个
+            # 用例在 setup 阶段失败 ("previous item was not torn down properly")。
             qtbot.addWidget(dlg)
             dlg.show()
             qtbot.wait(50)
             dlg.close()
             qtbot.wait(50)
-            dlg.deleteLater()
-            qtbot.wait(50)
+            assert not dlg.isVisible(), f"{type(dlg).__name__} close() 后仍可见"
 
 
 # =========================================================================
