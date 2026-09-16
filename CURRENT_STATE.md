@@ -1,13 +1,15 @@
 # CURRENT STATE — 2026-09-16（性能修复轮）
 
-**Branch:** master · **基线:** `1bcb4ab` · 其上 5 个提交，**已 push**（HEAD = origin）。
+**Branch:** master · **基线:** `1bcb4ab` · 其上 **7 个提交**（`241160c` / `a25fe83` 待 push）。
 工作区: 仅 `antenna_config.json`（用户配置，刻意不提交）+ 一批未跟踪的新文件。
 
 ---
 
-## A. 本轮工作 — 5 个提交
+## A. 本轮工作 — 7 个提交
 
 ```
+a25fe83  refactor(ui): 移除指向已废弃控件的 3 处死调用 — 消除 AttributeError 隐患
+241160c  docs: 状态固化 — 补充 UI 重构遗留死代码项 (F-1) 与测试假绿经过 (A-5)
 478cdd2  test(smoke): 替换 TestConfigTabButtons 为弹窗测试 — 原类测的全是已废弃控件
 818c156  fix(tests): 修 smoke 套件 3 处测试自身缺陷 — 断言恒真 / import 错路径 / 传参错
 3fd8d88  perf(src): FinalSummary→CSV 转换改流式 — 583MB 文件从 OOM 到 4.4 分钟
@@ -225,30 +227,49 @@ cd /mnt/d/cc/antenna-post-processor && \
    **实测开销**：`_sync_quick_buttons` **0.01ms/次**、`_update_lag_display`
    **0.13ms/次** —— 性能影响可忽略；功能上当前不报错、无副作用传播。
 
-   > ⚠ **但它是定时炸弹**：`_sync_quick_buttons` 里是
-   > `getattr(self.ui, btn_attr)`，**无默认值**，而这些调用挂在真实路径上
-   > （`ui/pages.py:2544` 的 `_sync_to_mw()` 每次图表配置同步都会走到）。
-   > **一旦真去做「Step 5 清扫」删掉控件属性，就会抛 `AttributeError` 并中断
-   > `_sync_to_mw()`。** 所以清理时「删控件」与「删调用点」必须在同一个提交里。
+   > ⚠ **原本是定时炸弹 —— 已在 `a25fe83` 拆除**：`_sync_quick_buttons` 里是
+   > `getattr(self.ui, btn_attr)`，**无默认值**，而调用挂在真实路径上
+   > （`_sync_to_mw()` 被 10+ 处信号连接）。若先删控件属性，就会抛
+   > `AttributeError` 并中断图表配置同步。
+   > a25fe83 已把 **3 处调用点**全部移除（`pages.py` ×2、`dialogs.py` ×1 ——
+   > 第三处是 grep 复查时才发现的），顺带删掉 `_sync_widget` 的 `has_ui` 参数
+   > （它唯一用途就是这对死调用）。**两个函数现已无任何调用方，隐患消失。**
 
-   **建议**：单独一轮做，别顺手改。第三组（7 个按钮）已是纯孤儿，清理零风险；
-   前两组要连调用点一起动，改完需跑 `_sync_to_mw()` 相关测试。**Blocker? No**
+   **剩余待做**（真正的死代码本体，非紧急）：
+   - 两个方法本体：`_sync_quick_buttons()` / `_update_lag_display()`
+   - `compiled/ui_main_window.py` 里那 49 个控件定义与 4 个 groupbox
 
-2. **`test_gui_e2e.py` 的 `configItemsWidget` 用例** —— `TestLagDisplayVisibility`
-   的 4 个用例测的同样是已 removeTab 的孤儿控件（与 A-5 同源）。
-   已扫描确认 `test_gui_smoke.py` / `test_gui.py` 无孤儿控件。**Blocker? No**
-   > 与 F-1 同源，建议一并处理：清理死代码时把用例迁到新界面。
+   > ⚠ 删控件定义**必须改 `.ui` 后重编译**，而 `.ui` / `compiled` 目前**不同步**
+   > （重编译会让 `MainWindow` 构造直接失败，见 D-11）。所以这项**卡在 `.ui` 上，
+   > 不是卡在风险上** —— 解决 `.ui` 同步后，那 7 个零引用按钮是最先可删的。
 
-3. **完整 smoke 套件需再跑一次** —— 本轮已跑过全量（**85 passed / 0 failed /
+   **Blocker? No**
+
+2. **~~`test_gui_e2e.py` 的 `configItemsWidget` 用例~~** —— **已在 `a25fe83` 处理**。
+   原 `TestLagDisplayVisibility` 的 4 个用例中，3 个测的是已 removeTab 的孤儿控件
+   （`configItemsWidget` 的 label 样式、tabLag 里 6 个 QDoubleSpinBox 与
+   `_QUICK_ANGLES` 按钮的对比度），已随产品调用点一并删除；类改名
+   `TestGlobalStyleSheet`，保留唯一有效的 `test_custom_qss_applied`。
+   e2e 用例数 27 → 24（24 passed）。
+   > 若日后要为**新界面**补「暗色主题可见性」覆盖，应针对 `AntennaParamsPage`
+   > 的角度 widget 与 `_show_angle_popup` 弹窗，而非这批死控件。
+   > 已扫描确认 `test_gui_smoke.py` / `test_gui.py` 无孤儿控件。
+
+3. **`_sync_to_mw()` 零测试覆盖** —— 它被 **10+ 处信号连接**调用（改图表配置、
+   频率源、外推选项、稳健模式等都会触发），是图表配置同步的核心路径，
+   但 `tests/` 里**完全没有覆盖**。本轮改它时只能靠手写脚本实测验证。
+   **Blocker? No**（但值得补：这是本轮唯一改到却无回归保护的真实路径）
+
+4. **完整 smoke 套件需再跑一次** —— 本轮已跑过全量（**85 passed / 0 failed /
    0 errors**，2880s），但那是**替换测试类之前**的数字。替换后用例数为 73，
    应重跑确认。**Blocker? No**
 
-4. **`feedback_client.resend_queue` TOCTOU 竞态** —— 已定位未修。**Blocker? No**
-5. **3D 重构批 C-3（查看器 GUI）** —— 见记忆 `3d-refactor-progress`，自 2026-07-11 挂起。
-6. **TIS 完整指标** —— 待用户提供灵敏度数据（镜像 TRP）。见记忆 `tis-metrics-todo`。
-7. **`ui/dialogs.py` 两处 CSS 被误包 `tr()`** —— 应把 `tr()` 去掉。
-8. **`RAGSettingsDialog` 硬编码英文 `"Model:"`** —— `ui/dialogs.py:2222`。
-9. **`ui/shell_window.py`** —— 死代码，全项目无实例化点。
+5. **`feedback_client.resend_queue` TOCTOU 竞态** —— 已定位未修。**Blocker? No**
+6. **3D 重构批 C-3（查看器 GUI）** —— 见记忆 `3d-refactor-progress`，自 2026-07-11 挂起。
+7. **TIS 完整指标** —— 待用户提供灵敏度数据（镜像 TRP）。见记忆 `tis-metrics-todo`。
+8. **`ui/dialogs.py` 两处 CSS 被误包 `tr()`** —— 应把 `tr()` 去掉。
+9. **`RAGSettingsDialog` 硬编码英文 `"Model:"`** —— `ui/dialogs.py:2222`。
+10. **`ui/shell_window.py`** —— 死代码，全项目无实例化点。
 
 ---
 
