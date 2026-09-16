@@ -264,6 +264,44 @@ cd /mnt/d/cc/antenna-post-processor && \
    - ⏳ **其余 42 个控件**（`btnQuick*` ×10 / 6 数值框 / 9 标签 / 4 分组 / 其他）
      —— 与 `_QUICK_ANGLES`、两个方法本体绑定，**必须与 Python 侧同批删**
      （含上面那 13 处 `self.` 调用点）。
+
+     **剩余清理步骤（非零风险，建议单独一轮；顺序不可颠倒）**
+
+     **Step 1 · 先摘活的调用点**（风险集中处，先做这步才能安全删方法）
+
+     | 方法 | 为什么是活的 | 处理 |
+     |---|---|---|
+     | `_auto_update_angle_config_from_template` (:1961) | 7 处调用点，模板变更时触发 | **保留方法**，只删其内部 :1984-1985 两行 |
+     | `_on_language_changed` (:3281) | I18nManager 调用 | **保留方法**，只删 :3287 |
+     | `__init__` (:180) | —— | **保留**，只删 :180 |
+     | `_remove_single` / `_remove_range` (:2264 / :2269) | 由 `_update_lag_display` 内部创建的删除按钮连接 | 与 `_update_lag_display` **一起删**（按钮随之消失，它们也就再无调用者） |
+
+     **Step 2 · 删 Python 侧死代码**（以下均已确认 0 调用点）
+     - 4 个角度操作方法：`_toggle_quick_angle` / `_add_custom_angle` /
+       `_on_step_generate` / `_on_add_range`（:1920-1958）
+     - 3 个配置方法：`_on_load_from_template` / `_on_clear_config` / `_on_load_preset`
+     - 两个显示同步方法：`_sync_quick_buttons` (:2173) / `_update_lag_display` (:2179)
+     - 映射表 `_QUICK_ANGLES` (:76)
+     - `_init_quick_angle_buttons` (:208) —— **连同它动态创建的
+       `btnQuick10/20/40/50`**（不在 `.ui` 里，最容易漏）
+
+     **Step 3 · 删 `.ui` 控件** → `pyside6-uic` 重编译
+     - `configItemsWidget`、6 个 spinbox、9 个 label、`btnQuick*` ×10
+     - 此时 4 个 groupbox 已空，可一并删
+
+     **Step 4 · 处理 `_hide_settings_tabs()`**（`ui/main_window.py:866-869`）
+     它按**固定索引** `reversed([1, 2, 3])` 移除 tabLag/tabPlot/tabCalc。
+     若这些 tab 直接在 `.ui` 中删掉，这段 `removeTab` 逻辑要同步删除，
+     并重算保留 tab 的索引与后续 `setTabText` 调用。
+
+     **Step 5 · 验证（必跑，不可省）**
+     ```bash
+     python3 gui_integrity_check.py                  # 12 项
+     python3 -m pytest tests/test_gui_e2e.py -q      # 24 用例
+     python3 -m pytest tests/test_gui_smoke.py -q    # 73 用例（约 48 分钟）
+     ```
+     另需**手写脚本验证** `_auto_update_angle_config_from_template` 仍正常 ——
+     它无测试覆盖（同类缺口见 F-3），是本轮唯一会改到的活路径。
    - ⚠ **4 个 groupbox 不能单独删**：它们内部还有**有引用**的子控件 ——
      `groupConfigured` 含 `configItemsWidget`，`groupQuickSingle` / `groupStepGen` /
      `groupRange` 各含 spinbox。只能连子控件一并处理。
