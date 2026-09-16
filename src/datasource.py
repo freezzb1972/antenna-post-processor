@@ -93,6 +93,14 @@ class DataSource(ABC):
         """
         return []
 
+    @property
+    def source_name(self) -> str:
+        """数据来源的可读名称 (通常是文件名); 未知时返回空串。
+
+        供提示信息标识问题出在哪个文件 —— 批处理下没有它无法定位。
+        """
+        return ""
+
     @staticmethod
     def from_path(path: str) -> DataSource:
         """根据文件扩展名自动创建合适的 DataSource。
@@ -156,6 +164,10 @@ class ResampledDataSource(DataSource):
     @property
     def detection_notes(self) -> list[str]:
         return self._base.detection_notes
+
+    @property
+    def source_name(self) -> str:
+        return self._base.source_name
 
     def close(self):
         self._cached = None

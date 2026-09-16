@@ -857,10 +857,20 @@ def _load_and_compute(
     compute_tasks = []
     _phi_warned = False
     _phase_warned_ds: set[int] = set()
+    _notes_shown_ds: set[int] = set()
     for i, (sheet_name, freq, csv_idx, lag_cfg, task_ds, needed_params) in enumerate(tasks):
         if cancel_callback and cancel_callback():
             break
         raw = task_ds.read_sections(csv_idx)
+
+        # 结构探测告警 (每个数据源提示一次, 与「是否缺相位」「是否请求 AR」无关)。
+        # reader 只产出 notes 数据, 由这里决定是否呈现 —— src/ 层不依赖日志设施。
+        # 正常文件 notes 为空 → 一行都不会多打 (零噪音)。
+        if id(task_ds) not in _notes_shown_ds:
+            _notes_shown_ds.add(id(task_ds))
+            _src = task_ds.source_name
+            for _note in task_ds.detection_notes:
+                _log(log_callback, f"⚠ {_src}: {_note}" if _src else f"⚠ {_note}")
 
         # 相位段缺失 (每个数据源提示一次): 请求了 AR 却没有相位数据时,
         # _process_one_frequency 会静默跳过 AR —— 用户只看到报告里少了几列。

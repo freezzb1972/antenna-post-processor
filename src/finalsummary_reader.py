@@ -13,6 +13,7 @@ FinalSummary.xlsx 直接读取器 (v3)
 
 from __future__ import annotations
 
+import os
 import re
 from collections import OrderedDict
 
@@ -110,7 +111,6 @@ class FinalSummarySource(DataSource):
         self._section_rows: dict[str, list[int]] = layout['sections']
         self._theta_header_row = layout['header_row'] or 0
         self._n_theta = layout['n_theta']
-        self._theta: list[float] = layout['theta_angles']
         self._detection_notes: list[str] = layout['notes']
 
         theta_rows = self._section_rows['theta']
@@ -132,7 +132,14 @@ class FinalSummarySource(DataSource):
         self._has_phase = bool(self._section_rows['theta_phase'])
         self._has_phi_pol = bool(self._section_rows['phi'])
 
-        # ---- phi 角度: theta 段各数据行的列 A (非数值时退化为序号) ----
+        # ---- θ/φ 角度: 只取第一段的, 全部段共用 ----
+        #
+        # 假设: 同一文件内各段的角度轴一致 —— 它们是同一次测试的不同极化/幅度/相位
+        # (转台角度相同), 由**测量过程**保证, 不由文件格式保证。此处**不做跨段比对**。
+        # 若某段角度确实不同, 该段的矩阵数据会挂上错误的角度标签且不报错。
+        # 但真出现这种文件, 说明文件本身已损坏 (相位对不上幅度的角度), 任何分析
+        # 都无意义 —— 属于应当排查数据源的情况, 不是需要兼容的格式变体。
+        self._theta: list[float] = layout['theta_angles']
         self._phi: list[float] = []
         for r in theta_rows:
             v = layout['col_a'].get(r)
@@ -278,6 +285,10 @@ class FinalSummarySource(DataSource):
     def detection_notes(self) -> list[str]:
         """结构探测中的异常提示; 空列表 = 一切正常 (见 DataSource.detection_notes)。"""
         return list(self._detection_notes)
+
+    @property
+    def source_name(self) -> str:
+        return os.path.basename(self._path)
 
     @property
     def frequencies(self) -> list[float]:

@@ -254,6 +254,42 @@ def test_theta_angle_vector_matches_columns():
         os.unlink(tmp.name)
 
 
+def test_pipeline_surfaces_detection_notes():
+    """布局告警必须经 pipeline 的日志出口到达用户。
+
+    回归背景: detection_notes 最初只在「缺相位 且 请求了 AR」的分支里被读取,
+    因此正常文件上产生的结构告警 (表头缺口 / 段行数不一致 / 标签被忽略) 全部被
+    静默丢弃 —— 等于没有诊断。本测试锁住「任何结构异常都提示一次」这个行为。
+    """
+    from pathlib import Path
+
+    from src.datasource import DataSource
+    from src.pipeline import run_pipeline
+
+    root = Path(__file__).resolve().parent.parent
+    tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
+    tmp.close()
+    out = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
+    out.close()
+    try:
+        build(tmp.name, header_gap_at=2)
+        logs = []
+        ds = DataSource.from_path(tmp.name)
+        try:
+            run_pipeline(datasource=ds,
+                         template_path=str(root / "data" / "template_AFN_L1.xlsx"),
+                         output_path=out.name,
+                         log_callback=logs.append)
+            assert ds.detection_notes, "前提不成立: 该布局本应产生探测告警"
+            hits = [m for m in logs if "空缺列" in m and ds.source_name in m]
+            assert hits, (f"探测告警未到达管线日志; notes={ds.detection_notes}, logs={logs}")
+        finally:
+            ds.close()
+    finally:
+        os.unlink(tmp.name)
+        os.unlink(out.name)
+
+
 def test_header_gap_is_reported_not_silently_truncated():
     """表头行列缺口属文件缺陷 —— 必须报告, 且不得静默把列数截断到缺口处。"""
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
