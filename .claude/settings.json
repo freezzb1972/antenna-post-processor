@@ -6,107 +6,69 @@
   "disabledMcpjsonServers": [
     "context7"
   ],
-  "mcpServers": {
-    "memory": {
-      "command": "npx",
-      "args": [
-        "@modelcontextprotocol/server-memory"
-      ]
-    }
-  },
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "tool == \"Edit\" || tool == \"Write\"",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
             "command": "node ~/.claude/global-skills/everything/strategic-compact/suggest-compact.js"
+          },
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/hook_dispatch.py dev-flow"
+          },
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/hook_dispatch.py func-catalog"
+          },
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/hook_dispatch.py ui-reminder"
           }
         ],
-        "description": "战略压缩建议：Edit/Write 超过阈值时提醒 compact"
+        "description": "文件写入前: 压缩建议 + dev-flow 计数 + FUNC_CATALOG 提醒 + UI 门禁提醒"
       },
       {
-        "matcher": "tool == \"Write\" && path.match(/\\.py$/)",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -c \"import json; p='.claude/dev-flow.json'; d=json.load(open(p)); d['stats']['filesModified']=d['stats'].get('filesModified',0)+1; json.dump(d,open(p,'w'),indent=2); c=d['stats']['filesModified']; print(f'📊 文件修改 {c} 次' + (' — 建议运行 /dev-flow check' if c>=5 else ''))\""
+            "command": "python3 .claude/hooks/hook_dispatch.py interface-audit-staged"
           }
         ],
-        "description": "文件修改计数：.py 文件修改 ≥5 次时建议验证"
-      },
-      {
-        "matcher": "tool == \"Write\" && path.match(/src\\//)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo '📋 新增 src/ 函数? 先检查 FUNC_CATALOG.md:'; grep -i \"$(echo \"$CLAUDE_CODE_FILE_PATH\" | sed 's/.*\\///' | sed 's/\\.py$//')\" FUNC_CATALOG.md 2>/dev/null | head -10 || echo '  (catalog not found, run: python3 generate_func_catalog.py)'"
-          }
-        ],
-        "description": "写入 src/ 文件时提醒查看已有函数目录"
-      },
-      {
-        "matcher": "tool == \"Write\" && path.match(/ui\\//)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo '🔔 UI 文件已修改 — 建议运行 python3 gui_integrity_check.py'"
-          }
-        ],
-        "description": "UI 文件修改提醒：ui/ 目录修改时建议 GUI 检查"
+        "description": "git commit 前审计暂存区接口变更 (必须是 PreToolUse: 挂 PostToolUse 时 commit 已完成, --staged 看不到内容)"
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "tool == \"Bash\" && command.match(/git commit/)",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/interface-audit.py --staged 2>&1; echo '---'; find . -type d -name __pycache__ -not -path './.venv/*' -not -path './venv/*' -exec rm -rf {} + 2>/dev/null; find . -type f -name '*.pyc' -delete 2>/dev/null; python3 generate_func_catalog.py; echo '---'; python3 targeted_verify.py 2>&1"
+            "command": "python3 .claude/hooks/hook_dispatch.py interface-audit"
+          },
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/hook_dispatch.py gui-audit"
           }
         ],
-        "description": "每次 git commit 前: 接口审计 + 后: 清理缓存 + 针对性验证"
+        "description": "写入 .py 后接口审计; 写入 ui/ 后 GUI 审计"
       },
       {
-        "matcher": "tool == \"Write\" && path.match(/\\.py$/)",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/interface-audit.py \"${CLAUDE_CODE_FILE_PATH}\" 2>&1 || echo '🔍 接口审计有警告 — 请逐一确认'"
-          }
-        ],
-        "description": "每次写入 .py 文件后检查接口变更是否遗漏消费方"
-      },
-      {
-        "matcher": "tool == \"Write\" && path.match(/ui\\//)",
-        "hooks": [
+            "command": "python3 .claude/hooks/hook_dispatch.py post-commit"
+          },
           {
             "type": "command",
-            "command": "python3 targeted_verify.py --dry-run 2>&1 | head -15"
+            "command": "python3 .claude/hooks/hook_dispatch.py pytest-count"
           }
         ],
-        "description": "UI 文件变更后提示应运行哪些针对性测试"
-      },
-      {
-        "matcher": "tool == \"Bash\" && command.match(/pytest/)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -c \"import json,subprocess; p='.claude/dev-flow.json'; d=json.load(open(p)); d['stats']['testsRun']=d['stats'].get('testsRun',0)+1; json.dump(d,open(p,'w'),indent=2)\""
-          }
-        ],
-        "description": "测试运行计数：pytest 运行后更新统计"
-      },
-      {
-        "matcher": "tool == \"Write\" && path.match(/ui\\//)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/skills/gui-audit/audit.py 2>&1 | head -10 || echo 'gui-audit: no audit.py, run SKILL.md checklist'"
-          }
-        ],
-        "description": "UI 文件修改后自动运行 GUI 审计"
+        "description": "git commit 后清缓存+重建 FUNC_CATALOG+针对性验证; pytest 后更新统计"
       }
     ],
     "PreCompact": [
@@ -118,7 +80,7 @@
             "command": "bash .claude/hooks/pre-compact-distill.sh"
           }
         ],
-        "description": "压缩前自动 distill: 保存 git log + 文件变更到 CURRENT_STATE.md"
+        "description": "自动压缩前保存 git log + 文件变更到 CURRENT_STATE.md"
       }
     ]
   },

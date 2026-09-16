@@ -2,24 +2,87 @@
   "version": 1,
   "currentPhase": "commit",
   "phases": {
-    "design": { "status": "completed", "skills": ["brainstorming", "architect", "architecture-decision-records"] },
-    "plan": { "status": "completed", "skills": ["writing-plans", "search-first"] },
-    "plan_review": { "status": "completed", "skills": ["codex-review"], "fallback": "architect", "plan_review_passed": true },
-    "develop": { "status": "completed", "skills": ["python-patterns", "test-driven-development", "error-handling", "e2e-testing"] },
-    "verify": { "status": "completed", "skills": ["verification-before-completion", "gui-check", "size-gate", "verify-py"] },
-    "commit": { "status": "active", "skills": ["checkpoint-commit", "finishing-a-development-branch"] },
-    "manage": { "status": "pending", "skills": ["distill-session", "strategic-compact"] }
+    "design": {
+      "status": "completed",
+      "skills": [
+        "brainstorming",
+        "architect",
+        "architecture-decision-records"
+      ]
+    },
+    "plan": {
+      "status": "completed",
+      "skills": [
+        "writing-plans",
+        "search-first"
+      ]
+    },
+    "plan_review": {
+      "status": "completed",
+      "skills": [
+        "codex-review"
+      ],
+      "fallback": "architect",
+      "plan_review_passed": true
+    },
+    "develop": {
+      "status": "completed",
+      "skills": [
+        "python-patterns",
+        "test-driven-development",
+        "error-handling",
+        "e2e-testing"
+      ]
+    },
+    "verify": {
+      "status": "completed",
+      "skills": [
+        "verification-before-completion",
+        "gui-check",
+        "size-gate",
+        "verify-py"
+      ]
+    },
+    "commit": {
+      "status": "active",
+      "skills": [
+        "checkpoint-commit",
+        "finishing-a-development-branch"
+      ]
+    },
+    "manage": {
+      "status": "pending",
+      "skills": [
+        "distill-session",
+        "strategic-compact"
+      ]
+    }
   },
   "qualityGates": {
-    "gui-check": { "command": "python3 gui_integrity_check.py", "trigger": "ui/*.py changed" },
-    "gui-health": { "command": "python3 -m pytest tests/test_gui_health.py -q -k \"not RealData and not Performance\"", "trigger": "ui/*.py changed" },
-    "size-gate": { "command": "python3 build_size_gate.py --spec-only", "trigger": "*.spec changed" },
-    "verify-py": { "command": "python3 -m pytest tests/ -q", "trigger": "any .py changed" },
-    "static-analysis": { "command": "python3 static_analysis_gate.py --quick", "trigger": "any .py changed" }
+    "gui-check": {
+      "command": "python3 gui_integrity_check.py",
+      "trigger": "ui/*.py changed"
+    },
+    "gui-health": {
+      "command": "python3 -m pytest tests/test_gui_health.py -q -k \"not RealData and not Performance\"",
+      "trigger": "ui/*.py changed"
+    },
+    "size-gate": {
+      "command": "python3 build_size_gate.py --spec-only",
+      "trigger": "*.spec changed"
+    },
+    "verify-py": {
+      "command": "python3 -m pytest tests/ -q",
+      "trigger": "any .py changed"
+    },
+    "static-analysis": {
+      "command": "python3 static_analysis_gate.py --quick",
+      "trigger": "any .py changed"
+    }
   },
   "stats": {
-    "filesModified": 0,
-    "testsRun": 71,
+    "filesModified": 1,
+    "testsRun": 72,
     "checkpointsCreated": 2
   },
   "lastStarted": "2026-07-01"

@@ -1,4 +1,13 @@
+---
+name: gui-audit
+description: GUI 完整性审计 — 检查控件可见性/被裁剪/布局正确性。触发条件：新增或修改 UI 元素后、修复 UI bug 后、release 打包前，或用户提到「界面不对/按钮不见了/布局错乱/控件被裁剪」。
+---
+
 # /gui-audit — GUI 完整性审计
+
+> 本 skill 原先**缺 frontmatter**（2026-09-16 补）。Claude Code 的全部
+> frontmatter 字段均为可选，缺了不会报错 —— 但没有 `description`，
+> 模型无法判断何时该自动调用它。
 
 ## 何时使用
 

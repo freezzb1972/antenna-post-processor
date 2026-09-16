@@ -57,7 +57,9 @@ if [[ ! -f "CURRENT_STATE.md" ]]; then
     exit 0
 fi
 
-cat << EOF
+# ⚠ 必须走 **stderr**: PreCompact 的 systemMessage/continue 会被丢弃,
+# 若阻止原因只在 stdout 且未设置 JSON, 手动 /compact 时横幅不会显示给用户。
+cat >&2 << EOF
 ╔══════════════════════════════════════════════════════════════╗
 ║ ⛔ 压缩被 PreCompact hook 阻止                              ║
 ╠══════════════════════════════════════════════════════════════╣
