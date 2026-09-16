@@ -352,6 +352,7 @@
       "test_excel_reader.py",
       "test_exporter.py",
       "test_finalsummary_reader.py",
+      "test_fs_to_csv.py",
       "test_gui.py",
       "test_gui_e2e.py",
       "test_gui_health.py",
@@ -1128,6 +1129,21 @@
       "widgets": [
         "ui/multi_antenna_page.py"
       ]
+    },
+    {
+      "id": "final-summary-to-csv",
+      "description": "工具菜单: FinalSummary .xlsx → merged CSV 转换",
+      "type": "computation",
+      "src_modules": [
+        "fs_to_csv.py",
+        "finalsummary_reader.py"
+      ],
+      "tests": [
+        "test_fs_to_csv.py"
+      ],
+      "e2e_verified": true,
+      "status": "verified",
+      "_verified_note": "读取改为复用 FinalSummarySource (2026-09-17), 不再自带一套结构探测。修复真实缺陷: phi 角度原用 `range(n_phi)` 合成而非读文件真实值 —— 1° 栅格恰好正确, 2°/5°/10° 栅格写出的角度轴完全错误且不报错。对拍 (旧 vs 新): 1° 文件输出逐行完全相同; 2°/5° 文件仅 phi 角列变化 (0,1,2,3→0,2,4,6 / 0,5,10,15); 真实 AFN 文件 30502 行逐行完全相同。端到端: xlsx直读 与 转CSV再读 产出 42 行一致 (仅 _cp_xpi/_lhcp_gain/_rhcp_gain 三处内部字段差 1e-14, 系 CSV %.16g 文本往返精度的正常放大; 下划线字段经 exporter.py 过滤不写入 Excel, 且所有上报值 round(...,6))。转换耗时 27.4s→读取 5.8s (对比 xlsx 直读 22.5s)。"
     }
   ]
 }

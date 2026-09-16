@@ -2,7 +2,14 @@
 FinalSummary .xlsx → merged CSV 转换器
 =====================================
 将 FinalSummary 格式的 Excel 转换为项目标准 merged CSV，
-供 MergedCSVParser 直接读取。一次转换 ~5 分钟，之后秒读。
+供 MergedCSVParser 直接读取。
+
+读取复用 FinalSummarySource —— 与出报告走**同一条读取路径**，因此探测规则
+与读出的数值保证一致，不再各自维护一套解析实现。
+
+历史: 本模块曾自带一套结构探测 + 逐段读取 (section 外层 × 频点内层), 存在
+两个问题: (1) 每个频点 sheet 被重复解析 4 遍; (2) phi 角度用 `range(n_phi)`
+合成, 对非 1° 步进的文件 (2°/5°) 写出的角度轴完全错误。
 
 GUI 和 CLI 共用同一入口: convert_fs_to_csv(src_path, out_path, progress_cb)
 """
@@ -13,8 +20,8 @@ import os
 from collections.abc import Callable
 
 import numpy as np
-import openpyxl
 
+from .finalsummary_reader import FinalSummarySource
 from .raw_converter import _write_normal_csv
 
 
@@ -45,117 +52,51 @@ def convert_fs_to_csv(
             progress_callback(cur, tot, msg)
 
     _report(0, 1, "打开 workbook...")
-    # read_only=True: 流式惰性解析。本函数要遍历全部频点 sheet, read_only=False
-    # 会把它们**同时**驻留内存 —— 实测 583MB / 139 sheet 的文件内存冲到 5.7GB
-    # 仍在增长 (本机总内存 11GB), 必然 OOM。流式下一个 sheet 用完即弃。
-    # max_row / iter_rows 在 read_only 下均可用 (max_row 取自 dimension 记录, 无全表扫描)。
-    wb = openpyxl.load_workbook(src_path, data_only=True, read_only=True)
 
-    # 收集频点
-    freqs: list[float] = []
-    for sn in wb.sheetnames:
-        try:
-            freqs.append(float(sn))
-        except ValueError:
-            pass
-    freqs.sort()
-    n_freqs = len(freqs)
+    # cache_size=1: 本函数顺序读完每个频点即弃, 自己持有全部矩阵,
+    # 再让 reader 缓存一份纯属内存翻倍 (139 频点 × 4 段 ≈ 178MB)。
+    # read_only=True 由 FinalSummarySource 保证: read_only=False 会把全部
+    # sheet 同时驻留内存 —— 实测 583MB / 139 sheet 必 OOM (本机总内存 11GB)。
+    src = FinalSummarySource(src_path, cache_size=1)
+    tp = pp = None
+    try:
+        freqs = src.frequencies
+        n_freqs = len(freqs)
+        theta_vals = src.theta_angles
+        all_phi = src.phi_angles
 
-    # 探测结构
-    sn0 = str(int(freqs[0])) if freqs[0] == int(freqs[0]) else str(freqs[0])
-    ws0 = wb[sn0]
+        # phi=360° 与 phi=0° 重合 → 丢弃 >=360 的行。
+        # 用真实角度值判断 (而非假定最后一行就是 360), 与 pipeline 的
+        # 角度域标准化 `phi_mask = _pa < 360.0` 保持一致。
+        keep = [i for i, p in enumerate(all_phi) if p < 360.0]
+        phi_vals = [all_phi[i] for i in keep]
 
-    theta_vals: list[float] = []
-    theta_start = 0
-    n_phi = 0
-    n_theta = 0
-    for r_idx, row in enumerate(ws0.iter_rows(min_row=1, max_row=20, values_only=True), 1):
-        vals = [v for v in row if v is not None]
-        if vals and isinstance(vals[0], (int, float)):
-            theta_start = r_idx
-            for v in list(ws0.iter_rows(min_row=r_idx - 1, max_row=r_idx - 1, values_only=True))[0][1:]:
-                if v is not None:
-                    try:
-                        theta_vals.append(float(v))
-                    except (ValueError, TypeError):
-                        pass
-            for r2 in ws0.iter_rows(min_row=theta_start, max_row=theta_start + 400,
-                                    min_col=1, max_col=1, values_only=True):
-                v = r2[0]
-                if v is None:
-                    break
-                try:
-                    float(v)
-                    n_phi += 1
-                except (ValueError, TypeError):
-                    break
-            n_theta = len(theta_vals)
-            break
+        n_theta, n_phi = len(theta_vals), len(keep)
+        if n_theta == 0 or n_phi == 0:
+            raise ValueError(f"{src_path}: 未读到有效的 theta/phi 角度轴")
 
-    # 扫描 section 标签
-    tp_start = pp_start = pp_phase_start = 0
-    for r_idx, row in enumerate(ws0.iter_rows(min_row=theta_start + n_phi,
-                                               max_row=ws0.max_row, max_col=3,
-                                               values_only=True),
-                                theta_start + n_phi):
-        v = str(row[0]) if row[0] else ""
-        if 'Phase' in v and 'Phi' not in v and tp_start == 0:
-            tp_start = r_idx + 2
-        if 'Phi Polarization' in v:
-            pp_start = r_idx + 3
-        if 'Phase' in v and pp_start > 0 and r_idx > pp_start:
-            pp_phase_start = r_idx + 2
-            break
+        def _blank() -> np.ndarray:
+            return np.full((n_freqs, n_phi, n_theta), np.nan, dtype=np.float64)
 
-    def _read_section(sec_start: int) -> np.ndarray | None:
-        if sec_start <= 0:
-            return None
-        data = np.full((n_freqs, n_phi, n_theta), np.nan, dtype=np.float64)
-        for fi, freq in enumerate(freqs):
-            sn = str(int(freq)) if freq == int(freq) else str(freq)
-            ws = wb[sn]
-            for pi, row in enumerate(ws.iter_rows(min_row=sec_start,
-                                                   max_row=sec_start + n_phi - 1,
-                                                   min_col=2, max_col=1 + n_theta,
-                                                   values_only=True)):
-                if pi >= n_phi:
-                    break
-                for ti, v in enumerate(row):
-                    if ti >= n_theta:
-                        break
-                    if v is not None:
-                        try:
-                            data[fi, pi, ti] = float(v)
-                        except (ValueError, TypeError):
-                            pass
+        tl, pl = _blank(), _blank()
+        has_theta_phase = has_phi_phase = False
+
+        for fi in range(n_freqs):
+            sec = src.read_sections(fi)
+            tl[fi] = sec["theta_logmag"][keep, :]
+            pl[fi] = sec["phi_logmag"][keep, :]
+            if sec["theta_phase"] is not None:
+                if not has_theta_phase:
+                    has_theta_phase, tp = True, _blank()
+                tp[fi] = sec["theta_phase"][keep, :]
+            if sec["phi_phase"] is not None:
+                if not has_phi_phase:
+                    has_phi_phase, pp = True, _blank()
+                pp[fi] = sec["phi_phase"][keep, :]
             _report(fi + 1, n_freqs + 1, f"读取中... ({fi + 1}/{n_freqs})")
-        return data
+    finally:
+        src.close()
 
-    # 检查并去掉 phi=360° 重复行（与 phi=0° 重合，保留 0-359）
-    phi_col_a = []
-    for r2 in ws0.iter_rows(min_row=theta_start, max_row=theta_start + n_phi,
-                            min_col=1, max_col=1, values_only=True):
-        v = r2[0]
-        if v is None: break
-        try: phi_col_a.append(float(v))
-        except (ValueError, TypeError): break
-    if phi_col_a and phi_col_a[-1] == 360.0:
-        n_phi -= 1  # 去掉最后一个 phi=360°
-
-    # 读 4 个 section
-    _report(0, n_freqs, "读取 Theta LogMag...")
-    tl = _read_section(theta_start)
-    _report(0, n_freqs, "读取 Theta Phase...")
-    tp = _read_section(tp_start) if tp_start > 0 else None
-    _report(0, n_freqs, "读取 Phi LogMag...")
-    pl = _read_section(pp_start) if pp_start > 0 else None
-    _report(0, n_freqs, "读取 Phi Phase...")
-    pp = _read_section(pp_phase_start) if pp_phase_start > 0 else None
-
-    wb.close()
-
-    # 写标准 merged CSV
-    phi_vals = [float(i) for i in range(n_phi)]
     _report(n_freqs, n_freqs + 1, "写入 CSV...")
     _write_normal_csv(
         out_path,

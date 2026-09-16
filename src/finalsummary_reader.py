@@ -80,7 +80,13 @@ def _to_float(v):
 class FinalSummarySource(DataSource):
     """从 FinalSummary.xlsx 逐频点读取天线测试数据。v3 完全自适应。"""
 
-    def __init__(self, path: str):
+    def __init__(self, path: str, cache_size: int = 512):
+        """Args:
+            path:       FinalSummary .xlsx 路径
+            cache_size: LRU 缓存的最大频点数。默认 512 覆盖宽频测试场景。
+                        顺序读完全部频点即弃的调用方 (如 FinalSummary→CSV 转换器)
+                        应传 1 —— 它自己持有全部矩阵, 再缓存一份纯属内存翻倍。
+        """
         self._path = path
         # read_only=True: 流式惰性解析, 只解析实际访问到的 sheet。
         # read_only=False 会把**全部** sheet 一次性读进内存 —— 实测 118MB/105 sheet
@@ -153,8 +159,8 @@ class FinalSummarySource(DataSource):
                 ", ".join(f"{k}={n}" for k, n in _counts.items()) + ")"
             )
 
-        # ---- 缓存 (LRU: 最多缓存 512 个频点，覆盖宽频测试场景) ----
-        self._cache: _LRUDict = _LRUDict(maxsize=512)
+        # ---- 缓存 (LRU) ----
+        self._cache: _LRUDict = _LRUDict(maxsize=max(1, int(cache_size)))
 
     @staticmethod
     def _scan_layout(ws) -> dict:
