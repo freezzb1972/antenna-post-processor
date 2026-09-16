@@ -45,7 +45,11 @@ def convert_fs_to_csv(
             progress_callback(cur, tot, msg)
 
     _report(0, 1, "打开 workbook...")
-    wb = openpyxl.load_workbook(src_path, data_only=True, read_only=False)
+    # read_only=True: 流式惰性解析。本函数要遍历全部频点 sheet, read_only=False
+    # 会把它们**同时**驻留内存 —— 实测 583MB / 139 sheet 的文件内存冲到 5.7GB
+    # 仍在增长 (本机总内存 11GB), 必然 OOM。流式下一个 sheet 用完即弃。
+    # max_row / iter_rows 在 read_only 下均可用 (max_row 取自 dimension 记录, 无全表扫描)。
+    wb = openpyxl.load_workbook(src_path, data_only=True, read_only=True)
 
     # 收集频点
     freqs: list[float] = []
