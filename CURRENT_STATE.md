@@ -1,13 +1,14 @@
 # CURRENT STATE — 2026-09-16（性能修复轮）
 
-**Branch:** master · **基线:** `1bcb4ab` · 其上 4 个提交，**尚未 push**。
+**Branch:** master · **基线:** `1bcb4ab` · 其上 5 个提交，**已 push**（HEAD = origin）。
 工作区: 仅 `antenna_config.json`（用户配置，刻意不提交）+ 一批未跟踪的新文件。
 
 ---
 
-## A. 本轮工作 — 4 个提交
+## A. 本轮工作 — 5 个提交
 
 ```
+478cdd2  test(smoke): 替换 TestConfigTabButtons 为弹窗测试 — 原类测的全是已废弃控件
 818c156  fix(tests): 修 smoke 套件 3 处测试自身缺陷 — 断言恒真 / import 错路径 / 传参错
 3fd8d88  perf(src): FinalSummary→CSV 转换改流式 — 583MB 文件从 OOM 到 4.4 分钟
 ea54fd5  perf(src,ui): 大 Excel 数据加载提速 100 倍 — read_only 流式 + 频点延迟加载
@@ -71,6 +72,36 @@ _on_export():   if state != READY: 弹「请先预览」; return
   （原返回 str 会让调用方逐字符当路径 → `PermissionError`）。
 - `tests/test_gui_smoke.py`：打桩 `QMessageBox.about` / `QDialog.exec` ——
   offscreen 下静态模态与嵌套事件循环无人关闭，**实测挂死 20 分钟**。
+
+### A-5 测试假绿清理（`818c156` + `478cdd2`）
+
+起因：smoke 套件每次都有 4 个用例 SKIPPED（`btnQuick0 not visible`）。
+追查发现根因在**产品侧的 UI 重构**，并牵出一整类假绿测试。
+
+**产品侧真相**：`MainWindow._hide_settings_tabs()` 把原 6 个 tab 重组为 3 个
+（处理设置 / 计算结果 / 图表查看），`tabLag`/`tabPlot`/`tabCalc` 被 `removeTab`
+移除。注释写着「控件对象保持存活，Step 5 清扫」—— **该清扫至今未做**。
+
+`removeTab` 只摘标签不删对象，且 `_make_tab_scrollable` 会把页 reparent 进
+`QScrollArea`，所以：
+- `ui.tabLag` 变成**空壳**（`findChildren` = 0），真正的内容在另一个匿名 QWidget 里
+- 那些控件不在任何 tab 中（实测 `tabConfig.indexOf(该页) == -1`），**永不显示**
+
+**测试侧后果**：`TestConfigTabButtons` 的 21 个用例全部建立在死控件上 ——
+4 个 `pytest.skip("not visible")` 永远跳过，其余写成
+`if btn.isVisible() and btn.isEnabled(): btn.click()`，静默略过点击且无任何断言，
+函数跑完即 PASSED。**没有一个真正验证过行为。**
+
+**处理**：删除该类，改为覆盖重构后的真实入口
+`AntennaParamsPage._show_angle_popup` 弹窗。弹窗是模态的 → 打桩 `QDialog.exec`
+并在打桩函数内捕获 dialog 对象（它是函数局部变量，返回后即失去引用），
+再对控件做真实点击 + `isVisible()` 断言（防止再次退化为假绿）。
+弹窗结构按**实测**确定而非按源码猜测：汇总组「已配置: N 个单角度, M 个范围」
++「添加单角度」(`+ 添加`) / 「步进批量生成」(生成) / 「角度范围」(添加范围)
++ 顶层 确定/取消。用例数 89 → **73**。
+
+> **教训**：`if 控件.isVisible(): 点击()` 这种写法等于没有测试。
+> 见到 `skip("not visible")` 或 `if ...isVisible()` 包住的点击，先问「它真的会可见吗」。
 
 ---
 
@@ -179,16 +210,45 @@ cd /mnt/d/cc/antenna-post-processor && \
 
 ## F. 未决项
 
-1. **完整 smoke 套件未重跑** —— 本轮只跑了相关子集（`TestAllDialogs` +
-   `TestFileSettingsPageButtons` + `TestButtonStateConsistency` = **23 passed / 0 failed**）。
-   全量上次是 52 分钟（3 failed + 2 errors，现已全部修复）。
-   > 顺带可验证 `window_manager` 的 O(n²) 修复是否让耗时下降。**Blocker? No**
-2. **`feedback_client.resend_queue` TOCTOU 竞态** —— 已定位未修。**Blocker? No**
-3. **3D 重构批 C-3（查看器 GUI）** —— 见记忆 `3d-refactor-progress`，自 2026-07-11 挂起。
-4. **TIS 完整指标** —— 待用户提供灵敏度数据（镜像 TRP）。见记忆 `tis-metrics-todo`。
-5. **`ui/dialogs.py` 两处 CSS 被误包 `tr()`** —— 应把 `tr()` 去掉。
-6. **`RAGSettingsDialog` 硬编码英文 `"Model:"`** —— `ui/dialogs.py:2222`。
-7. **`ui/shell_window.py`** —— 死代码，全项目无实例化点。
+1. **UI 重构遗留的死代码清理（注释里的「Step 5 清扫」）** —— 详见 A-5。
+   `_hide_settings_tabs()` 移除了 tabLag/tabPlot/tabCalc，但清扫没做，
+   一整套控件与操作它们的代码仍在空转：
+
+   | 实体 | 产品代码引用 |
+   |---|---|
+   | `configItemsWidget` + `_update_lag_display()`（`ui/main_window.py:2179`） | 6 处 |
+   | `_QUICK_ANGLES` + `btnQuick*` + `_sync_quick_buttons()`（`ui/main_window.py:76` / `:2173`） | 15 处 |
+   | `btnAddCustomAngle` 等 7 个操作按钮 | **0 处**（纯孤儿） |
+
+   **实测规模**：死子树 **49 个控件**（17 按钮 / 4 分组 / 9 标签 / 6 数值框），
+   占 MainWindow 总控件数 819 的 **6.0%**。
+   **实测开销**：`_sync_quick_buttons` **0.01ms/次**、`_update_lag_display`
+   **0.13ms/次** —— 性能影响可忽略；功能上当前不报错、无副作用传播。
+
+   > ⚠ **但它是定时炸弹**：`_sync_quick_buttons` 里是
+   > `getattr(self.ui, btn_attr)`，**无默认值**，而这些调用挂在真实路径上
+   > （`ui/pages.py:2544` 的 `_sync_to_mw()` 每次图表配置同步都会走到）。
+   > **一旦真去做「Step 5 清扫」删掉控件属性，就会抛 `AttributeError` 并中断
+   > `_sync_to_mw()`。** 所以清理时「删控件」与「删调用点」必须在同一个提交里。
+
+   **建议**：单独一轮做，别顺手改。第三组（7 个按钮）已是纯孤儿，清理零风险；
+   前两组要连调用点一起动，改完需跑 `_sync_to_mw()` 相关测试。**Blocker? No**
+
+2. **`test_gui_e2e.py` 的 `configItemsWidget` 用例** —— `TestLagDisplayVisibility`
+   的 4 个用例测的同样是已 removeTab 的孤儿控件（与 A-5 同源）。
+   已扫描确认 `test_gui_smoke.py` / `test_gui.py` 无孤儿控件。**Blocker? No**
+   > 与 F-1 同源，建议一并处理：清理死代码时把用例迁到新界面。
+
+3. **完整 smoke 套件需再跑一次** —— 本轮已跑过全量（**85 passed / 0 failed /
+   0 errors**，2880s），但那是**替换测试类之前**的数字。替换后用例数为 73，
+   应重跑确认。**Blocker? No**
+
+4. **`feedback_client.resend_queue` TOCTOU 竞态** —— 已定位未修。**Blocker? No**
+5. **3D 重构批 C-3（查看器 GUI）** —— 见记忆 `3d-refactor-progress`，自 2026-07-11 挂起。
+6. **TIS 完整指标** —— 待用户提供灵敏度数据（镜像 TRP）。见记忆 `tis-metrics-todo`。
+7. **`ui/dialogs.py` 两处 CSS 被误包 `tr()`** —— 应把 `tr()` 去掉。
+8. **`RAGSettingsDialog` 硬编码英文 `"Model:"`** —— `ui/dialogs.py:2222`。
+9. **`ui/shell_window.py`** —— 死代码，全项目无实例化点。
 
 ---
 
@@ -200,6 +260,7 @@ python3 -m pytest tests/test_finalsummary_reader.py -q           # 27 用例（�
 python3 -m pytest tests/test_pipeline.py tests/test_e2e_features.py -q   # 88 用例
 python3 -m pytest tests/test_gui_e2e.py -q                       # 27 用例
 python3 -m pytest tests/test_gui.py -q                           # 10 用例
+python3 -m pytest tests/test_gui_smoke.py -q                     # 73 用例（全量约 48 分钟）
 python3 -m pytest tests/test_e2e_features.py::TestThemeI18n -q    # 7 用例（含 i18n 碰撞守护）
 ```
 
@@ -208,3 +269,27 @@ python3 -m pytest tests/test_e2e_features.py::TestThemeI18n -q    # 7 用例（�
 
 **改 i18n 时**：`TestThemeI18n::test_language_switch_refreshes_widget_text` 断言的是
 **真实控件文本**，不是 manager 字段。**做证伪验证**：移走 `i18n/trans_table.json` 时它必须变红。
+
+**写 GUI 测试时**（A-5 的教训）：禁止用
+`if 控件.isVisible() and 控件.isEnabled(): 控件.click()` 这种写法 —— 不可见就静默略过，
+函数跑完即 PASSED，等于没有测试。也不要依赖 `pytest.skip("not visible")` 来表达
+「这个控件可能不显示」，那会把**产品缺陷伪装成环境限制**。
+正确做法：先确认控件**应该**可见（必要时显式切 Nav/Tab），再断言其可见性并点击。
+
+**判断控件是否已废弃**（本轮用的方法）：
+```python
+# 祖先链里若有 tabwidget 的 stacked widget, 且该页 indexOf == -1 → 已 removeTab, 永不显示
+def orphan(x):
+    cur = x
+    while cur is not None:
+        p = cur.parentWidget()
+        if p is None: return False
+        if p.objectName() == 'qt_tabwidget_stackedwidget':
+            tw = p.parentWidget()
+            if isinstance(tw, QTabWidget) and tw.indexOf(cur) == -1:
+                return True
+        cur = p
+    return False
+```
+> 注意 `ui.tabLag` 这类引用**不可靠**：`_make_tab_scrollable` 会 reparent，
+> 原 widget 会变成空壳（`findChildren` = 0），真正内容在匿名容器里。
