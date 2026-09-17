@@ -22,9 +22,9 @@ BASELINE_FILE = PROJECT_ROOT / ".build_baseline.json"
 
 # ── 配置 ────────────────────────────────────────────────────────────────
 
-# 体积上限 (MB)
+# 体积上限 (MB) — Windows 上限 2026-09-17 由 80 上调至 82 (用户拍板)
 SIZE_LIMITS = {
-    "Windows": 80,
+    "Windows": 82,
     "Linux": 110,
 }
 

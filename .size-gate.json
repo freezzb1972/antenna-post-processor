@@ -1,0 +1,7 @@
+{
+  "size_limit_mb": {
+    "default": 100,
+    "Windows": 82,
+    "Linux": 110
+  }
+}
