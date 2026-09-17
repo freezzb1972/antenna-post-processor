@@ -166,7 +166,7 @@
       </widget>
       <widget class="QWidget" name="tabResults">
        <attribute name="title">
-        <string>📊 参数结果</string>
+        <string>📊 计算结果</string>
        </attribute>
        <layout class="QVBoxLayout" name="vTabResults">
         <property name="spacing"><number>10</number></property>
@@ -204,7 +204,7 @@
     <item>
      <layout class="QHBoxLayout" name="hButtons">
       <item><spacer name="spBtnLeft"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
-      <item><widget class="QPushButton" name="btnStart"><property name="text"><string>▶ 开始处理</string></property><property name="minimumSize"><size><width>140</width><height>36</height></size></property><property name="styleSheet"><string>font-weight: bold; font-size: 14px;</string></property></widget></item>
+      <item><widget class="QPushButton" name="btnStart"><property name="text"><string>👁 预览</string></property><property name="minimumSize"><size><width>140</width><height>36</height></size></property><property name="styleSheet"><string>font-weight: bold; font-size: 14px;</string></property></widget></item>
       <item><widget class="QPushButton" name="btnStop"><property name="text"><string>⏹ 停止</string></property><property name="minimumSize"><size><width>100</width><height>36</height></size></property><property name="enabled"><bool>false</bool></property></widget></item>
      </layout>
     </item>
