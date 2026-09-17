@@ -235,7 +235,7 @@ class AnglePickerWidget(QWidget):
 # ═══════════════════════════════════════════════════════════════
 
 class TemplateSourceRow(QWidget):
-    """模板来源选择行：内置模板 ▾ | 从电脑选择... | 📋 预览报告。
+    """模板来源选择行：内置模板 ▾ | 浏览... | 📋 预览。
 
     信号:
         template_changed(str) — 模板路径变化时发出
@@ -261,16 +261,16 @@ class TemplateSourceRow(QWidget):
         self._cmb_tpl.setEditable(True)
         self._cmb_tpl.setInsertPolicy(QComboBox.NoInsert)
         self._cmb_tpl.lineEdit().setPlaceholderText(self.tr("模板..."))
-        self._cmb_tpl.setMinimumWidth(220)
+        self._cmb_tpl.setMinimumWidth(120)
         self._cmb_tpl.currentIndexChanged.connect(self._on_tpl_selected)
         layout.addWidget(self._cmb_tpl)
 
-        btn_browse = QPushButton(self.tr("从电脑选择..."))
+        btn_browse = QPushButton(self.tr("浏览..."))
         btn_browse.setMinimumWidth(110)
         btn_browse.clicked.connect(self._on_browse_cb if self._on_browse_cb else self._on_browse)
         layout.addWidget(btn_browse)
 
-        btn_preview = QPushButton(self.tr("📋 预览报告"))
+        btn_preview = QPushButton(self.tr("📋 预览"))
         btn_preview.setMinimumWidth(110)
         btn_preview.clicked.connect(self._on_preview_cb if self._on_preview_cb else self._on_preview)
         layout.addWidget(btn_preview)

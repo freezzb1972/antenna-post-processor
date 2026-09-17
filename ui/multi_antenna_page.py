@@ -177,7 +177,9 @@ class MultiAntennaPage(QWidget):
         for target, label in [("gain", "Gain ⚙"), ("ar", "AR ⚙"),
                                ("rhcp", "RHCP ⚙"), ("cpxpi", "CP-XPI ⚙")]:
             btn = QPushButton(label)
-            btn.setFixedWidth(80)
+            # 原为 setFixedWidth(80): "CP-XPI ⚙" 需 102px、"RHCP ⚙" 需 93px,
+            # 被硬切掉首字母。改为按内容自适应 (按钮默认 sizePolicy 即 Minimum)。
+            btn.setMinimumWidth(80)
             btn.clicked.connect(lambda checked, t=target: self._open_angle_popup(t))
             angle_layout.addWidget(btn)
         angle_layout.addStretch()

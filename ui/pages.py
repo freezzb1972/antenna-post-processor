@@ -275,6 +275,11 @@ class FileSettingsPage(QWidget):
 
         # === 右侧：输出设置 ===
         right_widget = QWidget()
+        # h_splitter 未设 sizes/stretch 时按各自 sizeHint 分配: 左栏(模板+数据文件
+        # 表格)的 sizeHint 远大于右栏, 右栏只能分到 ~216px — 复选框文字被右边界
+        # 切掉("测试报告（.doc"), 且页面级横向滚动条常驻。给右栏一个下限,
+        # 保证在默认窗口(1050x700 → 内容区 ~808px)下完整可读。
+        right_widget.setMinimumWidth(300)
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 8, 0)
         right_layout.setSpacing(1)
@@ -318,7 +323,7 @@ class FileSettingsPage(QWidget):
             parent_layout.addLayout(row2)
 
         # ── 1) 天线参数报告 (.xlsx) ──
-        self._check_out_excel = QCheckBox(self.tr("天线参数报告 (.xlsx)"))
+        self._check_out_excel = QCheckBox(self.tr("天线参数报告"))
         self._check_out_excel.setChecked(False)
         self._edit_xlsx = QLineEdit()
         self._edit_xlsx.setPlaceholderText(self.tr("选择输出路径..."))
@@ -329,7 +334,7 @@ class FileSettingsPage(QWidget):
         out_layout.addWidget(_make_block_sep())
 
         # ── 2) 图表报告 (.docx) ──
-        self._check_out_word = QCheckBox(self.tr("测试报告 (.docx)"))
+        self._check_out_word = QCheckBox(self.tr("测试报告"))
         self._edit_word = QLineEdit()
         self._edit_word.setPlaceholderText(self.tr("选择输出路径..."))
         btn_wd = QPushButton(self.tr("浏览..."))
@@ -342,7 +347,7 @@ class FileSettingsPage(QWidget):
         out_layout.addWidget(_make_block_sep())
 
         # ── 3) 中间数据文件 (.xlsx) ──
-        self._check_out_data = QCheckBox(self.tr("中间数据文件 (.xlsx)"))
+        self._check_out_data = QCheckBox(self.tr("中间数据文件"))
         self._edit_data = QLineEdit()
         self._edit_data.setPlaceholderText(self.tr("选择输出路径..."))
         btn_dt = QPushButton(self.tr("浏览..."))
@@ -355,8 +360,10 @@ class FileSettingsPage(QWidget):
         out_layout.addWidget(_make_block_sep())
 
         # ── 4) 保存任务包 (.ant) ──
-        self._check_save_task = QCheckBox(
-            self.tr("保存任务包 (.ant) — 下次双击秒开，不重算"))
+        # 标题必须短: QCheckBox 的 minimumSizeHint 取文本完整宽度(不会加省略号),
+        # 长文案会把整个「输出设置」面板的最小宽撑到 378px, 叠加上左栏需求后
+        # 整页最小宽 >1000px —— 窄窗口下右栏被挤出可视区。解释文字一律进 tooltip。
+        self._check_save_task = QCheckBox(self.tr("保存任务包"))
         self._check_save_task.setChecked(False)
         self._check_save_task.setToolTip(
             self.tr("保存为 .ant 任务包后，下次双击即可直接查看结果，无需重新计算。"))
@@ -370,8 +377,9 @@ class FileSettingsPage(QWidget):
         out_layout.addWidget(_make_block_sep())
 
         # ── 5) 完整报告: 独立 Excel + 独立 Word ──
-        self._check_full_report = QCheckBox(
-            self.tr("生成完整报告（独立 Excel + 独立 Word，含全部参数和图表）"))
+        self._check_full_report = QCheckBox(self.tr("生成完整报告"))
+        self._check_full_report.setToolTip(
+            self.tr("独立 Excel + 独立 Word，含全部参数和图表"))
         self._check_full_report.setChecked(False)
         # Excel 路径
         self._edit_full_xlsx = QLineEdit()
@@ -397,17 +405,17 @@ class FileSettingsPage(QWidget):
         # 设置默认输出目录 (初始占位，加载文件后 _auto_set_output_defaults 更新)
         self._default_out_dir = _default_output_dir()
         if not self._edit_xlsx.text():
-            self._edit_xlsx.setPlaceholderText(self.tr("加载源文件后自动生成"))
+            self._edit_xlsx.setPlaceholderText(self.tr("自动生成"))
         if not self._edit_word.text():
-            self._edit_word.setPlaceholderText(self.tr("加载源文件后自动生成"))
+            self._edit_word.setPlaceholderText(self.tr("自动生成"))
         if not self._edit_data.text():
-            self._edit_data.setPlaceholderText(self.tr("加载源文件后自动生成"))
+            self._edit_data.setPlaceholderText(self.tr("自动生成"))
         if not self._edit_task.text():
-            self._edit_task.setPlaceholderText(self.tr("加载源文件后自动生成"))
+            self._edit_task.setPlaceholderText(self.tr("自动生成"))
         if not self._edit_full_xlsx.text():
-            self._edit_full_xlsx.setPlaceholderText(self.tr("加载源文件后自动生成"))
+            self._edit_full_xlsx.setPlaceholderText(self.tr("自动生成"))
         if not self._edit_full_graph.text():
-            self._edit_full_graph.setPlaceholderText(self.tr("加载源文件后自动生成"))
+            self._edit_full_graph.setPlaceholderText(self.tr("自动生成"))
 
         right_layout.addStretch()
 
@@ -1465,7 +1473,9 @@ class FileSettingsPage(QWidget):
 
     def _on_multi_antenna_confirm(self):
         """打开多天线确认对话框 (预填已加载的文件)。"""
-        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout
+        from PySide6.QtWidgets import (
+            QDialog, QDialogButtonBox, QScrollArea, QVBoxLayout,
+        )
         from ui.multi_antenna_page import MultiAntennaPage
         from src.multi_antenna import extract_antenna_name
         dlg = QDialog(self)
@@ -1483,7 +1493,15 @@ class FileSettingsPage(QWidget):
             word_path = (self._edit_word_report_tpl or "").strip()
             if word_path:
                 page._edit_word_tpl = word_path
-        layout.addWidget(page)
+        # MultiAntennaPage 的 sizeHint 高约 1465px (天线列表+基本信息+参数/图表
+        # 两个 tab 全展开), 直接 addWidget 会把 QDialog 一路撑到 1532px ——
+        # 超 1080p 屏高, OK/Cancel 落在屏幕外且窗口无法缩小, 用户根本点不到确认。
+        # 包一层 QScrollArea 让高度可压缩, 内容超出时在对话框内滚动。
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(page)
+        scroll.setMinimumHeight(360)
+        layout.addWidget(scroll, 1)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(lambda: (
             setattr(self._mw, '_multi_antenna_config', page.get_config()) if self._mw else None,
