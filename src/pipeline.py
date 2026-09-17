@@ -425,6 +425,12 @@ def _process_one_frequency(
                 rhcp_g, lhcp_g = compute_rhcp_lhcp_gain(theta_lm, tp, phi_lm, pp)
                 cp_xpi = compute_cp_xpi(rhcp_g, lhcp_g)
 
+                # LAG 类聚合必须在线性域做 (规则 5)。rhcp_g / cp_xpi 都是 dB 域量
+                # 且以负值为主 (5G1 实测 rhcp 91% / cp_xpi 60% 为负) —— 直接当线性
+                # 值求平均会得到负均值, log10(负数) = nan, 整列报废。
+                rhcp_linear = 10.0 ** (rhcp_g / 10.0)
+                cp_linear = 10.0 ** (cp_xpi / 10.0)
+
                 if True:  # RHCP single always computed — 与 AR 一致取 φ 最大值
                     singles = (rhcp_lag_config if rhcp_lag_config and not rhcp_lag_config.is_empty() else lag_config).singles_sorted
                     for angle in singles:
@@ -433,21 +439,20 @@ def _process_one_frequency(
                         row[f"rhcp_single_{angle}"] = round(val, 6)
                 if (rhcp_lag_config if rhcp_lag_config and not rhcp_lag_config.is_empty() else lag_config).ranges_sorted:
                     for (lo, hi), val in compute_lag_ranges(
-                        rhcp_g, theta_deg,
+                        rhcp_linear, theta_deg,
                         (rhcp_lag_config if rhcp_lag_config and not rhcp_lag_config.is_empty() else lag_config).ranges_sorted
                     ).items():
                         row[f"rhcp_range_{lo}_{hi}"] = round(val, 6)
 
                 cp_cfg = cpxpi_lag_config if cpxpi_lag_config and not cpxpi_lag_config.is_empty() else lag_config
                 if cp_cfg.singles_sorted:
-                    cp_linear = 10.0 ** (cp_xpi / 10.0)  # dB → linear
                     for angle, val in compute_lag_at_angles(
                         cp_linear, theta_deg, cp_cfg.singles_sorted
                     ).items():
                         row[f"cp_xpi_single_{angle}"] = round(val, 6)
                 if cp_cfg.ranges_sorted:
                     for (lo, hi), val in compute_lag_ranges(
-                        cp_xpi, theta_deg, cp_cfg.ranges_sorted
+                        cp_linear, theta_deg, cp_cfg.ranges_sorted
                     ).items():
                         row[f"cp_xpi_range_{lo}_{hi}"] = round(val, 6)
             except Exception as e:

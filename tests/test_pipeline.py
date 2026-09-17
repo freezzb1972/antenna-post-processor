@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from src.calculator import compute_lag_ranges
 from src.datasource import DataSource
 from src.excel_reader import ColumnInfo, SheetInfo
 from src.lag_config import PRESET_AUTOMOTIVE, LagConfig
@@ -281,6 +282,35 @@ class TestProcessOneFrequency:
         row = _process_one_frequency(raw, 699.0, theta, lag)
         # RHCP/LHCP should be computed when phase data exists
         assert "rhcp_single_0" in row
+
+    def test_rhcp_cpxpi_range_uses_linear_domain(self):
+        """回归: range 聚合曾把 dB 域值直接当线性值传给 compute_lag_ranges。
+
+        compute_lag_range 内部是 `10*log10(mean(线性))`, 且带 `mean <= 0 → nan`
+        防护。rhcp_g / cp_xpi 是 dB 域量且以负值为主 (5G1 实测 91% / 60% 为负),
+        直接传入会触发该防护 → 整列 nan; 即使全为正, 结果也会变成
+        10log10(dB值) 而非真值。
+        """
+        theta_lm = np.ones((36, 19)) * -5.0
+        phi_lm = np.ones((36, 19)) * -8.0
+        theta_ph = np.zeros((36, 19))
+        phi_ph = np.full((36, 19), 45.0)  # 非零相位差 → RHCP ≠ LHCP
+        raw = self._make_raw(theta_lm, phi_lm, theta_ph, phi_ph)
+        theta = np.linspace(0, 180, 19)
+        lag = LagConfig()
+        lag.add_range(0, 90)
+
+        row = _process_one_frequency(raw, 699.0, theta, lag)
+
+        assert "rhcp_range_0_90" in row
+        assert "cp_xpi_range_0_90" in row
+        # 期望值 = 先把 dB 转线性再聚合 (与 single 分支同一条规则)
+        for key, src in (("rhcp_range_0_90", "_rhcp_gain"),
+                         ("cp_xpi_range_0_90", "_cp_xpi")):
+            expected = compute_lag_ranges(
+                10.0 ** (row[src] / 10.0), theta, [(0.0, 90.0)]
+            )[(0.0, 90.0)]
+            assert row[key] == pytest.approx(expected, rel=1e-6), key
 
     def test_result_contains_raw_data(self):
         raw = self._make_raw()
