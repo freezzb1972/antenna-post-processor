@@ -127,7 +127,26 @@ class MainWindow(AdaptiveWidgetMixin, QMainWindow):
         geo_str = self._cfg.config.window_geometry
         if geo_str:
             geo = QByteArray.fromBase64(bytes(geo_str, 'utf-8'))
-            self.restoreGeometry(geo)
+            if not self.restoreGeometry(geo):
+                # Qt 在「保存时的屏幕配置与当前不符」时会拒绝恢复, 且一个像素都
+                # 不恢复 (实测: 配置由 800x800 屏幕写入, 在 1280x800 屏上返回
+                # False) —— 用户感觉窗口大小从来就没被记住过。
+                # 降级: 至少取回保存的尺寸, 位置交给窗口管理器。
+                # QWidget::saveGeometry() 的布局 (QDataStream, 大端):
+                #   magic(4) major(2) minor(2) + frameGeometry(x,y,w,h 各 int32)
+                import struct
+                try:
+                    _x, _y, _w, _h = struct.unpack_from('>iiii', bytes(geo), 8)
+                except struct.error:
+                    _w = _h = 0
+                # 合理性校验: 挡住格式变化/损坏数据, 免得窗口被设成荒唐尺寸
+                if 600 <= _w <= 4000 and 400 <= _h <= 3000:
+                    self.resize(_w, _h)
+        # 内容(左侧导航 + 输入/输出两栏)的最小宽实测 816px (左栏 512 + 右栏 300
+        # + 分割条), 加上左侧导航 140px 与边距后约 1058px —— 低于此值
+        # 「输出设置」右栏会被挤出可视区, 只能拖横向滚动条才看得到。
+        # 取 1100 留出 Windows 字体比 WSL 宽的余量。
+        self.setMinimumWidth(1180)
         self._data_file_paths: List[str] = []
         self._last_matches: list = []        # 工作表-文件匹配结果
         self._chart_instances: list = []     # 图表实例列表 (ChartInstance)
