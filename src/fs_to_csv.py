@@ -75,6 +75,20 @@ def convert_fs_to_csv(
         if n_theta == 0 or n_phi == 0:
             raise ValueError(f"{src_path}: 未读到有效的 theta/phi 角度轴")
 
+        # ── 并行读取全部频点 ──
+        # 与出报告走同一条路径 (FinalSummarySource.read_many): xlsx 的 XML 解析是
+        # 纯 Python、受 GIL 限制, 必须用进程; 进程数按本机核数自动定档。
+        # 转换器正是并行读取的最佳场景 —— 它把所有频点一次读完, 中间不掺计算。
+        #
+        # 内存: 读回的结果 (n_freqs×4 段) 与下面填好的 3-D 数组会同时存在,
+        # 峰值约为两者的和 (139 频点 × 361 × 111 ≈ 356MB), 之后结果字典即释放。
+        # 仍远低于 read_only=False 时代的 5.7GB (见上方注释)。
+        read = src.read_many(
+            list(range(n_freqs)),
+            on_result=lambda _i, _s: _report(_i + 1, n_freqs + 1,
+                                             f"读取中... ({_i + 1}/{n_freqs})"),
+        )
+
         def _blank() -> np.ndarray:
             return np.full((n_freqs, n_phi, n_theta), np.nan, dtype=np.float64)
 
@@ -82,7 +96,7 @@ def convert_fs_to_csv(
         has_theta_phase = has_phi_phase = False
 
         for fi in range(n_freqs):
-            sec = src.read_sections(fi)
+            sec = read[fi]
             tl[fi] = sec["theta_logmag"][keep, :]
             pl[fi] = sec["phi_logmag"][keep, :]
             if sec["theta_phase"] is not None:
@@ -93,7 +107,6 @@ def convert_fs_to_csv(
                 if not has_phi_phase:
                     has_phi_phase, pp = True, _blank()
                 pp[fi] = sec["phi_phase"][keep, :]
-            _report(fi + 1, n_freqs + 1, f"读取中... ({fi + 1}/{n_freqs})")
     finally:
         src.close()
 
